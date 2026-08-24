@@ -7,6 +7,7 @@ import { ApiError } from '../../../shared/api/httpClient'
 import { useDebouncedValue } from '../../../shared/hooks/useDebouncedValue'
 import {
   approvalsApi,
+  type ApprovalRequestListItemDto,
   type ApprovalRequestDetailDto,
   type ApprovalSummaryDto,
   type ApprovalStatus,
@@ -573,6 +574,10 @@ export function ApprovalCenterPage() {
 
   const [summary, setSummary] = useState<ApprovalSummaryDto | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
+  // Invalidated whenever a Settings-drawer mutation (users/roles/applications/checker
+  // assignments) happens elsewhere, so this list doesn't go stale without a manual reload —
+  // mirrors MyRequestsPage's identical use of the same signal.
+  const mutationCount = useSettingsDrawerStore((s) => s.mutationCount)
 
   const [viewingId, setViewingId] = useState<string | null>(null)
   const [detail, setDetail] = useState<ApprovalRequestDetailDto | null>(null)
@@ -715,7 +720,7 @@ export function ApprovalCenterPage() {
   const { items, total, error } = useApprovalRequests(accessToken, fetcher, [
     activeTab, page, pageSize, module, actionFilter, assignedToMeOnly,
     debouncedMaker, debouncedEntity, debouncedChecker, statusFilter,
-    refreshKey, range.from, range.to, decidedRange, decidedCustomFrom, decidedCustomTo,
+    refreshKey, range.from, range.to, decidedRange, decidedCustomFrom, decidedCustomTo, mutationCount,
   ])
 
   // Handler for the page-size preset or custom selection
@@ -1630,7 +1635,7 @@ export function ApprovalCenterPage() {
                       {r.decidedAt ? formatDateOnly(r.decidedAt) : <span className={styles.mutedText}>—</span>}
                     </td>
                     <td>
-                      <button type="button" className={styles.viewDetailBtn} onClick={() => setViewingId(r.id)}>
+                      <button type="button" className={styles.viewDetailBtn} onClick={() => handleRowClick(r)}>
                         <span>View</span>
                         <Icon.ChevronRight width={12} height={12} />
                       </button>
@@ -1659,7 +1664,7 @@ export function ApprovalCenterPage() {
       {/* Detail drawer */}
       {viewingId && (
         <div className={drawerStyles.overlayRoot}>
-          <div className={drawerStyles.backdrop} onClick={() => setViewingId(null)} />
+          <div className={drawerStyles.backdrop} onClick={handleCloseDetail} />
           <div className={drawerStyles.drawerContainer}>
             <div className={drawerStyles.rootPanel}>
               <div className={drawerStyles.header}>
@@ -1672,7 +1677,7 @@ export function ApprovalCenterPage() {
                     <p className={drawerStyles.subtitle}>Full details of this request</p>
                   </div>
                 </div>
-                <button type="button" className={drawerStyles.closeBtn} onClick={() => setViewingId(null)} aria-label="Close details">
+                <button type="button" className={drawerStyles.closeBtn} onClick={handleCloseDetail} aria-label="Close details">
                   <Icon.X width={20} height={20} />
                 </button>
               </div>

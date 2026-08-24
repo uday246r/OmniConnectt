@@ -151,7 +151,7 @@ export default function CompanyOverview({ profile, contactInfo }: CompanyOvervie
           <div className="info-card">
             <div className="info-label">Phone Number</div>
             <div className="info-value" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: '8px' }}>
-              <span style={{ wordBreak: 'break-all' }}>{revealed['phoneCompany'] ? formatValue(contactInfo?.contactNumber) : maskPhone(contactInfo?.contactNumber)}</span>
+              <span style={{ overflowWrap: 'anywhere' }}>{revealed['phoneCompany'] ? formatValue(contactInfo?.contactNumber) : maskPhone(contactInfo?.contactNumber)}</span>
               {contactInfo?.contactNumber && contactInfo.contactNumber.trim() !== '' && contactInfo.contactNumber.toLowerCase() !== 'null' && (
                 <button
                   onClick={() => handleToggleReveal('phoneCompany', 'Company Phone Number', contactInfo.contactNumber!)}

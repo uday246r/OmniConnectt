@@ -1,4 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Calendar, ChevronDown, Check, RotateCcw } from 'lucide-react';
 import { useLeadStore } from '../../store/useLeadStore';
 
@@ -34,6 +35,15 @@ export const TimeRangeFilterDropdown: React.FC = () => {
   const [customStart, setCustomStart] = useState<string>(dashboardStartDate || '');
   const [customEnd, setCustomEnd] = useState<string>(dashboardEndDate || '');
   const dropdownRef = useRef<HTMLDivElement>(null);
+  // Portaled popover ref — needed separately from dropdownRef because the popover no longer lives
+  // inside dropdownRef's DOM subtree once portaled (see coords/createPortal below), so the
+  // click-outside check needs to test both.
+  const popoverRef = useRef<HTMLDivElement>(null);
+  // Viewport-relative coordinates for the portaled, position:'fixed' panel — same technique as
+  // LeadFilterPopover.tsx, needed because this dropdown lives inside .lead-hero-banner, which has
+  // overflow:hidden (to clip its own decorative circles) and was clipping this 460px-wide popover
+  // whenever it overflowed the banner's edge.
+  const [coords, setCoords] = useState<{ top: number; right: number } | null>(null);
 
   useEffect(() => {
     setActivePreset(dashboardDatePreset || 'this_month');
@@ -41,10 +51,33 @@ export const TimeRangeFilterDropdown: React.FC = () => {
     setCustomEnd(dashboardEndDate || '');
   }, [dashboardDatePreset, dashboardStartDate, dashboardEndDate]);
 
-  // Close popover when clicking outside
+  useLayoutEffect(() => {
+    if (!isOpen) return;
+
+    const updatePosition = () => {
+      const rect = dropdownRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      setCoords({ top: rect.bottom + 8, right: window.innerWidth - rect.right });
+    };
+
+    updatePosition();
+    window.addEventListener('resize', updatePosition);
+    window.addEventListener('scroll', updatePosition, true);
+    return () => {
+      window.removeEventListener('resize', updatePosition);
+      window.removeEventListener('scroll', updatePosition, true);
+    };
+  }, [isOpen]);
+
+  // Close popover when clicking outside — checks both the trigger buttons (dropdownRef) and the
+  // portaled panel (popoverRef), since the panel is no longer a DOM descendant of dropdownRef.
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      if (
+        dropdownRef.current && !dropdownRef.current.contains(target) &&
+        (!popoverRef.current || !popoverRef.current.contains(target))
+      ) {
         setIsOpen(false);
       }
     };
@@ -125,14 +158,19 @@ export const TimeRangeFilterDropdown: React.FC = () => {
         <span>Reset</span>
       </button>
 
-      {/* Popover Card - Matching Attached Screenshot Exactly */}
-      {isOpen && (
+      {/* Popover Card - Matching Attached Screenshot Exactly — portaled to document.body so it
+          escapes .lead-hero-banner's overflow:hidden (there to clip the banner's own decorative
+          circles), which otherwise clipped this 460px-wide popover whenever it overflowed the
+          banner's edge. Position is computed from coords (see useLayoutEffect above) instead of a
+          CSS position:absolute parent, same technique as LeadFilterPopover.tsx. */}
+      {isOpen && coords && createPortal(
         <div
+          ref={popoverRef}
           style={{
-            position: 'absolute',
-            top: 'calc(100% + 8px)',
-            right: 0,
-            zIndex: 100,
+            position: 'fixed',
+            top: coords.top,
+            right: coords.right,
+            zIndex: 1200,
             background: '#ffffff',
             borderRadius: '16px',
             boxShadow: '0 12px 32px -4px rgba(15, 23, 42, 0.15), 0 4px 12px rgba(0,0,0,0.06)',
@@ -265,7 +303,8 @@ export const TimeRangeFilterDropdown: React.FC = () => {
               Apply
             </button>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );

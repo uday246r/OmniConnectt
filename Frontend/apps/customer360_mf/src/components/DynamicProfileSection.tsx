@@ -153,7 +153,7 @@ export default function DynamicProfileSection({
                   className="info-value"
                   style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: '8px' }}
                 >
-                  <span style={{ wordBreak: 'break-all' }}>{displayValue}</span>
+                  <span style={{ overflowWrap: 'anywhere' }}>{displayValue}</span>
                   {revealable && (
                     <button
                       type="button"

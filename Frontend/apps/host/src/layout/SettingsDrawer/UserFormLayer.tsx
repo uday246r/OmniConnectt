@@ -21,7 +21,6 @@ import {
   required,
   maxLength,
   email as emailRule,
-  phone as phoneRule,
   firstError,
   isValid,
   type FieldErrors,
@@ -177,6 +176,8 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
     )
   }, [countrySearch])
 
+  const [roles, setRoles] = useState<RoleListItemDto[]>([])
+
   const filteredRoles = useMemo(() => {
     if (!roleSearch.trim()) return roles
     const q = roleSearch.toLowerCase().trim()
@@ -193,7 +194,6 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
   const [selectedPermKeys, setSelectedPermKeys] = useState<Set<string>>(new Set())
   const [catalog, setCatalog] = useState<PermissionFeatureDto[]>([])
   const [remoteApps, setRemoteApps] = useState<RemoteAppDto[]>([])
-  const [roles, setRoles] = useState<RoleListItemDto[]>([])
   const [expandedApps, setExpandedApps] = useState<Record<string, boolean>>({})
   const [permSearch, setPermSearch] = useState('')
 
@@ -1238,6 +1238,7 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
 
                       {expandedApps['host'] && (
                         <div className={styles.accordionBody}>
+                          <div className={styles.matrixTableWrap}>
                           <table className={styles.matrixTable}>
                             <thead>
                               <tr>
@@ -1292,6 +1293,7 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
                                 ))}
                             </tbody>
                           </table>
+                          </div>
                         </div>
                       )}
                     </div>
@@ -1374,6 +1376,7 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
                                   This application hasn&rsquo;t declared any capabilities yet.
                                 </p>
                               ) : (
+                                <div className={styles.matrixTableWrap}>
                                 <table className={styles.matrixTable}>
                                   <thead>
                                     <tr>
@@ -1420,6 +1423,7 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
                                     ))}
                                   </tbody>
                                 </table>
+                                </div>
                               )}
                             </div>
                           )}

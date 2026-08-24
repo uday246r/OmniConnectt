@@ -1047,7 +1047,7 @@ export const useLeadStore = create<LeadStoreState>((set, get) => ({
   closeEditReasonDrawer: () => set({ isEditReasonOpen: false, editLeadTarget: null, editReason: '' }),
 
   proceedToEditLead: (reason) => {
-    set({ editReason: reason, isEditLeadOpen: true });
+    set({ editReason: reason, isEditLeadOpen: true, isEditReasonOpen: false });
   },
 
   setEditFieldValue: (field, value) => {

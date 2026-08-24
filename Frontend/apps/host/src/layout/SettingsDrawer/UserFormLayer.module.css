@@ -829,6 +829,11 @@
   border-top: 1px solid #eaecf0;
 }
 
+.matrixTableWrap {
+  width: 100%;
+  overflow-x: auto;
+}
+
 .matrixTable {
   width: 100%;
   border-collapse: collapse;

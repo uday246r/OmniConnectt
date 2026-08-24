@@ -90,7 +90,7 @@ export const EditLeadDrawer: React.FC = () => {
   };
 
   return (
-    <div className="drawer-overlay" style={{ zIndex: 1100 }} onClick={closeEditLeadDrawer}>
+    <div className="drawer-overlay" onClick={closeEditLeadDrawer}>
       <div
         className="create-lead-drawer"
         onClick={(e) => e.stopPropagation()}

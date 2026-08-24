@@ -121,27 +121,33 @@ html, body {
   overflow-y: auto;
 }
 
+/* Top/side spacing is deliberately left to the host shell's own .content padding (AppShell.module.css,
+   26px/28px) — matching customer360_mf's .c360-workspace-viewport exactly. This used to also set its
+   own 24px/28px padding, stacking on top of the host's and roughly doubling the visible top gap
+   compared to every other remote. Max-width/margin match host's own DashboardPage.module.css cap
+   (1340px, centered) so this remote's pages are never a different width than the host's. */
 .lead-workspace-viewport {
-  padding: 24px 28px;
+  max-width: 1340px;
   width: 100%;
-  max-width: 100%;
+  margin: 0 auto;
+  padding: 0 0 24px 0;
   box-sizing: border-box;
 }
 
 .lead-workspace-viewport--wide {
-  max-width: 100%;
+  max-width: 1340px;
 }
 
-/* Reduce side padding on tablets/phones so content doesn't get squeezed */
+/* Reduce bottom padding on tablets/phones so content doesn't get squeezed */
 @media (max-width: 768px) {
   .lead-workspace-viewport {
-    padding: 16px 14px;
+    padding: 0 0 16px 0;
   }
 }
 
 @media (max-width: 480px) {
   .lead-workspace-viewport {
-    padding: 12px 10px;
+    padding: 0 0 12px 0;
   }
 }
 

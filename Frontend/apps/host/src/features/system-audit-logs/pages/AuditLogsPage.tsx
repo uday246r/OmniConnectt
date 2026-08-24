@@ -1813,10 +1813,10 @@ export function AuditLogsPage() {
                         <div className={styles.fieldCardBody}>
                           <span className={styles.fieldCardLabel}>Actor ID</span>
                           <span className={`${styles.fieldCardValue} ${styles.monoText}`}>
-                            {viewingLog.actorId ? (
-                              viewingLog.actorId.length > 22
-                                ? `${viewingLog.actorId.slice(0, 10)}…${viewingLog.actorId.slice(-8)}`
-                                : viewingLog.actorId
+                            {viewingLog.actorUserId ? (
+                              viewingLog.actorUserId.length > 22
+                                ? `${viewingLog.actorUserId.slice(0, 10)}…${viewingLog.actorUserId.slice(-8)}`
+                                : viewingLog.actorUserId
                             ) : (
                               'System / None'
                             )}

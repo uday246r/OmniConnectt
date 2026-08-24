@@ -115,25 +115,52 @@ export function RoleFormLayer({ roleId, initialTab }: RoleFormLayerProps) {
    * all four were previously ungrantable because the grid only had View/Create/Edit/Delete.
    */
   /*
-   * The step sequence itself shrinks when Platform Administrator Access is on — Host Permissions and
-   * Application Access are not just visually hidden, they are removed from the stepper entirely, since
-   * an administrator's grants have no effect to configure (see isGranted/togglePermission below, both
-   * short-circuit on isAdministrator). Turning the flag on while standing on either step would
-   * otherwise leave the drawer showing a step that no longer has a button in the header.
+   * Host Permissions and Application Access stay in the stepper even when Platform Administrator
+   * Access is on — matching UserFormLayer's Extra Permissions step, which stays reachable for an
+   * administrator user and shows a banner instead of disappearing. An administrator's grants have no
+   * effect to configure (see isGranted/togglePermission below, both short-circuit on isAdministrator),
+   * so each step renders an explanatory banner in place of interactive controls rather than vanishing.
    */
-  const stepOrder: TabType[] = isAdministrator ? ['basic', 'users'] : ['basic', 'host', 'apps', 'users']
-
-  useEffect(() => {
-    if (!stepOrder.includes(activeTab)) {
-      setActiveTab('basic')
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAdministrator])
+  const stepOrder: TabType[] = ['basic', 'host', 'apps', 'users']
 
   const currentStepIndex = stepOrder.indexOf(activeTab)
   const isLastStep = currentStepIndex === stepOrder.length - 1
 
   const hostGroups = useMemo(() => groupsFromCatalog(catalog, 'Host'), [catalog])
+  const allHostPermissions = useMemo(
+    () =>
+      hostGroups.flatMap((g) =>
+        g.rows.flatMap((row) =>
+          row.capabilities.map((cap) => ({ featureKey: row.key, capability: cap.key })),
+        ),
+      ),
+    [hostGroups],
+  )
+
+  const grantedHostPermsCount = useMemo(() => {
+    if (isAdministrator) return allHostPermissions.length
+    return allHostPermissions.filter((p) =>
+      permissions.some((perm) => perm.featureKey === p.featureKey && perm.capability === p.capability),
+    ).length
+  }, [isAdministrator, allHostPermissions, permissions])
+
+  const isAllHostSelected = useMemo(() => {
+    if (isAdministrator) return true
+    return allHostPermissions.length > 0 && grantedHostPermsCount === allHostPermissions.length
+  }, [isAdministrator, allHostPermissions.length, grantedHostPermsCount])
+
+  const handleToggleAllHost = (checked: boolean) => {
+    if (isAdministrator) return
+    const allHostKeys = new Set(allHostPermissions.map((p) => p.featureKey))
+    setPermissions((prev) => {
+      const appsOnly = prev.filter((p) => !allHostKeys.has(p.featureKey))
+      if (checked) {
+        return [...appsOnly, ...allHostPermissions]
+      } else {
+        return appsOnly
+      }
+    })
+  }
   const hostColumns = useMemo(
     () => columnsForRows(hostGroups.flatMap((g) => g.rows)),
     [hostGroups],
@@ -172,7 +199,7 @@ export function RoleFormLayer({ roleId, initialTab }: RoleFormLayerProps) {
     return visibleAppGroups.filter(({ feature, rows, app }) => {
       if (feature.displayName.toLowerCase().includes(q)) return true
       if (feature.key.toLowerCase().includes(q)) return true
-      if (app?.name?.toLowerCase().includes(q)) return true
+      if (app?.displayName?.toLowerCase().includes(q)) return true
       if (rows.some((r) => r.label.toLowerCase().includes(q) || r.key.toLowerCase().includes(q))) return true
       return false
     })
@@ -540,11 +567,12 @@ export function RoleFormLayer({ roleId, initialTab }: RoleFormLayerProps) {
         visible regardless of which tab was open, so a role could be created/saved without the admin
         ever having looked at Host Permissions or Application Access.
 
-        Both permission steps disappear from the sequence entirely while the role is an administrator
-        (see stepOrder above) — an administrator holds every capability unconditionally, so a grid of
-        checkboxes there would be describing a choice that has no effect. The underlying grants are
-        kept (see handleSubmit's comment), so turning the flag back off restores exactly what was
-        configured.
+        Both permission steps stay reachable while the role is an administrator, matching
+        UserFormLayer's Extra Permissions step — each renders an explanatory banner in place of the
+        checkbox grid (an administrator holds every capability unconditionally, so the grid would be
+        describing a choice that has no effect) rather than disappearing from the stepper. The
+        underlying grants are kept (see handleSubmit's comment), so turning the flag back off restores
+        exactly what was configured.
       */}
       <div className={styles.stepperContainer}>
         {stepOrder.map((step, idx) => {
@@ -658,17 +686,16 @@ export function RoleFormLayer({ roleId, initialTab }: RoleFormLayerProps) {
                 />
               </div>
 
-              {/* Task 5: hide/disable granular permission sections when Platform Administrator Access
-                  is on, and say so plainly — Host Permissions and Application Access have already
-                  dropped out of the step sequence above (see stepOrder), so this is the one place in
-                  the wizard where that fact needs to be visible to the admin configuring it. */}
+              {/* Say plainly what turning this on means — Host Permissions and Application Access
+                  stay reachable in the stepper (see stepOrder above), each showing this same banner
+                  in place of its grid, matching UserFormLayer's Extra Permissions step. */}
               {isAdministrator && (
                 <div className={styles.adminRoleBanner}>
                   <Icon.ShieldCheck width={20} height={20} />
                   <span>
                     Platform Administrator has full access to all features and applications. Host
-                    Permissions and Application Access are hidden — granular selection has no effect
-                    while this is enabled.
+                    Permissions and Application Access are already fully granted — granular selection
+                    has no effect while this is enabled.
                   </span>
                 </div>
               )}
@@ -686,6 +713,41 @@ export function RoleFormLayer({ roleId, initialTab }: RoleFormLayerProps) {
                       Grant only the capabilities this role needs. Columns are exactly what each
                       feature declares, so a dash means the action does not exist for that feature.
                     </p>
+                  </div>
+                </div>
+
+                {isAdministrator && (
+                  <div className={styles.adminRoleBanner}>
+                    <Icon.ShieldCheck width={20} height={20} />
+                    <span>
+                      Platform Administrator has full access to all features and applications. Every
+                      capability below is already granted while this is enabled.
+                    </span>
+                  </div>
+                )}
+
+                <div className={styles.globalSelectToolbar}>
+                  <label className={styles.globalCheckboxLabel}>
+                    <input
+                      type="checkbox"
+                      className={styles.checkbox}
+                      checked={isAllHostSelected}
+                      disabled={isAdministrator}
+                      onChange={(e) => handleToggleAllHost(e.target.checked)}
+                    />
+                    <div className={styles.globalTextGroup}>
+                      <span className={styles.globalSelectText}>
+                        Select All Host Permissions
+                      </span>
+                      <span className={styles.globalSelectSub}>
+                        Grant every capability across all host modules
+                      </span>
+                    </div>
+                  </label>
+                  <div className={styles.toolbarRightMeta}>
+                    <span className={styles.selectedCountBadge}>
+                      {grantedHostPermsCount} of {allHostPermissions.length} selected
+                    </span>
                   </div>
                 </div>
 
@@ -765,6 +827,16 @@ export function RoleFormLayer({ roleId, initialTab }: RoleFormLayerProps) {
                 </div>
               </div>
 
+              {isAdministrator && (
+                <div className={styles.adminRoleBanner}>
+                  <Icon.ShieldCheck width={20} height={20} />
+                  <span>
+                    Platform Administrator has full access to all features and applications. Every
+                    application's capabilities are already granted while this is enabled.
+                  </span>
+                </div>
+              )}
+
               {/* Global Select All Toolbar for Remote Apps */}
               <div className={styles.globalSelectToolbar}>
                 <label className={styles.globalCheckboxLabel}>
@@ -772,6 +844,7 @@ export function RoleFormLayer({ roleId, initialTab }: RoleFormLayerProps) {
                     type="checkbox"
                     className={styles.checkbox}
                     checked={isAllAppsSelected}
+                    disabled={isAdministrator}
                     onChange={(e) => handleToggleAllApps(e.target.checked)}
                   />
                   <div className={styles.globalTextGroup}>
@@ -881,6 +954,7 @@ export function RoleFormLayer({ roleId, initialTab }: RoleFormLayerProps) {
                             </button>
                           </div>
 
+                          <div className={styles.matrixTableWrap}>
                           <table className={styles.matrixTable}>
                             <thead>
                               <tr>
@@ -928,6 +1002,7 @@ export function RoleFormLayer({ roleId, initialTab }: RoleFormLayerProps) {
                               ))}
                             </tbody>
                           </table>
+                          </div>
                         </div>
                       )}
                     </div>

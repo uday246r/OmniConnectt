@@ -332,9 +332,13 @@ export default function Customer360() {
     const saved = readSavedCustomer();
     if (!saved) { setBootstrapping(false); return; }
 
-    const pathname = typeof window !== 'undefined' ? window.location.pathname : '';
-    const routeCustomerType = pathname.includes('/corporate') ? 'corporate' : 'individual';
-    if (saved.customerType !== routeCustomerType && saved.customerType !== customerType) {
+    // This app has no real URL routing for customer type — navigation is pure in-memory state
+    // (setCustomerType, called by the sidebar nav before this component mounts). Gate rehydration on
+    // that live `customerType` directly rather than guessing from window.location.pathname (which
+    // never actually contains a customer-type segment): comparing against a value that's always
+    // 'individual' let a stale Individual snapshot rehydrate and overwrite a just-set 'corporate'
+    // customerType, leaking Individual's search result onto the Non-Individual page.
+    if (saved.customerType !== customerType) {
       setBootstrapping(false);
       return;
     }

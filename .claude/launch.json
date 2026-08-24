@@ -35,7 +35,7 @@
       "name": "lead-service-dev",
       "runtimeExecutable": "dotnet",
       "runtimeArgs": ["run", "--project", "Backend/LeadService"],
-      "port": 5052
+      "port": 5046
     },
     {
       "name": "lead-mf-dev",

@@ -534,10 +534,10 @@ export function SettingsCheckerAssignmentTab() {
             <div key={i} className={styles.skeletonCard}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <SkeletonBlock height={20} width="35%" />
-                <SkeletonBlock height={20} width="80px" borderRadius={999} />
+                <SkeletonBlock height={20} width="80px" radius="999px" />
               </div>
               <SkeletonBlock height={14} width="60%" />
-              <SkeletonBlock height={32} width="100%" borderRadius={8} />
+              <SkeletonBlock height={32} width="100%" radius="8px" />
             </div>
           ))
         ) : filteredAppGroups.length === 0 ? (
