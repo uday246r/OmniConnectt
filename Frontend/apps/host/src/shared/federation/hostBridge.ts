@@ -22,6 +22,24 @@ export interface OmniRemitHostBridge {
   apiBaseUrls: {
     authService: string
   }
+  /**
+   * Resolved design-token values, for the cases CSS inheritance cannot reach.
+   *
+   * Remotes render inside the host document, so `theme.css`'s `:root` custom properties ALREADY
+   * inherit into remote DOM — a remote stylesheet can write `var(--omni-color-danger-600)` today and
+   * it simply works. That remains the preferred route and needs nothing from this bridge.
+   *
+   * This exists for the cases that route cannot serve: a value needed in JavaScript rather than CSS —
+   * a chart series color handed to recharts, an inline `style` computed from data, a canvas fill.
+   * Those currently hardcode hex literals that drift from the palette silently.
+   *
+   * Reads live from the document at call time rather than snapshotting at boot, so a future theme
+   * switch is picked up without remotes re-reading anything.
+   */
+  theme: {
+    /** One token's computed value, e.g. token('--omni-color-danger-600') → '#dc2626'. Returns '' if undefined. */
+    token: (name: string) => string
+  }
 }
 
 declare global {
@@ -42,6 +60,14 @@ export function installHostBridge() {
     },
     apiBaseUrls: {
       authService: env.authServiceUrl,
+    },
+    theme: {
+      token: (name) => {
+        // Normalized so both token('--omni-color-danger-600') and token('omni-color-danger-600')
+        // work — a remote author should not have to remember which form the bridge wants.
+        const property = name.startsWith('--') ? name : `--${name}`
+        return getComputedStyle(document.documentElement).getPropertyValue(property).trim()
+      },
     },
   }
 }

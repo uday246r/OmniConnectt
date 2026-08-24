@@ -33,18 +33,69 @@
   --omni-color-text-muted: #94a3b8;
   --omni-color-text-on-primary: #ffffff;
 
+  /*
+   * ---- Status scales ----
+   *
+   * The numbered steps are the same ramps the semantic aliases below are already drawn from, so
+   * `--omni-color-danger` and `--omni-color-danger-600` are the same value by construction rather
+   * than by coincidence. Both ramps are laid out like `--omni-color-primary-*` above.
+   *
+   * These existed only as aliases before, while 8 stylesheets referenced the numbered steps —
+   * danger-{50,100,200,400,500,600,700} and success-{50,200,500,700}. An undefined custom property
+   * makes the whole declaration invalid at computed-value time, so those rules silently fell back
+   * to inherited or initial values: most visibly, every Delete button rendered without its red.
+   * The full 50–900 range is defined rather than just the referenced steps, so reaching for a
+   * neighbouring shade later does not reintroduce the same class of bug.
+   */
+
+  /* Red */
+  --omni-color-danger-50: #fef2f2;
+  --omni-color-danger-100: #fee2e2;
+  --omni-color-danger-200: #fecaca;
+  --omni-color-danger-300: #fca5a5;
+  --omni-color-danger-400: #f87171;
+  --omni-color-danger-500: #ef4444;
+  --omni-color-danger-600: #dc2626;
+  --omni-color-danger-700: #b91c1c;
+  --omni-color-danger-800: #991b1b;
+  --omni-color-danger-900: #7f1d1d;
+
+  /* Emerald */
+  --omni-color-success-50: #ecfdf5;
+  --omni-color-success-100: #d1fae5;
+  --omni-color-success-200: #a7f3d0;
+  --omni-color-success-300: #6ee7b7;
+  --omni-color-success-400: #34d399;
+  --omni-color-success-500: #10b981;
+  --omni-color-success-600: #059669;
+  --omni-color-success-700: #047857;
+  --omni-color-success-800: #065f46;
+  --omni-color-success-900: #064e3b;
+
+  /* Amber */
+  --omni-color-warning-50: #fffbeb;
+  --omni-color-warning-100: #fef3c7;
+  --omni-color-warning-200: #fde68a;
+  --omni-color-warning-300: #fcd34d;
+  --omni-color-warning-400: #fbbf24;
+  --omni-color-warning-500: #f59e0b;
+  --omni-color-warning-600: #d97706;
+  --omni-color-warning-700: #b45309;
+  --omni-color-warning-800: #92400e;
+  --omni-color-warning-900: #78350f;
+
   /* ---- Status colors ---- */
-  --omni-color-success: #059669;
-  --omni-color-success-bg: #d1fae5;
-  --omni-color-success-text: #065f46;
+  --omni-color-success: var(--omni-color-success-600);
+  --omni-color-success-bg: var(--omni-color-success-100);
+  --omni-color-success-text: var(--omni-color-success-800);
 
-  --omni-color-warning: #d97706;
-  --omni-color-warning-bg: #fef3c7;
-  --omni-color-warning-text: #92400e;
+  --omni-color-warning: var(--omni-color-warning-600);
+  --omni-color-warning-bg: var(--omni-color-warning-100);
+  --omni-color-warning-text: var(--omni-color-warning-800);
 
-  --omni-color-danger: #dc2626;
-  --omni-color-danger-bg: #fee2e2;
-  --omni-color-danger-text: #991b1b;
+  --omni-color-danger: var(--omni-color-danger-600);
+  --omni-color-danger-bg: var(--omni-color-danger-100);
+  --omni-color-danger-text: var(--omni-color-danger-800);
 
   --omni-color-info: #2563eb;
   --omni-color-info-bg: #dbeafe;
@@ -96,6 +147,44 @@
   --omni-font-weight-bold: 700;
   --omni-line-height-tight: 1.25;
   --omni-line-height-normal: 1.5;
+
+  /*
+   * ---- Composite surfaces ----
+   * The blue page-header banner, the primary CTA gradient, and the "live" status dot were each
+   * hardcoded independently in ApprovalCenterPage, LoginHero, and the remotes' own stylesheets,
+   * which is exactly how My Requests ended up with a plain white header while Approval Center had
+   * a blue one. They live here so every page-level banner in the host AND in both remotes renders
+   * from one definition.
+   */
+  --omni-gradient-page-header: linear-gradient(135deg, #1e3a8a 0%, #2563eb 50%, #3b82f6 100%);
+  --omni-gradient-hero: linear-gradient(120deg, #1e3a8a 0%, #1e40af 30%, #2563eb 65%, #3b82f6 100%);
+  --omni-gradient-primary-btn: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  --omni-shadow-page-header: 0 8px 30px rgba(37, 99, 235, 0.28), 0 2px 6px rgba(37, 99, 235, 0.15);
+
+  /* Text/edges that sit ON the blue header, where the neutral tokens above would be invisible. */
+  --omni-color-on-header-text: #ffffff;
+  --omni-color-on-header-muted: rgba(255, 255, 255, 0.85);
+  --omni-color-on-header-surface: rgba(255, 255, 255, 0.18);
+  --omni-color-on-header-border: rgba(255, 255, 255, 0.3);
+
+  --omni-color-live-dot: #34d399;
+  --omni-color-live-dot-glow: rgba(52, 211, 153, 0.9);
+
+  /*
+   * ---- Approval action pills ----
+   * Create/Update/Delete/Enable/Disable badges appear in Approval Center, My Requests, and every
+   * audit table across host and both remotes. One palette so a "Delete" is the same red everywhere.
+   */
+  --omni-color-action-create-bg: #ecfdf5;
+  --omni-color-action-create-text: #059669;
+  --omni-color-action-update-bg: #eff6ff;
+  --omni-color-action-update-text: #2563eb;
+  --omni-color-action-delete-bg: #fef2f2;
+  --omni-color-action-delete-text: #dc2626;
+  --omni-color-action-enable-bg: #ecfdf5;
+  --omni-color-action-enable-text: #047857;
+  --omni-color-action-disable-bg: #fff7ed;
+  --omni-color-action-disable-text: #c2410c;
 
   /* ---- Motion ---- */
   --omni-transition-fast: 120ms ease;

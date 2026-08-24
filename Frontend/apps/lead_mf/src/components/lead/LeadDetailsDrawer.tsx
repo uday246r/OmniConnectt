@@ -37,6 +37,26 @@ const formatVal = (val?: string | null): string => {
   return val.trim();
 };
 
+/*
+ * Applied financing is delivered as a free-text string, so it can arrive as "50,000", "RM 50,000",
+ * "N/A", or empty. The previous inline expression did Number(val.replace(/,/g, '')).toLocaleString()
+ * and rendered the literal "RM NaN" for every one of those non-numeric forms — the amount looked
+ * broken rather than absent.
+ *
+ * Strips grouping separators and any currency prefix, then renders only when the result is a real
+ * finite number; anything else falls back to the same em dash the other formatters use.
+ */
+const formatRinggit = (val?: string | null): string => {
+  if (!val || !val.trim()) return '—';
+  // Guarded against the empty string specifically: Number('') is 0, not NaN, so a purely
+  // non-numeric value like "N/A" would otherwise strip to '' and render a confident "RM 0".
+  const cleaned = val.replace(/[^0-9.-]/g, '');
+  if (!cleaned) return '—';
+  const numeric = Number(cleaned);
+  if (!Number.isFinite(numeric)) return '—';
+  return `RM ${numeric.toLocaleString('en-MY', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+};
+
 const formatConsent = (val?: string | null): string => {
   if (!val || !val.trim()) return '—';
   const v = val.trim().toUpperCase();
@@ -334,9 +354,7 @@ export const LeadDetailsDrawer: React.FC = () => {
               <div className="lead-kpi-body">
                 <span className="lead-kpi-label">Applied Financing</span>
                 <span className="lead-kpi-value" style={{ color: '#059669' }}>
-                  {selectedLead.appliedAmount
-                    ? `RM ${Number(selectedLead.appliedAmount.replace(/,/g, '')).toLocaleString()}`
-                    : '—'}
+                  {formatRinggit(selectedLead.appliedAmount)}
                 </span>
               </div>
             </div>
