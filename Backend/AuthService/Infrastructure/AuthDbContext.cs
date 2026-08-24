@@ -15,6 +15,7 @@ public class AuthDbContext(DbContextOptions<AuthDbContext> options) : DbContext(
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<ApprovalRequest> ApprovalRequests => Set<ApprovalRequest>();
     public DbSet<CheckerAssignment> CheckerAssignments => Set<CheckerAssignment>();
+    public DbSet<SetPasswordInvite> SetPasswordInvites => Set<SetPasswordInvite>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -122,6 +123,24 @@ public class AuthDbContext(DbContextOptions<AuthDbContext> options) : DbContext(
                 .WithMany(f => f.UserPermissionOverrides)
                 .HasForeignKey(o => o.FeatureId)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // Mirrors the RefreshToken configuration below, for the same reasons: lookup is always by
+        // hash so that index must be unique, and the expiry index serves both the redemption check
+        // and any future cleanup sweep.
+        modelBuilder.Entity<SetPasswordInvite>(entity =>
+        {
+            entity.HasIndex(i => i.TokenHash).IsUnique();
+            entity.Property(i => i.TokenHash).HasMaxLength(200);
+            entity.HasIndex(i => i.ExpiresAt);
+
+            // Finding a user's outstanding invite happens on every re-issue.
+            entity.HasIndex(i => new { i.UserId, i.UsedAt, i.RevokedAt });
+
+            entity.HasOne(i => i.User)
+                .WithMany()
+                .HasForeignKey(i => i.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<RefreshToken>(entity =>

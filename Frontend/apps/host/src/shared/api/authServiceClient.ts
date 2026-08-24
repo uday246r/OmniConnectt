@@ -31,6 +31,14 @@ export type RefreshResponse = LoginResponse
 export interface SsoConfigDto {
   googleEnabled: boolean
   allowedDomains: string[]
+  /** Google OAuth Client ID. Public by design — Google Identity Services requires it in the page. */
+  clientId: string
+}
+
+export interface ValidateInviteResponse {
+  valid: boolean
+  /** Returned only for a valid invite, so the recipient can confirm which account they are setting up. */
+  email: string | null
 }
 
 /** Raw calls against AuthService's /api/auth/* surface. No token/refresh orchestration here — see features/auth/store/authStore.ts for that. */
@@ -42,6 +50,15 @@ export const authServiceClient = {
     apiFetch<LoginResponse>(`${base}/api/auth/google`, { method: 'POST', body: { idToken } }),
 
   ssoConfig: () => apiFetch<SsoConfigDto>(`${base}/api/auth/sso-config`),
+
+  /** Checks a set-password invite before showing the form, so a dead link says so up front. */
+  validateInvite: (token: string) =>
+    apiFetch<ValidateInviteResponse>(
+      `${base}/api/auth/set-password/validate?token=${encodeURIComponent(token)}`,
+    ),
+
+  setPassword: (token: string, newPassword: string) =>
+    apiFetch<void>(`${base}/api/auth/set-password`, { method: 'POST', body: { token, newPassword } }),
 
   refresh: () => apiFetch<RefreshResponse>(`${base}/api/auth/refresh`, { method: 'POST' }),
 

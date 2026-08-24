@@ -2,6 +2,7 @@ import { useState, useId, type FormEvent } from 'react'
 import { Icon } from '../../shared/components/Icon/Icon'
 import { BrandMark } from '../../shared/components/BrandMark/BrandMark'
 import { LoginHero } from './LoginHero'
+import { GoogleSignInButton } from '../../features/auth/components/GoogleSignInButton'
 import styles from './LoginPage.module.css'
 import { APP_NAME } from '../../shared/config/branding'
 
@@ -12,23 +13,17 @@ export interface LoginPageProps {
   errorMessage?: string | null
 }
 
-export function LoginPage({ onSubmit, loading, errorMessage }: LoginPageProps) {
+export function LoginPage({ onSubmit, onGoogleCredential, loading, errorMessage }: LoginPageProps) {
   const [email, setEmail]               = useState('')
   const [password, setPassword]         = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [rememberMe, setRememberMe]     = useState(true)
-  const [showSsoPrompt, setShowSsoPrompt] = useState(false)
   const passwordId = useId()
 
   function handleSubmit(event: FormEvent) {
     event.preventDefault()
     if (!email || !password || loading) return
     void onSubmit(email, password)
-  }
-
-  function handleSsoClick() {
-    setShowSsoPrompt(true)
-    setTimeout(() => setShowSsoPrompt(false), 3500)
   }
 
   return (
@@ -155,26 +150,19 @@ export function LoginPage({ onSubmit, loading, errorMessage }: LoginPageProps) {
               )}
             </button>
 
-            {/* OR Divider */}
-            <div className={styles.orDivider}>
-              <span>OR</span>
-            </div>
+            {/*
+              Single sign-on.
 
-            {/* SSO / Alternative Sign In */}
-            <button
-              type="button"
-              onClick={handleSsoClick}
-              className={styles.ssoButton}
-            >
-              <Icon.Building width={17} height={17} />
-              <span>Sign in with SSO</span>
-            </button>
-
-            {showSsoPrompt && (
-              <div className={styles.ssoInfoToast}>
-                Corporate SSO is active for enterprise domains. Please contact your administrator.
-              </div>
-            )}
+              Shown only when the server reports Google as configured. A deployment without a Client
+              ID renders nothing here — not even the divider — so the form reads as a deliberate
+              password-only login rather than one with a broken alternative. This replaces a button
+              that was permanently inert: it displayed a "contact your administrator" note and never
+              called the (fully working) /api/auth/google endpoint behind it.
+            */}
+            <GoogleSignInButton
+              onCredential={onGoogleCredential}
+              divider={<div className={styles.orDivider}><span>OR</span></div>}
+            />
 
           </form>
 

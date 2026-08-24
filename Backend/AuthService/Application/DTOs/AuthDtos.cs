@@ -6,7 +6,18 @@ public record LoginRequest(string Email, string Password);
 public record GoogleLoginRequest(string IdToken);
 
 /// <summary>Public, non-secret config the frontend reads instead of hardcoding whether Google Sign-In is available or which domains it accepts.</summary>
-public record SsoConfigDto(bool GoogleEnabled, IReadOnlyList<string> AllowedDomains);
+public record SsoConfigDto(bool GoogleEnabled, IReadOnlyList<string> AllowedDomains, string ClientId);
+
+/// <summary>Email is populated only for a valid invite — see AuthController.ValidateInvite for why.</summary>
+public record ValidateInviteResponse(bool Valid, string? Email);
+
+// Attributes go on the PARAMETER, not [property:] — on a record primary constructor the framework
+// validates the parameter and throws at runtime if the metadata is only on the generated property.
+public record SetPasswordRequest(
+    [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = false, ErrorMessage = "Token is required.")]
+    string Token,
+    [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = false, ErrorMessage = "A new password is required.")]
+    string NewPassword);
 
 public record CurrentUserDto(
     Guid Id,

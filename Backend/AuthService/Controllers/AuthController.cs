@@ -16,6 +16,7 @@ public class AuthController(
     AuthAppService authAppService,
     IOptions<AuthCookieOptions> cookieOptions,
     IOptions<PasswordPolicyOptions> passwordPolicyOptions,
+    SetPasswordInviteService invites,
     IWebHostEnvironment env) : ControllerBase
 {
     private readonly AuthCookieOptions _cookieOptions = cookieOptions.Value;
@@ -79,6 +80,44 @@ public class AuthController(
     [HttpGet("sso-config")]
     [AllowAnonymous]
     public ActionResult<SsoConfigDto> SsoConfig() => Ok(authAppService.GetSsoConfig());
+
+    /*
+     * Set-password invites.
+     *
+     * Both endpoints are necessarily anonymous — the whole point is that the recipient has no
+     * credentials yet — so both are rate limited under the authentication policy alongside login,
+     * which is what makes brute-forcing the 256-bit token impractical as well as pointless.
+     *
+     * Neither endpoint ever distinguishes "no such token" from "expired" from "already used". They
+     * are all one message, because telling an anonymous caller which of those applies would confirm
+     * that a particular token once existed.
+     */
+
+    /// <summary>Checks a link before the user types anything, so an expired invite says so up front rather than after.</summary>
+    [HttpGet("set-password/validate")]
+    [EnableRateLimiting(RateLimitPolicies.Authentication)]
+    [AllowAnonymous]
+    public async Task<ActionResult<ValidateInviteResponse>> ValidateInvite([FromQuery] string token, CancellationToken ct)
+    {
+        var invite = await invites.FindRedeemableAsync(token, ct);
+        return invite?.User is null
+            ? Ok(new ValidateInviteResponse(false, null))
+            // The email address is echoed back only for a VALID token — the caller demonstrably
+            // already has the invite, so showing which account it belongs to reveals nothing new and
+            // prevents someone setting a password on an account they did not expect.
+            : Ok(new ValidateInviteResponse(true, invite.User.Email));
+    }
+
+    [HttpPost("set-password")]
+    [EnableRateLimiting(RateLimitPolicies.Authentication)]
+    [AllowAnonymous]
+    public async Task<IActionResult> SetPassword([FromBody] SetPasswordRequest request, CancellationToken ct)
+    {
+        var problem = await invites.RedeemAsync(request.Token, request.NewPassword, ct);
+        return problem is null
+            ? NoContent()
+            : BadRequest(new ProblemDetails { Title = problem, Status = 400 });
+    }
 
     [HttpPost("refresh")]
     [EnableRateLimiting(RateLimitPolicies.Authentication)]

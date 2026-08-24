@@ -11,7 +11,8 @@ namespace AuthService.Application.Services;
 
 public class UserAppService(
     AuthDbContext db, PasswordHasher passwordHasher, AuditLogAppService auditLog,
-    IHttpContextAccessor httpContextAccessor, ApprovalGatingService gating)
+    IHttpContextAccessor httpContextAccessor, ApprovalGatingService gating,
+    SetPasswordInviteService invites)
 {
     private const string ServiceName = "AuthService";
 
@@ -203,10 +204,31 @@ public class UserAppService(
         var saved = await FindWithRoleAsync(user.Id, ct) ?? throw NotFound(user.Id);
         var savedOverrides = await LoadOverridesAsync(user.Id, ct);
 
-        var actorName = await ResolveActorNameAsync(actingUserId, ct);
-        await auditLog.WriteAsync(ServiceName, actingUserId, actorName, "user.created", "User", user.Id.ToString(), $"Created {user.Email}", SourceIp, userAgent: UserAgent, entityLabel: user.Name, ct: ct);
+        /*
+         * Invite the new user to choose their own password.
+         *
+         * Best-effort by design: IssueAsync returns false rather than throwing when SMTP is
+         * unconfigured or delivery fails, because the account already exists by this point and a mail
+         * problem must not undo it. The encrypted temporary password above stays available in every
+         * case, retrievable by the maker from My Requests — the two mechanisms coexist rather than
+         * one replacing the other.
+         *
+         * Local accounts only: a Google-provisioned account has no local password to set.
+         */
+        var inviteEmailed = false;
+        if (isLocal)
+        {
+            inviteEmailed = await invites.IssueAsync(saved, actingUserId, ct);
+            await db.SaveChangesAsync(ct);
+        }
 
-        return MutationResult<CreateUserResponse>.Ok(new CreateUserResponse(ToDetailDto(saved, savedOverrides), tempPassword));
+        var actorName = await ResolveActorNameAsync(actingUserId, ct);
+        var auditDetail = inviteEmailed
+            ? $"Created {user.Email} (set-password invite emailed)"
+            : $"Created {user.Email}";
+        await auditLog.WriteAsync(ServiceName, actingUserId, actorName, "user.created", "User", user.Id.ToString(), auditDetail, SourceIp, userAgent: UserAgent, entityLabel: user.Name, ct: ct);
+
+        return MutationResult<CreateUserResponse>.Ok(new CreateUserResponse(ToDetailDto(saved, savedOverrides), tempPassword, inviteEmailed));
     }
 
     public async Task<MutationResult<UserDetailDto>> UpdateAsync(

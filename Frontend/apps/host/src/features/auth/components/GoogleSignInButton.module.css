@@ -1,32 +1,40 @@
+/*
+ * Google renders its own button into `.buttonSlot`, and that markup is not ours to restyle — Google's
+ * branding guidelines require the button be presented as shipped. So this only positions it and keeps
+ * it from overflowing a narrow card.
+ *
+ * `min-height` is deliberately absent: the slot is collapsed to zero while the config probe runs, so
+ * a password-only deployment never reserves space for a button that will not appear.
+ */
 .buttonSlot {
-  display: flex;
-  justify-content: center;
-  min-height: 48px;
-}
-
-.notConfigured {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
   width: 100%;
-  height: 48px;
-  border-radius: 12px;
-  border: 1.5px solid #e2e8f0;
-  background: #f8fafc;
-  color: #64748b;
-  font-size: 13.5px;
-  font-weight: 500;
-  text-align: center;
-  padding: 0 16px;
-  cursor: not-allowed;
-  user-select: none;
-  box-sizing: border-box;
-  letter-spacing: -0.01em;
-  transition: border-color 0.15s ease;
+  overflow-x: hidden;
 }
 
-.googleIcon {
-  flex-shrink: 0;
-  opacity: 0.7;
+.buttonSlot > div {
+  max-width: 100%;
+}
+
+.domainHint {
+  margin: 10px 0 0 0;
+  text-align: center;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--omni-color-text-muted);
+}
+
+/* Shown only when Google's script cannot load — the password form remains fully usable. */
+.notConfigured {
+  margin: 10px 0 0 0;
+  padding: 9px 14px;
+  border-radius: var(--omni-radius-sm);
+  background: var(--omni-color-warning-bg);
+  border: 1px solid var(--omni-color-warning-200);
+  color: var(--omni-color-warning-text);
+  font-size: 12px;
+  line-height: 1.45;
+  text-align: center;
 }

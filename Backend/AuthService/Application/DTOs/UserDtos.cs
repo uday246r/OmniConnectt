@@ -72,7 +72,13 @@ public record CreateUserRequest(
     string AuthProvider = "Local");
 
 /// <summary>Null for Google-provisioned accounts — there's no local password to hand back.</summary>
-public record CreateUserResponse(UserDetailDto User, string? TemporaryPassword);
+/// <summary>
+/// <paramref name="InviteEmailed"/> reports whether a set-password link actually reached the user, so
+/// the UI can tell the maker "they have been emailed a setup link" instead of guessing. False covers
+/// both "SMTP is not configured here" and "delivery failed" — in either case the temporary password
+/// above is the fallback, which is exactly what the maker needs to know.
+/// </summary>
+public record CreateUserResponse(UserDetailDto User, string? TemporaryPassword, bool InviteEmailed = false);
 
 public record UpdateUserRequest(
     [Required(AllowEmptyStrings = false, ErrorMessage = "Name is required.")]

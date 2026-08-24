@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using System.Threading.RateLimiting;
 using AuthService.Application.Services;
 using AuthService.Infrastructure;
+using AuthService.Infrastructure.Email;
 using AuthService.Infrastructure.Security;
 using AuthService.Infrastructure.Seed;
 using AuthService.Options;
@@ -39,6 +40,7 @@ builder.Services.Configure<AuthCookieOptions>(builder.Configuration.GetSection(A
 builder.Services.Configure<InternalApiOptions>(builder.Configuration.GetSection(InternalApiOptions.SectionName));
 builder.Services.Configure<GoogleAuthOptions>(builder.Configuration.GetSection(GoogleAuthOptions.SectionName));
 builder.Services.Configure<SecretProtectionOptions>(builder.Configuration.GetSection(SecretProtectionOptions.SectionName));
+builder.Services.Configure<SmtpOptions>(builder.Configuration.GetSection(SmtpOptions.SectionName));
 
 var connectionString = builder.Configuration.GetConnectionString("AuthDb");
 var isDbConfigured = !string.IsNullOrWhiteSpace(connectionString);
@@ -66,6 +68,9 @@ builder.Services.AddScoped<UserAppService>();
 builder.Services.AddScoped<RoleAppService>();
 builder.Services.AddScoped<ApprovalAppService>();
 builder.Services.AddScoped<CheckerAssignmentAppService>();
+// Inert without SMTP settings, exactly as Google SSO is inert without a Client ID.
+builder.Services.AddScoped<IEmailSender, EmailSender>();
+builder.Services.AddScoped<SetPasswordInviteService>();
 builder.Services.AddScoped<PermissionCatalogAppService>();
 builder.Services.AddScoped<DashboardAppService>();
 builder.Services.AddScoped<SearchAppService>();

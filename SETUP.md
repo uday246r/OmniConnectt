@@ -233,22 +233,69 @@ As the Super Admin, everything is already granted (administrators bypass per-cap
 
 ### Enabling Google SSO (optional)
 
-Google Sign-In ships fully wired but **inert by default** — the login page shows an honest
-"Google Sign-In is not configured yet" state and nobody can authenticate this way until you do the
-following:
+Google Sign-In ships fully wired but **inert by default**. While unconfigured the login page hides
+the SSO block entirely — no button, no "OR" divider, and Google's script is never even requested —
+so the form reads as a deliberate password-only login rather than one with a broken alternative.
+
+Configuration is **backend-only**: the browser reads the Client ID from `GET /api/auth/sso-config`
+at runtime, so enabling SSO needs no frontend rebuild and rotating the ID needs no redeploy.
 
 1. In [Google Cloud Console](https://console.cloud.google.com/apis/credentials), create an **OAuth
    2.0 Client ID** of type "Web application".
-2. Add `http://localhost:5173` under **Authorized JavaScript origins** (no path, no trailing slash).
-3. Copy the generated Client ID and set it in **both**:
-   - `Backend/AuthService/.env` — `Google__ClientId=` (also set `Google__AllowedDomains=` to a
-     comma-separated list of email domains allowed to sign in, e.g. `acme.com,acme.co.uk`)
-   - `Frontend/apps/host/.env` — `VITE_GOOGLE_CLIENT_ID=` (same value)
-4. Restart AuthService and the frontend dev server.
-5. Create a user with **Authentication Method: Google SSO** in Setup → User — SSO never
-   auto-creates an account, an admin still provisions the User row first, just with no password.
-   That user's email domain must be one of the allowed domains from step 3.
-6. That user can now sign in with the "Sign in with Google" button on the login page.
+2. Add your frontend origin under **Authorized JavaScript origins** — `http://localhost:5173` for
+   local work, plus your real origin for production (no path, no trailing slash). No redirect URI is
+   needed: Google Identity Services returns the credential to the page, not via a redirect.
+3. Set **both** of these in `Backend/AuthService/.env`:
+   - `Google__ClientId=` — the generated Client ID. It is public by design (Google requires it in
+     the page), so it is not a secret, but it still belongs in `.env` rather than a committed default.
+   - `Google__AllowedDomains=` — comma-separated email domains permitted to sign in, e.g.
+     `acme.com,acme.co.uk`. **Both must be set**: an empty domain list means nobody can sign in, which
+     is the safe default rather than an oversight.
+4. Restart AuthService. The button appears on the next page load — no frontend rebuild.
+5. Create a user with **Authentication Method: Google SSO** in Setup → User. SSO never auto-creates
+   an account: an administrator still provisions the User row first, just with no password. That
+   user's email domain must be one of the allowed domains from step 3.
+6. That user can now sign in with the Google button on the login page.
+
+Three rejections are reported distinctly, so a failure is diagnosable: SSO not configured (503),
+domain not on the allowlist (401), and no provisioned account for that Google identity (401).
+
+> `VITE_GOOGLE_CLIENT_ID` in `Frontend/apps/host/.env` is **no longer used** and can be removed. The
+> Client ID is served from AuthService so that one build runs in every environment.
+
+### Enabling email — set-password invites (optional)
+
+When an administrator creates a user, the new account can be emailed a **single-use, time-limited
+link** to choose their own password. This is preferred over emailing the temporary password: a link
+expires, dies on first use, and never leaves a working credential sitting in a mailbox.
+
+Like SSO, this is **inert until configured** — without SMTP settings no mail is attempted, account
+creation succeeds exactly as before, and the maker collects the temporary password from My Requests
+as usual. That fallback remains available even once email is on, for users who cannot receive mail.
+
+Set these in `Backend/AuthService/.env`:
+
+- `Smtp__Host` — e.g. `smtp.gmail.com`, `smtp.office365.com`, or your corporate relay
+- `Smtp__Port` — `587` for STARTTLS (typical) or `465` for implicit TLS
+- `Smtp__Username` / `Smtp__Password` — mailbox credentials. For Google Workspace this must be an
+  **App Password**, not the account password. Leave both blank for an internal relay that accepts
+  mail from trusted hosts without authentication.
+- `Smtp__FromAddress` — sender address; defaults to `Smtp__Username` if omitted
+- `Smtp__FromName` — display name, defaults to `OmniConnect`
+- `Smtp__AppBaseUrl` — **required.** The public URL of the frontend, e.g. `http://localhost:5173` or
+  `https://app.yourcompany.com`. Invite links are built from this. It cannot be inferred from the
+  request: the `Host` header is attacker-controllable, and an invite link is precisely the kind of
+  thing that must never be built from one.
+- `Smtp__InviteValidHours` — link lifetime, default `48`
+
+All three of `Smtp__Host`, a resolvable sender, and `Smtp__AppBaseUrl` must be present before any
+mail is sent — a half-configured deployment stays silent rather than promising an email that cannot
+arrive with a link that would not work.
+
+Connections always use TLS. Port 465 connects with implicit TLS; anything else requires a successful
+STARTTLS upgrade and fails rather than silently falling back to an unencrypted session.
+
+**These credentials are secrets** — keep them in the gitignored `.env`, never in `appsettings.json`.
 
 ## Troubleshooting
 

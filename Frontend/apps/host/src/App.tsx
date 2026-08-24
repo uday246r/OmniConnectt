@@ -43,6 +43,9 @@ const AuditLogsPage = lazy(() =>
 const ApprovalCenterPage = lazy(() =>
   import('./features/approvals/pages/ApprovalCenterPage').then((m) => ({ default: m.ApprovalCenterPage })),
 )
+const SetPasswordPage = lazy(() =>
+  import('./pages/SetPasswordPage/SetPasswordPage').then((m) => ({ default: m.SetPasswordPage })),
+)
 const MyRequestsPage = lazy(() =>
   import('./features/approvals/pages/MyRequestsPage').then((m) => ({ default: m.MyRequestsPage })),
 )
@@ -276,6 +279,19 @@ function AppRoutes() {
     <Suspense fallback={<RouteFallback />}>
       <Routes>
         <Route path="/login" element={<LoginRoute />} />
+        {/*
+          Public by necessity — the recipient of an invite has no credentials yet, which is the whole
+          point. Sits outside RequireAuth alongside /login for that reason. The token in the query
+          string is the only thing that grants access, and the server treats it as single-use.
+        */}
+        <Route
+          path="/set-password"
+          element={
+            <Suspense fallback={<RouteFallback />}>
+              <SetPasswordPage />
+            </Suspense>
+          }
+        />
 
       <Route
         element={

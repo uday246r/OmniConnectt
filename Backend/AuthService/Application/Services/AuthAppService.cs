@@ -141,7 +141,11 @@ public class AuthAppService(
         return result;
     }
 
-    public SsoConfigDto GetSsoConfig() => new(_google.IsConfigured, _google.IsConfigured ? _google.AllowedDomainsList : []);
+    public SsoConfigDto GetSsoConfig() => new(
+        _google.IsConfigured,
+        _google.IsConfigured ? _google.AllowedDomainsList : [],
+        // Only surfaced once fully configured, so a half-set-up deployment advertises nothing.
+        _google.IsConfigured ? _google.ClientId : string.Empty);
 
     /// <summary>
     /// Every real failure path lands here — invalid credentials, inactive accounts, and every
