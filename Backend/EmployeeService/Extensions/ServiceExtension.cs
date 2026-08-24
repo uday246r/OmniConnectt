@@ -24,7 +24,16 @@ public static class ServiceExtensions
         // the app still starts (health checks and /permissions still work); anything that actually
         // touches the database fails at request time with a clear error instead of crashing the
         // whole process on startup. Mirrors AuthService/ModuleRegistry's identical pattern.
-        services.AddDbContext<AppDbContext>(options =>
+        /*
+         * Pooled. AddDbContext builds a fresh DbContext per request, re-running the per-instance
+         * plumbing every time; AddDbContextPool reuses instances and resets their state instead. The
+         * model configuration is cached either way, but the per-instance allocation is not, and under
+         * concurrent load the difference is measurable.
+         *
+         * Safe because AppDbContext takes only DbContextOptions — pooling cannot be used with a
+         * context that captures request-scoped state through its constructor.
+         */
+        services.AddDbContextPool<AppDbContext>(options =>
         {
             options.UseNpgsql(isDbConfigured ? connectionString : "Host=unconfigured;Database=unconfigured;Username=unconfigured;Password=unconfigured");
         });

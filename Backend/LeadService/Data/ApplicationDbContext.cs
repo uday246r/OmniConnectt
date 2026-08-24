@@ -32,6 +32,26 @@ namespace LeadManagement.Api.Data
             modelBuilder.Entity<Lead>()
                 .HasIndex(l => l.CreatedAt);
 
+            /*
+             * The shape every lead list request actually has.
+             *
+             * GetLeadsAsync opens with `.Where(l => !l.IsDeleted)` and closes with
+             * `.OrderByDescending(l => l.CreatedAt)` on EVERY call, whatever else it filters on in
+             * between. The CreatedAt-only index above cannot serve that: Postgres still has to filter
+             * the soft-deleted rows out after reading the index, and the proportion of dead rows only
+             * grows over time.
+             *
+             * Descending on CreatedAt so the index order matches the sort direction and no separate
+             * sort step is needed.
+             */
+            modelBuilder.Entity<Lead>()
+                .HasIndex(l => new { l.IsDeleted, l.CreatedAt })
+                .IsDescending(false, true);
+
+            // Filtered by the list's status facet, and previously unindexed.
+            modelBuilder.Entity<Lead>()
+                .HasIndex(l => l.Status);
+
             modelBuilder.Entity<Lead>()
                 .HasIndex(l => l.CustomerName);
 

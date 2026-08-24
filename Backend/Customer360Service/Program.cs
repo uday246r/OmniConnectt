@@ -27,7 +27,16 @@ var builder = WebApplication.CreateBuilder(args);
 var connectionString = builder.Configuration.GetConnectionString("Customer360Db");
 var isDbConfigured = !string.IsNullOrWhiteSpace(connectionString);
 
-builder.Services.AddDbContext<Customer360DbContext>(options =>
+/*
+ * Pooled. AddDbContext builds a fresh DbContext per request, which re-runs the model's internal
+ * plumbing setup every time; AddDbContextPool reuses instances and resets their state instead. The
+ * model configuration itself is cached either way, but the per-instance allocation is not, and under
+ * concurrent load that difference is measurable.
+ *
+ * Safe here because no DbContext in this solution holds request-scoped state injected through its
+ * constructor - they take only DbContextOptions, which is what pooling requires.
+ */
+builder.Services.AddDbContextPool<Customer360DbContext>(options =>
     options.UseNpgsql(isDbConfigured ? connectionString : "Host=unconfigured;Database=unconfigured;Username=unconfigured;Password=unconfigured"));
 
 // ---------------------------------------------------------------------------

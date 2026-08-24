@@ -82,6 +82,16 @@ namespace backend.Controllers
             [FromQuery] int pageNumber = 1,
             [FromQuery] int pageSize = 10)
         {
+            /*
+             * Clamp server-side. pageSize arrives straight from the query string, so without this a
+             * single request for pageSize=1000000 makes the database materialise the whole table into
+             * memory - a trivially cheap request that is expensive to serve, which is the shape of an
+             * accidental (or deliberate) denial of service. 100 matches the cap AuthService and
+             * ModuleRegistry already enforce.
+             */
+            pageNumber = Math.Max(pageNumber, 1);
+            pageSize = Math.Clamp(pageSize, 1, 100);
+
             var (logs, totalCount) = await _auditRepository.GetAsync(search, action, pageNumber, pageSize);
             int totalPages = (int)Math.Ceiling((double)totalCount / pageSize);
             if (totalPages < 1) totalPages = 1;

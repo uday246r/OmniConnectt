@@ -51,7 +51,16 @@ builder.Services.Configure<InternalApiOptions>(builder.Configuration.GetSection(
 builder.Services.Configure<SelfOptions>(builder.Configuration.GetSection(SelfOptions.SectionName));
 
 // Database Context
-builder.Services.AddDbContext<ApplicationDbContext>(options =>
+/*
+ * Pooled. AddDbContext builds a fresh DbContext per request, which re-runs the model's internal
+ * plumbing setup every time; AddDbContextPool reuses instances and resets their state instead. The
+ * model configuration itself is cached either way, but the per-instance allocation is not, and under
+ * concurrent load that difference is measurable.
+ *
+ * Safe here because no DbContext in this solution holds request-scoped state injected through its
+ * constructor - they take only DbContextOptions, which is what pooling requires.
+ */
+builder.Services.AddDbContextPool<ApplicationDbContext>(options =>
 {
     var connectionString = builder.Configuration.GetConnectionString("LeadDb")
         ?? builder.Configuration.GetConnectionString("DefaultConnection");

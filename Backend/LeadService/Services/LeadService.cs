@@ -368,10 +368,9 @@ namespace LeadManagement.Api.Services
 
             var totalRecords = await q.CountAsync();
 
-            if (pageSize <= 0 || pageSize > 1000)
-            {
-                pageSize = totalRecords > 0 ? totalRecords : 10;
-            }
+            // Same reasoning as AuditLogService: the old branch set pageSize to totalRecords, which
+            // returned the entire table for any out-of-range request instead of limiting it.
+            pageSize = Math.Clamp(pageSize, 1, 100);
 
             page = Math.Max(1, page);
             var totalPages = (int)Math.Ceiling((double)totalRecords / pageSize);

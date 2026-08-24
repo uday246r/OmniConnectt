@@ -119,10 +119,18 @@ namespace LeadManagement.Api.Services
 
             var totalRecords = await q.CountAsync();
 
-            if (pageSize <= 0 || pageSize > 1000)
-            {
-                pageSize = totalRecords > 0 ? totalRecords : 10;
-            }
+            /*
+             * A real cap, at the same 100 AuthService and ModuleRegistry enforce.
+             *
+             * This previously read "if pageSize is <= 0 or > 1000, set it to totalRecords" — the
+             * opposite of a limit: asking for an absurd page size returned the ENTIRE table, so one
+             * cheap request could make the database materialise everything into memory. That is the
+             * shape of an accidental denial of service.
+             *
+             * Nothing depended on the old behaviour: CSV export serialises the page already held in
+             * component state rather than issuing an unbounded fetch.
+             */
+            pageSize = Math.Clamp(pageSize, 1, 100);
 
             page = Math.Max(1, page);
             var totalPages = (int)Math.Ceiling((double)totalRecords / pageSize);

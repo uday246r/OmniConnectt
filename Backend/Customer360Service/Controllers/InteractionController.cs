@@ -33,6 +33,15 @@ namespace backend.Controllers
                 return BadRequest(new { status = 400, message = "Bad Request.", detail = "Path parameter 'id' is required." });
             }
 
+            /*
+             * Clamp before forwarding. pageSize goes straight into the upstream CRM request, so
+             * without this a single call for pageSize=1000000 is passed along verbatim — a trivially
+             * cheap request that is expensive for someone else to serve. 100 matches the cap
+             * AuthService and ModuleRegistry already enforce.
+             */
+            pageNumber = Math.Max(pageNumber, 1);
+            pageSize = Math.Clamp(pageSize, 1, 100);
+
             var path = $"v1/interactions/{Uri.EscapeDataString(id)}?pageNumber={pageNumber}&pageSize={pageSize}";
             var res = await _crmProxy.ProxyGetAsync(path, HttpContext.RequestAborted);
             if (!res.IsSuccess)
