@@ -30,6 +30,10 @@ builder.Services.AddSwaggerGen();
 builder.Services.Configure<CorsOptions>(builder.Configuration.GetSection(CorsOptions.SectionName));
 builder.Services.Configure<JwtValidationOptions>(builder.Configuration.GetSection(JwtValidationOptions.SectionName));
 builder.Services.Configure<AuthIntegrationOptions>(builder.Configuration.GetSection(AuthIntegrationOptions.SectionName));
+// Maker-Checker: Self describes how AuthService reaches this service back to replay an approved
+// change; Internal is the shared key it must present when it does.
+builder.Services.Configure<SelfOptions>(builder.Configuration.GetSection(SelfOptions.SectionName));
+builder.Services.Configure<InternalApiOptions>(builder.Configuration.GetSection(InternalApiOptions.SectionName));
 
 builder.Services.AddApplicationServices(builder.Configuration);
 // 10s, matching ModuleRegistry/LeadService/Customer360Service. Without an explicit timeout HttpClient

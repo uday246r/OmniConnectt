@@ -53,13 +53,18 @@ public class EmployeesController : ControllerBase
     [RequiresCapability("Employee", "Create")]
     public async Task<IActionResult> CreateEmployee(CreateEmployeeRequest request)
     {
-        var employee = await _service.CreateAsync(request, CurrentUserId(), CurrentUserName());
+        var result = await _service.CreateAsync(request, CurrentUserId(), CurrentUserName());
+
+        // 202 with the pending payload when the module is under Maker-Checker. The host frontend's
+        // isApprovalPending() guard reads this shape from every service, so the response is the same
+        // whichever service gated the change.
+        if (result.Pending is not null) return Accepted(result.Pending);
 
         return Ok(new ApiResponse<object>
         {
             Success = true,
             Message = "Employee created successfully",
-            Data = employee
+            Data = result.Applied
         });
     }
 
@@ -67,14 +72,15 @@ public class EmployeesController : ControllerBase
     [RequiresCapability("Employee", "Edit")]
     public async Task<IActionResult> UpdateEmployee(Guid id, UpdateEmployeeRequest request)
     {
-        var employee = await _service.UpdateAsync(id, request, CurrentUserId(), CurrentUserName());
-        if (employee == null) return NotFound(new ApiResponse<object> { Success = false, Message = "Employee not found" });
+        var result = await _service.UpdateAsync(id, request, CurrentUserId(), CurrentUserName());
+        if (result == null) return NotFound(new ApiResponse<object> { Success = false, Message = "Employee not found" });
+        if (result.Pending is not null) return Accepted(result.Pending);
 
         return Ok(new ApiResponse<object>
         {
             Success = true,
             Message = "Employee updated successfully",
-            Data = employee
+            Data = result.Applied
         });
     }
 
@@ -82,8 +88,9 @@ public class EmployeesController : ControllerBase
     [RequiresCapability("Employee", "Delete")]
     public async Task<IActionResult> DeleteEmployee(Guid id)
     {
-        var success = await _service.DeleteAsync(id, CurrentUserId(), CurrentUserName());
-        if (!success) return NotFound(new ApiResponse<object> { Success = false, Message = "Employee not found" });
+        var result = await _service.DeleteAsync(id, CurrentUserId(), CurrentUserName());
+        if (result == null) return NotFound(new ApiResponse<object> { Success = false, Message = "Employee not found" });
+        if (result.Pending is not null) return Accepted(result.Pending);
 
         return Ok(new ApiResponse<object>
         {
