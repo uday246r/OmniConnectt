@@ -152,15 +152,22 @@ export const RecentLeadsCard: React.FC = () => {
                 const statusInfo = getStatusBadge(lead.status);
                 const initials = getInitials(lead.name);
 
+                /*
+                 * The row is deliberately not clickable — the "View Full Lead Profile" button in the
+                 * last cell is the single, explicit way in, matching the host's audit table and the
+                 * other lead tables. A whole-row handler makes it impossible to select text in a
+                 * cell without navigating away, and gives no keyboard equivalent.
+                 *
+                 * The hover highlight stays (it aids reading across a wide row) but `cursor: pointer`
+                 * is gone, so the row no longer advertises a click it does not handle.
+                 */
                 return (
                   <tr
                     key={lead.id}
                     style={{
                       borderBottom: '1px solid #f1f5f9',
                       transition: 'background 0.12s ease',
-                      cursor: 'pointer',
                     }}
-                    onClick={(e) => handleActionClick(e, lead)}
                     onMouseEnter={(e) => {
                       e.currentTarget.style.background = '#f8fafc';
                     }}

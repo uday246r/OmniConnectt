@@ -51,23 +51,6 @@ const getInitials = (name: string): string => {
   return name.slice(0, 2).toUpperCase();
 };
 
-const getStatusBadge = (status?: string) => {
-  const s = status?.toLowerCase() || 'new';
-  if (s.includes('convert')) {
-    return { bg: '#ecfdf5', text: '#047857', border: '#a7f3d0', dot: '#10b981', label: status || 'Converted' };
-  }
-  if (s.includes('progress')) {
-    return { bg: '#fffbeb', text: '#b45309', border: '#fde68a', dot: '#f59e0b', label: status || 'In Progress' };
-  }
-  if (s.includes('reject') || s.includes('cancel')) {
-    return { bg: '#fff1f2', text: '#be123c', border: '#fecdd3', dot: '#f43f5e', label: status || 'Rejected' };
-  }
-  if (s.includes('qualif') || s.includes('contact')) {
-    return { bg: '#ede9fe', text: '#6d28d9', border: '#ddd6fe', dot: '#8b5cf6', label: status || 'Contacted' };
-  }
-  return { bg: '#eff6ff', text: '#1d4ed8', border: '#bfdbfe', dot: '#2563eb', label: status || 'New' };
-};
-
 export const ViewLeadPage: React.FC = () => {
   const {
     leads,
@@ -463,16 +446,16 @@ export const ViewLeadPage: React.FC = () => {
                     Customer Details
                   </th>
                   <th style={{ padding: '13px 18px', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.06em', color: '#475569', whiteSpace: 'nowrap' }}>
-                    IC / Contact
+                    IC Number
                   </th>
                   <th style={{ padding: '13px 18px', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.06em', color: '#475569', whiteSpace: 'nowrap' }}>
-                    Product &amp; Amount
+                    Contact
                   </th>
                   <th style={{ padding: '13px 18px', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.06em', color: '#475569', whiteSpace: 'nowrap' }}>
-                    Branch / State
+                    Product
                   </th>
                   <th style={{ padding: '13px 18px', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.06em', color: '#475569', whiteSpace: 'nowrap' }}>
-                    Status
+                    Branch
                   </th>
                   <th style={{ padding: '13px 18px', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.06em', color: '#475569', whiteSpace: 'nowrap' }}>
                     Created Date
@@ -485,7 +468,6 @@ export const ViewLeadPage: React.FC = () => {
               <tbody>
                 {leads.map((lead, idx) => {
                   const initials = getInitials(lead.name);
-                  const statusInfo = getStatusBadge(lead.status);
                   const avatarColor = AVATAR_COLORS[idx % AVATAR_COLORS.length];
 
                   return (
@@ -495,9 +477,7 @@ export const ViewLeadPage: React.FC = () => {
                       style={{
                         borderBottom: '1px solid #f1f5f9',
                         transition: 'background 0.12s ease',
-                        cursor: 'pointer',
                       }}
-                      onClick={() => openDetailsDrawer(lead)}
                       onMouseEnter={(e) => {
                         e.currentTarget.style.background = '#f8fafc';
                       }}
@@ -531,66 +511,32 @@ export const ViewLeadPage: React.FC = () => {
                         </div>
                       </td>
 
-                      {/* IC & Phone — masked per Field Settings when the field is marked Sensitive */}
+                      {/* IC Number — masked per Field Settings when the field is marked Sensitive */}
                       <td style={{ padding: '13px 18px', verticalAlign: 'middle' }}>
                         {isFieldVisible(commonFieldConfig, 'icNumber') && (
                           <div style={{ color: '#0f172a', fontWeight: 500, fontSize: '13px', fontFamily: "'SF Mono', 'Fira Code', monospace" }}>
                             {renderMaskedCell(commonFieldConfig, 'icNumber', lead.icNumber)}
                           </div>
                         )}
+                      </td>
+
+                      {/* Contact */}
+                      <td style={{ padding: '13px 18px', verticalAlign: 'middle' }}>
                         {isFieldVisible(commonFieldConfig, 'phoneNumber') && (
-                          <div style={{ color: '#64748b', fontSize: '12px', marginTop: '1px' }}>{lead.phone}</div>
+                          <div style={{ color: '#0f172a', fontWeight: 500 }}>{lead.phone}</div>
                         )}
                       </td>
 
-                      {/* Product & Applied Amount */}
+                      {/* Product */}
                       <td style={{ padding: '13px 18px', verticalAlign: 'middle' }}>
                         <div style={{ fontWeight: 600, color: '#0f172a' }}>{lead.product}</div>
-                        {isFieldVisible(commonFieldConfig, 'appliedAmount') && lead.appliedAmount ? (
-                          <div style={{ fontSize: '12px', color: '#16a34a', fontWeight: 600, marginTop: '2px' }}>
-                            RM {Number(lead.appliedAmount).toLocaleString()}
-                          </div>
-                        ) : null}
                       </td>
 
-                      {/* Branch & State */}
+                      {/* Branch */}
                       <td style={{ padding: '13px 18px', verticalAlign: 'middle' }}>
                         {isFieldVisible(commonFieldConfig, 'branch') && (
                           <div style={{ color: '#0f172a', fontWeight: 500 }}>{lead.branch || 'Not Assigned'}</div>
                         )}
-                        {isFieldVisible(commonFieldConfig, 'state') && (
-                          <div style={{ color: '#64748b', fontSize: '12px', marginTop: '1px' }}>{lead.state}</div>
-                        )}
-                      </td>
-
-                      {/* Status pill badge */}
-                      <td style={{ padding: '13px 18px', verticalAlign: 'middle' }}>
-                        <span
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '5px',
-                            padding: '3px 10px',
-                            borderRadius: '999px',
-                            background: statusInfo.bg,
-                            color: statusInfo.text,
-                            fontSize: '11.5px',
-                            fontWeight: 600,
-                            border: `1px solid ${statusInfo.border}`,
-                            whiteSpace: 'nowrap',
-                          }}
-                        >
-                          <span
-                            style={{
-                              width: '5px',
-                              height: '5px',
-                              borderRadius: '50%',
-                              background: statusInfo.dot,
-                              flexShrink: 0,
-                            }}
-                          />
-                          {statusInfo.label}
-                        </span>
                       </td>
 
                       {/* Created Date */}

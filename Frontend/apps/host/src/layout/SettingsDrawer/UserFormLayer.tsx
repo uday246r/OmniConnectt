@@ -34,6 +34,7 @@ import {
   pairId,
 } from '../../shared/permissions/catalog'
 import styles from './UserFormLayer.module.css'
+import { TOPICS, invalidate } from '../../shared/stores/invalidationStore'
 
 export interface CountryPhoneConfig {
   code: string
@@ -136,9 +137,7 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
   const refreshSession = useAuthStore((s) => s.refreshSession)
   // Gates which roles this operator may hand out — see filteredRoles.
   const isAdministrator = Boolean(useAuthStore((s) => s.user)?.isAdministrator)
-  const popLayer = useSettingsDrawerStore((s) => s.popLayer)
-  const notifyMutation = useSettingsDrawerStore((s) => s.notifyMutation)
-
+  const popLayer = useSettingsDrawerStore((s) => s.popLayer)
   const [currentStep, setCurrentStep] = useState<Step>('basic')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -557,7 +556,7 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
         // the drawer is now stale — without these the drawer closed onto old rows and only a full page
         // reload would show the change.
         void refreshSession()
-        notifyMutation()
+        invalidate(TOPICS.users, TOPICS.approvals)
         toast.success(`User '${name}' updated successfully.`)
         useSettingsDrawerStore.getState().resetToRoot('users')
       } else {
@@ -581,7 +580,7 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
           return
         }
 
-        notifyMutation()
+        invalidate(TOPICS.users, TOPICS.approvals)
         toast.success(`User '${res.user.name}' created successfully.`)
         setCreatedResult(res)
       }

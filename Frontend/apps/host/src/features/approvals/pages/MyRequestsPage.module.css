@@ -3,40 +3,135 @@
 .page {
   display: flex;
   flex-direction: column;
-  gap: 20px;
-  max-width: 1240px;
+  gap: 22px;
+  max-width: 1340px;
   width: 100%;
-  padding-bottom: 32px;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  padding-bottom: 36px;
+  font-family: var(--omni-font-family);
+  animation: pageFadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+@keyframes pageFadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page { animation: none; }
+}
+
+/* ════════════════════════════════════════════════════
+   HERO HEADER BANNER — same gradient/glass treatment as
+   ApprovalCenterPage, both driven from theme.css tokens
+   so the two governance pages can never drift apart.
+   ════════════════════════════════════════════════════ */
+
 .header {
+  border-radius: 20px;
+  padding: 28px 32px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: 20px;
   flex-wrap: wrap;
+  position: relative;
+  overflow: hidden;
+  background: var(--omni-gradient-page-header);
+  border: none;
+  box-shadow: var(--omni-shadow-page-header);
 }
 
-.titleGroup { display: flex; flex-direction: column; gap: 5px; }
-.title { font-size: 20px; font-weight: 800; color: #0f172a; margin: 0; letter-spacing: -0.02em; }
-.subtitle { font-size: 13px; color: #64748b; margin: 0; max-width: 560px; line-height: 1.5; }
+.header::before {
+  content: '';
+  position: absolute;
+  top: -60px;
+  right: -60px;
+  width: 240px;
+  height: 240px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.18) 0%, rgba(255, 255, 255, 0) 70%);
+  pointer-events: none;
+}
 
+.header::after {
+  content: '';
+  position: absolute;
+  bottom: -80px;
+  right: 140px;
+  width: 180px;
+  height: 180px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0) 70%);
+  pointer-events: none;
+}
+
+.titleGroup { display: flex; flex-direction: column; gap: 6px; position: relative; z-index: 1; }
+.titleHeaderRow { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.title {
+  font-size: 24px; font-weight: 800; color: var(--omni-color-on-header-text); margin: 0;
+  letter-spacing: -0.03em; line-height: 1.2; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+}
+.subtitle {
+  font-size: 13.5px; color: var(--omni-color-on-header-muted); margin: 0;
+  font-weight: 400; max-width: 620px; line-height: 1.45;
+}
+
+.liveStreamBadge {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--omni-color-on-header-surface);
+  border: 1px solid var(--omni-color-on-header-border);
+  backdrop-filter: blur(8px);
+  padding: 3px 10px; border-radius: var(--omni-radius-pill);
+  font-size: 11px; font-weight: 700; color: var(--omni-color-on-header-text); letter-spacing: 0.03em;
+}
+
+.liveDot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--omni-color-live-dot);
+  box-shadow: 0 0 8px var(--omni-color-live-dot);
+  animation: pulseDot 2s infinite;
+}
+
+@keyframes pulseDot {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.35); opacity: 0.75; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .liveDot { animation: none; }
+}
+
+/* Refresh sits ON the blue banner here, so it uses the glass treatment rather than the
+   neutral-on-white styling it had when the header was plain. */
 .refreshBtn {
-  display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 8px;
-  font-size: 12.5px; font-weight: 600; cursor: pointer; transition: all 0.15s ease; font-family: inherit;
-  background: #f8fafc; border: 1px solid #e2e8f0; color: #475569; white-space: nowrap;
+  display: inline-flex; align-items: center; gap: 7px; padding: 9px 16px;
+  border-radius: var(--omni-radius-md);
+  font-size: 12.5px; font-weight: 600; cursor: pointer;
+  transition: all var(--omni-transition-fast); font-family: inherit;
+  background: var(--omni-color-on-header-surface);
+  border: 1px solid var(--omni-color-on-header-border);
+  color: var(--omni-color-on-header-text);
+  backdrop-filter: blur(8px);
+  white-space: nowrap;
+  position: relative; z-index: 1;
 }
-.refreshBtn:hover { background: #ffffff; border-color: #cbd5e1; color: #0f172a; }
+.refreshBtn:hover { background: rgba(255, 255, 255, 0.28); transform: translateY(-1px); }
 
-.filterPills { display: inline-flex; gap: 4px; background: #f1f5f9; padding: 4px; border-radius: 10px; width: fit-content; }
+.filterPills {
+  display: inline-flex; gap: 4px; background: var(--omni-color-surface-alt);
+  padding: 4px; border-radius: 10px; width: fit-content;
+  border: 1px solid var(--omni-color-border);
+}
 .pill, .pillActive {
   padding: 7px 16px; border-radius: 7px; border: none; font-size: 12.5px; font-weight: 600;
-  cursor: pointer; transition: all 0.15s ease; font-family: inherit;
+  cursor: pointer; transition: all var(--omni-transition-fast); font-family: inherit;
 }
-.pill { background: transparent; color: #64748b; }
-.pill:hover { color: #0f172a; }
-.pillActive { background: #ffffff; color: #2563eb; box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08); }
+.pill { background: transparent; color: var(--omni-color-text-secondary); }
+.pill:hover { color: var(--omni-color-text-primary); }
+.pillActive {
+  background: var(--omni-color-primary-50); color: var(--omni-color-primary-600);
+  box-shadow: inset 0 0 0 1px var(--omni-color-primary-100);
+}
 
 .errorBanner {
   padding: 12px 16px; border-radius: 10px; background: #fee2e2; border: 1px solid #fca5a5;

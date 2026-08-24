@@ -13,6 +13,7 @@ import { Button } from '../../shared/components/Button/Button'
 import { ApiError } from '../../shared/api/httpClient'
 import { toast } from '../../shared/stores/toastStore'
 import styles from './SettingsCheckerAssignmentTab.module.css'
+import { TOPICS, invalidate, useDataRevision } from '../../shared/stores/invalidationStore'
 
 function getInitials(name?: string): string {
   if (!name || !name.trim()) return 'U'
@@ -50,9 +51,7 @@ export function SettingsCheckerAssignmentTab() {
   const isAdministrator = Boolean(useAuthStore((s) => s.user)?.isAdministrator)
   const hasCapability = useAuthStore((s) => s.hasCapability)
   const pushLayer = useSettingsDrawerStore((s) => s.pushLayer)
-  const mutationCount = useSettingsDrawerStore((s) => s.mutationCount)
-  const notifyMutation = useSettingsDrawerStore((s) => s.notifyMutation)
-
+  const dataRevision = useDataRevision(TOPICS.checkerAssignments)
   const canManage = isAdministrator || hasCapability('host.system.checker-assignment', 'Manage')
 
   const [modules, setModules] = useState<AssignableModuleDto[]>([])
@@ -106,7 +105,7 @@ export function SettingsCheckerAssignmentTab() {
     return () => {
       cancelled = true
     }
-  }, [accessToken, mutationCount])
+  }, [accessToken, dataRevision])
 
   // Group modules by Application (Host Platform + Remote Apps)
   const appGroups = useMemo<AppGroup[]>(() => {
@@ -277,7 +276,7 @@ export function SettingsCheckerAssignmentTab() {
       await checkerAssignmentsApi.remove(accessToken, pendingRemove.id)
       setPendingRemove(null)
       toast.success(`${pendingRemove.checkerName} is no longer a checker for '${pendingRemove.module}'.`)
-      notifyMutation()
+      invalidate(TOPICS.checkerAssignments)
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Could not remove this checker.')
       setPendingRemove(null)

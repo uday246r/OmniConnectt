@@ -1,44 +1,58 @@
-/* Lead Management System - Design Tokens & Stylesheet */
+/* Lead Management System - Design Tokens & Stylesheet
+ *
+ * Every token below is an ALIAS onto the host's own design tokens (Frontend/apps/host/src/shared/
+ * styles/theme.css), with the previous literal kept as the fallback. That gives one source of truth
+ * when this remote runs inside the host shell — restyling the platform's blue in theme.css restyles
+ * Lead Management too — while standalone `pnpm dev` on :5002 (no host, so no --omni-* defined) still
+ * renders exactly as before via the fallbacks.
+ *
+ * This works because postcss-prefix-selector rewrites THIS `:root` to `#lead-mf-scope` (see
+ * postcss.config.cjs), so it never competes with the host's real `:root` — the host's --omni-*
+ * custom properties inherit straight through into this subtree.
+ */
 :root {
-  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-  
-  /* Primary & Brand Colors - Vibrant Electric Blue (Host App Theme) */
-  --brand-primary: #2563eb;
-  --brand-primary-hover: #1d4ed8;
-  --brand-teal-accent: #2563eb;
-  --brand-blue-accent: #2563eb;
-  --brand-blue-translucent: #eff6ff;
-  --brand-blue-translucent-hover: #dbeafe;
-  
+  --font-sans: var(--omni-font-family, 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif);
+
+  /* Primary & Brand Colors */
+  --brand-primary: var(--omni-color-primary-600, #2563eb);
+  --brand-primary-hover: var(--omni-color-primary-700, #1d4ed8);
+  --brand-teal-accent: var(--omni-color-primary-600, #2563eb);
+  --brand-blue-accent: var(--omni-color-primary-600, #2563eb);
+  --brand-blue-translucent: var(--omni-color-primary-50, #eff6ff);
+  --brand-blue-translucent-hover: var(--omni-color-primary-100, #dbeafe);
+
   /* Surface & Background */
-  --bg-app: #f8fafc;
-  --bg-card: #ffffff;
-  --bg-sidebar: #ffffff;
-  --bg-input: #ffffff;
-  
+  --bg-app: var(--omni-color-surface-alt, #f8fafc);
+  --bg-card: var(--omni-color-surface, #ffffff);
+  --bg-sidebar: var(--omni-color-surface, #ffffff);
+  --bg-input: var(--omni-color-surface, #ffffff);
+
   /* Text Colors */
-  --text-primary: #1e293b;
-  --text-secondary: #64748b;
-  --text-muted: #94a3b8;
-  --text-heading: #0f172a;
-  --text-danger: #dc2626;
-  
+  --text-primary: var(--omni-color-text-primary, #1e293b);
+  --text-secondary: var(--omni-color-text-secondary, #64748b);
+  --text-muted: var(--omni-color-text-muted, #94a3b8);
+  --text-heading: var(--omni-color-text-primary, #0f172a);
+  --text-danger: var(--omni-color-danger, #dc2626);
+
   /* Borders */
-  --border-subtle: #e2e8f0;
-  --border-input: #cbd5e1;
-  --border-focus: #2563eb;
-  
+  --border-subtle: var(--omni-color-border, #e2e8f0);
+  --border-input: var(--omni-color-border-strong, #cbd5e1);
+  --border-focus: var(--omni-color-primary-600, #2563eb);
+
   /* Shadows */
-  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-sm: var(--omni-shadow-sm, 0 1px 2px 0 rgba(0, 0, 0, 0.05));
   --shadow-card: 0 4px 20px -2px rgba(15, 23, 42, 0.05), 0 2px 6px -1px rgba(15, 23, 42, 0.03);
-  --shadow-dropdown: 0 10px 30px -5px rgba(15, 23, 42, 0.12), 0 4px 8px -2px rgba(15, 23, 42, 0.06);
+  --shadow-dropdown: var(--omni-shadow-lg, 0 10px 30px -5px rgba(15, 23, 42, 0.12), 0 4px 8px -2px rgba(15, 23, 42, 0.06));
   --shadow-focus: 0 0 0 3px rgba(37, 99, 235, 0.2);
-  
+
+  /* The platform's blue banner — shared with the host's page headers and drawer headers. */
+  --header-gradient: var(--omni-gradient-hero, linear-gradient(120deg, #1e3a8a 0%, #1e40af 30%, #2563eb 65%, #3b82f6 100%));
+
   /* Radii */
-  --radius-sm: 6px;
+  --radius-sm: var(--omni-radius-sm, 6px);
   --radius-md: 10px;
-  --radius-lg: 12px;
-  --radius-xl: 16px;
+  --radius-lg: var(--omni-radius-lg, 12px);
+  --radius-xl: var(--omni-radius-xl, 16px);
 }
 
 /* Skeleton shimmer — same convention as the host's Skeleton component and Customer 360's own
@@ -1169,7 +1183,7 @@ html, body {
   align-items: center;
   justify-content: space-between;
   padding: 22px 28px 20px;
-  background: linear-gradient(120deg, #1e3a8a 0%, #1e40af 30%, #2563eb 65%, #3b82f6 100%);
+  background: var(--header-gradient);
   border-bottom: none;
   flex-shrink: 0;
   box-shadow: 0 4px 16px rgba(37, 99, 235, 0.24);
@@ -2219,7 +2233,7 @@ html, body {
   align-items: center;
   justify-content: space-between;
   padding: 22px 28px 20px;
-  background: linear-gradient(120deg, #1e3a8a 0%, #1e40af 30%, #2563eb 65%, #3b82f6 100%);
+  background: var(--header-gradient);
   color: #ffffff;
   flex-shrink: 0;
   position: relative;

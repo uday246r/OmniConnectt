@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useAuthStore } from '../../auth/store/authStore'
-import { useSettingsDrawerStore } from '../../../shared/stores/settingsDrawerStore'
 import { Badge, type BadgeTone } from '../../../shared/components/Badge/Badge'
 import { SkeletonBlock } from '../../../shared/components/Skeleton'
 import { ApiError } from '../../../shared/api/httpClient'
@@ -19,6 +18,7 @@ import { Icon } from '../../../shared/components/Icon/Icon'
 // not building a fourth right-side-panel implementation.
 import drawerStyles from '../../../layout/SettingsDrawer/SettingsDrawer.module.css'
 import styles from './ApprovalCenterPage.module.css'
+import { TOPICS, invalidate, useDataRevision } from '../../../shared/stores/invalidationStore'
 
 const DEFAULT_PAGE_SIZE = 10
 const PAGE_SIZE_OPTIONS = [5, 10, 15, 20] as const
@@ -577,7 +577,7 @@ export function ApprovalCenterPage() {
   // Invalidated whenever a Settings-drawer mutation (users/roles/applications/checker
   // assignments) happens elsewhere, so this list doesn't go stale without a manual reload —
   // mirrors MyRequestsPage's identical use of the same signal.
-  const mutationCount = useSettingsDrawerStore((s) => s.mutationCount)
+  const dataRevision = useDataRevision(TOPICS.approvals)
 
   const [viewingId, setViewingId] = useState<string | null>(null)
   const [detail, setDetail] = useState<ApprovalRequestDetailDto | null>(null)
@@ -720,7 +720,7 @@ export function ApprovalCenterPage() {
   const { items, total, error } = useApprovalRequests(accessToken, fetcher, [
     activeTab, page, pageSize, module, actionFilter, assignedToMeOnly,
     debouncedMaker, debouncedEntity, debouncedChecker, statusFilter,
-    refreshKey, range.from, range.to, decidedRange, decidedCustomFrom, decidedCustomTo, mutationCount,
+    refreshKey, range.from, range.to, decidedRange, decidedCustomFrom, decidedCustomTo, dataRevision,
   ])
 
   // Handler for the page-size preset or custom selection
@@ -791,7 +791,7 @@ export function ApprovalCenterPage() {
       setDetail(updated)
       setRefreshKey((k) => k + 1)
       void loadSummary()
-      window.dispatchEvent(new Event('omniremit:approval-count-invalidated'))
+      invalidate()
     } catch (err) {
       setDetailError(err instanceof ApiError ? err.message : 'Could not approve this request.')
     } finally {
@@ -809,7 +809,7 @@ export function ApprovalCenterPage() {
       setRejecting(false)
       setRefreshKey((k) => k + 1)
       void loadSummary()
-      window.dispatchEvent(new Event('omniremit:approval-count-invalidated'))
+      invalidate()
     } catch (err) {
       setDetailError(err instanceof ApiError ? err.message : 'Could not reject this request.')
     } finally {

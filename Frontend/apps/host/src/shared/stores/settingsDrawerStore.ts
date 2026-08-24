@@ -13,8 +13,6 @@ interface SettingsDrawerState {
   isOpen: boolean
   activeTab: SettingsTab
   layerStack: DrawerLayer[]
-  mutationCount: number
-  notifyMutation: () => void
   open: (tab?: SettingsTab) => void
   close: () => void
   setActiveTab: (tab: SettingsTab) => void
@@ -27,9 +25,7 @@ export const useSettingsDrawerStore = create<SettingsDrawerState>((set, get) => 
   isOpen: false,
   activeTab: 'users',
   layerStack: [{ type: 'root', tab: 'users' }],
-  mutationCount: 0,
 
-  notifyMutation: () => set((s) => ({ mutationCount: s.mutationCount + 1 })),
 
   open: (tab = 'users') => {
     set({

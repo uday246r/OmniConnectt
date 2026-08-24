@@ -15,6 +15,7 @@ import { Button } from '../../shared/components/Button/Button'
 import { ApiError } from '../../shared/api/httpClient'
 import { toast } from '../../shared/stores/toastStore'
 import styles from './SettingsUsersTab.module.css'
+import { TOPICS, invalidate, useDataRevision } from '../../shared/stores/invalidationStore'
 
 const PAGE_SIZE = 10
 
@@ -27,9 +28,7 @@ export function SettingsUsersTab() {
   // all, so an operator saw a live Delete button and a working deactivate toggle on their own row.
   const currentUserId = useAuthStore((s) => s.user?.id)
   const pushLayer = useSettingsDrawerStore((s) => s.pushLayer)
-  const mutationCount = useSettingsDrawerStore((s) => s.mutationCount)
-  const notifyMutation = useSettingsDrawerStore((s) => s.notifyMutation)
-
+  const dataRevision = useDataRevision(TOPICS.users)
   const canCreate = isAdministrator || hasCapability('host.settings.users', 'Create')
   const canEdit = isAdministrator || hasCapability('host.settings.users', 'Edit')
   const canDelete = isAdministrator || hasCapability('host.settings.users', 'Delete')
@@ -111,7 +110,7 @@ export function SettingsUsersTab() {
     return () => {
       cancelled = true
     }
-  }, [accessToken, debouncedSearch, selectedRoleId, selectedStatus, page, mutationCount])
+  }, [accessToken, debouncedSearch, selectedRoleId, selectedStatus, page, dataRevision])
 
   // Any change of filter invalidates the page number
   useEffect(() => {
@@ -138,7 +137,7 @@ export function SettingsUsersTab() {
       toast.success(
         `User '${userTarget.name || userTarget.email}' ${willBeActive ? 'activated' : 'deactivated'} successfully.`
       )
-      notifyMutation()
+      invalidate(TOPICS.users, TOPICS.approvals)
     } catch (err) {
       setPendingStatusToggle(null)
       // "Already awaiting approval" is not a failure the operator caused — it gets an explanatory
@@ -167,7 +166,7 @@ export function SettingsUsersTab() {
       }
       toast.success(`User '${userName}' deleted successfully.`)
       if (users.length === 1 && page > 1) setPage((p) => p - 1)
-      else notifyMutation()
+      else invalidate(TOPICS.users, TOPICS.approvals)
     } catch (err) {
       setPendingDelete(null)
       const conflict = asPendingApprovalConflict(err)

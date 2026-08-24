@@ -8,6 +8,7 @@ import { Icon } from '../../shared/components/Icon/Icon'
 import { ApiError } from '../../shared/api/httpClient'
 import { toast } from '../../shared/stores/toastStore'
 import styles from './CheckerAssignmentFormLayer.module.css'
+import { TOPICS, invalidate } from '../../shared/stores/invalidationStore'
 
 interface CheckerAssignmentFormLayerProps {
   /** Pre-selected module, when opened via a specific module card's "Add Checker" button. */
@@ -26,14 +27,12 @@ function getInitials(name?: string, email?: string): string {
 
 /**
  * Assigns one checker to one module. Deliberately a single simple form, not a wizard — there's only
- * two fields — but follows the same header/popLayer/notifyMutation shape every other form layer here
+ * two fields — but follows the same header/popLayer/invalidate shape every other form layer here
  * uses (UserFormLayer, RoleFormLayer, ApplicationFormLayer) so it reads as the same system.
  */
 export function CheckerAssignmentFormLayer({ module: initialModule }: CheckerAssignmentFormLayerProps) {
   const accessToken = useAuthStore((s) => s.accessToken)
-  const popLayer = useSettingsDrawerStore((s) => s.popLayer)
-  const notifyMutation = useSettingsDrawerStore((s) => s.notifyMutation)
-
+  const popLayer = useSettingsDrawerStore((s) => s.popLayer)
   const [module, setModule] = useState(initialModule ?? '')
   const [modules, setModules] = useState<AssignableModuleDto[]>([])
   const [moduleDropdownOpen, setModuleDropdownOpen] = useState(false)
@@ -121,7 +120,7 @@ export function CheckerAssignmentFormLayer({ module: initialModule }: CheckerAss
     try {
       const result = await checkerAssignmentsApi.upsert(accessToken, { module, checkerUserId })
       toast.success(`${result.checkerName} is now a checker for '${module}'.`)
-      notifyMutation()
+      invalidate(TOPICS.checkerAssignments)
       popLayer()
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Could not assign this checker.')

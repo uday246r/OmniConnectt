@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useAuthStore } from '../../auth/store/authStore'
-import { useSettingsDrawerStore } from '../../../shared/stores/settingsDrawerStore'
 import { Badge, type BadgeTone } from '../../../shared/components/Badge/Badge'
 import { SkeletonBlock } from '../../../shared/components/Skeleton'
 import { approvalsApi, type ApprovalStatus, type RevealTempPasswordResponse } from '../api/approvalsApi'
@@ -8,6 +7,7 @@ import { useApprovalRequests } from '../hooks/useApprovalRequests'
 import { Icon } from '../../../shared/components/Icon/Icon'
 import { ApiError } from '../../../shared/api/httpClient'
 import styles from './MyRequestsPage.module.css'
+import { TOPICS, useDataRevision } from '../../../shared/stores/invalidationStore'
 
 const DEFAULT_PAGE_SIZE = 10
 
@@ -137,14 +137,14 @@ export function MyRequestsPage() {
   const [page, setPage] = useState(1)
   const [pageSize] = useState(DEFAULT_PAGE_SIZE)
   const [refreshKey, setRefreshKey] = useState(0)
-  const mutationCount = useSettingsDrawerStore((s) => s.mutationCount)
+  const dataRevision = useDataRevision(TOPICS.approvals)
 
   const fetcher = useCallback(
     (token: string) =>
       approvalsApi.listMine(token, { page, pageSize, status: statusFilter === 'all' ? undefined : statusFilter }),
     [page, pageSize, statusFilter],
   )
-  const { items, total, error } = useApprovalRequests(accessToken, fetcher, [page, pageSize, statusFilter, refreshKey, mutationCount])
+  const { items, total, error } = useApprovalRequests(accessToken, fetcher, [page, pageSize, statusFilter, refreshKey, dataRevision])
 
   useEffect(() => {
     setPage(1)
@@ -167,8 +167,18 @@ export function MyRequestsPage() {
       setCollectedIds((prev) => new Set(prev).add(id))
       setRevealed(result)
     } catch (err) {
-      // 410 (already collected) lands here too — mark it collected so the dead button disappears.
-      setCollectedIds((prev) => new Set(prev).add(id))
+      /*
+       * Only a 410 means the password is genuinely gone (already collected — it is one-time).
+       *
+       * This used to mark the row collected for ANY failure, so a dropped connection or a
+       * momentary 500 permanently hid the only button that can retrieve the credential: the flag
+       * lives in component state, and nothing clears it short of a remount. The password was still
+       * sitting on the server, unreachable. Every other error now leaves the button in place so the
+       * operator can simply try again.
+       */
+      if (err instanceof ApiError && err.status === 410) {
+        setCollectedIds((prev) => new Set(prev).add(id))
+      }
       setRevealError(err instanceof ApiError ? err.message : 'Could not retrieve the temporary password.')
     } finally {
       setRevealing(null)
@@ -187,7 +197,13 @@ export function MyRequestsPage() {
     <div className={styles.page}>
       <div className={styles.header}>
         <div className={styles.titleGroup}>
-          <h1 className={styles.title}>My Requests</h1>
+          <div className={styles.titleHeaderRow}>
+            <h1 className={styles.title}>My Requests</h1>
+            <span className={styles.liveStreamBadge}>
+              <span className={styles.liveDot} />
+              Live Status
+            </span>
+          </div>
           <p className={styles.subtitle}>Every action you've submitted for approval — status, assigned checker, and rejection reasons if any.</p>
         </div>
         <button type="button" className={styles.refreshBtn} onClick={() => setRefreshKey((k) => k + 1)}>

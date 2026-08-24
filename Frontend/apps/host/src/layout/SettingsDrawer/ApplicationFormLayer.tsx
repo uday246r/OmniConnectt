@@ -8,6 +8,7 @@ import { SkeletonBlock } from '../../shared/components/Skeleton'
 import { ApiError } from '../../shared/api/httpClient'
 import { toast } from '../../shared/stores/toastStore'
 import styles from './ApplicationFormLayer.module.css'
+import { TOPICS, invalidate } from '../../shared/stores/invalidationStore'
 
 interface ApplicationFormLayerProps {
   appId?: string
@@ -174,7 +175,7 @@ export function ApplicationFormLayer({ appId }: ApplicationFormLayerProps) {
       }
       const { useModuleRegistryStore } = await import('../../shared/stores/moduleRegistryStore')
       void useModuleRegistryStore.getState().fetchForSidebar(token)
-      useSettingsDrawerStore.getState().notifyMutation()
+      invalidate(TOPICS.applications, TOPICS.approvals)
       useSettingsDrawerStore.getState().resetToRoot('applications')
     } catch (err: any) {
       if (err instanceof ApiError && err.errors) {

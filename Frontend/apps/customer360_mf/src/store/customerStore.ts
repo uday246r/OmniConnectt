@@ -155,7 +155,14 @@ export const useCustomerStore = create<CustomerStoreState>((set, get) => ({
     const state = get();
     const cachedProfile = type === 'individual' ? state.individualProfile : state.corporateProfile;
     const cachedContact = type === 'individual' ? state.individualContactInfo : state.corporateContactInfo;
-    set({ customerType: type, profile: cachedProfile, contactInfo: cachedContact, error: null });
+    /*
+     * `loading` is cleared for the same reason `error` is: it describes a request for the type being
+     * switched AWAY from, and that request can no longer write to the shared view (loadActiveProfile
+     * now discards cross-type results). Without this the spinner would hang forever whenever a
+     * switch happened while a fetch was still in flight — the request would land, correctly decline
+     * to touch the shared fields, and leave `loading` stuck true with nothing left to clear it.
+     */
+    set({ customerType: type, profile: cachedProfile, contactInfo: cachedContact, error: null, loading: false });
   },
 
   loadActiveProfile: async () => {
@@ -187,21 +194,37 @@ export const useCustomerStore = create<CustomerStoreState>((set, get) => ({
       const currentVersion = customerType === 'individual' ? _individualSearchVersion : _corporateSearchVersion;
       if (version !== currentVersion) return;
 
+      /*
+       * Has the user switched customer TYPE while this request was in flight?
+       *
+       * The version guard above only detects a newer search of the same type, which left the
+       * cross-type race wide open and is the cause of the Individual↔Non-Individual regression:
+       * search an Individual, switch to Non-Individual before the response lands, and the individual
+       * fetch resolves with its version still current — so the guard passes and the block below
+       * writes individual data into `profile`, the shared view field that the (now corporate) page
+       * is rendering. The result is one customer type's data displayed under the other's heading.
+       *
+       * The per-type slot is still safe to fill: it is keyed by type and nothing else reads it right
+       * now, so caching it keeps a switch back instant. Only the SHARED view fields — profile,
+       * contactInfo, loading, error — must be left to whichever type is actually on screen.
+       */
+      const stillOnThisType = get().customerType === customerType;
+
+      const sharedView = stillOnThisType
+        ? { profile: profileData, contactInfo: contactData, loading: false }
+        : {};
+
       if (customerType === 'individual') {
         set({
           individualProfile: profileData as IndividualProfile | null,
           individualContactInfo: contactData,
-          profile: profileData,
-          contactInfo: contactData,
-          loading: false,
+          ...sharedView,
         });
       } else {
         set({
           corporateProfile: profileData as CorporateProfile | null,
           corporateContactInfo: contactData,
-          profile: profileData,
-          contactInfo: contactData,
-          loading: false,
+          ...sharedView,
         });
       }
       if (profileData) {
@@ -214,6 +237,9 @@ export const useCustomerStore = create<CustomerStoreState>((set, get) => ({
     } catch (err) {
       const currentVersion = customerType === 'individual' ? _individualSearchVersion : _corporateSearchVersion;
       if (version !== currentVersion) return;
+      // Same cross-type guard as the success path: a failed individual lookup must not surface as an
+      // error banner over the corporate page the user has already switched to.
+      if (get().customerType !== customerType) return;
       const error = err as ApiError;
       set({ error: error.message, errorStatus: error.status, loading: false });
       console.error('Error loading customer profile:', err);

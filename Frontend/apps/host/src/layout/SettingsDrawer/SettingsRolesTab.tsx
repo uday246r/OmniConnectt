@@ -14,6 +14,7 @@ import { Button } from '../../shared/components/Button/Button'
 import { ApiError } from '../../shared/api/httpClient'
 import { toast } from '../../shared/stores/toastStore'
 import styles from './SettingsRolesTab.module.css'
+import { TOPICS, invalidate, useDataRevision } from '../../shared/stores/invalidationStore'
 
 const PAGE_SIZE = 10
 
@@ -27,9 +28,7 @@ export function SettingsRolesTab() {
   const currentUserRoleId = useAuthStore((s) => s.user?.roleId)
   const pushLayer = useSettingsDrawerStore((s) => s.pushLayer)
   // Bumped by every form layer that saves, so closing an editor refreshes this list.
-  const mutationCount = useSettingsDrawerStore((s) => s.mutationCount)
-  const notifyMutation = useSettingsDrawerStore((s) => s.notifyMutation)
-
+  const dataRevision = useDataRevision(TOPICS.roles)
   const canCreate = isAdministrator || hasCapability('host.settings.roles', 'Create')
   const canEdit = isAdministrator || hasCapability('host.settings.roles', 'Edit')
   const canDelete = isAdministrator || hasCapability('host.settings.roles', 'Delete')
@@ -80,7 +79,7 @@ export function SettingsRolesTab() {
     return () => {
       cancelled = true
     }
-  }, [accessToken, debouncedSearch, page, mutationCount])
+  }, [accessToken, debouncedSearch, page, dataRevision])
 
   // A new search term invalidates the current page number.
   useEffect(() => {
@@ -101,7 +100,7 @@ export function SettingsRolesTab() {
       toast.success(`Role '${roleName}' deleted successfully.`)
       // If the last row on the final page just went, step back rather than showing an empty page.
       if (roles.length === 1 && page > 1) setPage((p) => p - 1)
-      else notifyMutation()
+      else invalidate(TOPICS.roles, TOPICS.approvals)
     } catch (err) {
       setPendingDelete(null)
       const conflict = asPendingApprovalConflict(err)

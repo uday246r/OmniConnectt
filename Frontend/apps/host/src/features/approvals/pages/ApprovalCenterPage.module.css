@@ -36,9 +36,9 @@
   flex-wrap: wrap;
   position: relative;
   overflow: hidden;
-  background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 50%, #3b82f6 100%);
+  background: var(--omni-gradient-page-header);
   border: none;
-  box-shadow: 0 8px 30px rgba(37, 99, 235, 0.28), 0 2px 6px rgba(37, 99, 235, 0.15);
+  box-shadow: var(--omni-shadow-page-header);
 }
 
 /* Ambient glow & decorative background circles */
@@ -84,7 +84,7 @@
 .title {
   font-size: 24px;
   font-weight: 800;
-  color: #ffffff;
+  color: var(--omni-color-on-header-text);
   margin: 0;
   letter-spacing: -0.03em;
   line-height: 1.2;
@@ -95,14 +95,14 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background: rgba(255, 255, 255, 0.18);
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: var(--omni-color-on-header-surface);
+  border: 1px solid var(--omni-color-on-header-border);
   backdrop-filter: blur(8px);
   padding: 3px 10px;
-  border-radius: 999px;
+  border-radius: var(--omni-radius-pill);
   font-size: 11px;
   font-weight: 700;
-  color: #ffffff;
+  color: var(--omni-color-on-header-text);
   letter-spacing: 0.03em;
 }
 
@@ -110,8 +110,8 @@
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #34d399;
-  box-shadow: 0 0 8px #34d399;
+  background: var(--omni-color-live-dot);
+  box-shadow: 0 0 8px var(--omni-color-live-dot);
   animation: pulseDot 2s infinite;
 }
 
@@ -120,9 +120,13 @@
   50% { transform: scale(1.35); opacity: 0.75; }
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .liveDot { animation: none; }
+}
+
 .subtitle {
   font-size: 13.5px;
-  color: rgba(255, 255, 255, 0.85);
+  color: var(--omni-color-on-header-muted);
   margin: 0;
   font-weight: 400;
   max-width: 620px;

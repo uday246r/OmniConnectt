@@ -501,9 +501,7 @@ export const AuditLogsPage: React.FC = () => {
                       style={{
                         borderBottom: '1px solid #f1f5f9',
                         transition: 'background 0.12s ease',
-                        cursor: 'pointer',
                       }}
-                      onClick={() => openAuditDetails(log)}
                       onMouseEnter={(e) => {
                         e.currentTarget.style.background = '#f8fafc';
                       }}

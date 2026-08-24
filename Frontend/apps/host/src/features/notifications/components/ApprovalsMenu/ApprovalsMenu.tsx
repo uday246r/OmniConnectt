@@ -2,13 +2,13 @@ import { useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useAuthStore } from '../../../auth/store/authStore'
-import { useSettingsDrawerStore } from '../../../../shared/stores/settingsDrawerStore'
 import { useClickOutside } from '../../../../shared/hooks/useClickOutside'
 import { useMenuKeyboardNav } from '../../../../shared/hooks/useMenuKeyboardNav'
 import { Icon } from '../../../../shared/components/Icon/Icon'
 import { SkeletonBlock } from '../../../../shared/components/Skeleton'
 import { approvalsApi } from '../../../approvals/api/approvalsApi'
 import styles from './ApprovalsMenu.module.css'
+import { TOPICS, useDataRevision } from '../../../../shared/stores/invalidationStore'
 
 const ITEM_LIMIT = 8
 
@@ -39,7 +39,7 @@ export function ApprovalsMenu() {
   // assign/remove — the same cross-component "something changed elsewhere, refetch" signal
   // DashboardPage already relies on for unrelated Settings mutations. Included in the query keys
   // below so React Query treats a bump as an immediate refetch trigger, not just the 60s poll.
-  const mutationCount = useSettingsDrawerStore((s) => s.mutationCount)
+  const dataRevision = useDataRevision(TOPICS.approvals)
 
   const [open, setOpen] = useState(false)
   const wrapperRef = useRef<HTMLDivElement>(null)
@@ -49,7 +49,7 @@ export function ApprovalsMenu() {
   const handleKeyDown = useMenuKeyboardNav(wrapperRef, () => setOpen(false), triggerRef)
 
   const listQuery = useQuery({
-    queryKey: ['assignedApprovals', ITEM_LIMIT, mutationCount],
+    queryKey: ['assignedApprovals', ITEM_LIMIT, dataRevision],
     queryFn: () => approvalsApi.list(accessToken!, { page: 1, pageSize: ITEM_LIMIT, assignedToMe: true, status: 'Pending' }),
     enabled: Boolean(accessToken) && open,
     refetchInterval: 60_000,
@@ -57,7 +57,7 @@ export function ApprovalsMenu() {
   })
 
   const summaryQuery = useQuery({
-    queryKey: ['approvalSummaryBadge', mutationCount],
+    queryKey: ['approvalSummaryBadge', dataRevision],
     queryFn: () => approvalsApi.summary(accessToken!),
     enabled: Boolean(accessToken),
     refetchInterval: 60_000,

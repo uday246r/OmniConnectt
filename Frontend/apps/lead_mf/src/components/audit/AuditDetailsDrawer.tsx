@@ -92,8 +92,6 @@ function getActionLabel(action?: string): string {
 
 export const AuditDetailsDrawer: React.FC = () => {
   const { isAuditDetailsOpen, selectedAuditLog, closeAuditDetails } = useLeadStore();
-  const [copiedId, setCopiedId] = useState(false);
-  const [copiedPayload, setCopiedPayload] = useState(false);
 
   // Lock body scroll when drawer is open
   useEffect(() => {
@@ -160,50 +158,10 @@ export const AuditDetailsDrawer: React.FC = () => {
 
   if (!isAuditDetailsOpen || !selectedAuditLog) return null;
 
-  const recordId = selectedAuditLog.id ? String(selectedAuditLog.id) : '';
   const statusStr = selectedAuditLog.status ? String(selectedAuditLog.status) : '';
   const isSuccess = statusStr.toUpperCase() === 'SUCCESS' || !statusStr;
   const actorName = selectedAuditLog.userName || selectedAuditLog.userId || 'System';
   const actorInitial = (String(actorName).charAt(0) || 'S').toUpperCase();
-
-  const rawJsonPayload = JSON.stringify(
-    {
-      id: recordId,
-      timestamp: selectedAuditLog.timestamp,
-      serviceName: 'LeadService',
-      module: 'Lead Management',
-      actionType: selectedAuditLog.actionType,
-      status: selectedAuditLog.status,
-      actor: {
-        id: selectedAuditLog.userId,
-        name: selectedAuditLog.userName,
-        role: selectedAuditLog.userRole,
-        ipAddress: selectedAuditLog.ipAddress,
-      },
-      entity: {
-        type: selectedAuditLog.entityType || 'Lead',
-        id: selectedAuditLog.entityId || recordId,
-        description: selectedAuditLog.description,
-        reason: selectedAuditLog.reason || null,
-      },
-      diffs: parsedDiffs.length > 0 ? parsedDiffs : undefined,
-    },
-    null,
-    2
-  );
-
-  const handleCopyId = () => {
-    if (!recordId) return;
-    navigator.clipboard.writeText(recordId);
-    setCopiedId(true);
-    setTimeout(() => setCopiedId(false), 1600);
-  };
-
-  const handleCopyPayload = () => {
-    navigator.clipboard.writeText(rawJsonPayload);
-    setCopiedPayload(true);
-    setTimeout(() => setCopiedPayload(false), 1600);
-  };
 
   const handleOverlayClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (e.target === e.currentTarget) {
@@ -389,17 +347,6 @@ export const AuditDetailsDrawer: React.FC = () => {
                 </div>
               </div>
 
-              <div className="audit-field-card">
-                <span className="audit-field-card-icon">
-                  <Key size={15} />
-                </span>
-                <div className="audit-field-card-body">
-                  <span className="audit-field-card-label">Actor ID</span>
-                  <span className="audit-field-card-value audit-mono-text">
-                    {selectedAuditLog.userId || 'System / None'}
-                  </span>
-                </div>
-              </div>
 
               <div className="audit-field-card">
                 <span className="audit-field-card-icon">
@@ -453,17 +400,6 @@ export const AuditDetailsDrawer: React.FC = () => {
                 </div>
               </div>
 
-              <div className="audit-field-card">
-                <span className="audit-field-card-icon">
-                  <Key size={15} />
-                </span>
-                <div className="audit-field-card-body">
-                  <span className="audit-field-card-label">Entity ID / Key</span>
-                  <span className="audit-field-card-value audit-mono-text">
-                    {selectedAuditLog.entityId || recordId}
-                  </span>
-                </div>
-              </div>
 
               <div className="audit-field-card audit-field-card-full">
                 <span className="audit-field-card-icon">
@@ -509,67 +445,15 @@ export const AuditDetailsDrawer: React.FC = () => {
             </section>
           )}
 
-          {/* 5. Raw Event Payload & Execution Metadata */}
-          <section className="audit-drawer-section">
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-              <h3 className="audit-drawer-section-title" style={{ margin: 0 }}>
-                <FileText size={12} />
-                Event Payload &amp; Metadata
-              </h3>
-              <button
-                type="button"
-                onClick={handleCopyPayload}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '5px',
-                  background: '#eff6ff',
-                  border: '1px solid #bfdbfe',
-                  fontSize: '11.5px',
-                  fontWeight: 600,
-                  color: copiedPayload ? '#059669' : '#1d4ed8',
-                  cursor: 'pointer',
-                  padding: '4px 9px',
-                  borderRadius: '6px',
-                  transition: 'all 0.12s ease',
-                }}
-              >
-                {copiedPayload ? <Check size={13} /> : <Copy size={13} />}
-                <span>{copiedPayload ? 'Copied JSON' : 'Copy JSON'}</span>
-              </button>
-            </div>
-            <pre className="audit-payload-code-box">{rawJsonPayload}</pre>
-          </section>
         </div>
 
-        {/* Sticky Footer */}
+        {/*
+          Sticky Footer — the raw JSON payload dump, the "Copy JSON"/"Copy ID" controls and the
+          truncated record GUID were removed: this drawer is read by business users reviewing who
+          did what, and internal identifiers are noise they cannot act on. Everything meaningful is
+          already presented as labelled fields above.
+        */}
         <div className="audit-drawer-footer">
-          <div className="audit-footer-meta">
-            <span style={{ fontFamily: 'ui-monospace, monospace', color: '#94a3b8' }}>
-              ID: {recordId ? `${recordId.slice(0, 14)}…` : '—'}
-            </span>
-            <button
-              type="button"
-              onClick={handleCopyId}
-              style={{
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-                color: copiedId ? '#059669' : '#64748b',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '4px',
-                padding: '3px 6px',
-                fontSize: '11.5px',
-                fontWeight: 600,
-              }}
-              title="Copy Record ID"
-            >
-              {copiedId ? <Check size={13} /> : <Copy size={13} />}
-              <span>{copiedId ? 'Copied' : 'Copy ID'}</span>
-            </button>
-          </div>
-
           <button
             type="button"
             className="audit-footer-close-btn"

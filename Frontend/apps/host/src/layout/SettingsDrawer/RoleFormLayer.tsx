@@ -15,6 +15,7 @@ import { groupsFromCatalog, columnsForRows } from '../../shared/permissions/cata
 import { toast } from '../../shared/stores/toastStore'
 import { LIMITS, required, maxLength, firstError, isValid, type FieldErrors } from '../../shared/validation/rules'
 import styles from './RoleFormLayer.module.css'
+import { TOPICS, invalidate } from '../../shared/stores/invalidationStore'
 
 interface RoleFormLayerProps {
   roleId?: string
@@ -376,7 +377,7 @@ export function RoleFormLayer({ roleId, initialTab }: RoleFormLayerProps) {
 
       if (isApprovalPending(result)) {
         // Nothing was actually created/changed — the "Roles" module has a checker assigned, so this
-        // submission is queued instead of applied. No refreshSession/notifyMutation: there is nothing
+        // submission is queued instead of applied. No refreshSession/invalidate: there is nothing
         // stale to refresh yet.
         if (isEdit) {
           // Mirrors UserFormLayer's own update path: the drawer just closes back to the list — there's
@@ -396,7 +397,7 @@ export function RoleFormLayer({ roleId, initialTab }: RoleFormLayerProps) {
 
       toast.success(`Role '${name}' ${isEdit ? 'updated' : 'created'} successfully.`)
       void refreshSession()
-      useSettingsDrawerStore.getState().notifyMutation()
+      invalidate(TOPICS.roles, TOPICS.approvals)
       useSettingsDrawerStore.getState().resetToRoot('roles')
     } catch (err: any) {
       // Blocked by an in-flight request on this same role — explained in a dialog rather than as a

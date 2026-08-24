@@ -10,6 +10,7 @@ import { SkeletonStatCard, SkeletonDashboardWidget, SkeletonAuditRow, SkeletonDo
 import { Icon } from '../../shared/components/Icon/Icon'
 import styles from './DashboardPage.module.css'
 import { APP_NAME, COPYRIGHT_YEAR } from '../../shared/config/branding'
+import { useDataRevision } from '../../shared/stores/invalidationStore'
 
 interface RoleDistribution {
   name: string
@@ -82,7 +83,7 @@ export function DashboardPage() {
   const accessToken = useAuthStore((s) => s.accessToken)
   const openDrawer = useSettingsDrawerStore((s) => s.open)
   const pushLayer = useSettingsDrawerStore((s) => s.pushLayer)
-  const mutationCount = useSettingsDrawerStore((s) => s.mutationCount)
+  const dataRevision = useDataRevision()
 
   const [loading, setLoading] = useState(true)
   const [totalUsers, setTotalUsers] = useState(0)
@@ -164,7 +165,7 @@ export function DashboardPage() {
     return () => {
       cancelled = true
     }
-  }, [accessToken, mutationCount])
+  }, [accessToken, dataRevision])
 
   /**
    * Users by role, straight from the server's GROUP BY.

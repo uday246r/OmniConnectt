@@ -18,9 +18,6 @@ export interface SidebarProps {
   apps?: SidebarAppItem[]
   canAccessAuditLogs?: boolean
   canAccessApprovals?: boolean
-  /** Super Admins never submit approval requests — every gated mutation they make applies
-   * immediately — so "My Requests" would always be an empty page for them. */
-  isAdministrator?: boolean
   error?: string | null
   userName?: string
   onLogout?: () => void
@@ -59,7 +56,7 @@ function forwardClickToChevron(e: React.MouseEvent<HTMLAnchorElement>) {
   // NavLink navigate normally.
 }
 
-export function Sidebar({ apps, canAccessAuditLogs, canAccessApprovals, isAdministrator, error, mobileOpen }: SidebarProps) {
+export function Sidebar({ apps, canAccessAuditLogs, canAccessApprovals, error, mobileOpen }: SidebarProps) {
   return (
     <aside className={classNames(styles.sidebar, mobileOpen ? styles.sidebarMobileOpen : '')}>
 
@@ -138,10 +135,9 @@ export function Sidebar({ apps, canAccessAuditLogs, canAccessApprovals, isAdmini
         {/* ── System section — pushed to bottom of nav with margin-top: auto
             so it sits right below the apps list, never floats to the bottom
             of 100vh creating a giant empty gap ─────────────────────────── */}
-        {/* "My Requests" is shown to every authenticated user EXCEPT Super Admins — everyone else
-            tracks their own submitted requests here regardless of whether they hold Approval Center
-            or Audit Log access. Super Admins never raise a request at all (every gated mutation of
-            theirs applies immediately), so this page can only ever be empty for them. */}
+        {/* "My Requests" is shown to every authenticated user — it tracks their own submitted
+            requests regardless of whether they hold Approval Center or Audit Log access, since
+            approvalsApi.listMine is scoped to the caller's own id server-side. */}
         <div className={styles.systemSection}>
           <div className={styles.sectionLabel}>System</div>
           {canAccessApprovals && (
@@ -152,14 +148,23 @@ export function Sidebar({ apps, canAccessAuditLogs, canAccessApprovals, isAdmini
               <span className={styles.navLabel}>Approval Center</span>
             </NavLink>
           )}
-          {!isAdministrator && (
-            <NavLink to="/my-requests" className={navItemClass}>
-              <span className={styles.navIcon} aria-hidden="true">
-                <Icon.Clock width={17} height={17} />
-              </span>
-              <span className={styles.navLabel}>My Requests</span>
-            </NavLink>
-          )}
+          {/*
+            Shown to everyone, administrators included.
+
+            This was previously hidden from administrators on the grounds that they never create
+            approval requests. That is only true of SUPER administrators: UsersController passes
+            `bypassApproval: IsSuperAdmin()`, so any other administrator is an ordinary maker whose
+            gated mutations queue like anybody else's. Hiding the page left them with no way to
+            collect the temporary password for an account they had just created — the button exists
+            only on this page. An empty page for the few who genuinely never make requests is a far
+            smaller cost than an unreachable credential.
+          */}
+          <NavLink to="/my-requests" className={navItemClass}>
+            <span className={styles.navIcon} aria-hidden="true">
+              <Icon.Clock width={17} height={17} />
+            </span>
+            <span className={styles.navLabel}>My Requests</span>
+          </NavLink>
           {canAccessAuditLogs && (
             <NavLink to="/system/audit-logs" className={navItemClass}>
               <span className={styles.navIcon} aria-hidden="true">

@@ -9,7 +9,7 @@ import { useAuthStore } from './features/auth/store/authStore'
 import { useModuleRegistryStore } from './shared/stores/moduleRegistryStore'
 import { useSettingsDrawerStore, type SettingsTab } from './shared/stores/settingsDrawerStore'
 import { RouteFallback } from './shared/components/RouteFallback/RouteFallback'
-import { LoginPageSkeleton } from './pages/LoginPage/LoginPageSkeleton'
+import { LoginPage } from './pages/LoginPage/LoginPage'
 import { AppShellSkeleton } from './shared/components/AppShellSkeleton/AppShellSkeleton'
 import { lazyWithPreload, preloadWhenIdle } from './shared/utils/lazyWithPreload'
 
@@ -29,7 +29,10 @@ import { lazyWithPreload, preloadWhenIdle } from './shared/utils/lazyWithPreload
 const { Component: DashboardPage, preload: preloadDashboard } = lazyWithPreload(() =>
   import('./pages/DashboardPage/DashboardPage').then((m) => ({ default: m.DashboardPage })),
 )
-const LoginPage = lazy(() => import('./pages/LoginPage/LoginPage').then((m) => ({ default: m.LoginPage })))
+// NOT lazy, deliberately. Login is the first — and for an unauthenticated visitor the only — screen
+// rendered, so code-splitting it bought nothing: it just inserted a Suspense gap that had to be
+// papered over with a skeleton on the very first paint. Importing it eagerly removes that skeleton
+// entirely and gets the real form on screen sooner. Everything behind authentication stays split.
 const MaintenancePage = lazy(() => import('./pages/MaintenancePage/MaintenancePage').then((m) => ({ default: m.MaintenancePage })))
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage/NotFoundPage').then((m) => ({ default: m.NotFoundPage })))
 const RemoteAppPage = lazy(() => import('./pages/RemoteAppPage/RemoteAppPage').then((m) => ({ default: m.RemoteAppPage })))
@@ -124,31 +127,27 @@ function LoginRoute() {
   }
 
   return (
-    // Nested Suspense with a login-shaped fallback: on a cold visit (first thing loaded this
-    // session) the outer Suspense's RouteFallback would otherwise flash — a generic header+body
-    // shape that looks nothing like the real split-panel login screen.
-    //
-    // The LoginPageSkeleton itself has a 200ms CSS animation-delay (animation-fill-mode: both),
-    // so it stays invisible on warm-cache loads where the chunk resolves quickly — no flicker —
-    // and only fades in when the download actually takes noticeable time.
-    <Suspense fallback={<LoginPageSkeleton />}>
-      <LoginPage
-        onSubmit={login}
-        onGoogleCredential={loginWithGoogle}
-        loading={loginLoading}
-        errorMessage={loginError}
-      />
-    </Suspense>
+    // No Suspense wrapper and no skeleton: LoginPage is imported eagerly (see its import above), so
+    // it is already in the initial bundle and paints immediately.
+    <LoginPage
+      onSubmit={login}
+      onGoogleCredential={loginWithGoogle}
+      loading={loginLoading}
+      errorMessage={loginError}
+    />
   )
 }
 
-/** Super Admins never create approval requests (every gated mutation of theirs applies
- * immediately), so this page can only ever be empty for them. The sidebar link is hidden; this
- * makes the URL itself resolve somewhere useful instead of to a dead screen. */
-function MyRequestsRoute() {
-  const isAdministrator = useAuthStore((s) => Boolean(s.user?.isAdministrator))
-  return isAdministrator ? <Navigate to="/" replace /> : <MyRequestsPage />
-}
+/*
+ * Previously this redirected administrators away, on the reasoning that Super Admins never create
+ * approval requests. Only SUPER administrators bypass approval (UsersController passes
+ * `bypassApproval: IsSuperAdmin()`); every other administrator is an ordinary maker. The redirect
+ * therefore made the page — and with it the only "Get password" button in the app — unreachable for
+ * exactly the people who had just created an account and needed the credential.
+ *
+ * The route now renders for everyone; an administrator who has genuinely never made a request sees
+ * the normal empty state.
+ */
 
 function AuthenticatedShell() {
   const user = useAuthStore((s) => s.user)
@@ -225,9 +224,7 @@ function AuthenticatedShell() {
       userName={user?.name}
       settingsAccess={settingsAccess}
       canAccessAuditLogs={canAccessAuditLogs}
-      canAccessApprovals={canAccessApprovals}
-      isAdministrator={isAdministrator}
-      onLogout={() => {
+      canAccessApprovals={canAccessApprovals}      onLogout={() => {
         void logout().then(() => navigate('/login', { replace: true }))
       }}
     />
@@ -330,7 +327,7 @@ function AppRoutes() {
           {/* No capability gate — every authenticated user tracks their own submitted requests
               regardless of whether they hold Approval Center access; the backend scopes this to the
               caller's own id server-side (see GET /api/approvals/mine), so there is nothing to leak. */}
-          <Route path="my-requests" element={<MyRequestsRoute />} />
+          <Route path="my-requests" element={<MyRequestsPage />} />
 
           {/*
             Settings has no pages of its own — it IS the gear drawer, rendered globally by AppShell.
