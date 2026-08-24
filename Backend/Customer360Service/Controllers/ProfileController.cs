@@ -12,10 +12,18 @@ using backend.Models;
 
 namespace backend.Controllers
 {
+    /*
+     * Capability attributes are per-ACTION here, not on the class.
+     *
+     * The class-level [RequiresCapability("profile","View")] applied to /v1/lookups too — static
+     * dropdown configuration containing no customer data — and a method-level [AllowAnonymous] could
+     * not lift it, because a hand-written IAsyncAuthorizationFilter does not honour IAllowAnonymous.
+     * Declaring the requirement on the two actions that actually return customer data is both honest
+     * about the contract and the only way to exempt the one that doesn't.
+     */
     [Authorize]
     [ApiController]
     [Route("v1")]
-    [RequiresCapability("profile", "View")]
     public class ProfileController : ControllerBase
     {
         private readonly CrmProxyService _crmProxy;
@@ -33,9 +41,20 @@ namespace backend.Controllers
             public string Label { get; set; } = string.Empty;
         }
 
-        // GET /v1/lookups
+        /*
+         * GET /v1/lookups — the search-type dropdown options (NRIC, Phone, Name, …). Static
+         * configuration, no customer data, so it is available to any authenticated user of this app.
+         *
+         * It previously carried [AllowAnonymous], which did nothing: the class-level
+         * [RequiresCapability("profile","View")] is a hand-written IAsyncAuthorizationFilter, and only
+         * the built-in AuthorizeFilter/AuthorizationMiddleware honour IAllowAnonymous metadata. So the
+         * attribute advertised "public" while the endpoint actually demanded profile:View — and the
+         * search form silently rendered with no options for anyone who lacked it.
+         *
+         * Kept authenticated (the class [Authorize] still applies) but with the capability requirement
+         * genuinely lifted, which is what the [AllowAnonymous] was reaching for.
+         */
         [HttpGet("lookups")]
-        [AllowAnonymous]
         public IActionResult GetLookups()
         {
             var section = _configuration.GetSection("SearchOptions");
@@ -86,6 +105,7 @@ namespace backend.Controllers
         }
 
         // GET /v1/indprofile?type=NRIC&id=92418-14-5678
+        [RequiresCapability("profile", "View")]
         [HttpGet("indprofile")]
         public async Task<IActionResult> GetIndividualProfile([FromQuery] string? type, [FromQuery] string? id, [FromQuery] string? subtype)
         {
@@ -134,6 +154,7 @@ namespace backend.Controllers
         }
 
         // GET /v1/corpprofile
+        [RequiresCapability("profile", "View")]
         [HttpGet("corpprofile")]
         public async Task<IActionResult> GetCorporateProfile([FromQuery] string? type, [FromQuery] string? id)
         {

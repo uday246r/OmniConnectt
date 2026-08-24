@@ -20,6 +20,48 @@ public class UserAppService(
     // EmployeeService/LeadService, which have to capture and forward these explicitly.
     private string? SourceIp => httpContextAccessor.HttpContext?.Connection.RemoteIpAddress?.ToString();
     private string? UserAgent => httpContextAccessor.HttpContext?.Request.Headers.UserAgent.ToString();
+
+    /// <summary>
+    /// Refuses assigning a role that carries Platform Administrator Access unless the acting user is
+    /// themselves an administrator.
+    ///
+    /// The counterpart to RoleAppService's create/update guards: locking down who can MINT an admin
+    /// role is pointless if anyone with Users:Edit can then hand out an existing one. Together the two
+    /// close the escalation path completely.
+    ///
+    /// "Is the actor an administrator" is resolved from the acting user's own DB record rather than
+    /// the ambient JWT claim, because during an approval replay the HttpContext belongs to the checker
+    /// — see RoleAppService.IsActorAdministratorAsync for the full reasoning.
+    /// </summary>
+    private async Task EnsureMayAssignRoleAsync(Guid? targetRoleId, Guid? actingUserId, CancellationToken ct)
+    {
+        if (targetRoleId is null)
+        {
+            return;
+        }
+
+        var targetIsAdministrator = await db.Roles.AsNoTracking()
+            .Where(r => r.Id == targetRoleId.Value)
+            .Select(r => r.IsAdministrator)
+            .FirstOrDefaultAsync(ct);
+
+        if (!targetIsAdministrator)
+        {
+            return;
+        }
+
+        var actorIsAdministrator = actingUserId is not null && await db.Users.AsNoTracking()
+            .Where(u => u.Id == actingUserId.Value)
+            .Select(u => u.Role != null && u.Role.IsAdministrator)
+            .FirstOrDefaultAsync(ct);
+
+        if (!actorIsAdministrator)
+        {
+            throw new ForbiddenAppException(
+                "Only an administrator can assign a role that has Platform Administrator Access.");
+        }
+    }
+
     public async Task<PagedResult<UserListItemDto>> ListAsync(
         int page, int pageSize, string? search, bool? isActive, Guid? roleId, CancellationToken ct = default)
     {
@@ -84,6 +126,8 @@ public class UserAppService(
             throw new ValidationAppException($"Unknown authentication provider '{request.AuthProvider}'.");
         }
 
+        await EnsureMayAssignRoleAsync(request.RoleId, actingUserId, ct);
+
         /*
          * Maker-Checker gate. Runs AFTER every validation above (a request doomed to fail must never
          * be submitted for approval) but BEFORE anything is actually created. bypassApproval:true is
@@ -93,6 +137,8 @@ public class UserAppService(
          * this email while the request was pending" as a real error instead of silently corrupting
          * data.
          */
+        await gating.EnsureActorIdentifiedAsync(ApprovalModuleKeys.Users, actingUserId, ct);
+
         if (!bypassApproval && actingUserId is not null && await gating.IsGatedAsync(ApprovalModuleKeys.Users, ct))
         {
             var newRoleName = request.RoleId is null
@@ -103,7 +149,12 @@ public class UserAppService(
                 request.IsActive, overrides, request.AuthProvider);
             var pending = await gating.SubmitAsync(
                 ApprovalModuleKeys.Users, ApprovalActionKeys.Create, "User", null, request.Name.Trim(),
-                null, JsonSerializer.Serialize(newSnapshot), actingUserId.Value, ct);
+                null, JsonSerializer.Serialize(newSnapshot), actingUserId.Value, ct,
+                // No id exists yet, so the dedupe key is the natural key this module already enforces
+                // as unique — the normalized email checked a few lines above. Stops two makers both
+                // queueing "create foo@bar", where the second would otherwise fail at approval time
+                // with a confusing duplicate-email error the checker can do nothing about.
+                entityKey: email);
             return MutationResult<CreateUserResponse>.PendingApproval(pending);
         }
 
@@ -174,6 +225,43 @@ public class UserAppService(
         {
             throw new NotFoundAppException($"Role '{request.RoleId}' was not found.");
         }
+
+        // Only guard an actual CHANGE of role — re-saving a user who already holds an administrator
+        // role (e.g. a non-admin editing their phone number) must not be refused.
+        if (request.RoleId != user.RoleId)
+        {
+            await EnsureMayAssignRoleAsync(request.RoleId, actingUserId, ct);
+        }
+
+        /*
+         * Self-protection, checked BEFORE the approval gate so it is refused outright rather than
+         * queued for a checker to reject — there is no legitimate version of these requests, so making
+         * someone review one is pure noise.
+         *
+         * Editing your own name/email/phone stays allowed; only the two genuinely self-destructive
+         * changes are blocked. Deactivating yourself locks you out immediately, and changing your own
+         * role is the classic privilege-escalation shape (grant yourself a bigger role, or strip your
+         * own role and lose access with nobody able to notice you did it).
+         *
+         * Deliberately NOT conditioned on bypassApproval: a replay carries actingUserId = MakerId, so
+         * this doubles as defense in depth for anything that somehow got queued before this shipped.
+         */
+        if (actingUserId is not null && id == actingUserId.Value)
+        {
+            if (!request.IsActive)
+            {
+                throw new ForbiddenAppException(
+                    "You cannot deactivate your own account. Ask another administrator to do it.");
+            }
+
+            if (request.RoleId != user.RoleId)
+            {
+                throw new ForbiddenAppException(
+                    "You cannot change your own role. Ask another administrator to do it.");
+            }
+        }
+
+        await gating.EnsureActorIdentifiedAsync(ApprovalModuleKeys.Users, actingUserId, ct);
 
         if (!bypassApproval && actingUserId is not null && await gating.IsGatedAsync(ApprovalModuleKeys.Users, ct))
         {
@@ -248,6 +336,15 @@ public class UserAppService(
     {
         var user = await FindWithRoleAsync(id, ct) ?? throw NotFound(id);
 
+        // See UpdateAsync for the full rationale. Refused before the gate so it never reaches a checker.
+        if (!isActive && actingUserId is not null && id == actingUserId.Value)
+        {
+            throw new ForbiddenAppException(
+                "You cannot deactivate your own account. Ask another administrator to do it.");
+        }
+
+        await gating.EnsureActorIdentifiedAsync(ApprovalModuleKeys.Users, actingUserId, ct);
+
         if (!bypassApproval && actingUserId is not null && await gating.IsGatedAsync(ApprovalModuleKeys.Users, ct))
         {
             var oldSnapshot = JsonSerializer.Serialize(new { IsActive = user.Status == UserStatus.Active });
@@ -256,6 +353,15 @@ public class UserAppService(
                 "User", id.ToString(), user.Name, oldSnapshot,
                 JsonSerializer.Serialize(new UpdateUserStatusRequest(isActive)), actingUserId.Value, ct);
             return MutationResult<UserDetailDto>.PendingApproval(pending);
+        }
+
+        // Deactivating a checker must not strand the requests waiting on them. Runs on the APPLY path
+        // (after the gate) so the reassignment happens when the change actually takes effect, and
+        // commits in the same SaveChanges below — never half-applied.
+        if (!isActive)
+        {
+            await gating.ReassignPendingRequestsForDepartingCheckerAsync(
+                id, actingUserId, "their account was deactivated", ct);
         }
 
         user.Status = isActive ? UserStatus.Active : UserStatus.Inactive;
@@ -275,6 +381,15 @@ public class UserAppService(
     {
         var user = await FindWithRoleAsync(id, ct) ?? throw NotFound(id);
 
+        // See UpdateAsync for the full rationale. Refused before the gate so it never reaches a checker.
+        if (actingUserId is not null && id == actingUserId.Value)
+        {
+            throw new ForbiddenAppException(
+                "You cannot delete your own account. Ask another administrator to do it.");
+        }
+
+        await gating.EnsureActorIdentifiedAsync(ApprovalModuleKeys.Users, actingUserId, ct);
+
         if (!bypassApproval && actingUserId is not null && await gating.IsGatedAsync(ApprovalModuleKeys.Users, ct))
         {
             var existingOverrides = await LoadOverridesAsync(id, ct);
@@ -285,6 +400,11 @@ public class UserAppService(
                 ApprovalModuleKeys.Users, ApprovalActionKeys.Delete, "User", id.ToString(), user.Name,
                 JsonSerializer.Serialize(oldSnapshot), "{}", actingUserId.Value, ct);
         }
+
+        // Same reasoning as deactivation — a deleted checker can no longer act on anything assigned to
+        // them, so their queue has to move before the deletion commits.
+        await gating.ReassignPendingRequestsForDepartingCheckerAsync(
+            id, actingUserId, "their account was deleted", ct);
 
         user.IsDeleted = true;
         user.Status = UserStatus.Inactive;
@@ -324,6 +444,8 @@ public class UserAppService(
         Guid userId, IReadOnlyList<PermissionOverrideDto> overrides, Guid? actingUserId, CancellationToken ct = default, bool bypassApproval = false)
     {
         var user = await FindWithRoleAsync(userId, ct) ?? throw NotFound(userId);
+
+        await gating.EnsureActorIdentifiedAsync(ApprovalModuleKeys.Users, actingUserId, ct);
 
         if (!bypassApproval && actingUserId is not null && await gating.IsGatedAsync(ApprovalModuleKeys.Users, ct))
         {

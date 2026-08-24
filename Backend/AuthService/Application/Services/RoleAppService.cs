@@ -16,6 +16,29 @@ public class RoleAppService(
     // HttpContext is the real end-user's own request, not a service-to-service hop.
     private string? SourceIp => httpContextAccessor.HttpContext?.Connection.RemoteIpAddress?.ToString();
     private string? UserAgent => httpContextAccessor.HttpContext?.Request.Headers.UserAgent.ToString();
+
+    /// <summary>
+    /// Whether the ACTING USER is an administrator, resolved from their own database record.
+    ///
+    /// Deliberately not read from the ambient JWT "administrator" claim, even though that claim exists
+    /// and is cheaper. During an approval replay the ambient HttpContext belongs to the CHECKER, not
+    /// the maker — so a claim-based check would let a super-admin checker approve a privilege
+    /// escalation that the non-admin maker was never allowed to submit. Keying off actingUserId (which
+    /// is the maker's id on both the submit and the replay path) makes the answer identical in both,
+    /// which is the only way this guard can be trusted.
+    /// </summary>
+    private async Task<bool> IsActorAdministratorAsync(Guid? actingUserId, CancellationToken ct)
+    {
+        if (actingUserId is null)
+        {
+            return false;
+        }
+
+        return await db.Users.AsNoTracking()
+            .Where(u => u.Id == actingUserId.Value)
+            .Select(u => u.Role != null && u.Role.IsAdministrator)
+            .FirstOrDefaultAsync(ct);
+    }
     public async Task<PagedResult<RoleListItemDto>> ListAsync(int page, int pageSize, string? search, CancellationToken ct = default)
     {
         var query = db.Roles.AsNoTracking().AsQueryable();
@@ -57,11 +80,35 @@ public class RoleAppService(
             throw new ConflictAppException($"A role named '{name}' already exists.");
         }
 
+        /*
+         * Only an administrator may mint another administrator role.
+         *
+         * IsAdministrator is not an ordinary permission — PermissionClaimsBuilder short-circuits on it
+         * and returns "unrestricted", so a role carrying it bypasses every capability check in the
+         * platform. Without this guard, anyone holding Roles:Create could create such a role and then
+         * (with Users:Edit) assign it to themselves or an accomplice — a complete privilege escalation
+         * that, on a gated module, another non-admin checker could unwittingly rubber-stamp.
+         *
+         * Checked before the approval gate: an escalation attempt should never become a request that
+         * exists at all, let alone one a checker might approve.
+         */
+        if (request.IsAdministrator && !await IsActorAdministratorAsync(actingUserId, ct))
+        {
+            throw new ForbiddenAppException(
+                "Only an administrator can create a role with Platform Administrator Access.");
+        }
+
+        await gating.EnsureActorIdentifiedAsync(ApprovalModuleKeys.Roles, actingUserId, ct);
+
         if (!bypassApproval && actingUserId is not null && await gating.IsGatedAsync(ApprovalModuleKeys.Roles, ct))
         {
             var pending = await gating.SubmitAsync(
                 ApprovalModuleKeys.Roles, ApprovalActionKeys.Create, "Role", null, name,
-                null, JsonSerializer.Serialize(request), actingUserId.Value, ct);
+                null, JsonSerializer.Serialize(request), actingUserId.Value, ct,
+                // No id yet — dedupe on the natural key this module already enforces as unique (the
+                // role name, checked just above). Lowercased so "Manager" and "manager" collide here
+                // exactly as they would at creation time.
+                entityKey: name.ToLowerInvariant());
             return MutationResult<RoleDetailDto>.PendingApproval(pending);
         }
 
@@ -98,6 +145,40 @@ public class RoleAppService(
             throw new ConflictAppException($"A role named '{name}' already exists.");
         }
 
+        /*
+         * Administrator-role lockdown — three separate things, all checked before the approval gate.
+         *
+         * 1. A non-administrator cannot edit an administrator role at all. Editing one means editing
+         *    the permissions of an account that outranks you.
+         * 2. Nobody but an administrator can flip the flag in either direction — granting it is the
+         *    escalation described in CreateAsync; revoking it is how you'd lock every admin out.
+         * 3. A system role's identity is fixed. AuthDbSeeder looks the Super Admin role up BY NAME on
+         *    every startup (roles.TryGetValue("Super Admin", …)), so renaming it silently breaks
+         *    bootstrap seeding on the next deploy. Permissions on a system role stay editable — only
+         *    the name and description are pinned.
+         */
+        var actorIsAdministrator = await IsActorAdministratorAsync(actingUserId, ct);
+
+        if (role.IsAdministrator && !actorIsAdministrator)
+        {
+            throw new ForbiddenAppException(
+                "Only an administrator can modify a role that has Platform Administrator Access.");
+        }
+
+        if (request.IsAdministrator != role.IsAdministrator && !actorIsAdministrator)
+        {
+            throw new ForbiddenAppException(
+                "Only an administrator can grant or revoke Platform Administrator Access.");
+        }
+
+        if (role.IsSystemRole && !string.Equals(name, role.Name, StringComparison.Ordinal))
+        {
+            throw new ConflictAppException(
+                $"'{role.Name}' is a built-in role and cannot be renamed. Its permissions can still be edited.");
+        }
+
+        await gating.EnsureActorIdentifiedAsync(ApprovalModuleKeys.Roles, actingUserId, ct);
+
         if (!bypassApproval && actingUserId is not null && await gating.IsGatedAsync(ApprovalModuleKeys.Roles, ct))
         {
             var oldPermissions = await LoadPermissionsAsync(id, ct);
@@ -133,11 +214,28 @@ public class RoleAppService(
             throw new ConflictAppException("Built-in roles cannot be deleted.");
         }
 
+        /*
+         * Deleting the role you yourself hold is refused with a message that says so.
+         *
+         * The generic "still assigned to one or more users" check below would already refuse this, but
+         * it reads as though somebody ELSE is in the way — leaving the requester hunting for a user to
+         * reassign when the blocker is their own account. Checked first, and before the approval gate,
+         * so it never becomes a request a checker has to reject.
+         */
+        if (actingUserId is not null && role.Id == await db.Users.AsNoTracking()
+                .Where(u => u.Id == actingUserId.Value).Select(u => u.RoleId).FirstOrDefaultAsync(ct))
+        {
+            throw new ForbiddenAppException(
+                "You cannot delete the role you are currently assigned to. Move yourself to another role first.");
+        }
+
         var hasUsers = await db.Users.AnyAsync(u => u.RoleId == id, ct);
         if (hasUsers)
         {
             throw new ConflictAppException("This role is still assigned to one or more users and cannot be deleted.");
         }
+
+        await gating.EnsureActorIdentifiedAsync(ApprovalModuleKeys.Roles, actingUserId, ct);
 
         if (!bypassApproval && actingUserId is not null && await gating.IsGatedAsync(ApprovalModuleKeys.Roles, ct))
         {

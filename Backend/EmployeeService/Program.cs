@@ -32,7 +32,10 @@ builder.Services.Configure<JwtValidationOptions>(builder.Configuration.GetSectio
 builder.Services.Configure<AuthIntegrationOptions>(builder.Configuration.GetSection(AuthIntegrationOptions.SectionName));
 
 builder.Services.AddApplicationServices(builder.Configuration);
-builder.Services.AddHttpClient<AuthServiceClient>();
+// 10s, matching ModuleRegistry/LeadService/Customer360Service. Without an explicit timeout HttpClient
+// inherits the 100-second default, so a hung AuthService would hold an employee mutation (and its DB
+// connection) open for over a minute and a half before the audit push gave up.
+builder.Services.AddHttpClient<AuthServiceClient>(client => client.Timeout = TimeSpan.FromSeconds(10));
 
 builder.Services.AddCors(options =>
 {

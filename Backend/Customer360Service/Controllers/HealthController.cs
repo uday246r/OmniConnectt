@@ -1,22 +1,26 @@
+using backend.Infrastructure;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace backend.Controllers
 {
     [ApiController]
-    public class HealthController(IConfiguration configuration) : ControllerBase
+    public class HealthController(IConfiguration configuration, Customer360DbContext db) : ControllerBase
     {
         // GET /health
-        // Lightweight liveness endpoint for load balancers and monitoring systems.
-        // Does NOT perform CRM connectivity checks (avoids generating traffic against the real CRM
-        // API on every probe) or expose secrets, configuration values, or customer data.
+        // Readiness endpoint for load balancers and monitoring systems.
+        // Does NOT call the CRM API (that would generate real upstream traffic on every probe) and
+        // never exposes secrets, configuration values, or customer data.
         //
-        // It DOES verify the service can actually do its job: this service has no database, so its
-        // only real dependency is being configured at all. Previously this endpoint returned a fixed
-        // {"status":"healthy"} regardless of configuration — a load balancer would route traffic to an
-        // instance that could never successfully answer a single request. This is not a network check
-        // (still no CRM call), just a check that the required settings are present.
+        // It DOES verify this service can actually do its job — required configuration present AND the
+        // database reachable. The database check is not optional: the comment here used to say "this
+        // service has no database", which stopped being true when Customer360DbContext arrived to back
+        // FieldConfigService and AuditRepository. Until this was added, an unreachable Customer360Db
+        // reported healthy while /v1/field-config and /v1/audit both returned 500 — a load balancer
+        // would keep routing traffic to an instance that could not serve it. Every other service in
+        // the platform uses AddDbContextCheck for exactly this reason.
         [HttpGet("health")]
-        public IActionResult GetHealth()
+        public async Task<IActionResult> GetHealth(CancellationToken ct)
         {
             var missing = new List<string>();
 
@@ -24,10 +28,19 @@ namespace backend.Controllers
             if (string.IsNullOrWhiteSpace(configuration["CrmApi:ClientId"])) missing.Add("CrmApi:ClientId");
             if (string.IsNullOrWhiteSpace(configuration["CrmApi:ClientSecret"])) missing.Add("CrmApi:ClientSecret");
             if (string.IsNullOrWhiteSpace(configuration["Jwt:SigningKeyPublic"])) missing.Add("Jwt:SigningKeyPublic");
+            if (string.IsNullOrWhiteSpace(configuration.GetConnectionString("Customer360Db"))) missing.Add("ConnectionStrings:Customer360Db");
 
             if (missing.Count > 0)
             {
                 return StatusCode(503, new { status = "unhealthy", missingConfiguration = missing });
+            }
+
+            // Reports the dependency as down without leaking the connection string, host, or the
+            // provider's exception text — a health endpoint is typically the most publicly reachable
+            // route on the service.
+            if (!await db.Database.CanConnectAsync(ct))
+            {
+                return StatusCode(503, new { status = "unhealthy", dependency = "database" });
             }
 
             return Ok(new { status = "healthy" });

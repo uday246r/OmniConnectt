@@ -75,6 +75,23 @@ public record MutationResult<T>(T? Applied, ApprovalPendingDto? Pending)
     public static MutationResult<T> PendingApproval(ApprovalPendingDto pending) => new(default, pending);
 }
 
+/// <summary>
+/// Details of the already-open request that blocked a new submission. Returned as the
+/// <c>pendingRequest</c> extension on the 409 ProblemDetails so the UI can name exactly what is
+/// pending, who raised it and who holds it, instead of showing a bare "conflict" message.
+/// </summary>
+public record PendingApprovalConflictDto(
+    Guid ApprovalRequestId,
+    string Module,
+    string Action,
+    string? EntityLabel,
+    string? MakerName,
+    string? CheckerName,
+    DateTimeOffset RequestedAt,
+    /// <summary>True when the blocked maker is also the one who raised the open request — lets the UI
+    /// say "You already have…" rather than naming them in the third person.</summary>
+    bool IsOwnRequest);
+
 public record CheckerAssignmentDto(Guid Id, string Module, Guid CheckerUserId, string CheckerName, DateTimeOffset CreatedAt);
 
 public record UpsertCheckerAssignmentRequest(

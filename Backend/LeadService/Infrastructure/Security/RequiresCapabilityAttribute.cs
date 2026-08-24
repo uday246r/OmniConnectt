@@ -41,19 +41,19 @@ public class RequiresCapabilityAttribute : Attribute, IAsyncAuthorizationFilter
             return Task.CompletedTask;
         }
 
-        // Administrator bypass — identical to EmployeeService and AuthService
-        var isAdministrator =
-            user.FindFirst(JwtClaimTypes.Administrator)?.Value == "true" ||
-            user.FindFirst("administrator")?.Value == "true" ||
-            user.FindFirst("admin")?.Value == "true" ||
-            user.FindFirst("isAdministrator")?.Value?.Equals("true", StringComparison.OrdinalIgnoreCase) == true ||
-            user.Claims.Any(c => (c.Type == "administrator" || c.Type == "admin" || c.Type == "isAdministrator") &&
-                                 c.Value.Equals("true", StringComparison.OrdinalIgnoreCase)) ||
-            user.IsInRole("Admin") ||
-            user.IsInRole("SuperAdmin") ||
-            user.IsInRole("Administrator");
-
-        if (isAdministrator)
+        /*
+         * Administrator bypass — ONE claim, checked exactly, matching EmployeeService, AuthService and
+         * ModuleRegistry.
+         *
+         * This previously also accepted `admin`/`isAdministrator` claim aliases and, worse,
+         * `user.IsInRole("Admin"|"SuperAdmin"|"Administrator")`. IsInRole matches any claim whose type
+         * is the token's role-claim type, so anyone who could get a role-shaped claim named "Admin"
+         * into a token received a full authorization bypass here — while the same token was correctly
+         * refused by the three services that check only `administrator == "true"`. Authorization must
+         * not vary by service, and it must not depend on a claim the platform never issues:
+         * PermissionClaimsBuilder emits exactly one administrator signal, JwtClaimTypes.Administrator.
+         */
+        if (user.FindFirst(JwtClaimTypes.Administrator)?.Value == "true")
         {
             return Task.CompletedTask;
         }
@@ -71,16 +71,29 @@ public class RequiresCapabilityAttribute : Attribute, IAsyncAuthorizationFilter
             permissions = [];
         }
 
+        /*
+         * EXACT match on the full "featureKey:Capability" string — nothing else.
+         *
+         * This check previously ended with two prefix clauses:
+         *     p.StartsWith($"{FeatureKey}.") || p.StartsWith($"{FeatureKey}:")
+         * Every permission this service can possibly grant begins with "remote.lead." (see
+         * RequiredPermission above), so those clauses collapsed the entire check into "does the caller
+         * hold ANY permission in this app?". A user granted only `remote.lead.lead:View` therefore
+         * passed [RequiresCapability("Lead","Delete")] and [RequiresCapability("FieldSettings","Manage")]
+         * — a read-only viewer could delete leads and rewrite the product field configuration.
+         *
+         * The alternate-format string.Equals clauses that preceded them were dead weight: AuthService's
+         * PermissionClaimsBuilder emits one and only one shape, $"{feature.Key}:{capability}", which is
+         * exactly what RequiredPermission builds. The "*" and "{FeatureKey}:*" wildcards were likewise
+         * unreachable — nothing in the platform ever issues them — but would have been a total bypass
+         * if anything ever did.
+         *
+         * Case-insensitive because capability casing is authored by hand in [RequiresCapability(...)]
+         * attributes and stored separately in the DB; it is still a full-string match, so it grants
+         * nothing the exact-match comparison in EmployeeService/AuthService wouldn't.
+         */
         var hasMatch = permissions.Any(p =>
-            string.Equals(p, RequiredPermission, StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(p, $"{FeatureKey}:{Module.ToLowerInvariant()}.{Capability}", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(p, $"{FeatureKey}:{Capability}", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(p, $"{FeatureKey}.{Module.ToLowerInvariant()}:{Capability.ToLowerInvariant()}", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(p, $"{Module.ToLowerInvariant()}:{Capability}", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(p, $"{FeatureKey}:*", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(p, "*", StringComparison.OrdinalIgnoreCase) ||
-            p.StartsWith($"{FeatureKey}.", StringComparison.OrdinalIgnoreCase) ||
-            p.StartsWith($"{FeatureKey}:", StringComparison.OrdinalIgnoreCase));
+            string.Equals(p, RequiredPermission, StringComparison.OrdinalIgnoreCase));
 
         if (!hasMatch)
         {

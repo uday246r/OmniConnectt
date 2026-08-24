@@ -180,6 +180,7 @@ public class AuthDbContext(DbContextOptions<AuthDbContext> options) : DbContext(
             entity.Property(a => a.EntityType).HasMaxLength(100);
             entity.Property(a => a.EntityId).HasMaxLength(200);
             entity.Property(a => a.EntityLabel).HasMaxLength(300);
+            entity.Property(a => a.EntityKey).HasMaxLength(200);
             entity.Property(a => a.Status).HasMaxLength(20);
             entity.Property(a => a.MakerName).HasMaxLength(200);
             entity.Property(a => a.CheckerName).HasMaxLength(200);
@@ -199,11 +200,53 @@ public class AuthDbContext(DbContextOptions<AuthDbContext> options) : DbContext(
             // Approval Center's module/application filter.
             entity.HasIndex(a => new { a.Module, a.Status });
 
+            /*
+             * ONE open approval request per record — enforced by the database, not just by the
+             * application check in ApprovalGatingService.SubmitAsync.
+             *
+             * PARTIAL unique index: uniqueness applies only while Status = 'Pending', so the same
+             * record can be requested again once the previous request has been approved or rejected —
+             * which is the whole point. Without the WHERE clause a user could never be deleted twice
+             * in their lifetime.
+             *
+             * The application check exists to produce a helpful "already pending with X since Y"
+             * error; this index is what makes the rule actually hold when two makers submit
+             * simultaneously and both pass that check before either commits. A NULL EntityKey never
+             * collides (Postgres treats NULLs as distinct), so a module that hasn't adopted a key is
+             * simply un-deduplicated rather than broken.
+             *
+             * The filter string must stay in sync with the migration
+             * 20260821..._AddEntityKeyAndPendingUniqueIndex, or EF will scaffold a migration to undo it.
+             */
+            entity.HasIndex(a => new { a.Module, a.EntityKey })
+                .IsUnique()
+                .HasFilter("\"Status\" = 'Pending'");
+
             // Restrict, not Cascade — an approval request is itself a historical/audit record and must
             // never silently disappear because the maker or checker account was later deleted (soft
             // delete already keeps the User row in place regardless, so this should never actually fire).
             entity.HasOne<User>().WithMany().HasForeignKey(a => a.MakerId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne<User>().WithMany().HasForeignKey(a => a.CheckerId).OnDelete(DeleteBehavior.Restrict);
+
+            /*
+             * Optimistic concurrency on the decision.
+             *
+             * Two checkers (or one checker double-clicking, or an administrator and the assigned
+             * checker) can hit Approve at the same instant. Both reads pass EnsureDecidable's
+             * "Status == Pending" check before either writes, so without this the mutation replays
+             * TWICE — and for a soft delete the second replay succeeds silently, leaving no trace
+             * except two audit rows.
+             *
+             * xmin is Postgres's own per-row transaction id: a system column, so this costs no schema
+             * change and no bookkeeping. EF appends it to the UPDATE's WHERE clause, the loser matches
+             * zero rows, and ApprovalAppService turns the resulting DbUpdateConcurrencyException into a
+             * plain "already decided" 409.
+             */
+            entity.Property<uint>("xmin")
+                .HasColumnName("xmin")
+                .HasColumnType("xid")
+                .ValueGeneratedOnAddOrUpdate()
+                .IsConcurrencyToken();
         });
 
         modelBuilder.Entity<CheckerAssignment>(entity =>

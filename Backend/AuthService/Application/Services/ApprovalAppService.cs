@@ -81,29 +81,54 @@ public class ApprovalAppService(
                 "(Security__TempPasswordKey is not configured). Ask an administrator to configure it, then approve again.");
         }
 
-        // Replay the original mutation through the SAME validated method a direct call would have
-        // used — re-running its own conflict/existence checks for free, so "the email was taken by
-        // someone else while this was pending" surfaces as a real error to the checker instead of
-        // silently corrupting data. actingUserId is the MAKER (not the checker), so the resulting
-        // "user.created"/"role.updated" audit row is attributed exactly as an ungated mutation would
-        // be — it still means "this reflects this person's account/role", not "who clicked approve".
-        //
-        // If replay throws (e.g. NotFoundAppException because the target was deleted while this sat
-        // pending), that exception is left to propagate: the request stays Pending, nothing here marks
-        // it decided, and the error surfaces to the checker's click.
-        //
+        /*
+         * CLAIM FIRST, THEN REPLAY — both inside one transaction.
+         *
+         * The order matters and used to be the other way round. Replaying first meant the inner
+         * service's own SaveChangesAsync COMMITTED the mutation before this method had recorded any
+         * decision, so a failure in the gap left the user created/deleted while the request still read
+         * Pending — and therefore still approvable, applying it a second time.
+         *
+         * Flipping the status first turns the decision into the claim: the UPDATE carries the xmin
+         * concurrency token (see AuthDbContext), so of two simultaneous approvals exactly one succeeds
+         * and the other matches zero rows. The transaction then makes the pair atomic in the other
+         * direction too — if the replay throws, the status flip rolls back with it and the request is
+         * genuinely still Pending rather than half-decided.
+         *
+         * The replay itself runs through the SAME validated method a direct call would have used, so
+         * "the email was taken by someone else while this was pending" surfaces as a real error to the
+         * checker instead of silently corrupting data. actingUserId is the MAKER, not the checker, so
+         * the resulting "user.created"/"role.updated" audit row is attributed exactly as an ungated
+         * mutation would be.
+         */
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+
+        request.Status = ApprovalStatus.Approved;
+        request.DecidedAt = DateTimeOffset.UtcNow;
+
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            // Someone else decided this request between our read and our write. Their outcome stands.
+            throw new ConflictAppException(
+                "This request was just decided by someone else. Refresh to see its current status.");
+        }
+
         // The only thing a replay can produce that is otherwise unrecoverable afterwards is a
         // Create-User's temporary password (everything else is readable back from the DB, or is a
         // password hash which is one-way by design) — see ReplayAsync's own doc comment.
         var issuedTempPassword = await ReplayAsync(request, ct);
 
-        request.Status = ApprovalStatus.Approved;
-        request.DecidedAt = DateTimeOffset.UtcNow;
         if (issuedTempPassword is not null)
         {
             request.TempPasswordCiphertext = secretProtector.Protect(issuedTempPassword);
+            await db.SaveChangesAsync(ct);
         }
-        await db.SaveChangesAsync(ct);
+
+        await transaction.CommitAsync(ct);
 
         var checkerName = await db.Users.AsNoTracking().Where(u => u.Id == checkerUserId).Select(u => u.Name).FirstOrDefaultAsync(ct);
         await auditLog.WriteAsync(
@@ -133,7 +158,19 @@ public class ApprovalAppService(
         request.Status = ApprovalStatus.Rejected;
         request.DecidedAt = DateTimeOffset.UtcNow;
         request.RejectionReason = reason;
-        await db.SaveChangesAsync(ct);
+
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            // Same race as ApproveAsync — a rejection landing after someone else already approved must
+            // not silently overwrite that decision. No transaction needed here: rejecting replays
+            // nothing, so this single write is already the whole operation.
+            throw new ConflictAppException(
+                "This request was just decided by someone else. Refresh to see its current status.");
+        }
 
         var checkerName = await db.Users.AsNoTracking().Where(u => u.Id == checkerUserId).Select(u => u.Name).FirstOrDefaultAsync(ct);
         await auditLog.WriteAsync(

@@ -21,6 +21,21 @@ public class ApprovalRequest
     public string? EntityId { get; set; }
     public string? EntityLabel { get; set; }
 
+    /// <summary>
+    /// Stable business identity of whatever this request targets, used to enforce ONE open request per
+    /// record. For an action against an existing row it is that row's id; for a Create — where no id
+    /// exists yet — it is the natural key the module already treats as unique (a user's normalized
+    /// email, a role's normalized name), so two makers cannot both queue "create foo@bar" and have the
+    /// second one fail confusingly at approval time.
+    ///
+    /// Backed by a PARTIAL UNIQUE INDEX on (Module, EntityKey) WHERE Status = 'Pending' — see
+    /// AuthDbContext. The application-level check in ApprovalGatingService.SubmitAsync produces the
+    /// friendly "already pending" error; the index is what makes it true under concurrency. Null is
+    /// permitted and never collides (Postgres treats NULLs as distinct in a unique index), which is
+    /// what lets a remote module that hasn't adopted a key yet keep working unchanged.
+    /// </summary>
+    public string? EntityKey { get; set; }
+
     /// <summary>JSON snapshot of the entity's state before this change. Null for Create.</summary>
     public string? OldDataJson { get; set; }
 

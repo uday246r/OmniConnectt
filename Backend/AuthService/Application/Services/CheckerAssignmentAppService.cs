@@ -72,6 +72,18 @@ public class CheckerAssignmentAppService(AuthDbContext db, AuditLogAppService au
         var checkerUser = await db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == checkerUserId, ct)
             ?? throw new NotFoundAppException($"User '{checkerUserId}' was not found.");
 
+        /*
+         * An inactive account cannot sign in, so it cannot approve anything. Assigning one looks like
+         * it worked, silently reduces the pool of checkers the balancer can actually use, and — if it
+         * were the only assignment — would make the module "gated" with nobody able to clear the queue.
+         * Refuse it at the point of assignment, where the administrator can still see why.
+         */
+        if (checkerUser.Status != Domain.Enums.UserStatus.Active)
+        {
+            throw new ValidationAppException(
+                $"{checkerUser.Name} is not an active user and cannot be assigned as a checker.");
+        }
+
         var existing = await db.CheckerAssignments.FirstOrDefaultAsync(c => c.Module == module && c.CheckerUserId == checkerUserId, ct);
         if (existing is not null)
         {

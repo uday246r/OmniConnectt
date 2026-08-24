@@ -10,7 +10,11 @@ namespace LeadManagement.Api.Controllers
     [Route("api/products")]
     [Route("api/v1/products")]
     [Route("products")]
-    [AllowAnonymous]
+    // [Authorize], not [AllowAnonymous]: the [RequiresCapability] attributes on the actions below
+    // are a hand-written IAsyncAuthorizationFilter, which does NOT honour IAllowAnonymous metadata.
+    // These endpoints have therefore always demanded an authenticated caller holding MasterData:View —
+    // the [AllowAnonymous] simply misdescribed the contract, and every real caller already sends a token.
+    [Authorize]
     public class ProductsController : ControllerBase
     {
         private readonly IMasterDataService _masterDataService;
@@ -44,7 +48,11 @@ namespace LeadManagement.Api.Controllers
     [Route("api/states")]
     [Route("api/v1/states")]
     [Route("states")]
-    [AllowAnonymous]
+    // [Authorize], not [AllowAnonymous]: the [RequiresCapability] attributes on the actions below
+    // are a hand-written IAsyncAuthorizationFilter, which does NOT honour IAllowAnonymous metadata.
+    // These endpoints have therefore always demanded an authenticated caller holding MasterData:View —
+    // the [AllowAnonymous] simply misdescribed the contract, and every real caller already sends a token.
+    [Authorize]
     public class StatesController : ControllerBase
     {
         private readonly IMasterDataService _masterDataService;
@@ -67,7 +75,11 @@ namespace LeadManagement.Api.Controllers
     [Route("api/branches")]
     [Route("api/v1/branches")]
     [Route("branches")]
-    [AllowAnonymous]
+    // [Authorize], not [AllowAnonymous]: the [RequiresCapability] attributes on the actions below
+    // are a hand-written IAsyncAuthorizationFilter, which does NOT honour IAllowAnonymous metadata.
+    // These endpoints have therefore always demanded an authenticated caller holding MasterData:View —
+    // the [AllowAnonymous] simply misdescribed the contract, and every real caller already sends a token.
+    [Authorize]
     public class BranchesController : ControllerBase
     {
         private readonly IMasterDataService _masterDataService;
@@ -90,7 +102,11 @@ namespace LeadManagement.Api.Controllers
     [Route("api/sales-executives")]
     [Route("api/v1/sales-executives")]
     [Route("sales-executives")]
-    [AllowAnonymous]
+    // [Authorize], not [AllowAnonymous]: the [RequiresCapability] attributes on the actions below
+    // are a hand-written IAsyncAuthorizationFilter, which does NOT honour IAllowAnonymous metadata.
+    // These endpoints have therefore always demanded an authenticated caller holding MasterData:View —
+    // the [AllowAnonymous] simply misdescribed the contract, and every real caller already sends a token.
+    [Authorize]
     public class SalesExecutivesController : ControllerBase
     {
         private readonly IMasterDataService _masterDataService;
@@ -113,7 +129,11 @@ namespace LeadManagement.Api.Controllers
     [Route("api/reference-data")]
     [Route("api/v1/reference-data")]
     [Route("reference-data")]
-    [AllowAnonymous]
+    // [Authorize], not [AllowAnonymous]: the [RequiresCapability] attributes on the actions below
+    // are a hand-written IAsyncAuthorizationFilter, which does NOT honour IAllowAnonymous metadata.
+    // These endpoints have therefore always demanded an authenticated caller holding MasterData:View —
+    // the [AllowAnonymous] simply misdescribed the contract, and every real caller already sends a token.
+    [Authorize]
     public class ReferenceDataController : ControllerBase
     {
         private readonly IMasterDataService _masterDataService;

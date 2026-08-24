@@ -17,6 +17,7 @@ public class AppExceptionFilter(ILogger<AppExceptionFilter> logger) : IException
         var (status, title) = context.Exception switch
         {
             NotFoundAppException ex => (StatusCodes.Status404NotFound, ex.Message),
+            PendingApprovalConflictException ex => (StatusCodes.Status409Conflict, ex.Message),
             ConflictAppException ex => (StatusCodes.Status409Conflict, ex.Message),
             ValidationAppException ex => (StatusCodes.Status400BadRequest, ex.Message),
             ForbiddenAppException ex => (StatusCodes.Status403Forbidden, ex.Message),
@@ -44,7 +45,18 @@ public class AppExceptionFilter(ILogger<AppExceptionFilter> logger) : IException
             logger.LogError(context.Exception, "Unhandled database error on {Path}", context.HttpContext.Request.Path);
         }
 
-        context.Result = new ObjectResult(new ProblemDetails { Title = title, Status = status }) { StatusCode = status };
+        var problem = new ProblemDetails { Title = title, Status = status };
+
+        // A blocked-by-pending-approval refusal carries structured detail (which request, whose, with
+        // which checker, since when) so the UI can render a real explanation instead of a bare toast.
+        // ProblemDetails.Extensions is the standard place for this — it serialises alongside the
+        // title/status without needing a bespoke response envelope.
+        if (context.Exception is PendingApprovalConflictException conflict)
+        {
+            problem.Extensions["pendingRequest"] = conflict.Pending;
+        }
+
+        context.Result = new ObjectResult(problem) { StatusCode = status };
         context.ExceptionHandled = true;
     }
 

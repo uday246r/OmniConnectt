@@ -4,6 +4,7 @@ using AuthService.Domain.Entities;
 using AuthService.Domain.Enums;
 using AuthService.Infrastructure;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace AuthService.Application.Services;
 
@@ -29,6 +30,29 @@ public class ApprovalGatingService(AuthDbContext db, AuditLogAppService auditLog
         db.CheckerAssignments.AnyAsync(c => c.Module == module, ct);
 
     /// <summary>
+    /// Refuses an un-attributable mutation on a gated module.
+    ///
+    /// Every gating check reads `!bypassApproval &amp;&amp; actingUserId is not null &amp;&amp; IsGatedAsync(...)`, so a
+    /// null acting user falls straight through to the direct-mutation path — a maker-checker bypass
+    /// that leaves no maker to record. In practice `[Authorize]` plus a well-formed token always yields
+    /// a `sub`, so this should be unreachable; if it ever isn't, failing loudly is the only safe
+    /// reading. An approval workflow with no identifiable maker is not an approval workflow.
+    /// </summary>
+    public async Task EnsureActorIdentifiedAsync(string module, Guid? actingUserId, CancellationToken ct = default)
+    {
+        if (actingUserId is not null)
+        {
+            return;
+        }
+
+        if (await IsGatedAsync(module, ct))
+        {
+            throw new ForbiddenAppException(
+                $"'{module}' requires approval, and this request could not be attributed to a signed-in user. Sign in again and retry.");
+        }
+    }
+
+    /// <summary>
     /// <paramref name="sourceService"/>/<paramref name="callbackUrl"/>/<paramref name="correlationId"/>
     /// default to AuthService's own in-process values — UserAppService/RoleAppService's call sites are
     /// unaffected. A remote service submitting through InternalApprovalsController passes its own name,
@@ -39,8 +63,16 @@ public class ApprovalGatingService(AuthDbContext db, AuditLogAppService auditLog
     public async Task<ApprovalPendingDto> SubmitAsync(
         string module, string action, string? entityType, string? entityId, string? entityLabel,
         string? oldDataJson, string newDataJson, Guid makerId, CancellationToken ct = default,
-        string sourceService = ServiceName, string? callbackUrl = null, string? correlationId = null)
+        string sourceService = ServiceName, string? callbackUrl = null, string? correlationId = null,
+        string? entityKey = null)
     {
+        // Falls back to the entity id, which is the correct key for every action against a record that
+        // already exists. Only Create needs to supply something else (a natural key), since it has no
+        // id yet — see ApprovalRequest.EntityKey.
+        var resolvedKey = entityKey ?? entityId;
+
+        await EnsureNoOpenRequestAsync(module, resolvedKey, makerId, ct);
+
         var makerName = await db.Users.AsNoTracking().Where(u => u.Id == makerId).Select(u => u.Name).FirstOrDefaultAsync(ct);
         var (checkerId, checkerName) = await SelectCheckerAsync(module, makerId, ct);
 
@@ -52,6 +84,7 @@ public class ApprovalGatingService(AuthDbContext db, AuditLogAppService auditLog
             EntityType = entityType,
             EntityId = entityId,
             EntityLabel = entityLabel,
+            EntityKey = resolvedKey,
             OldDataJson = oldDataJson,
             NewDataJson = newDataJson,
             Status = ApprovalStatus.Pending,
@@ -65,7 +98,24 @@ public class ApprovalGatingService(AuthDbContext db, AuditLogAppService auditLog
             CorrelationId = correlationId,
         };
         db.ApprovalRequests.Add(request);
-        await db.SaveChangesAsync(ct);
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
+        {
+            // Lost the race: another submission for this same record committed between our check above
+            // and this save. Detach the row we failed to insert so the retry below reads clean, then
+            // re-run the check — it will now find the winner and throw the same friendly
+            // PendingApprovalConflictException a sequential caller would have got.
+            db.Entry(request).State = EntityState.Detached;
+            await EnsureNoOpenRequestAsync(module, resolvedKey, makerId, ct);
+
+            // Defensive: the index fired but no Pending row is visible (e.g. the winner was decided in
+            // the interim). Surface a plain conflict rather than pretending the write succeeded.
+            throw new ConflictAppException(
+                "Another change to this record was submitted at the same moment. Please refresh and try again.");
+        }
 
         await auditLog.WriteAsync(
             ServiceName, makerId, makerName, "approval.requested", "ApprovalRequest", request.Id.ToString(),
@@ -73,6 +123,55 @@ public class ApprovalGatingService(AuthDbContext db, AuditLogAppService auditLog
             entityLabel: entityLabel, ct: ct);
 
         return new ApprovalPendingDto(request.Id, module, action, checkerName ?? "Unassigned");
+    }
+
+    /// <summary>
+    /// Refuses a second open request against a record that already has one.
+    ///
+    /// Without this, a maker who submits "delete this user", sees nothing happen in the list (because
+    /// nothing HAS happened — it is awaiting approval), and clicks delete again, silently queues a
+    /// second request. Both then sit in the checker's queue, and approving both replays the mutation
+    /// twice. For a soft delete that second replay succeeds silently rather than erroring, so the
+    /// duplicate is invisible in the data and only shows up as a confusing pair of rows in the audit
+    /// trail. The same applies to two different makers acting on the same record concurrently.
+    ///
+    /// The friendly error is produced here; the partial unique index on (Module, EntityKey) WHERE
+    /// Status = 'Pending' (see AuthDbContext) is what holds the line when two submissions race past
+    /// this check before either commits — SubmitAsync translates that violation back into this same
+    /// exception so the caller gets one consistent experience either way.
+    /// </summary>
+    private async Task EnsureNoOpenRequestAsync(string module, string? entityKey, Guid makerId, CancellationToken ct)
+    {
+        if (string.IsNullOrEmpty(entityKey))
+        {
+            // No stable identity to deduplicate on. Rather than guess, allow it — the DB index treats
+            // NULL keys as distinct too, so behaviour is consistent at both layers.
+            return;
+        }
+
+        var existing = await db.ApprovalRequests.AsNoTracking()
+            .Where(r => r.Module == module && r.EntityKey == entityKey && r.Status == ApprovalStatus.Pending)
+            .OrderBy(r => r.RequestedAt)
+            .Select(r => new { r.Id, r.Module, r.Action, r.EntityLabel, r.MakerId, r.MakerName, r.CheckerName, r.RequestedAt })
+            .FirstOrDefaultAsync(ct);
+
+        if (existing is null)
+        {
+            return;
+        }
+
+        var isOwn = existing.MakerId == makerId;
+        var subject = existing.EntityLabel is not null ? $" on '{existing.EntityLabel}'" : "";
+        var raisedBy = isOwn ? "You" : existing.MakerName ?? "Another user";
+        var verb = isOwn ? "have" : "has";
+
+        throw new PendingApprovalConflictException(
+            $"{raisedBy} already {verb} a pending {existing.Action} request{subject} awaiting approval" +
+            (existing.CheckerName is not null ? $" from {existing.CheckerName}" : "") +
+            ". It must be approved or rejected before another change can be requested.",
+            new PendingApprovalConflictDto(
+                existing.Id, existing.Module, existing.Action, existing.EntityLabel,
+                existing.MakerName, existing.CheckerName, existing.RequestedAt, isOwn));
     }
 
     /// <summary>
@@ -104,6 +203,83 @@ public class ApprovalGatingService(AuthDbContext db, AuditLogAppService auditLog
     }
 
     /// <summary>
+    /// Moves every request still waiting on a checker who is about to lose the ability to act — because
+    /// their account is being deactivated or deleted — onto someone who can, or refuses the change.
+    ///
+    /// Without this, disabling a checker silently strands their queue: the request stays Pending and
+    /// assigned to them forever, EnsureDecidable insists only the assigned checker may act, and that
+    /// person can no longer sign in. The maker sees a request that never resolves and nobody can
+    /// explain why. Removing a checker from a MODULE already handled this correctly
+    /// (CheckerAssignmentAppService.DeleteAsync); disabling the underlying USER did not, which is the
+    /// same hole reached by a different door.
+    ///
+    /// Spans every module the departing checker holds, since deactivating an account takes them out of
+    /// all of them at once. Mutates tracked entities and writes the audit rows; the CALLER commits, so
+    /// the reassignment lands in the same transaction as the deactivation that caused it.
+    /// </summary>
+    internal async Task ReassignPendingRequestsForDepartingCheckerAsync(
+        Guid departingCheckerId, Guid? actingUserId, string reason, CancellationToken ct)
+    {
+        var affected = await db.ApprovalRequests
+            .Where(r => r.Status == ApprovalStatus.Pending && r.CheckerId == departingCheckerId)
+            .ToListAsync(ct);
+
+        if (affected.Count == 0)
+        {
+            return;
+        }
+
+        var departingName = await db.Users.AsNoTracking()
+            .Where(u => u.Id == departingCheckerId).Select(u => u.Name).FirstOrDefaultAsync(ct) ?? "That user";
+
+        // One lookup for every module involved, rather than one per request.
+        var modules = affected.Select(r => r.Module).Distinct().ToList();
+        var assignmentsByModule = (await db.CheckerAssignments.AsNoTracking()
+                .Where(c => modules.Contains(c.Module) && c.CheckerUserId != departingCheckerId)
+                .Select(c => new { c.Module, c.CheckerUserId })
+                .ToListAsync(ct))
+            .GroupBy(c => c.Module)
+            .ToDictionary(g => g.Key, g => g.Select(x => x.CheckerUserId).Distinct().ToList());
+
+        var reassignments = new List<(ApprovalRequest Request, Guid NewCheckerId, string? NewCheckerName)>();
+
+        foreach (var request in affected)
+        {
+            var candidates = assignmentsByModule.TryGetValue(request.Module, out var ids) ? ids : [];
+            // Each request excludes its OWN maker — a replacement who happens to be the maker would
+            // re-introduce exactly the self-approval this system exists to prevent.
+            var eligible = candidates.Where(cid => cid != request.MakerId).ToList();
+
+            var replacement = await TrySelectCheckerAsync(request.Module, eligible, ct);
+            if (replacement is null)
+            {
+                throw new ConflictAppException(
+                    $"{departingName} still has {affected.Count} pending approval request(s) and there is no other " +
+                    $"eligible checker for '{request.Module}' to take them on. Assign another checker to that module, " +
+                    $"or have the pending request(s) approved or rejected first.");
+            }
+
+            reassignments.Add((request, replacement.Value.CheckerId, replacement.Value.CheckerName));
+        }
+
+        var actorName = actingUserId is null
+            ? null
+            : await db.Users.AsNoTracking().Where(u => u.Id == actingUserId).Select(u => u.Name).FirstOrDefaultAsync(ct);
+
+        foreach (var (request, newCheckerId, newCheckerName) in reassignments)
+        {
+            var oldCheckerName = request.CheckerName;
+            request.CheckerId = newCheckerId;
+            request.CheckerName = newCheckerName;
+
+            await auditLog.WriteAsync(
+                ServiceName, actingUserId, actorName, "approval.reassigned", "ApprovalRequest", request.Id.ToString(),
+                $"Reassigned from {oldCheckerName ?? "Unknown"} to {newCheckerName ?? "Unknown"} on '{request.Module}' — {reason}.",
+                entityLabel: request.EntityLabel, ct: ct);
+        }
+    }
+
+    /// <summary>
     /// The non-throwing core of the least-workload algorithm, reused by
     /// CheckerAssignmentAppService.DeleteAsync to find a replacement for requests orphaned by a checker
     /// removal — same "fewest current Pending requests, ties by Id" selection, just over a
@@ -130,9 +306,12 @@ public class ApprovalGatingService(AuthDbContext db, AuditLogAppService auditLog
             return null;
         }
 
+        // Workload is counted PER MODULE, not globally. `module` was previously accepted and never
+        // used, so a checker busy on one module was silently de-prioritised for every other — making
+        // the balancing look erratic to an administrator who can only see one module's queue at a time.
         var activeIds = active.Select(a => a.Id).ToList();
         var pendingCounts = await db.ApprovalRequests.AsNoTracking()
-            .Where(r => r.Status == ApprovalStatus.Pending && activeIds.Contains(r.CheckerId))
+            .Where(r => r.Status == ApprovalStatus.Pending && r.Module == module && activeIds.Contains(r.CheckerId))
             .GroupBy(r => r.CheckerId)
             .Select(g => new { g.Key, Count = g.Count() })
             .ToDictionaryAsync(x => x.Key, x => x.Count, ct);
