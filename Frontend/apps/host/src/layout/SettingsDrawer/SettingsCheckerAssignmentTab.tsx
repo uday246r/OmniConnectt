@@ -51,7 +51,7 @@ export function SettingsCheckerAssignmentTab() {
   const isAdministrator = Boolean(useAuthStore((s) => s.user)?.isAdministrator)
   const hasCapability = useAuthStore((s) => s.hasCapability)
   const pushLayer = useSettingsDrawerStore((s) => s.pushLayer)
-  const dataRevision = useDataRevision(TOPICS.checkerAssignments)
+  const dataRevision = useDataRevision(TOPICS.checkerAssignments)
   const canManage = isAdministrator || hasCapability('host.system.checker-assignment', 'Manage')
 
   const [modules, setModules] = useState<AssignableModuleDto[]>([])
@@ -686,10 +686,32 @@ export function SettingsCheckerAssignmentTab() {
                               <div className={styles.checkerChipsWrap}>
                                 {modAssignments.map((a) => (
                                   <div key={a.id} className={styles.checkerCardChip}>
-                                    <div className={styles.checkerAvatarSmall}>
-                                      {getInitials(a.checkerName)}
+                                    {/*
+                                      A role assignment gets a shield rather than initials, and states
+                                      how many active members it currently expands to. "Assigned to
+                                      Manager" on its own says nothing about whether anyone can
+                                      actually approve — a role that has emptied out gates the module
+                                      with no way to clear the queue, and that has to be visible here.
+                                    */}
+                                    <div
+                                      className={a.isRole ? styles.checkerRoleIconSmall : styles.checkerAvatarSmall}
+                                      title={a.isRole ? 'Role — any active member can approve' : undefined}
+                                    >
+                                      {a.isRole ? <Icon.ShieldCheck width={12} height={12} /> : getInitials(a.checkerName)}
                                     </div>
                                     <span>{a.checkerName}</span>
+                                    {a.isRole && (
+                                      <span
+                                        className={a.memberCount === 0 ? styles.memberCountEmpty : styles.memberCount}
+                                        title={
+                                          a.memberCount === 0
+                                            ? 'This role has no active members, so nobody can approve for this module.'
+                                            : `${a.memberCount} active member(s) can approve`
+                                        }
+                                      >
+                                        {a.memberCount ?? 0}
+                                      </span>
+                                    )}
                                     {canManage && (
                                       <button
                                         type="button"

@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo, useRef, type FormEvent } from 'react'
 import { useAuthStore } from '../../features/auth/store/authStore'
 import { usersApi, type UserListItemDto } from '../../features/settings-users/api/usersApi'
+import { rolesApi, type RoleListItemDto } from '../../features/settings-roles/api/rolesApi'
 import { checkerAssignmentsApi, type AssignableModuleDto } from '../../features/approvals/api/checkerAssignmentsApi'
 import { useSettingsDrawerStore } from '../../shared/stores/settingsDrawerStore'
 import { useClickOutside } from '../../shared/hooks/useClickOutside'
@@ -32,13 +33,21 @@ function getInitials(name?: string, email?: string): string {
  */
 export function CheckerAssignmentFormLayer({ module: initialModule }: CheckerAssignmentFormLayerProps) {
   const accessToken = useAuthStore((s) => s.accessToken)
-  const popLayer = useSettingsDrawerStore((s) => s.popLayer)
+  const popLayer = useSettingsDrawerStore((s) => s.popLayer)
   const [module, setModule] = useState(initialModule ?? '')
   const [modules, setModules] = useState<AssignableModuleDto[]>([])
   const [moduleDropdownOpen, setModuleDropdownOpen] = useState(false)
   const [moduleSearch, setModuleSearch] = useState('')
 
+  /*
+   * An assignment names a user OR a role. A role is usually the better choice — "any Manager can
+   * approve" survives people joining and leaving, whereas a named individual has to be remembered
+   * and updated. Membership is re-resolved on every routing decision, never frozen at assignment.
+   */
+  const [targetKind, setTargetKind] = useState<'user' | 'role'>('user')
   const [checkerUserId, setCheckerUserId] = useState('')
+  const [checkerRoleId, setCheckerRoleId] = useState('')
+  const [roles, setRoles] = useState<RoleListItemDto[]>([])
   const [userDropdownOpen, setUserDropdownOpen] = useState(false)
   const [userSearch, setUserSearch] = useState('')
   const [users, setUsers] = useState<UserListItemDto[]>([])
@@ -67,7 +76,17 @@ export function CheckerAssignmentFormLayer({ module: initialModule }: CheckerAss
       }
     }
 
+    async function loadRoles() {
+      try {
+        const res = await rolesApi.list(accessToken!, { pageSize: 100 })
+        if (!cancelled) setRoles(res.items.sort((a, b) => a.name.localeCompare(b.name)))
+      } catch (err) {
+        console.error('Failed to load roles for checker picker:', err)
+      }
+    }
+
     void loadUsers()
+    void loadRoles()
     return () => {
       cancelled = true
     }
@@ -114,12 +133,20 @@ export function CheckerAssignmentFormLayer({ module: initialModule }: CheckerAss
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
-    if (!accessToken || !checkerUserId) return
+    const targetId = targetKind === 'user' ? checkerUserId : checkerRoleId
+    if (!accessToken || !targetId) return
     setSaving(true)
     setError(null)
     try {
-      const result = await checkerAssignmentsApi.upsert(accessToken, { module, checkerUserId })
-      toast.success(`${result.checkerName} is now a checker for '${module}'.`)
+      const result = await checkerAssignmentsApi.upsert(
+        accessToken,
+        targetKind === 'user' ? { module, checkerUserId } : { module, checkerRoleId },
+      )
+      toast.success(
+        result.isRole
+          ? `Anyone with the '${result.checkerName}' role (${result.memberCount ?? 0} active) is now a checker for '${module}'.`
+          : `${result.checkerName} is now a checker for '${module}'.`,
+      )
       invalidate(TOPICS.checkerAssignments)
       popLayer()
     } catch (err) {
@@ -237,8 +264,67 @@ export function CheckerAssignmentFormLayer({ module: initialModule }: CheckerAss
               </div>
             </div>
 
-            {/* Checker User Dropdown */}
+            {/*
+              Who approves: one named person, or anyone holding a role.
+
+              A role is usually the better answer. It survives staff changes — a new Manager can act
+              the day they get the role, a departing one stops being eligible the moment it is taken
+              away — and it removes the single-checker deadlock where the only assigned approver is
+              also the person making the request. Membership is resolved at routing time, never
+              frozen when the assignment is saved.
+            */}
             <div className={styles.inputGroup}>
+              <label className={styles.label}>
+                <span>Checker Type <span className={styles.req}>*</span></span>
+              </label>
+              <div className={styles.kindToggle} role="radiogroup" aria-label="Checker type">
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={targetKind === 'user'}
+                  className={targetKind === 'user' ? styles.kindOptionActive : styles.kindOption}
+                  onClick={() => setTargetKind('user')}
+                >
+                  <Icon.User width={15} height={15} />
+                  <span>A specific user</span>
+                </button>
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={targetKind === 'role'}
+                  className={targetKind === 'role' ? styles.kindOptionActive : styles.kindOption}
+                  onClick={() => setTargetKind('role')}
+                >
+                  <Icon.ShieldCheck width={15} height={15} />
+                  <span>Anyone with a role</span>
+                </button>
+              </div>
+            </div>
+
+            {targetKind === 'role' && (
+              <div className={styles.inputGroup}>
+                <label className={styles.label}>
+                  <span>Select Checker Role <span className={styles.req}>*</span></span>
+                </label>
+                <select
+                  className={styles.roleSelect}
+                  value={checkerRoleId}
+                  onChange={(e) => setCheckerRoleId(e.target.value)}
+                >
+                  <option value="">-- Select a role --</option>
+                  {roles.map((r) => (
+                    <option key={r.id} value={r.id}>{r.name}</option>
+                  ))}
+                </select>
+                <p className={styles.hint}>
+                  Every active member of this role can approve requests for this module. A request is
+                  never routed to its own maker, even if they hold the role.
+                </p>
+              </div>
+            )}
+
+            {/* Checker User Dropdown */}
+            <div className={styles.inputGroup} style={targetKind === 'role' ? { display: 'none' } : undefined}>
               <label className={styles.label}>
                 <span>Select Checker User <span className={styles.req}>*</span></span>
               </label>
@@ -342,7 +428,7 @@ export function CheckerAssignmentFormLayer({ module: initialModule }: CheckerAss
           <button type="button" className={styles.cancelBtn} onClick={popLayer}>
             Cancel
           </button>
-          <button type="submit" className={styles.saveBtn} disabled={saving || !checkerUserId}>
+          <button type="submit" className={styles.saveBtn} disabled={saving || !(targetKind === 'user' ? checkerUserId : checkerRoleId)}>
             {saving ? (
               <span>Saving...</span>
             ) : (

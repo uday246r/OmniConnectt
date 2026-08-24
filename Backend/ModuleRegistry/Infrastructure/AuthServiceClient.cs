@@ -47,7 +47,8 @@ public class AuthServiceClient(HttpClient httpClient, IOptions<AuthIntegrationOp
 
     private record SubmitInternalApprovalRequest(
         string Module, string Action, string? EntityType, string? EntityId, string? EntityLabel,
-        string? OldDataJson, string NewDataJson, Guid MakerId, string SourceService, string CallbackUrl, string? CorrelationId);
+        string? OldDataJson, string NewDataJson, Guid MakerId, string SourceService, string CallbackUrl, string? CorrelationId,
+        string? EntityKey = null);
 
     public Task<bool> UpsertAsync(
         string featureKey, string displayName, int sortOrder,
@@ -126,7 +127,8 @@ public class AuthServiceClient(HttpClient httpClient, IOptions<AuthIntegrationOp
     public async Task<ApprovalPendingDto> SubmitApprovalAsync(
         string module, string action, string? entityType, string? entityId, string? entityLabel,
         string? oldDataJson, string newDataJson, Guid makerId, string callbackUrl, string correlationId,
-        CancellationToken ct = default)
+        // Required for Create, which has no entity id yet — see SubmitInternalApprovalRequest.EntityKey.
+        CancellationToken ct = default, string? entityKey = null)
     {
         if (string.IsNullOrWhiteSpace(_options.BaseUrl))
         {
@@ -140,7 +142,7 @@ public class AuthServiceClient(HttpClient httpClient, IOptions<AuthIntegrationOp
             {
                 Content = JsonContent.Create(new SubmitInternalApprovalRequest(
                     module, action, entityType, entityId, entityLabel, oldDataJson, newDataJson, makerId,
-                    "ModuleRegistry", callbackUrl, correlationId)),
+                    "ModuleRegistry", callbackUrl, correlationId, entityKey)),
             };
             request.Headers.Add("X-Internal-Api-Key", _options.InternalApiKey);
 

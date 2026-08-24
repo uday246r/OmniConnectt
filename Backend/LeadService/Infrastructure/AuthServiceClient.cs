@@ -21,7 +21,11 @@ public class AuthServiceClient(HttpClient httpClient, IOptions<AuthIntegrationOp
 
     private record SubmitInternalApprovalRequest(
         string Module, string Action, string? EntityType, string? EntityId, string? EntityLabel,
-        string? OldDataJson, string NewDataJson, Guid MakerId, string SourceService, string CallbackUrl, string? CorrelationId);
+        string? OldDataJson, string NewDataJson, Guid MakerId, string SourceService, string CallbackUrl, string? CorrelationId,
+        // Dedupe key for the one-open-request-per-record rule. Null is correct when EntityId exists;
+        // Create MUST supply one, since a null key defeats the partial unique index (Postgres treats
+        // NULLs as distinct) and lets the same record be submitted for approval twice.
+        string? EntityKey = null);
 
     private record GatedResponse(bool Gated);
 
@@ -62,7 +66,11 @@ public class AuthServiceClient(HttpClient httpClient, IOptions<AuthIntegrationOp
     public async Task<ApprovalPendingDto> SubmitApprovalAsync(
         string module, string action, string? entityType, string? entityId, string? entityLabel,
         string? oldDataJson, string newDataJson, Guid makerId, string callbackUrl, string correlationId,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        // Required for Create, which has no entity id yet. Without it AuthService's dedupe key is null
+        // and Postgres treats NULLs as distinct, so the partial unique index stops preventing two open
+        // Create requests for the same record.
+        string? entityKey = null)
     {
         if (string.IsNullOrWhiteSpace(_options.BaseUrl))
         {
@@ -75,7 +83,7 @@ public class AuthServiceClient(HttpClient httpClient, IOptions<AuthIntegrationOp
             {
                 Content = JsonContent.Create(new SubmitInternalApprovalRequest(
                     module, action, entityType, entityId, entityLabel, oldDataJson, newDataJson, makerId,
-                    "LeadService", callbackUrl, correlationId)),
+                    "LeadService", callbackUrl, correlationId, entityKey)),
             };
             request.Headers.Add("X-Internal-Api-Key", _options.InternalApiKey);
 

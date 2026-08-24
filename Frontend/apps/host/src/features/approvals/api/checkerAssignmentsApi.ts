@@ -12,17 +12,31 @@ export interface AssignableModuleDto {
   label: string
 }
 
+/**
+ * An assignment targets a specific user OR a role — exactly one of `checkerUserId` and
+ * `checkerRoleId` is set. `checkerName` carries whichever name applies so the UI has a single field
+ * to render, and `isRole` says which kind it is.
+ */
 export interface CheckerAssignmentDto {
   id: string
   module: string
-  checkerUserId: string
+  checkerUserId: string | null
+  checkerRoleId: string | null
   checkerName: string
+  isRole: boolean
+  /**
+   * Active members the role currently expands to; null for a user assignment. Worth surfacing:
+   * "assigned to Manager" says nothing about whether anyone can actually approve today.
+   */
+  memberCount: number | null
   createdAt: string
 }
 
+/** Supply exactly one of the two ids. */
 export interface UpsertCheckerAssignmentRequest {
   module: string
-  checkerUserId: string
+  checkerUserId?: string
+  checkerRoleId?: string
 }
 
 export const checkerAssignmentsApi = {

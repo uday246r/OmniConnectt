@@ -186,11 +186,7 @@ public class ApprovalGatingService(AuthDbContext db, AuditLogAppService auditLog
     /// </summary>
     private async Task<(Guid CheckerId, string? CheckerName)> SelectCheckerAsync(string module, Guid makerId, CancellationToken ct)
     {
-        var eligible = await db.CheckerAssignments.AsNoTracking()
-            .Where(c => c.Module == module && c.CheckerUserId != makerId)
-            .Select(c => c.CheckerUserId)
-            .Distinct()
-            .ToListAsync(ct);
+        var eligible = await ResolveEligibleCheckerIdsAsync(module, makerId, ct);
 
         if (eligible.Count == 0)
         {
@@ -232,14 +228,15 @@ public class ApprovalGatingService(AuthDbContext db, AuditLogAppService auditLog
         var departingName = await db.Users.AsNoTracking()
             .Where(u => u.Id == departingCheckerId).Select(u => u.Name).FirstOrDefaultAsync(ct) ?? "That user";
 
-        // One lookup for every module involved, rather than one per request.
+        // One lookup per module involved, rather than one per request. Role assignments are expanded
+        // here too, so a module whose only checker "assignment" is a role still finds a replacement
+        // among that role's other active members.
         var modules = affected.Select(r => r.Module).Distinct().ToList();
-        var assignmentsByModule = (await db.CheckerAssignments.AsNoTracking()
-                .Where(c => modules.Contains(c.Module) && c.CheckerUserId != departingCheckerId)
-                .Select(c => new { c.Module, c.CheckerUserId })
-                .ToListAsync(ct))
-            .GroupBy(c => c.Module)
-            .ToDictionary(g => g.Key, g => g.Select(x => x.CheckerUserId).Distinct().ToList());
+        var assignmentsByModule = new Dictionary<string, List<Guid>>();
+        foreach (var module in modules)
+        {
+            assignmentsByModule[module] = await ResolveEligibleCheckerIdsAsync(module, departingCheckerId, ct);
+        }
 
         var reassignments = new List<(ApprovalRequest Request, Guid NewCheckerId, string? NewCheckerName)>();
 
@@ -277,6 +274,63 @@ public class ApprovalGatingService(AuthDbContext db, AuditLogAppService auditLog
                 $"Reassigned from {oldCheckerName ?? "Unknown"} to {newCheckerName ?? "Unknown"} on '{request.Module}' — {reason}.",
                 entityLabel: request.EntityLabel, ct: ct);
         }
+    }
+
+    /// <summary>
+    /// Turns a module's checker assignments into the concrete set of user ids that may act on it,
+    /// excluding <paramref name="excludeUserId"/> — always the request's own maker, since the whole
+    /// point of the system is that nobody approves their own change.
+    ///
+    /// User assignments contribute their user directly. Role assignments expand to that role's ACTIVE
+    /// members, resolved at selection time rather than when the assignment was created: membership
+    /// changes as people join, move and leave, and a snapshot taken on the day of assignment would go
+    /// stale silently. A user who is both named individually and a member of an assigned role appears
+    /// once — Distinct() keeps them from being counted twice by the workload balancer.
+    ///
+    /// Inactive users are filtered later by <see cref="TrySelectCheckerAsync"/>, which already checks
+    /// status for the direct-user case; role expansion applies the same filter here so an all-inactive
+    /// role behaves exactly like an all-inactive list of individuals.
+    /// </summary>
+    internal async Task<List<Guid>> ResolveEligibleCheckerIdsAsync(
+        string module, Guid? excludeUserId, CancellationToken ct, Guid? ignoreAssignmentId = null)
+    {
+        // `ignoreAssignmentId` answers "who would still be eligible if this assignment were gone?",
+        // which is what removing an assignment needs to know before it strands anyone.
+        var assignments = await db.CheckerAssignments.AsNoTracking()
+            .Where(c => c.Module == module && (ignoreAssignmentId == null || c.Id != ignoreAssignmentId))
+            .Select(c => new { c.CheckerUserId, c.CheckerRoleId })
+            .ToListAsync(ct);
+
+        if (assignments.Count == 0)
+        {
+            return [];
+        }
+
+        var userIds = assignments
+            .Where(a => a.CheckerUserId.HasValue)
+            .Select(a => a.CheckerUserId!.Value)
+            .ToList();
+
+        var roleIds = assignments
+            .Where(a => a.CheckerRoleId.HasValue)
+            .Select(a => a.CheckerRoleId!.Value)
+            .Distinct()
+            .ToList();
+
+        if (roleIds.Count > 0)
+        {
+            // One query for every assigned role rather than one per role.
+            var fromRoles = await db.Users.AsNoTracking()
+                .Where(u => u.RoleId != null
+                    && roleIds.Contains(u.RoleId.Value)
+                    && u.Status == UserStatus.Active)
+                .Select(u => u.Id)
+                .ToListAsync(ct);
+
+            userIds.AddRange(fromRoles);
+        }
+
+        return userIds.Where(id => excludeUserId == null || id != excludeUserId.Value).Distinct().ToList();
     }
 
     /// <summary>

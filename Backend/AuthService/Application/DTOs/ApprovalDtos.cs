@@ -92,13 +92,33 @@ public record PendingApprovalConflictDto(
     /// say "You already have…" rather than naming them in the third person.</summary>
     bool IsOwnRequest);
 
-public record CheckerAssignmentDto(Guid Id, string Module, Guid CheckerUserId, string CheckerName, DateTimeOffset CreatedAt);
+/// <summary>
+/// One assignment targets a user OR a role — exactly one of <paramref name="CheckerUserId"/> and
+/// <paramref name="CheckerRoleId"/> is populated. <paramref name="CheckerName"/> carries whichever
+/// name applies so the UI has one field to render, and <paramref name="MemberCount"/> is the number
+/// of active members a role currently expands to (null for a user assignment) — an administrator
+/// needs to see that "Manager" means three people today, and especially that it means zero.
+/// </summary>
+public record CheckerAssignmentDto(
+    Guid Id,
+    string Module,
+    Guid? CheckerUserId,
+    Guid? CheckerRoleId,
+    string CheckerName,
+    bool IsRole,
+    int? MemberCount,
+    DateTimeOffset CreatedAt);
 
+/// <summary>
+/// Supply exactly one of the two ids. Neither is marked [Required] individually because either is a
+/// valid choice; the "exactly one" rule is checked in the service, where it can produce a message
+/// that names the actual problem.
+/// </summary>
 public record UpsertCheckerAssignmentRequest(
     [Required(AllowEmptyStrings = false, ErrorMessage = "Module is required.")]
     string Module,
-    [Required(ErrorMessage = "A checker user is required.")]
-    Guid CheckerUserId);
+    Guid? CheckerUserId,
+    Guid? CheckerRoleId);
 
 /// <summary>One module the Checker Assignment UI may offer a checker for — either <see cref="ApprovalModuleKeys.Users"/>/
 /// <see cref="ApprovalModuleKeys.Roles"/>, or a live PermissionFeature.Key from any registered remote app.</summary>
@@ -114,7 +134,14 @@ public record ApplyApprovedMutationRequest(
 /// <summary>Body a remote service POSTs to internal/approvals/submit to gate one of its own mutations.</summary>
 public record SubmitInternalApprovalRequest(
     string Module, string Action, string? EntityType, string? EntityId, string? EntityLabel,
-    string? OldDataJson, string NewDataJson, Guid MakerId, string SourceService, string CallbackUrl, string? CorrelationId);
+    string? OldDataJson, string NewDataJson, Guid MakerId, string SourceService, string CallbackUrl, string? CorrelationId,
+    /// <summary>
+    /// The dedupe key behind the one-open-request-per-record guarantee. Optional, and null is correct
+    /// for any action against a record that already has an id — SubmitAsync falls back to EntityId.
+    /// A remote MUST supply this for Create, which has no id yet: without it the key is null, Postgres
+    /// treats NULLs as distinct, and the partial unique index stops preventing duplicate Creates.
+    /// </summary>
+    string? EntityKey = null);
 
 /// <summary>
 /// The one and only time this value is ever transmitted. Returned by POST

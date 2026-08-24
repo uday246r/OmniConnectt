@@ -38,7 +38,7 @@ public class CheckerAssignmentsController(CheckerAssignmentAppService assignment
     [HttpPost]
     [RequirePermission(Feature, "Manage")]
     public async Task<ActionResult<CheckerAssignmentDto>> Upsert([FromBody] UpsertCheckerAssignmentRequest request, CancellationToken ct)
-        => Ok(await assignments.UpsertAsync(request.Module, request.CheckerUserId, CurrentUserId(), ct));
+        => Ok(await assignments.UpsertAsync(request.Module, request.CheckerUserId, request.CheckerRoleId, CurrentUserId(), ct));
 
     [HttpDelete("{id:guid}")]
     [RequirePermission(Feature, "Manage")]

@@ -56,7 +56,8 @@ namespace LeadManagement.Api.Services
         /// surgical insert AuthService's own UserAppService/RoleAppService use. Returns null when the
         /// caller should proceed to mutate directly.</summary>
         private async Task<ApprovalPendingDto?> TrySubmitForApprovalAsync(
-            string action, string? entityId, string entityLabel, string? oldDataJson, object requestBody, Guid? actingUserId, bool bypassApproval)
+            string action, string? entityId, string entityLabel, string? oldDataJson, object requestBody, Guid? actingUserId, bool bypassApproval,
+            string? entityKey = null)
         {
             if (bypassApproval || actingUserId is null)
             {
@@ -72,7 +73,7 @@ namespace LeadManagement.Api.Services
             return await _authServiceClient.SubmitApprovalAsync(
                 _selfOptions.LeadModuleKey, action, "Lead", entityId, entityLabel,
                 oldDataJson, System.Text.Json.JsonSerializer.Serialize(requestBody), actingUserId.Value,
-                callbackUrl, Guid.NewGuid().ToString());
+                callbackUrl, Guid.NewGuid().ToString(), entityKey: entityKey);
         }
 
         public async Task<MutationResult<LeadRecordDto>> CreateLeadAsync(CreateLeadDto dto, Guid? actingUserId, bool bypassApproval = false)
@@ -103,7 +104,20 @@ namespace LeadManagement.Api.Services
             var fieldConfigs = await _fieldConfigService.GetByProductAsync(product.Id);
             LeadFieldConfigService.EnsureRequiredFieldsPresent(fieldConfigs, dto, product.Name);
 
-            var pending = await TrySubmitForApprovalAsync("Create", null, dto.CustomerName.Trim(), null, dto, actingUserId, bypassApproval);
+            /*
+             * A Create has no entity id yet, so it must supply a natural key or AuthService's
+             * one-open-request-per-record guarantee silently does nothing for it: the dedupe key falls
+             * back to the null entity id, and Postgres treats NULLs as distinct, so the partial unique
+             * index never fires and the same lead can be submitted for approval twice.
+             *
+             * IC number identifies the person; product is included because the same person may
+             * legitimately have separate leads for different products, and blocking that would be
+             * wrong. Lowercased and trimmed so trivial formatting differences cannot defeat the match.
+             */
+            var createKey = $"lead:{dto.IcNumber.Trim().ToLowerInvariant()}:{product.Name.Trim().ToLowerInvariant()}";
+
+            var pending = await TrySubmitForApprovalAsync(
+                "Create", null, dto.CustomerName.Trim(), null, dto, actingUserId, bypassApproval, entityKey: createKey);
             if (pending is not null)
             {
                 return MutationResult<LeadRecordDto>.PendingApproval(pending);

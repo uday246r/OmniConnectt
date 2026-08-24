@@ -271,13 +271,45 @@ public class AuthDbContext(DbContextOptions<AuthDbContext> options) : DbContext(
         modelBuilder.Entity<CheckerAssignment>(entity =>
         {
             entity.Property(c => c.Module).HasMaxLength(100);
-            entity.HasIndex(c => new { c.Module, c.CheckerUserId }).IsUnique();
+
+            /*
+             * An assignment targets a user OR a role, never both and never neither.
+             *
+             * The uniqueness indexes are PARTIAL for that reason: a plain unique index on
+             * (Module, CheckerUserId) would treat every role assignment as a row with a NULL user,
+             * and Postgres considers NULLs distinct — so it would neither prevent duplicate role
+             * assignments nor say anything useful. One filtered index per target type states the
+             * real rule: a given user appears at most once per module, and so does a given role.
+             */
+            entity.HasIndex(c => new { c.Module, c.CheckerUserId })
+                .IsUnique()
+                .HasFilter("\"CheckerUserId\" IS NOT NULL");
+
+            entity.HasIndex(c => new { c.Module, c.CheckerRoleId })
+                .IsUnique()
+                .HasFilter("\"CheckerRoleId\" IS NOT NULL");
+
+            // Enforced in the database, not just in the service: this invariant is what the checker
+            // selection logic relies on, and application-level guards can be bypassed by a migration,
+            // a script, or a future code path that forgets.
+            entity.ToTable(t => t.HasCheckConstraint(
+                "CK_CheckerAssignment_UserOrRole",
+                "(\"CheckerUserId\" IS NOT NULL AND \"CheckerRoleId\" IS NULL) OR "
+                + "(\"CheckerUserId\" IS NULL AND \"CheckerRoleId\" IS NOT NULL)"));
+
             // Backs both IsGatedAsync's existence check and the least-workload selection query.
             entity.HasIndex(c => c.Module);
 
             entity.HasOne(c => c.CheckerUser)
                 .WithMany()
                 .HasForeignKey(c => c.CheckerUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // Restrict, like the user relationship: deleting a role that is somebody's approval route
+            // must fail loudly rather than silently leaving a module with no reachable checker.
+            entity.HasOne(c => c.CheckerRole)
+                .WithMany()
+                .HasForeignKey(c => c.CheckerRoleId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
     }

@@ -928,3 +928,47 @@
   gap: 10px;
 }
 
+
+/*
+ * Role assignments in the checker chip list.
+ *
+ * Same 17px footprint as .checkerAvatarSmall so a mixed list of users and roles stays aligned; a
+ * squircle and a shield rather than a circle and initials, because "a role" is a different kind of
+ * thing from "a person" and should not have to be read to be told apart.
+ */
+.checkerRoleIconSmall {
+  width: 17px;
+  height: 17px;
+  border-radius: 5px;
+  background: linear-gradient(135deg, var(--omni-color-primary-500), var(--omni-color-primary-700));
+  color: var(--omni-color-text-on-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.memberCount,
+.memberCountEmpty {
+  min-width: 15px;
+  height: 15px;
+  padding: 0 4px;
+  border-radius: var(--omni-radius-pill, 999px);
+  font-size: 9.5px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.memberCount {
+  background: var(--omni-color-primary-100);
+  color: var(--omni-color-primary-700);
+}
+
+/* Zero members means the module is gated with nobody able to approve — read as a warning, not a count. */
+.memberCountEmpty {
+  background: var(--omni-color-danger-100);
+  color: var(--omni-color-danger-700);
+}

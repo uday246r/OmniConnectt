@@ -472,3 +472,67 @@
   pointer-events: none;
 }
 
+
+/* ── Checker type toggle (user vs role) ──────────────────────── */
+.kindToggle {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.kindOption,
+.kindOptionActive {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: var(--omni-radius-md);
+  font-size: 12.5px;
+  font-weight: var(--omni-font-weight-semibold, 600);
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color 140ms ease, background 140ms ease, color 140ms ease;
+}
+
+.kindOption {
+  border: 1.5px solid var(--omni-color-border);
+  background: var(--omni-color-surface);
+  color: var(--omni-color-text-secondary);
+}
+
+.kindOption:hover {
+  border-color: var(--omni-color-border-strong);
+  background: var(--omni-color-surface-alt);
+}
+
+.kindOptionActive {
+  border: 1.5px solid var(--omni-color-primary-600);
+  background: var(--omni-color-primary-50);
+  color: var(--omni-color-primary-700);
+}
+
+.roleSelect {
+  width: 100%;
+  height: 42px;
+  padding: 0 12px;
+  border-radius: var(--omni-radius-md);
+  border: 1.5px solid var(--omni-color-border);
+  background: var(--omni-color-surface);
+  color: var(--omni-color-text-primary);
+  font-size: 13px;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+
+.roleSelect:focus {
+  outline: none;
+  border-color: var(--omni-color-primary-600);
+}
+
+.hint {
+  margin: 8px 0 0 0;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--omni-color-text-muted);
+}

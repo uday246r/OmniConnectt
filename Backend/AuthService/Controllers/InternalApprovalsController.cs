@@ -29,7 +29,7 @@ public class InternalApprovalsController(ApprovalGatingService gating) : Control
         var pending = await gating.SubmitAsync(
             request.Module, request.Action, request.EntityType, request.EntityId, request.EntityLabel,
             request.OldDataJson, request.NewDataJson, request.MakerId, ct,
-            request.SourceService, request.CallbackUrl, request.CorrelationId);
+            request.SourceService, request.CallbackUrl, request.CorrelationId, request.EntityKey);
         return Ok(pending);
     }
 }

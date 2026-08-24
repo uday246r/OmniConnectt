@@ -32,7 +32,7 @@ public partial class RemoteAppAppService(
     /// should proceed to mutate directly (bypassing, no actor, or the module isn't gated).</summary>
     private async Task<ApprovalPendingDto?> TrySubmitForApprovalAsync(
         string action, string? entityId, string entityLabel, string? oldDataJson, object requestBody,
-        Guid? actingUserId, bool bypassApproval, CancellationToken ct)
+        Guid? actingUserId, bool bypassApproval, CancellationToken ct, string? entityKey = null)
     {
         if (bypassApproval || actingUserId is null)
         {
@@ -48,7 +48,7 @@ public partial class RemoteAppAppService(
         return await authServiceClient.SubmitApprovalAsync(
             ApprovalModule, action, "RemoteApp", entityId, entityLabel,
             oldDataJson, JsonSerializer.Serialize(requestBody), actingUserId.Value,
-            callbackUrl, Guid.NewGuid().ToString(), ct);
+            callbackUrl, Guid.NewGuid().ToString(), ct, entityKey);
     }
 
     public async Task<PagedResult<RemoteAppDto>> ListAsync(int page, int pageSize, string? search, CancellationToken ct = default)
@@ -130,7 +130,11 @@ public partial class RemoteAppAppService(
         var displayName = request.DisplayName.Trim();
 
         var pending = await TrySubmitForApprovalAsync(
-            "Create", null, displayName, oldDataJson: null, request, actingUserId, bypassApproval, ct);
+            // A Create has no id yet, so it supplies the app Key - the value already validated as
+            // unique - as the dedupe key. Without it the guarantee is inert for Creates: the key falls
+            // back to a null entity id, and Postgres treats NULLs as distinct.
+            "Create", null, displayName, oldDataJson: null, request, actingUserId, bypassApproval, ct,
+            entityKey: $"remoteapp:{key}");
         if (pending is not null)
         {
             return MutationResult<RemoteAppDto>.PendingApproval(pending);
