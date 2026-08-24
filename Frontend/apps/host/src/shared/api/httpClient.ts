@@ -2,12 +2,27 @@ export class ApiError extends Error {
   status: number
   /** Field-level validation errors from ASP.NET ValidationProblemDetails `errors` dictionary. */
   errors: Record<string, string[]> | null
+  /**
+   * Any additional members the server attached to the ProblemDetails body beyond the standard
+   * title/status/errors — ASP.NET serialises `ProblemDetails.Extensions` inline at the top level.
+   *
+   * Used today by the maker-checker duplicate-request refusal, which returns a `pendingRequest`
+   * object describing the request that blocked this one (who raised it, which checker holds it,
+   * since when) so the UI can explain the block instead of showing a bare "conflict".
+   */
+  extensions: Record<string, unknown>
 
-  constructor(status: number, message: string, errors: Record<string, string[]> | null = null) {
+  constructor(
+    status: number,
+    message: string,
+    errors: Record<string, string[]> | null = null,
+    extensions: Record<string, unknown> = {},
+  ) {
     super(message)
     this.name = 'ApiError'
     this.status = status
     this.errors = errors
+    this.extensions = extensions
   }
 }
 
@@ -90,8 +105,8 @@ export async function apiFetch<T>(url: string, options: ApiFetchOptions = {}): P
   }
 
   if (!response.ok) {
-    const { title, errors } = await readErrorBody(response)
-    throw new ApiError(response.status, title, errors)
+    const { title, errors, extensions } = await readErrorBody(response)
+    throw new ApiError(response.status, title, errors, extensions)
   }
 
   if (response.status === 204) {
@@ -101,14 +116,35 @@ export async function apiFetch<T>(url: string, options: ApiFetchOptions = {}): P
   return (await response.json()) as T
 }
 
-async function readErrorBody(response: Response): Promise<{ title: string; errors: Record<string, string[]> | null }> {
+/** RFC 7807 members ASP.NET always emits; anything else in the body is a ProblemDetails extension. */
+const STANDARD_PROBLEM_MEMBERS = new Set(['type', 'title', 'status', 'detail', 'instance', 'errors', 'traceId'])
+
+async function readErrorBody(
+  response: Response,
+): Promise<{ title: string; errors: Record<string, string[]> | null; extensions: Record<string, unknown> }> {
   try {
-    const problem = (await response.json()) as { title?: string; errors?: Record<string, string[]> }
+    const problem = (await response.json()) as Record<string, unknown> & {
+      title?: string
+      errors?: Record<string, string[]>
+    }
+
+    // Extensions are serialised inline alongside the standard members rather than under a nested
+    // key, so they're recovered by subtracting the known ones.
+    const extensions: Record<string, unknown> = {}
+    for (const [key, value] of Object.entries(problem)) {
+      if (!STANDARD_PROBLEM_MEMBERS.has(key)) extensions[key] = value
+    }
+
     return {
       title: problem.title ?? response.statusText,
       errors: problem.errors && Object.keys(problem.errors).length > 0 ? problem.errors : null,
+      extensions,
     }
   } catch {
-    return { title: response.statusText || `Request failed with status ${response.status}`, errors: null }
+    return {
+      title: response.statusText || `Request failed with status ${response.status}`,
+      errors: null,
+      extensions: {},
+    }
   }
 }

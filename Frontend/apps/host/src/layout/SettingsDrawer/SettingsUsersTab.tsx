@@ -3,6 +3,8 @@ import { useAuthStore } from '../../features/auth/store/authStore'
 import { usersApi, type UserListItemDto } from '../../features/settings-users/api/usersApi'
 import { rolesApi, type RoleListItemDto } from '../../features/settings-roles/api/rolesApi'
 import { isApprovalPending } from '../../features/approvals/api/approvalsApi'
+import { asPendingApprovalConflict, type PendingApprovalConflict } from '../../features/approvals/pendingConflict'
+import { PendingApprovalDialog } from '../../features/approvals/components/PendingApprovalDialog'
 import { useSettingsDrawerStore } from '../../shared/stores/settingsDrawerStore'
 import { useDebouncedValue } from '../../shared/hooks/useDebouncedValue'
 import { Icon } from '../../shared/components/Icon/Icon'
@@ -20,6 +22,10 @@ export function SettingsUsersTab() {
   const accessToken = useAuthStore((s) => s.accessToken)
   const isAdministrator = Boolean(useAuthStore((s) => s.user)?.isAdministrator)
   const hasCapability = useAuthStore((s) => s.hasCapability)
+  // Needed per ROW, not just for the page: the destructive actions below must never be offered on
+  // the signed-in user's own account. Previously this component never read the current user's id at
+  // all, so an operator saw a live Delete button and a working deactivate toggle on their own row.
+  const currentUserId = useAuthStore((s) => s.user?.id)
   const pushLayer = useSettingsDrawerStore((s) => s.pushLayer)
   const mutationCount = useSettingsDrawerStore((s) => s.mutationCount)
   const notifyMutation = useSettingsDrawerStore((s) => s.notifyMutation)
@@ -42,6 +48,7 @@ export function SettingsUsersTab() {
   const [deleting, setDeleting] = useState(false)
   const [pendingStatusToggle, setPendingStatusToggle] = useState<UserListItemDto | null>(null)
   const [statusUpdating, setStatusUpdating] = useState(false)
+  const [approvalConflict, setApprovalConflict] = useState<PendingApprovalConflict | null>(null)
 
   // Debounced so typing a name doesn't fire one query per keystroke against the user table.
   const debouncedSearch = useDebouncedValue(search, 300)
@@ -133,8 +140,15 @@ export function SettingsUsersTab() {
       )
       notifyMutation()
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Could not update this user status.')
       setPendingStatusToggle(null)
+      // "Already awaiting approval" is not a failure the operator caused — it gets an explanatory
+      // dialog naming the in-flight request, not a red banner.
+      const conflict = asPendingApprovalConflict(err)
+      if (conflict) {
+        setApprovalConflict(conflict)
+        return
+      }
+      setError(err instanceof ApiError ? err.message : 'Could not update this user status.')
     } finally {
       setStatusUpdating(false)
     }
@@ -155,8 +169,13 @@ export function SettingsUsersTab() {
       if (users.length === 1 && page > 1) setPage((p) => p - 1)
       else notifyMutation()
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Could not delete this user.')
       setPendingDelete(null)
+      const conflict = asPendingApprovalConflict(err)
+      if (conflict) {
+        setApprovalConflict(conflict)
+        return
+      }
+      setError(err instanceof ApiError ? err.message : 'Could not delete this user.')
     } finally {
       setDeleting(false)
     }
@@ -243,6 +262,16 @@ export function SettingsUsersTab() {
           users.map((u) => {
             const initial = (u.name || u.email).charAt(0).toUpperCase()
             const isActive = u.isActive
+            /*
+             * Your own row is not a target for destructive actions.
+             *
+             * Deleting or deactivating yourself locks you out instantly, and there is no undo an
+             * operator can reach afterwards — they can't sign in to reverse it. The server refuses
+             * these too (UserAppService); hiding them here means the operator never reaches a dead
+             * end, rather than discovering it from a 403. Editing your own row stays available: name,
+             * email and phone are legitimately self-serviceable.
+             */
+            const isSelf = u.id === currentUserId
 
             return (
               <div key={u.id} className={styles.userCard}>
@@ -261,9 +290,15 @@ export function SettingsUsersTab() {
                 <div className={styles.userMeta}>
                   <span
                     className={isActive ? styles.activeBadge : styles.inactiveBadge}
-                    onClick={() => handleToggleStatusClick(u)}
-                    style={{ cursor: canDisable ? 'pointer' : 'default' }}
-                    title={canDisable ? (isActive ? 'Click to deactivate user' : 'Click to activate user') : undefined}
+                    onClick={() => !isSelf && handleToggleStatusClick(u)}
+                    style={{ cursor: canDisable && !isSelf ? 'pointer' : 'default' }}
+                    title={
+                      isSelf
+                        ? 'You cannot change your own account status'
+                        : canDisable
+                          ? (isActive ? 'Click to deactivate user' : 'Click to activate user')
+                          : undefined
+                    }
                   >
                     <span className={isActive ? styles.badgeDotGreen : styles.badgeDotGray} />
                     {isActive ? 'Active' : 'Inactive'}
@@ -280,7 +315,7 @@ export function SettingsUsersTab() {
                     </button>
                   )}
 
-                  {canDelete && (
+                  {canDelete && !isSelf && (
                     <button
                       type="button"
                       className={styles.deleteBtn}
@@ -357,6 +392,8 @@ export function SettingsUsersTab() {
         This removes their access immediately. Their audit log entries are kept, so the record of
         what they did remains intact.
       </Modal>
+
+      <PendingApprovalDialog conflict={approvalConflict} onClose={() => setApprovalConflict(null)} />
     </div>
   )
 }

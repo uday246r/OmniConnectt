@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { useAuthStore } from '../../features/auth/store/authStore'
 import { rolesApi, type RoleListItemDto } from '../../features/settings-roles/api/rolesApi'
 import { isApprovalPending } from '../../features/approvals/api/approvalsApi'
+import { asPendingApprovalConflict, type PendingApprovalConflict } from '../../features/approvals/pendingConflict'
+import { PendingApprovalDialog } from '../../features/approvals/components/PendingApprovalDialog'
 import { useSettingsDrawerStore } from '../../shared/stores/settingsDrawerStore'
 import { useDebouncedValue } from '../../shared/hooks/useDebouncedValue'
 import { Icon } from '../../shared/components/Icon/Icon'
@@ -19,6 +21,10 @@ export function SettingsRolesTab() {
   const accessToken = useAuthStore((s) => s.accessToken)
   const isAdministrator = Boolean(useAuthStore((s) => s.user)?.isAdministrator)
   const hasCapability = useAuthStore((s) => s.hasCapability)
+  // The role the signed-in user currently holds — deleting it would strip their own access, and the
+  // server refuses it. Previously this component never read it, so the Delete button appeared on the
+  // operator's own role and only failed once clicked.
+  const currentUserRoleId = useAuthStore((s) => s.user?.roleId)
   const pushLayer = useSettingsDrawerStore((s) => s.pushLayer)
   // Bumped by every form layer that saves, so closing an editor refreshes this list.
   const mutationCount = useSettingsDrawerStore((s) => s.mutationCount)
@@ -36,6 +42,7 @@ export function SettingsRolesTab() {
   const [page, setPage] = useState(1)
   const [pendingDelete, setPendingDelete] = useState<RoleListItemDto | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [approvalConflict, setApprovalConflict] = useState<PendingApprovalConflict | null>(null)
 
   // Every keystroke previously fired its own request. On a large directory that is a request storm
   // against the database for results the operator never sees.
@@ -96,8 +103,13 @@ export function SettingsRolesTab() {
       if (roles.length === 1 && page > 1) setPage((p) => p - 1)
       else notifyMutation()
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Could not delete this role.')
       setPendingDelete(null)
+      const conflict = asPendingApprovalConflict(err)
+      if (conflict) {
+        setApprovalConflict(conflict)
+        return
+      }
+      setError(err instanceof ApiError ? err.message : 'Could not delete this role.')
     } finally {
       setDeleting(false)
     }
@@ -163,8 +175,19 @@ export function SettingsRolesTab() {
                 </span>
               </div>
 
+              {/*
+                Two guards beyond the plain capability check, both mirroring server-side rules so the
+                operator never reaches a button that can only fail:
+
+                - An administrator role may only be touched by an administrator. It confers
+                  unrestricted access, so editing or deleting one from a lesser account is a
+                  privilege-escalation surface (RoleAppService refuses it outright).
+                - Your own role can't be deleted — that would strip your access mid-session.
+
+                `isSystemRole` continues to hide Delete on the built-in roles as before.
+              */}
               <div className={styles.roleActions}>
-                {canEdit && (
+                {canEdit && (!role.isAdministrator || isAdministrator) && (
                   <button
                     type="button"
                     className={styles.editBtn}
@@ -174,7 +197,10 @@ export function SettingsRolesTab() {
                     <Icon.Edit width={16} height={16} />
                   </button>
                 )}
-                {canDelete && !role.isSystemRole && (
+                {canDelete
+                  && !role.isSystemRole
+                  && role.id !== currentUserRoleId
+                  && (!role.isAdministrator || isAdministrator) && (
                   <button
                     type="button"
                     className={styles.deleteBtn}
@@ -222,6 +248,8 @@ export function SettingsRolesTab() {
       >
         Any user currently holding this role loses the permissions it grants. This cannot be undone.
       </Modal>
+
+      <PendingApprovalDialog conflict={approvalConflict} onClose={() => setApprovalConflict(null)} />
     </div>
   )
 }

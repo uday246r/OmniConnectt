@@ -7,6 +7,8 @@ import {
 } from '../../features/settings-users/api/usersApi'
 import { rolesApi, type RoleListItemDto } from '../../features/settings-roles/api/rolesApi'
 import { isApprovalPending, type ApprovalPendingDto } from '../../features/approvals/api/approvalsApi'
+import { asPendingApprovalConflict, type PendingApprovalConflict } from '../../features/approvals/pendingConflict'
+import { PendingApprovalDialog } from '../../features/approvals/components/PendingApprovalDialog'
 import { remoteAppsApi, type RemoteAppDto } from '../../features/settings-applications/api/remoteAppsApi'
 import { permissionsApi, type PermissionFeatureDto } from '../../shared/api/permissionsApi'
 import { useSettingsDrawerStore } from '../../shared/stores/settingsDrawerStore'
@@ -132,6 +134,8 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
   const accessToken = useAuthStore((s) => s.accessToken)
   const ensureFreshAccessToken = useAuthStore((s) => s.ensureFreshAccessToken)
   const refreshSession = useAuthStore((s) => s.refreshSession)
+  // Gates which roles this operator may hand out — see filteredRoles.
+  const isAdministrator = Boolean(useAuthStore((s) => s.user)?.isAdministrator)
   const popLayer = useSettingsDrawerStore((s) => s.popLayer)
   const notifyMutation = useSettingsDrawerStore((s) => s.notifyMutation)
 
@@ -143,6 +147,7 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
   // Set only on the CREATE path when Maker-Checker gates the "Users" module — the account doesn't
   // exist yet, so there's no temp password to show, just confirmation the request is queued.
   const [pendingApproval, setPendingApproval] = useState<ApprovalPendingDto | null>(null)
+  const [approvalConflict, setApprovalConflict] = useState<PendingApprovalConflict | null>(null)
 
   // Step 1: Basic Fields
   const [name, setName] = useState('')
@@ -156,7 +161,6 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
 
   const [roleDropdownOpen, setRoleDropdownOpen] = useState(false)
   const [roleSearch, setRoleSearch] = useState('')
-  const [customerType, setCustomerType] = useState<'individual' | 'corporate' | 'staff'>('individual')
 
   const countryDropdownRef = useRef<HTMLDivElement>(null)
   useClickOutside([countryDropdownRef], () => setCountryDropdownOpen(false), countryDropdownOpen)
@@ -179,15 +183,29 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
   const [roles, setRoles] = useState<RoleListItemDto[]>([])
 
   const filteredRoles = useMemo(() => {
-    if (!roleSearch.trim()) return roles
+    /*
+     * Administrator roles are only offered to administrators.
+     *
+     * Such a role grants unrestricted access to everything (PermissionClaimsBuilder short-circuits on
+     * the flag), so letting anyone with Users:Edit hand one out is a complete privilege escalation —
+     * and on a gated module it could be laundered through an unwitting non-admin checker. The server
+     * refuses it either way (UserAppService.EnsureMayAssignRoleAsync); filtering here means a
+     * non-admin is never shown an option that can only be rejected.
+     *
+     * The "administrator admin" search alias below is likewise scoped, so it can't surface a role
+     * that has been filtered out of the list.
+     */
+    const assignable = isAdministrator ? roles : roles.filter((r) => !r.isAdministrator)
+
+    if (!roleSearch.trim()) return assignable
     const q = roleSearch.toLowerCase().trim()
-    return roles.filter(
+    return assignable.filter(
       (r) =>
         r.name.toLowerCase().includes(q) ||
         (r.description && r.description.toLowerCase().includes(q)) ||
         (r.isAdministrator && 'administrator admin'.includes(q)),
     )
-  }, [roles, roleSearch])
+  }, [roles, roleSearch, isAdministrator])
 
   // Step 2: Permissions state
   const [rolePermissions, setRolePermissions] = useState<Set<string>>(new Set())
@@ -568,6 +586,13 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
         setCreatedResult(res)
       }
     } catch (err: any) {
+      // Blocked by an in-flight request on this same record — explained in a dialog rather than as a
+      // form error, since nothing about the form input is wrong.
+      const conflict = asPendingApprovalConflict(err)
+      if (conflict) {
+        setApprovalConflict(conflict)
+        return
+      }
       setError(err?.message || 'Could not save user.')
     } finally {
       setSaving(false)
@@ -951,53 +976,8 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
                 </div>
 
                 <div className={styles.formCard}>
-                  <h4 className={styles.formCardTitle}>Role & Customer Classification</h4>
+                  <h4 className={styles.formCardTitle}>Assigned Role</h4>
                   <div className={styles.fieldsGrid}>
-                    {/* Customer / Account Type Picker */}
-                    <div className={styles.inputGroupFull}>
-                      <label className={styles.label}>Customer / Account Classification</label>
-                      <div className={styles.customerTypeGrid}>
-                        <div
-                          className={`${styles.customerTypeCard} ${customerType === 'individual' ? styles.customerTypeCardActive : ''}`}
-                          onClick={() => setCustomerType('individual')}
-                          role="button"
-                          tabIndex={0}
-                        >
-                          <div className={styles.customerTypeIconBox}>
-                            <Icon.Users width={14} height={14} />
-                          </div>
-                          <span className={styles.customerTypeTitle}>Individual</span>
-                          <span className={styles.customerTypeSubtitle}>Retail / Personal</span>
-                        </div>
-
-                        <div
-                          className={`${styles.customerTypeCard} ${customerType === 'corporate' ? styles.customerTypeCardActive : ''}`}
-                          onClick={() => setCustomerType('corporate')}
-                          role="button"
-                          tabIndex={0}
-                        >
-                          <div className={styles.customerTypeIconBox}>
-                            <Icon.FileText width={14} height={14} />
-                          </div>
-                          <span className={styles.customerTypeTitle}>Corporate</span>
-                          <span className={styles.customerTypeSubtitle}>Non-Individual / Org</span>
-                        </div>
-
-                        <div
-                          className={`${styles.customerTypeCard} ${customerType === 'staff' ? styles.customerTypeCardActive : ''}`}
-                          onClick={() => setCustomerType('staff')}
-                          role="button"
-                          tabIndex={0}
-                        >
-                          <div className={styles.customerTypeIconBox}>
-                            <Icon.Shield width={14} height={14} />
-                          </div>
-                          <span className={styles.customerTypeTitle}>Internal Staff</span>
-                          <span className={styles.customerTypeSubtitle}>Platform Operator</span>
-                        </div>
-                      </div>
-                    </div>
-
                     {/* Searchable Role Dropdown */}
                     <div className={styles.inputGroupFull}>
                       <label className={styles.label}>Assigned System Role</label>
@@ -1462,16 +1442,6 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
 
                   <div className={styles.reviewMetaList}>
                     <div className={styles.reviewMetaItem}>
-                      <span className={styles.reviewMetaLabel}>Customer / Account Type</span>
-                      <span className={styles.reviewMetaVal}>
-                        {customerType === 'individual'
-                          ? 'Individual (Retail)'
-                          : customerType === 'corporate'
-                            ? 'Corporate (Non-Individual)'
-                            : 'Internal Staff'}
-                      </span>
-                    </div>
-                    <div className={styles.reviewMetaItem}>
                       <span className={styles.reviewMetaLabel}>Phone Number</span>
                       <span className={styles.reviewMetaVal}>{fullPhoneNumber || 'None provided'}</span>
                     </div>
@@ -1613,6 +1583,8 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
           </div>
         </div>
       )}
+
+      <PendingApprovalDialog conflict={approvalConflict} onClose={() => setApprovalConflict(null)} />
     </div>
   )
 }

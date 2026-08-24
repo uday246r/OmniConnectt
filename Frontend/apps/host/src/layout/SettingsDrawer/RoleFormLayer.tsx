@@ -3,6 +3,8 @@ import { useAuthStore } from '../../features/auth/store/authStore'
 import { permissionsApi, type PermissionFeatureDto } from '../../shared/api/permissionsApi'
 import { rolesApi, type RolePermissionGrantDto, type RoleUserDto } from '../../features/settings-roles/api/rolesApi'
 import { isApprovalPending, type ApprovalPendingDto } from '../../features/approvals/api/approvalsApi'
+import { asPendingApprovalConflict, type PendingApprovalConflict } from '../../features/approvals/pendingConflict'
+import { PendingApprovalDialog } from '../../features/approvals/components/PendingApprovalDialog'
 import { remoteAppsApi, type RemoteAppDto } from '../../features/settings-applications/api/remoteAppsApi'
 import { useSettingsDrawerStore } from '../../shared/stores/settingsDrawerStore'
 import { Icon } from '../../shared/components/Icon/Icon'
@@ -38,6 +40,7 @@ export function RoleFormLayer({ roleId, initialTab }: RoleFormLayerProps) {
   const [activeTab, setActiveTab] = useState<TabType>((initialTab as TabType) || 'basic')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [approvalConflict, setApprovalConflict] = useState<PendingApprovalConflict | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [pendingApproval, setPendingApproval] = useState<ApprovalPendingDto | null>(null)
 
@@ -396,6 +399,13 @@ export function RoleFormLayer({ roleId, initialTab }: RoleFormLayerProps) {
       useSettingsDrawerStore.getState().notifyMutation()
       useSettingsDrawerStore.getState().resetToRoot('roles')
     } catch (err: any) {
+      // Blocked by an in-flight request on this same role — explained in a dialog rather than as a
+      // form error, since nothing about the form input is wrong.
+      const conflict = asPendingApprovalConflict(err)
+      if (conflict) {
+        setApprovalConflict(conflict)
+        return
+      }
       setError(err?.message || 'Could not save role.')
     } finally {
       setSaving(false)
@@ -1129,6 +1139,8 @@ export function RoleFormLayer({ roleId, initialTab }: RoleFormLayerProps) {
           )}
         </div>
       </div>
+
+      <PendingApprovalDialog conflict={approvalConflict} onClose={() => setApprovalConflict(null)} />
     </div>
   )
 }

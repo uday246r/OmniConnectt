@@ -171,10 +171,22 @@ public class RoleAppService(
                 "Only an administrator can grant or revoke Platform Administrator Access.");
         }
 
-        if (role.IsSystemRole && !string.Equals(name, role.Name, StringComparison.Ordinal))
+        /*
+         * Renaming is blocked for system roles AND for administrator roles.
+         *
+         * IsSystemRole alone is not enough: AuthDbSeeder resolves the bootstrap role by the literal
+         * NAME "Super Admin" on every startup, and an administrator role that was created through the
+         * API (rather than seeded) carries IsSystemRole = false — which is the actual state of the
+         * Super Admin role in at least one live database. Renaming it there would silently break
+         * bootstrap seeding on the next deploy, with no error until an empty database failed to
+         * provision an administrator.
+         *
+         * Permissions on such a role remain editable; only its identity is pinned.
+         */
+        if ((role.IsSystemRole || role.IsAdministrator) && !string.Equals(name, role.Name, StringComparison.Ordinal))
         {
             throw new ConflictAppException(
-                $"'{role.Name}' is a built-in role and cannot be renamed. Its permissions can still be edited.");
+                $"'{role.Name}' is a protected role and cannot be renamed. Its permissions can still be edited.");
         }
 
         await gating.EnsureActorIdentifiedAsync(ApprovalModuleKeys.Roles, actingUserId, ct);
@@ -212,6 +224,28 @@ public class RoleAppService(
         if (role.IsSystemRole)
         {
             throw new ConflictAppException("Built-in roles cannot be deleted.");
+        }
+
+        /*
+         * An administrator role can never be deleted, by anyone — including another administrator.
+         *
+         * Deleting the last one leaves a platform with no account able to grant administrator access
+         * to anybody, and no in-app route back: the flag can only be set by an existing administrator.
+         * That is unrecoverable without direct database access.
+         *
+         * This is checked separately from IsSystemRole because an administrator role created through
+         * the API carries IsSystemRole = false — which is the real state of the Super Admin role in at
+         * least one live database, so the system-role guard above would not have caught it.
+         *
+         * The escape hatch is deliberate and explicit: an administrator may first revoke the flag
+         * (itself an administrator-only change, and one that shows up in the audit trail as exactly
+         * what it is), then delete the now-ordinary role.
+         */
+        if (role.IsAdministrator)
+        {
+            throw new ConflictAppException(
+                $"'{role.Name}' has Platform Administrator Access and cannot be deleted. " +
+                "Remove that access from the role first if you genuinely intend to delete it.");
         }
 
         /*
