@@ -136,8 +136,10 @@ export function DashboardPage() {
            */
           remoteAppsApi.list(accessToken!, { pageSize: 12 }).catch(() => null),
           auditLogsApi.list(accessToken!, { pageSize: 6 }).catch(() => ({ items: [], total: 0 })),
-          // A failing probe must not blank the whole dashboard — the card falls back to "Unknown".
-          dashboardApi.health(accessToken!).catch(() => [] as HealthEntryDto[]),
+          // Re-probed on arrival rather than read from the registry's last sweep, so what the System
+          // Status card shows is what is true now. A failing probe must not blank the whole dashboard
+          // — the card falls back to "Unknown", which renders as a neutral "Checking".
+          dashboardApi.refreshHealth(accessToken!).catch(() => [] as HealthEntryDto[]),
         ])
 
         if (!cancelled) {

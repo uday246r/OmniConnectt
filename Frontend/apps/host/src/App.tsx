@@ -203,13 +203,27 @@ function AuthenticatedShell() {
    * `status` — it can't trigger the 'loading' skeleton this file (line ~182) and RemoteAppPage both
    * render whenever status is 'idle' or 'loading'.
    */
+  /*
+   * The cadence is adaptive, for the same reason the registry's own sweep is: while everything is
+   * green there is nothing to watch for and a minute is plenty, but while an app is showing as
+   * anything other than healthy the poll interval IS how long a wrong answer stays on screen. A flat
+   * 60s meant an app that had already come back up kept its warning badge for up to a minute.
+   */
+  const hasUnsettledApp = useModuleRegistryStore((s) =>
+    s.apps.some((a) => a.health !== undefined && a.health !== 'Healthy'),
+  )
+
   useEffect(() => {
     if (!accessToken) return
+    const period = hasUnsettledApp ? 10_000 : 60_000
     const interval = setInterval(() => {
-      void refetchHealth()
-    }, 60_000)
+      // Force an actual re-probe while something looks wrong: the plain read returns whatever the
+      // registry's background sweep last stored, which is exactly the stale value we are trying to
+      // move past. When all is well, the cheap cached read is fine.
+      void refetchHealth(hasUnsettledApp)
+    }, period)
     return () => clearInterval(interval)
-  }, [accessToken, refetchHealth])
+  }, [accessToken, refetchHealth, hasUnsettledApp])
 
   const isAdministrator = Boolean(user?.isAdministrator)
   const settingsAccess = {

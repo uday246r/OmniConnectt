@@ -49,6 +49,16 @@ export const dashboardApi = {
   /** One round trip. Replaces three list calls that fetched a throwaway row each just to read `total`. */
   stats: (accessToken: string) => apiFetch<DashboardStatsDto>(`${base}/api/dashboard/stats`, { accessToken }),
 
-  /** Real reachability per registered remote app, from ModuleRegistry's background probe. */
+  /** Real reachability per registered remote app, as last recorded by ModuleRegistry's background probe. */
   health: (accessToken: string) => moduleRegistryClient.health(accessToken),
+
+  /**
+   * Reachability, re-probed now.
+   *
+   * The System Status card is the most prominent health readout in the product, so it should not be
+   * showing a value that could be a whole sweep interval old — that is precisely how a recovered app
+   * ended up still reported as "Degraded" no matter how many times the page was refreshed. The
+   * registry throttles this, so calling it on every dashboard mount is safe.
+   */
+  refreshHealth: (accessToken: string) => moduleRegistryClient.refreshHealth(accessToken),
 }

@@ -13,8 +13,9 @@ interface ModuleRegistryState {
   /** Merges fresh health/lastHealthCheckAt into the existing apps array by key — never touches
    * `status`, never re-fetches the full app list. Safe to call on a timer: unlike fetchForSidebar,
    * this can't flip `status` back to 'loading' and blank the sidebar or a mounted RemoteAppPage. */
-  refreshHealth: (accessToken: string) => Promise<void>
-  refetchHealth: () => Promise<void>
+  refreshHealth: (accessToken: string, forceProbe?: boolean) => Promise<void>
+  /** `forceProbe` asks the registry to probe the remotes now instead of returning its last sweep. */
+  refetchHealth: (forceProbe?: boolean) => Promise<void>
   getApp: (key: string) => SidebarAppDto | undefined
   /** Wipes cached apps back to the pre-login state. Registered as a session-cleanup handler below. */
   reset: () => void
@@ -53,11 +54,16 @@ export const useModuleRegistryStore = create<ModuleRegistryState>((set, get) => 
     }
   },
 
-  async refreshHealth(accessToken) {
+  async refreshHealth(accessToken, forceProbe = false) {
     const { apps, status } = get()
     if (status !== 'loaded' || apps.length === 0) return
     try {
-      const entries = await moduleRegistryClient.health(accessToken)
+      // Same merge either way — only where the numbers come from differs. The forced call makes the
+      // registry re-probe rather than hand back what its background sweep last stored, which is what
+      // makes arriving on a page reflect reality instead of a value up to a sweep interval old.
+      const entries = forceProbe
+        ? await moduleRegistryClient.refreshHealth(accessToken)
+        : await moduleRegistryClient.health(accessToken)
       const byKey = new Map(entries.map((e) => [e.key, e]))
       set({
         apps: get().apps.map((app) => {
@@ -72,12 +78,12 @@ export const useModuleRegistryStore = create<ModuleRegistryState>((set, get) => 
     }
   },
 
-  async refetchHealth() {
+  async refetchHealth(forceProbe = false) {
     try {
       const { useAuthStore } = await import('../../features/auth/store/authStore')
       const token = await useAuthStore.getState().ensureFreshAccessToken()
       if (token) {
-        await get().refreshHealth(token)
+        await get().refreshHealth(token, forceProbe)
       }
     } catch (err) {
       console.warn('ModuleRegistry refetchHealth failed:', err)

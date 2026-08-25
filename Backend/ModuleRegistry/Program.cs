@@ -55,6 +55,10 @@ var probeTimeout = remoteHealthSection.GetValue<TimeSpan?>(nameof(RemoteHealthOp
 builder.Services.AddHttpClient<AuthServiceClient>(client => client.Timeout = TimeSpan.FromSeconds(10));
 builder.Services.AddHttpClient<RemoteManifestClient>(client => client.Timeout = probeTimeout);
 builder.Services.AddScoped<RemoteAppAppService>();
+// Singleton: the background sweep and the on-demand refresh endpoint must share one set of
+// consecutive-failure counters, or they would disagree about whether an app has failed often enough
+// to be called down. It resolves its own scopes for the DbContext.
+builder.Services.AddSingleton<RemoteHealthProber>();
 builder.Services.AddHostedService<RemoteAppHealthProbeService>();
 
 builder.Services.AddResponseCompression(options => options.EnableForHttps = true);

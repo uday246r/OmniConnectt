@@ -3,14 +3,20 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ModuleRegistry.Application.DTOs;
 using ModuleRegistry.Application.Services;
+using ModuleRegistry.Infrastructure;
 using ModuleRegistry.Infrastructure.Security;
+using ModuleRegistry.Options;
+using Microsoft.Extensions.Options;
 
 namespace ModuleRegistry.Controllers;
 
 [ApiController]
 [Route("api/remote-apps")]
 [Authorize]
-public class RemoteAppsController(RemoteAppAppService remoteApps) : ControllerBase
+public class RemoteAppsController(
+    RemoteAppAppService remoteApps,
+    RemoteHealthProber healthProber,
+    IOptions<RemoteHealthOptions> remoteHealthOptions) : ControllerBase
 {
     // Must match AuthService.Infrastructure.Seed.AuthDbSeeder.HostFeatureKeys.SettingsApplications —
     // the two services don't share a code package, so this string is kept in sync by hand.
@@ -93,6 +99,28 @@ public class RemoteAppsController(RemoteAppAppService remoteApps) : ControllerBa
     [HttpGet("health")]
     public async Task<ActionResult<IReadOnlyList<HealthEntryDto>>> Health(CancellationToken ct)
     {
+        var (isAdministrator, permissions) = CallerAccess();
+        return Ok(await remoteApps.GetHealthAsync(isAdministrator, permissions, ct));
+    }
+
+    /// <summary>
+    /// Re-probes the remotes now, then returns the fresh result.
+    ///
+    /// <see cref="Health"/> reads the stored value written by the background sweep, so before this
+    /// existed there was no way for the UI to ask "check again" — refreshing the page just re-read
+    /// the same row, which is exactly why a stale "Degraded" appeared unfixable to the user.
+    ///
+    /// Throttled by <see cref="RemoteHealthOptions.OnDemandMaximumAge"/>: if a sweep ran moments ago
+    /// this returns the current values without probing, so repeated refreshes cannot become a probe
+    /// storm against the remotes. Same visibility rule as the read endpoints, and it deliberately
+    /// requires no special permission — it reveals nothing the caller cannot already see, and the
+    /// throttle is what protects it rather than authorization.
+    /// </summary>
+    [HttpPost("health/refresh")]
+    public async Task<ActionResult<IReadOnlyList<HealthEntryDto>>> RefreshHealth(CancellationToken ct)
+    {
+        await healthProber.ProbeIfStaleAsync(remoteHealthOptions.Value.OnDemandMaximumAge, ct);
+
         var (isAdministrator, permissions) = CallerAccess();
         return Ok(await remoteApps.GetHealthAsync(isAdministrator, permissions, ct));
     }

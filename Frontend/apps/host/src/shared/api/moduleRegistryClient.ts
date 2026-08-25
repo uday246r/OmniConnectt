@@ -57,4 +57,18 @@ export const moduleRegistryClient = {
       accessToken,
       signal: AbortSignal.timeout(REGISTRY_TIMEOUT_MS),
     }),
+  /**
+   * Asks the registry to probe the remotes NOW, rather than returning the value its background sweep
+   * last stored. Used when the user has just arrived on a page and would reasonably expect what they
+   * are looking at to be current — `health` above can be up to a sweep interval old, which is why a
+   * recovered app used to keep showing as down no matter how often the page was refreshed.
+   *
+   * Server-side throttled, so calling it on every mount is safe.
+   */
+  refreshHealth: (accessToken: string) =>
+    apiFetch<HealthEntryDto[]>(`${base}/api/remote-apps/health/refresh`, {
+      method: 'POST',
+      accessToken,
+      signal: AbortSignal.timeout(REGISTRY_TIMEOUT_MS),
+    }),
 }
