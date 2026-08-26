@@ -12,9 +12,32 @@ namespace AuthService.Application.Services;
 /// (Maker-Checker required) if and only if it has at least one row here — see
 /// ApprovalGatingService.IsGatedAsync.
 /// </summary>
-public class CheckerAssignmentAppService(AuthDbContext db, AuditLogAppService auditLog, PermissionCatalogAppService catalog, ApprovalGatingService gating)
+public class CheckerAssignmentAppService(
+    AuthDbContext db,
+    AuditLogAppService auditLog,
+    PermissionCatalogAppService catalog,
+    ApprovalGatingService gating,
+    Infrastructure.Security.PermissionClaimsBuilder permissionClaims)
 {
     private const string ServiceName = "AuthService";
+
+    /// <summary>The capability a checker must hold to act on anything assigned to them.</summary>
+    private static readonly string ApprovePermission =
+        $"{AuthDbSeeder.HostFeatureKeys.SystemApprovals}:Approve";
+
+    /// <summary>
+    /// Can this user actually approve? Resolved through <see cref="PermissionClaimsBuilder"/> rather
+    /// than by reading role permissions directly, because the capability can legitimately arrive by
+    /// three different routes — an administrator flag, a role grant, or a per-user override — and only
+    /// the builder accounts for all three. That matters here specifically: a checker who holds nothing
+    /// but an Approvals override and has no role at all is an explicitly supported setup.
+    /// </summary>
+    private async Task<bool> CanApproveAsync(User user, CancellationToken ct)
+    {
+        var claims = await permissionClaims.BuildAsync(user, ct);
+        return claims.IsAdministrator
+            || claims.Permissions.Any(p => string.Equals(p, ApprovePermission, StringComparison.OrdinalIgnoreCase));
+    }
 
     public async Task<IReadOnlyList<CheckerAssignmentDto>> ListAsync(string? module, CancellationToken ct = default)
     {
@@ -154,6 +177,19 @@ public class CheckerAssignmentAppService(AuthDbContext db, AuditLogAppService au
                     $"{checkerUser.Name} is not an active user and cannot be assigned as a checker.");
             }
 
+            /*
+             * Being nominated as a checker is useless without the capability to act on the nomination.
+             * Previously this assignment succeeded and the problem only surfaced later, when the person
+             * opened the Approval Center and found they could not approve anything — by which point the
+             * request is already routed to them and nobody else can take it either.
+             */
+            if (!await CanApproveAsync(checkerUser, ct))
+            {
+                throw new ValidationAppException(
+                    $"{checkerUser.Name} cannot approve requests — they need the 'Approval Center: Approve' " +
+                    "capability, through their role or as an extra permission, before they can be assigned as a checker.");
+            }
+
             checkerName = checkerUser.Name;
         }
         else
@@ -180,6 +216,32 @@ public class CheckerAssignmentAppService(AuthDbContext db, AuditLogAppService au
                     $"'{role.Name}' has no active members, so assigning it as checker would leave this module with nobody able to approve.");
             }
 
+            /*
+             * At least one active member must actually be able to approve.
+             *
+             * Not ALL of them, deliberately: a role legitimately mixes people who can approve with
+             * people who cannot, and the selection logic already skips anyone ineligible. What must not
+             * happen is assigning a role where NOBODY can act, because that gates the module with an
+             * approval queue no one can ever clear — the same failure the empty-role check above
+             * prevents, just arriving by a different route.
+             */
+            var members = await db.Users.AsNoTracking()
+                .Where(u => u.RoleId == checkerRoleId!.Value && u.Status == Domain.Enums.UserStatus.Active)
+                .ToListAsync(ct);
+
+            var approverCount = 0;
+            foreach (var member in members)
+            {
+                if (await CanApproveAsync(member, ct)) approverCount++;
+            }
+
+            if (approverCount == 0)
+            {
+                throw new ValidationAppException(
+                    $"No active member of '{role.Name}' has the 'Approval Center: Approve' capability, so assigning " +
+                    "it as checker would leave this module with nobody able to approve. Grant that capability to the role first.");
+            }
+
             checkerName = role.Name;
         }
 
@@ -189,11 +251,16 @@ public class CheckerAssignmentAppService(AuthDbContext db, AuditLogAppService au
                 && c.CheckerRoleId == checkerRoleId, ct);
         if (existing is not null)
         {
-            // Already assigned — treat as a no-op success rather than a conflict, so the UI doesn't
-            // need to pre-check before offering "Add Checker".
+            /*
+             * Already assigned. Still a success rather than an error — the operation is idempotent and
+             * the UI should not have to pre-check before offering "Add Checker" — but flagged, because
+             * silently reporting "assigned successfully" for the second attempt left the administrator
+             * believing they had changed something when they had not.
+             */
             return new CheckerAssignmentDto(
                 existing.Id, existing.Module, existing.CheckerUserId, existing.CheckerRoleId,
-                checkerName, existing.CheckerRoleId.HasValue, memberCount, existing.CreatedAt);
+                checkerName, existing.CheckerRoleId.HasValue, memberCount, existing.CreatedAt,
+                AlreadyAssigned: true);
         }
 
         var assignment = new CheckerAssignment
@@ -252,6 +319,29 @@ public class CheckerAssignmentAppService(AuthDbContext db, AuditLogAppService au
          */
         var remainingEligible = await gating.ResolveEligibleCheckerIdsAsync(module, excludeUserId: null, ct, ignoreAssignmentId: id);
         var remainingSet = remainingEligible.ToHashSet();
+
+        /*
+         * Refuse only the genuinely broken outcome: assignments REMAIN but none of them can act.
+         *
+         * Removing the last assignment is explicitly allowed. A module is gated precisely BY having at
+         * least one assignment (ApprovalGatingService.IsGatedAsync is `AnyAsync(c => c.Module ==
+         * module)`), so clearing them all turns approval OFF for that module rather than stranding it —
+         * and it is the only way to un-gate one. Blocking that would make gating a one-way door.
+         *
+         * What must not be allowed is the in-between state: rows still present, so the module still
+         * demands approval, but every remaining checker is inactive or otherwise ineligible. The next
+         * request would be unroutable, which is exactly what the UpsertAsync guards exist to prevent.
+         */
+        var remainingAssignments = await db.CheckerAssignments.AsNoTracking()
+            .CountAsync(c => c.Module == module && c.Id != id, ct);
+
+        if (remainingAssignments > 0 && remainingEligible.Count == 0)
+        {
+            throw new ConflictAppException(
+                $"Removing {checkerName} would leave '{module}' still requiring approval, with no active checker " +
+                "able to give it. Assign another checker or reactivate an existing one first — or remove the " +
+                "remaining checkers too, which turns approval off for this module.");
+        }
 
         var affected = (await db.ApprovalRequests
                 .Where(r => r.Status == ApprovalStatus.Pending && r.Module == module)

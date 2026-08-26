@@ -107,7 +107,14 @@ public record CheckerAssignmentDto(
     string CheckerName,
     bool IsRole,
     int? MemberCount,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    /// <summary>
+    /// True when the upsert matched a row that already existed. The call still succeeds — assignment
+    /// is idempotent — but the UI needs to distinguish "added" from "was already there", since
+    /// reporting the second as a fresh success tells the administrator they changed something when
+    /// they did not.
+    /// </summary>
+    bool AlreadyAssigned = false);
 
 /// <summary>
 /// Supply exactly one of the two ids. Neither is marked [Required] individually because either is a
