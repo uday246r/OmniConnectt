@@ -435,28 +435,28 @@ export const ViewLeadPage: React.FC = () => {
           </div>
         ) : (
           <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-            <table style={{ width: '100%', minWidth: '780px', borderCollapse: 'collapse', fontSize: '13px', textAlign: 'left' }}>
+            <table className="omni-table" style={{ minWidth: '780px' }}>
               <thead>
-                <tr style={{ background: 'linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%)', borderBottom: '1px solid #eaecf0' }}>
-                  <th style={{ padding: '13px 18px', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.06em', color: '#475569', whiteSpace: 'nowrap' }}>
+                <tr>
+                  <th>
                     Customer Details
                   </th>
-                  <th style={{ padding: '13px 18px', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.06em', color: '#475569', whiteSpace: 'nowrap' }}>
+                  <th>
                     IC Number
                   </th>
-                  <th style={{ padding: '13px 18px', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.06em', color: '#475569', whiteSpace: 'nowrap' }}>
+                  <th>
                     Contact
                   </th>
-                  <th style={{ padding: '13px 18px', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.06em', color: '#475569', whiteSpace: 'nowrap' }}>
+                  <th>
                     Product
                   </th>
-                  <th style={{ padding: '13px 18px', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.06em', color: '#475569', whiteSpace: 'nowrap' }}>
+                  <th>
                     Branch
                   </th>
-                  <th style={{ padding: '13px 18px', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.06em', color: '#475569', whiteSpace: 'nowrap' }}>
+                  <th>
                     Created Date
                   </th>
-                  <th style={{ padding: '13px 18px', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.06em', color: '#475569', whiteSpace: 'nowrap', textAlign: 'right' }}>
+                  <th style={{ textAlign: 'right' }}>
                     Actions
                   </th>
                 </tr>
@@ -482,7 +482,7 @@ export const ViewLeadPage: React.FC = () => {
                       }}
                     >
                       {/* Customer — avatar + name only, no ID badge */}
-                      <td style={{ padding: '13px 18px', verticalAlign: 'middle' }}>
+                      <td>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '11px' }}>
                           <div
                             style={{
@@ -508,7 +508,7 @@ export const ViewLeadPage: React.FC = () => {
                       </td>
 
                       {/* IC Number — masked per Field Settings when the field is marked Sensitive */}
-                      <td style={{ padding: '13px 18px', verticalAlign: 'middle' }}>
+                      <td>
                         {isFieldVisible(commonFieldConfig, 'icNumber') && (
                           <div style={{ color: '#0f172a', fontWeight: 500, fontSize: '13px', fontFamily: "'SF Mono', 'Fira Code', monospace" }}>
                             {renderMaskedCell(commonFieldConfig, 'icNumber', lead.icNumber)}
@@ -517,19 +517,19 @@ export const ViewLeadPage: React.FC = () => {
                       </td>
 
                       {/* Contact */}
-                      <td style={{ padding: '13px 18px', verticalAlign: 'middle' }}>
+                      <td>
                         {isFieldVisible(commonFieldConfig, 'phoneNumber') && (
                           <div style={{ color: '#0f172a', fontWeight: 500 }}>{lead.phone}</div>
                         )}
                       </td>
 
                       {/* Product */}
-                      <td style={{ padding: '13px 18px', verticalAlign: 'middle' }}>
+                      <td>
                         <div style={{ fontWeight: 600, color: '#0f172a' }}>{lead.product}</div>
                       </td>
 
                       {/* Branch */}
-                      <td style={{ padding: '13px 18px', verticalAlign: 'middle' }}>
+                      <td>
                         {isFieldVisible(commonFieldConfig, 'branch') && (
                           <div style={{ color: '#0f172a', fontWeight: 500 }}>{lead.branch || 'Not Assigned'}</div>
                         )}
@@ -541,7 +541,7 @@ export const ViewLeadPage: React.FC = () => {
                       </td>
 
                       {/* Action Buttons */}
-                      <td style={{ padding: '13px 18px', textAlign: 'right', verticalAlign: 'middle' }}>
+                      <td style={{ textAlign: 'right' }}>
                         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
                           {/* View — text + icon */}
                           <button

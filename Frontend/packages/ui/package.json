@@ -9,7 +9,8 @@
     ".": "./index.ts",
     "./validation": "./src/validation/index.ts",
     "./skeleton": "./src/skeleton/index.ts",
-    "./skeleton.css": "./src/skeleton/Skeleton.module.css"
+    "./skeleton.css": "./src/skeleton/Skeleton.module.css",
+    "./styles.css": "./src/styles/table.css"
   },
   "peerDependencies": {
     "react": ">=19"

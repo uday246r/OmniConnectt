@@ -1,3 +1,7 @@
+/* Platform table, card and pill treatment, shared with the host and the other remotes.
+   Imported once here so every page in this app inherits it. */
+@import '@omniremit/ui/styles.css';
+
 /* ==========================================================================
    Customer 360 Remote App — Host Design System Tokens & Foundation
    Conforms 100% with OmniRemit Host App & Lead Management Design Standard
@@ -515,10 +519,10 @@
 
 /* Tables */
 .c360-table-container {
-  background: #ffffff;
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--border-subtle);
-  box-shadow: var(--shadow-card);
+  background: var(--omni-color-surface);
+  border: 1.5px solid var(--omni-color-border);
+  border-radius: var(--omni-radius-xl, 18px);
+  box-shadow: var(--omni-shadow-sm, 0 2px 8px rgba(15, 23, 42, 0.04));
   overflow: hidden;
 }
 
@@ -533,21 +537,21 @@
    at 0.03em tracking, and one consistent border color (was 11.5px/700/0.04em with a lighter, ad-hoc
    #f1f5f9 for the body rows that didn't match the header's own border, or the host's). */
 .c360-table th {
-  background: #f8fafc;
+  background: linear-gradient(180deg, var(--omni-color-surface-alt) 0%, #f1f5f9 100%);
   padding: 12px 16px;
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 11px;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.03em;
-  color: var(--text-secondary);
-  border-bottom: 1px solid var(--border-subtle);
+  letter-spacing: 0.06em;
+  color: var(--omni-color-text-secondary);
+  border-bottom: 1.5px solid var(--omni-color-border);
   white-space: nowrap;
 }
 
 .c360-table td {
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--border-subtle);
-  color: var(--text-heading);
+  padding: 13px 18px;
+  border-bottom: 1px solid #f1f5f9;
+  color: var(--omni-color-text-primary);
   vertical-align: middle;
 }
 
