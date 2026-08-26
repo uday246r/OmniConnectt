@@ -47,10 +47,11 @@ export type { HealthEntryDto }
 
 export const dashboardApi = {
   /** One round trip. Replaces three list calls that fetched a throwaway row each just to read `total`. */
-  stats: (accessToken: string) => apiFetch<DashboardStatsDto>(`${base}/api/dashboard/stats`, { accessToken }),
+  stats: (accessToken: string, signal?: AbortSignal) =>
+    apiFetch<DashboardStatsDto>(`${base}/api/dashboard/stats`, { accessToken, signal }),
 
   /** Real reachability per registered remote app, as last recorded by ModuleRegistry's background probe. */
-  health: (accessToken: string) => moduleRegistryClient.health(accessToken),
+  health: (accessToken: string, signal?: AbortSignal) => moduleRegistryClient.health(accessToken, signal),
 
   /**
    * Reachability, re-probed now.
@@ -60,5 +61,6 @@ export const dashboardApi = {
    * ended up still reported as "Degraded" no matter how many times the page was refreshed. The
    * registry throttles this, so calling it on every dashboard mount is safe.
    */
-  refreshHealth: (accessToken: string) => moduleRegistryClient.refreshHealth(accessToken),
+  refreshHealth: (accessToken: string, signal?: AbortSignal) =>
+    moduleRegistryClient.refreshHealth(accessToken, signal),
 }

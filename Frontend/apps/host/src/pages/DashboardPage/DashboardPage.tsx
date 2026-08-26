@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../features/auth/store/authStore'
 import { remoteAppsApi, type RemoteAppDto } from '../../features/settings-applications/api/remoteAppsApi'
@@ -10,6 +10,7 @@ import { Icon } from '../../shared/components/Icon/Icon'
 import styles from './DashboardPage.module.css'
 import { APP_NAME, COPYRIGHT_YEAR } from '../../shared/config/branding'
 import { useDataRevision } from '../../shared/stores/invalidationStore'
+import { useAbortableEffect } from '../../shared/hooks/useAbortableEffect'
 
 interface RoleDistribution {
   name: string
@@ -99,9 +100,8 @@ export function DashboardPage() {
   const [health, setHealth] = useState<HealthEntryDto[] | null>(null)
   const [recentLogs, setRecentLogs] = useState<AuditLogDto[]>([])
 
-  useEffect(() => {
+  useAbortableEffect(async (signal) => {
     if (!accessToken) return
-    let cancelled = false
 
     async function loadDashboardData() {
       try {
@@ -119,7 +119,7 @@ export function DashboardPage() {
          * individually; they are genuinely row-level data, not aggregates.
          */
         const [statsRes, appsRes, logsRes, healthRes] = await Promise.all([
-          dashboardApi.stats(accessToken!),
+          dashboardApi.stats(accessToken!, signal),
           /*
            * Guarded like its neighbours, because it talks to a DIFFERENT service.
            *
@@ -132,15 +132,15 @@ export function DashboardPage() {
            * `null` (not an empty list) marks unreachable, so the card can distinguish "the registry is
            * down" from "no applications are registered".
            */
-          remoteAppsApi.list(accessToken!, { pageSize: 12 }).catch(() => null),
-          auditLogsApi.list(accessToken!, { pageSize: 6 }).catch(() => ({ items: [], total: 0 })),
+          remoteAppsApi.list(accessToken!, { pageSize: 12 }, signal).catch(() => null),
+          auditLogsApi.list(accessToken!, { pageSize: 6 }, signal).catch(() => ({ items: [], total: 0 })),
           // Re-probed on arrival rather than read from the registry's last sweep, so what the System
           // Status card shows is what is true now. A failing probe must not blank the whole dashboard
           // — the card falls back to "Unknown", which renders as a neutral "Checking".
-          dashboardApi.refreshHealth(accessToken!).catch(() => [] as HealthEntryDto[]),
+          dashboardApi.refreshHealth(accessToken!, signal).catch(() => [] as HealthEntryDto[]),
         ])
 
-        if (!cancelled) {
+        {
           setStats(statsRes)
           setTotalUsers(statsRes.users ?? 0)
           setTotalRoles(statsRes.roles ?? 0)
@@ -152,19 +152,15 @@ export function DashboardPage() {
           setError(null)
         }
       } catch (err) {
-        if (cancelled) return
         // Surfaced instead of console-only: the page otherwise rendered zeroes, which reads as "the
         // platform has no users" rather than "the request failed".
         setError(err instanceof ApiError ? err.message : 'Could not load dashboard metrics.')
       } finally {
-        if (!cancelled) setLoading(false)
+        setLoading(false)
       }
     }
 
-    void loadDashboardData()
-    return () => {
-      cancelled = true
-    }
+    await loadDashboardData()
   }, [accessToken, dataRevision])
 
   /**
