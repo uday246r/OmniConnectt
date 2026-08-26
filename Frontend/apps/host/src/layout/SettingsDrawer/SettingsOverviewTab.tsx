@@ -47,7 +47,8 @@ function formatLogTime(iso: string): string {
 
 export function SettingsOverviewTab() {
   const accessToken = useAuthStore((s) => s.accessToken)
-  const openTab = useSettingsDrawerStore((s) => s.setActiveTab)
+  // Same reasoning as the drawer's own tab buttons: these are navigations, not store writes.
+  const openTab = (tab: string) => navigate(`/settings/${tab}`)
   const closeDrawer = useSettingsDrawerStore((s) => s.close)
   const navigate = useNavigate()
 

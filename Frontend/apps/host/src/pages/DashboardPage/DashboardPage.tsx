@@ -1,11 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../features/auth/store/authStore'
 import { remoteAppsApi, type RemoteAppDto } from '../../features/settings-applications/api/remoteAppsApi'
 import { auditLogsApi, type AuditLogDto } from '../../features/system-audit-logs/api/auditLogsApi'
 import { dashboardApi, type DashboardStatsDto, type HealthEntryDto } from '../../features/dashboard/api/dashboardApi'
 import { ApiError } from '../../shared/api/httpClient'
-import { useSettingsDrawerStore } from '../../shared/stores/settingsDrawerStore'
 import { SkeletonStatCard, SkeletonDashboardWidget, SkeletonAuditRow, SkeletonDonutChart } from '../../shared/components/Skeleton'
 import { Icon } from '../../shared/components/Icon/Icon'
 import styles from './DashboardPage.module.css'
@@ -81,8 +80,7 @@ function getUserInitials(name?: string | null): string {
 export function DashboardPage() {
   const user = useAuthStore((s) => s.user)
   const accessToken = useAuthStore((s) => s.accessToken)
-  const openDrawer = useSettingsDrawerStore((s) => s.open)
-  const pushLayer = useSettingsDrawerStore((s) => s.pushLayer)
+  const navigate = useNavigate()
   const dataRevision = useDataRevision()
 
   const [loading, setLoading] = useState(true)
@@ -499,7 +497,7 @@ export function DashboardPage() {
             {/* Action 1: Add New User */}
             <div
               className={styles.quickOpItem}
-              onClick={() => pushLayer({ type: 'user-form' })}
+              onClick={() => navigate('/settings/users/new')}
               role="button"
               tabIndex={0}
             >
@@ -516,7 +514,7 @@ export function DashboardPage() {
             {/* Action 2: Create Role */}
             <div
               className={styles.quickOpItem}
-              onClick={() => pushLayer({ type: 'role-form' })}
+              onClick={() => navigate('/settings/roles/new')}
               role="button"
               tabIndex={0}
             >
@@ -533,7 +531,7 @@ export function DashboardPage() {
             {/* Action 3: Register Application */}
             <div
               className={styles.quickOpItem}
-              onClick={() => pushLayer({ type: 'app-form' })}
+              onClick={() => navigate('/settings/applications/new')}
               role="button"
               tabIndex={0}
             >
@@ -649,7 +647,7 @@ export function DashboardPage() {
             <button
               type="button"
               className={styles.headerManageBtn}
-              onClick={() => openDrawer('applications')}
+              onClick={() => navigate('/settings/applications')}
             >
               <span>Manage</span>
               <Icon.ChevronRight width={13} height={13} />
@@ -724,7 +722,7 @@ export function DashboardPage() {
                 <button
                   type="button"
                   className={styles.emptyRegisterBtn}
-                  onClick={() => pushLayer({ type: 'app-form' })}
+                  onClick={() => navigate('/settings/applications/new')}
                 >
                   <Icon.Plus width={14} height={14} />
                   <span>Register Application</span>

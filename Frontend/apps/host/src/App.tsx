@@ -56,10 +56,17 @@ const FEATURE_KEYS = {
   applications: 'host.settings.applications',
   auditLogs: 'host.system.audit-logs',
   approvals: 'host.system.approvals',
+  checkerAssignment: 'host.system.checker-assignment',
 } as const
 
 /**
- * Opens the settings drawer for a `/settings/...` URL, then returns to the dashboard.
+ * Opens the settings drawer for a `/settings/...` URL — and, unlike before, leaves the URL alone.
+ *
+ * This previously called `navigate('/', { replace: true })` in the same effect that opened the
+ * drawer, so every settings URL was thrown away the instant it was consumed. Clicking Users, Roles,
+ * Applications or Checker Assignment left the address bar on the dashboard, nothing was linkable, and
+ * Back did not step between tabs. The URL is now the source of truth: the tab buttons navigate, and
+ * this component reacts.
  *
  * Users, Roles and Applications used to exist twice over: once as routed full pages behind SetupPanel,
  * and once as tabs inside the gear drawer. Both were live, so the same CRUD was maintained in two
@@ -72,18 +79,17 @@ const FEATURE_KEYS = {
  * into an open drawer. `replace` is used so the redirect leaves no dead history entry for Back to
  * bounce off.
  */
-function SettingsDeepLink({ tab }: { tab: SettingsTab }) {
+function SettingsRoute({ tab }: { tab: SettingsTab }) {
   const { id } = useParams<{ id: string }>()
   const openTab = useSettingsDrawerStore((s) => s.open)
   const pushLayer = useSettingsDrawerStore((s) => s.pushLayer)
-  const navigate = useNavigate()
   const location = useLocation()
 
   useEffect(() => {
     openTab(tab)
 
-    // A trailing /new or /:id opens the matching form layer straight away, which is what the routed
-    // form pages used to do.
+    // A trailing /new or /:id opens the matching form layer straight away. Ordering matters: open()
+    // resets the layer stack, so the push has to follow it, which is why both live in one effect.
     const isNew = location.pathname.endsWith('/new')
     if (isNew || id) {
       const entityId = isNew ? undefined : id
@@ -91,11 +97,15 @@ function SettingsDeepLink({ tab }: { tab: SettingsTab }) {
       else if (tab === 'roles') pushLayer({ type: 'role-form', roleId: entityId })
       else if (tab === 'applications') pushLayer({ type: 'app-form', appId: entityId })
     }
+  }, [tab, id, location.pathname, openTab, pushLayer])
 
-    navigate('/', { replace: true })
-  }, [tab, id, location.pathname, openTab, pushLayer, navigate])
-
-  return <RouteFallback />
+  /*
+   * The dashboard is the backdrop, because the drawer is an overlay and something has to be behind
+   * it. This is also exactly what was on screen before: the old version redirected to "/" after
+   * opening the drawer, so the dashboard was already what you saw through it — only now the address
+   * bar keeps saying where you actually are.
+   */
+  return <DashboardPage />
 }
 
 function LoginRoute() {
@@ -375,12 +385,13 @@ function AppRoutes() {
             Deleting them is what fixes those, not patching them twice.
           */}
           <Route path="settings">
-            <Route index element={<SettingsDeepLink tab="users" />} />
+            <Route index element={<SettingsRoute tab="users" />} />
             {(
               [
                 ['users', FEATURE_KEYS.users, 'Create'],
                 ['roles', FEATURE_KEYS.roles, 'Create'],
                 ['applications', FEATURE_KEYS.applications, 'Register'],
+                ['checker-assignment', FEATURE_KEYS.checkerAssignment, 'Manage'],
               ] as const
             ).map(([tab, featureKey, createCapability]) => (
               <Route key={tab} path={tab}>
@@ -388,7 +399,7 @@ function AppRoutes() {
                   index
                   element={
                     <RequireCapability featureKey={featureKey}>
-                      <SettingsDeepLink tab={tab} />
+                      <SettingsRoute tab={tab} />
                     </RequireCapability>
                   }
                 />
@@ -396,7 +407,7 @@ function AppRoutes() {
                   path="new"
                   element={
                     <RequireCapability featureKey={featureKey} capability={createCapability}>
-                      <SettingsDeepLink tab={tab} />
+                      <SettingsRoute tab={tab} />
                     </RequireCapability>
                   }
                 />
@@ -404,7 +415,7 @@ function AppRoutes() {
                   path=":id"
                   element={
                     <RequireCapability featureKey={featureKey} capability="Edit">
-                      <SettingsDeepLink tab={tab} />
+                      <SettingsRoute tab={tab} />
                     </RequireCapability>
                   }
                 />

@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../features/auth/store/authStore'
-import { useSettingsDrawerStore } from '../../shared/stores/settingsDrawerStore'
+import { useSettingsDrawerStore, type SettingsTab } from '../../shared/stores/settingsDrawerStore'
 import { Icon } from '../../shared/components/Icon/Icon'
 import { SettingsUsersTab } from './SettingsUsersTab'
 import { SettingsRolesTab } from './SettingsRolesTab'
@@ -16,10 +17,19 @@ export function SettingsDrawer() {
   const isOpen = useSettingsDrawerStore((s) => s.isOpen)
   const activeTab = useSettingsDrawerStore((s) => s.activeTab)
   const layerStack = useSettingsDrawerStore((s) => s.layerStack)
-  const close = useSettingsDrawerStore((s) => s.close)
-  const setActiveTab = useSettingsDrawerStore((s) => s.setActiveTab)
   const popLayer = useSettingsDrawerStore((s) => s.popLayer)
   const drawerRef = useRef<HTMLDivElement>(null)
+  const navigate = useNavigate()
+
+  /*
+   * Switching tabs and closing are NAVIGATIONS, not direct store writes.
+   *
+   * The URL is the source of truth for which tab is open — SettingsRoute in App.tsx reacts to it.
+   * Writing straight to the store here would move the drawer without moving the address bar, which is
+   * exactly the behaviour being fixed: nothing was linkable and Back did not step between tabs.
+   */
+  const goToTab = (tab: SettingsTab) => navigate(`/settings/${tab}`)
+  const close = () => navigate('/')
 
   const isAdministrator = Boolean(useAuthStore((s) => s.user)?.isAdministrator)
   const hasCapability = useAuthStore((s) => s.hasCapability)
@@ -101,7 +111,7 @@ export function SettingsDrawer() {
               <button
                 type="button"
                 className={`${styles.tabBtn} ${activeTab === 'users' ? styles.tabBtnActive : ''}`}
-                onClick={() => setActiveTab('users')}
+                onClick={() => goToTab('users')}
               >
                 <Icon.Users width={16} height={16} />
                 <span>Users</span>
@@ -109,7 +119,7 @@ export function SettingsDrawer() {
               <button
                 type="button"
                 className={`${styles.tabBtn} ${activeTab === 'roles' ? styles.tabBtnActive : ''}`}
-                onClick={() => setActiveTab('roles')}
+                onClick={() => goToTab('roles')}
               >
                 <Icon.ShieldCheck width={16} height={16} />
                 <span>Roles</span>
@@ -117,7 +127,7 @@ export function SettingsDrawer() {
               <button
                 type="button"
                 className={`${styles.tabBtn} ${activeTab === 'applications' ? styles.tabBtnActive : ''}`}
-                onClick={() => setActiveTab('applications')}
+                onClick={() => goToTab('applications')}
               >
                 <Icon.Grid width={16} height={16} />
                 <span>Applications</span>
@@ -126,7 +136,7 @@ export function SettingsDrawer() {
                 <button
                   type="button"
                   className={`${styles.tabBtn} ${activeTab === 'checker-assignment' ? styles.tabBtnActive : ''}`}
-                  onClick={() => setActiveTab('checker-assignment')}
+                  onClick={() => goToTab('checker-assignment')}
                 >
                   <Icon.UserCheck width={16} height={16} />
                   <span>Checker Assignment</span>

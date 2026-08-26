@@ -46,6 +46,20 @@ export function AppShell({ apps, appsError, userName, settingsAccess, canAccessA
     closeSidebar()
   }, [location.pathname, closeSidebar])
 
+  /*
+   * The settings drawer follows the URL out of /settings, not just into it.
+   *
+   * SettingsRoute opens it when a /settings/* URL is entered; this is the other half. It covers every
+   * way of leaving — the close button and backdrop (which navigate to "/"), a sidebar link, and the
+   * browser Back button — with one rule instead of each exit remembering to close the store itself.
+   */
+  const closeDrawer = useSettingsDrawerStore((s) => s.close)
+  useEffect(() => {
+    if (!location.pathname.startsWith('/settings') && drawerOpen) {
+      closeDrawer()
+    }
+  }, [location.pathname, drawerOpen, closeDrawer])
+
   // Prevent body scroll while mobile sidebar is overlaying the content
   useEffect(() => {
     document.body.style.overflow = sidebarOpen ? 'hidden' : ''
