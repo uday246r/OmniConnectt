@@ -45,9 +45,22 @@ namespace LeadManagement.Api.Models.Dtos
         [RegularExpression(@"^\d{6}-\d{2}-\d{4}$", ErrorMessage = "Please enter IC Number in format YYMMDD-PB-XXXX (e.g. 880512-14-5678).")]
         public string IcNumber { get; set; } = string.Empty;
 
+        /// <summary>Defaults to Malaysia, but no longer constrains what the number may be.</summary>
         public string PhoneCountryCode { get; set; } = "+60";
 
-        [RegularExpression(@"^\+60\s?[1-9]\d{1,2}-?\d{3,4}\s?\d{3,4}$|^\+60[1-9]\d{7,9}$|^[1-9]\d{7,9}$", ErrorMessage = "Please enter a valid Malaysian phone number.")]
+        /*
+         * Widened from a Malaysia-only pattern to a general digit-count rule.
+         *
+         * The old regex accepted only +60 numbers, while the platform's shared validator
+         * (Frontend/packages/ui/src/validation/phone.ts) supports 35 countries and AuthService accepts
+         * any 7-15 digits. A lead for a Singaporean or Indian customer was therefore valid in the UI
+         * and in AuthService, and rejected here — the same number judged three different ways.
+         *
+         * The precise per-country digit ranges live in the shared frontend validator, which knows
+         * which country was actually selected. This server-side rule is the backstop: it enforces the
+         * shape and a sane length without pretending to know the country from the number alone.
+         */
+        [RegularExpression(@"^(?=(?:\D*\d){7,15}\D*$)[0-9+()\-.\s]+$", ErrorMessage = "Enter a valid phone number (7-15 digits).")]
         public string PhoneNumber { get; set; } = string.Empty;
 
         [EmailAddress(ErrorMessage = "Please enter a valid email address.")]

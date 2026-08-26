@@ -1,3 +1,4 @@
+import { validateFullPhone } from '@omniremit/ui/validation'
 /**
  * Form validation rules, in one place, mirroring the server's data annotations.
  *
@@ -76,9 +77,8 @@ const COMMON_DOMAINS = [
  * The previous rule only checked the character set, which meant it rejected letters but happily
  * accepted "1" or a 40-digit string.
  */
-const PHONE_CHARS = /^[0-9+()\-.\s]+$/
-const PHONE_MIN_DIGITS = 7
-const PHONE_MAX_DIGITS = 15
+// The generic 7–15 digit constants that used to live here are gone: the shared country-aware
+// validator in @omniremit/ui owns those limits now, per country rather than one range for the world.
 
 export function email(value: string | null | undefined): string | undefined {
   if (value == null || value.trim() === '') return undefined
@@ -104,19 +104,12 @@ export function email(value: string | null | undefined): string | undefined {
  * administrator trying to reach the person, and it is a common control requirement.
  */
 export function phone(value: string | null | undefined): string | undefined {
-  if (value == null || value.trim() === '') return 'Phone number is required.'
-
-  const trimmed = value.trim()
-  if (!PHONE_CHARS.test(trimmed)) {
-    return 'Phone number may contain only digits, spaces and + ( ) - . characters.'
-  }
-
-  const digits = trimmed.replace(/\D/g, '').length
-  if (digits < PHONE_MIN_DIGITS || digits > PHONE_MAX_DIGITS) {
-    return `Enter a valid phone number (${PHONE_MIN_DIGITS}–${PHONE_MAX_DIGITS} digits).`
-  }
-
-  return undefined
+  /*
+   * Delegates to the shared country-aware validator rather than re-checking a generic 7-15 digit
+   * range here. Two validators for one concept is how the platform ended up accepting a number in the
+   * UI that the server then rejected - see packages/ui/src/validation/phone.ts.
+   */
+  return validateFullPhone(value)
 }
 
 /**

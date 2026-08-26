@@ -1,3 +1,4 @@
+import type { PasswordPolicy } from '@omniremit/ui/validation'
 import { env } from '../../config/env'
 import { apiFetch } from './httpClient'
 
@@ -50,6 +51,14 @@ export const authServiceClient = {
     apiFetch<LoginResponse>(`${base}/api/auth/google`, { method: 'POST', body: { idToken } }),
 
   ssoConfig: () => apiFetch<SsoConfigDto>(`${base}/api/auth/sso-config`),
+
+  /**
+   * The live password policy. Fetched rather than hardcoded so the UI enforces whatever the server is
+   * actually configured with — an administrator changing the policy changes the form without a
+   * rebuild, and the two can never drift apart.
+   */
+  passwordPolicy: (accessToken: string) =>
+    apiFetch<PasswordPolicy>(`${base}/api/auth/password-policy`, { accessToken }),
 
   /** Checks a set-password invite before showing the form, so a dead link says so up front. */
   validateInvite: (token: string) =>

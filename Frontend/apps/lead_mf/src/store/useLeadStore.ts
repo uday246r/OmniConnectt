@@ -1,3 +1,4 @@
+import { validateFullPhone } from '@omniremit/ui/validation';
 import { create } from 'zustand';
 import { LeadFormData, FormValidationErrors, NavigationPage, LeadRecord, DropdownOption, AuditRecord } from '../types/lead';
 import {
@@ -460,7 +461,7 @@ export const useLeadStore = create<LeadStoreState>((set, get) => ({
         case 'phoneNumber':
           if (val && typeof val === 'string' && val.trim()) {
             const fullPhone = `${state.formData.phoneCountryCode}${val.trim().replace(/\s|-/g, '')}`;
-            if (!/^\+60[1-9]\d{7,9}$/.test(fullPhone)) {
+            if (validateFullPhone(fullPhone) !== undefined) {
               errors.phoneNumber = getIncorrectErrorMessage('phoneNumber');
             } else {
               delete errors.phoneNumber;
@@ -522,7 +523,7 @@ export const useLeadStore = create<LeadStoreState>((set, get) => ({
       errors.phoneNumber = getEmptyErrorMessage('phoneNumber');
     } else if (formData.phoneNumber.trim()) {
       const fullPhone = `${formData.phoneCountryCode}${formData.phoneNumber.trim().replace(/\s|-/g, '')}`;
-      if (!/^\+60[1-9]\d{7,9}$/.test(fullPhone)) {
+      if (validateFullPhone(fullPhone) !== undefined) {
         errors.phoneNumber = getIncorrectErrorMessage('phoneNumber');
       }
     }
@@ -1086,7 +1087,7 @@ export const useLeadStore = create<LeadStoreState>((set, get) => ({
     if (isFieldRequired(fieldConfig, 'phoneNumber') && !editFormData.phoneNumber.trim()) errors.phoneNumber = getEmptyErrorMessage('phoneNumber');
     else if (editFormData.phoneNumber.trim()) {
       const fullPhone = `${editFormData.phoneCountryCode}${editFormData.phoneNumber.trim().replace(/\s|-/g, '')}`;
-      if (!/^\+60[1-9]\d{7,9}$/.test(fullPhone)) errors.phoneNumber = getIncorrectErrorMessage('phoneNumber');
+      if (validateFullPhone(fullPhone) !== undefined) errors.phoneNumber = getIncorrectErrorMessage('phoneNumber');
     }
 
     if (isFieldRequired(fieldConfig, 'email') && !editFormData.email.trim()) errors.email = getEmptyErrorMessage('email');
