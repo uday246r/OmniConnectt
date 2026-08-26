@@ -1,0 +1,235 @@
+/*
+ * Visual parity with the hand-rolled dropdown this component replaces
+ * (CheckerAssignmentFormLayer's user picker), but expressed in design tokens rather than the hex
+ * literals that copy carried — so it looks identical today and follows the theme from here on.
+ */
+
+.wrap {
+  position: relative;
+  width: 100%;
+}
+
+.trigger {
+  width: 100%;
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: var(--omni-radius-md);
+  border: 1.5px solid var(--omni-color-border);
+  background: var(--omni-color-surface);
+  color: var(--omni-color-text-primary);
+  font-size: 13px;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--omni-transition-fast);
+}
+
+.trigger:hover:not(:disabled) {
+  border-color: var(--omni-color-border-strong);
+}
+
+.triggerOpen,
+.trigger:focus-visible {
+  outline: none;
+  border-color: var(--omni-color-primary-600);
+}
+
+.trigger:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.triggerLeft {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+
+.triggerLabel {
+  font-weight: var(--omni-font-weight-semibold, 600);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.triggerSub {
+  color: var(--omni-color-text-muted);
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.placeholder {
+  color: var(--omni-color-text-muted);
+}
+
+.chevron {
+  flex-shrink: 0;
+  color: var(--omni-color-text-muted);
+  transition: transform var(--omni-transition-fast);
+}
+
+.chevronOpen {
+  transform: rotate(180deg);
+}
+
+.avatar,
+.avatarSmall {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--omni-color-primary-600), var(--omni-color-primary-700));
+  color: var(--omni-color-text-on-primary);
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.avatar {
+  width: 22px;
+  height: 22px;
+  font-size: 9px;
+}
+
+.avatarSmall {
+  width: 26px;
+  height: 26px;
+  font-size: 10px;
+}
+
+/* ── Menu ─────────────────────────────────────────────────── */
+
+.menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 40;
+  background: var(--omni-color-surface);
+  border: 1px solid var(--omni-color-border);
+  border-radius: var(--omni-radius-md);
+  box-shadow: var(--omni-shadow-lg, 0 12px 28px rgba(15, 23, 42, 0.12));
+  overflow: hidden;
+}
+
+.searchWrap {
+  position: relative;
+  padding: 8px;
+  border-bottom: 1px solid var(--omni-color-border);
+}
+
+.searchInput {
+  width: 100%;
+  height: 32px;
+  padding: 0 10px 0 28px;
+  border-radius: var(--omni-radius-sm);
+  border: 1px solid var(--omni-color-border);
+  background: var(--omni-color-surface-alt);
+  color: var(--omni-color-text-primary);
+  font-size: 12.5px;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+
+.searchInput:focus {
+  outline: none;
+  border-color: var(--omni-color-primary-600);
+  background: var(--omni-color-surface);
+}
+
+.searchIcon {
+  position: absolute;
+  left: 18px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--omni-color-text-muted);
+  pointer-events: none;
+}
+
+.list {
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--omni-color-surface-alt);
+}
+
+.item:last-child {
+  border-bottom: none;
+}
+
+/* Hover and keyboard focus share one treatment so the two navigation modes agree. */
+.itemActive {
+  background: var(--omni-color-surface-alt);
+}
+
+.itemSelected {
+  background: var(--omni-color-primary-50);
+}
+
+.itemLeft {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  flex: 1;
+}
+
+.itemText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.itemLabel {
+  font-size: 12.5px;
+  font-weight: var(--omni-font-weight-semibold, 600);
+  color: var(--omni-color-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.itemSub {
+  font-size: 11px;
+  color: var(--omni-color-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.itemCheck {
+  flex-shrink: 0;
+  color: var(--omni-color-primary-600);
+}
+
+.status {
+  padding: 18px 12px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--omni-color-text-muted);
+}
+
+/* The "this is a window onto more" line — see the component's comment for why it matters. */
+.footer {
+  padding: 7px 10px;
+  border-top: 1px solid var(--omni-color-border);
+  background: var(--omni-color-surface-alt);
+  font-size: 11px;
+  color: var(--omni-color-text-muted);
+  text-align: center;
+}

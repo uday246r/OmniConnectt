@@ -1,11 +1,16 @@
-import { useEffect, useState, useMemo, useRef, type FormEvent } from 'react'
+import { useCallback, useEffect, useState, useMemo, useRef, type FormEvent } from 'react'
 import { useAuthStore } from '../../features/auth/store/authStore'
-import { usersApi, type UserListItemDto } from '../../features/settings-users/api/usersApi'
-import { rolesApi, type RoleListItemDto } from '../../features/settings-roles/api/rolesApi'
+import { usersApi } from '../../features/settings-users/api/usersApi'
+import { rolesApi } from '../../features/settings-roles/api/rolesApi'
 import { checkerAssignmentsApi, type AssignableModuleDto } from '../../features/approvals/api/checkerAssignmentsApi'
 import { useSettingsDrawerStore } from '../../shared/stores/settingsDrawerStore'
 import { useClickOutside } from '../../shared/hooks/useClickOutside'
 import { Icon } from '../../shared/components/Icon/Icon'
+import {
+  AsyncSearchSelect,
+  type AsyncSearchOption,
+  type AsyncSearchResult,
+} from '../../shared/components/AsyncSearchSelect'
 import { ApiError } from '../../shared/api/httpClient'
 import { toast } from '../../shared/stores/toastStore'
 import styles from './CheckerAssignmentFormLayer.module.css'
@@ -14,16 +19,6 @@ import { TOPICS, invalidate } from '../../shared/stores/invalidationStore'
 interface CheckerAssignmentFormLayerProps {
   /** Pre-selected module, when opened via a specific module card's "Add Checker" button. */
   module?: string
-}
-
-function getInitials(name?: string, email?: string): string {
-  if (name && name.trim()) {
-    const parts = name.trim().split(/\s+/)
-    if (parts.length >= 2) return `${parts[0][0]}${parts[1][0]}`.toUpperCase()
-    return name.substring(0, 2).toUpperCase()
-  }
-  if (email) return email.substring(0, 2).toUpperCase()
-  return 'U'
 }
 
 /**
@@ -47,50 +42,46 @@ export function CheckerAssignmentFormLayer({ module: initialModule }: CheckerAss
   const [targetKind, setTargetKind] = useState<'user' | 'role'>('user')
   const [checkerUserId, setCheckerUserId] = useState('')
   const [checkerRoleId, setCheckerRoleId] = useState('')
-  const [roles, setRoles] = useState<RoleListItemDto[]>([])
-  const [userDropdownOpen, setUserDropdownOpen] = useState(false)
-  const [userSearch, setUserSearch] = useState('')
-  const [users, setUsers] = useState<UserListItemDto[]>([])
-  const [loadingUsers, setLoadingUsers] = useState(true)
+  /*
+   * Only the SELECTED user/role is held here, not a list.
+   *
+   * Both pickers used to fetch a page of records and filter it in the browser. Because the list
+   * endpoints clamp pageSize to 100, every record past the hundredth was unreachable — the search box
+   * looked like it worked while searching a fraction of the data. The options now come from the
+   * server per keystroke; the only thing that must be remembered locally is the current choice, so it
+   * still renders when it falls outside the latest result window.
+   */
+  const [selectedUser, setSelectedUser] = useState<AsyncSearchOption | null>(null)
+  const [selectedRole, setSelectedRole] = useState<AsyncSearchOption | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const moduleDropdownRef = useRef<HTMLDivElement>(null)
   useClickOutside([moduleDropdownRef], () => setModuleDropdownOpen(false), moduleDropdownOpen)
 
-  const userDropdownRef = useRef<HTMLDivElement>(null)
-  useClickOutside([userDropdownRef], () => setUserDropdownOpen(false), userDropdownOpen)
-
-  useEffect(() => {
-    if (!accessToken) return
-    let cancelled = false
-
-    async function loadUsers() {
-      try {
-        const res = await usersApi.list(accessToken!, { pageSize: 100, isActive: true })
-        if (!cancelled) setUsers(res.items.sort((a, b) => (a.name || a.email).localeCompare(b.name || b.email)))
-      } catch (err) {
-        console.error('Failed to load users for checker picker:', err)
-      } finally {
-        if (!cancelled) setLoadingUsers(false)
+  const searchUsers = useCallback(
+    async (term: string): Promise<AsyncSearchResult> => {
+      if (!accessToken) return { options: [] }
+      const res = await usersApi.list(accessToken, { pageSize: 25, isActive: true, search: term || undefined })
+      return {
+        options: res.items.map((u) => ({ id: u.id, label: u.name || u.email, sublabel: u.email })),
+        total: res.total,
       }
-    }
+    },
+    [accessToken],
+  )
 
-    async function loadRoles() {
-      try {
-        const res = await rolesApi.list(accessToken!, { pageSize: 100 })
-        if (!cancelled) setRoles(res.items.sort((a, b) => a.name.localeCompare(b.name)))
-      } catch (err) {
-        console.error('Failed to load roles for checker picker:', err)
+  const searchRoles = useCallback(
+    async (term: string): Promise<AsyncSearchResult> => {
+      if (!accessToken) return { options: [] }
+      const res = await rolesApi.list(accessToken, { pageSize: 25, search: term || undefined })
+      return {
+        options: res.items.map((r) => ({ id: r.id, label: r.name, sublabel: r.description ?? undefined })),
+        total: res.total,
       }
-    }
-
-    void loadUsers()
-    void loadRoles()
-    return () => {
-      cancelled = true
-    }
-  }, [accessToken])
+    },
+    [accessToken],
+  )
 
   useEffect(() => {
     if (!accessToken) return
@@ -113,23 +104,15 @@ export function CheckerAssignmentFormLayer({ module: initialModule }: CheckerAss
   }, [accessToken])
 
   const selectedModule = useMemo(() => modules.find((m) => m.key === module), [modules, module])
-  const selectedUser = useMemo(() => users.find((u) => u.id === checkerUserId), [users, checkerUserId])
 
+  // The module list stays client-filtered on purpose: it is the live PermissionFeature catalog, which
+  // is inherently small and bounded by how many modules the platform has — not by how much data users
+  // have entered. There is no server-side search endpoint for it, and it needs none.
   const filteredModules = useMemo(() => {
     if (!moduleSearch.trim()) return modules
     const q = moduleSearch.toLowerCase().trim()
     return modules.filter((m) => m.label.toLowerCase().includes(q) || m.key.toLowerCase().includes(q))
   }, [modules, moduleSearch])
-
-  const filteredUsers = useMemo(() => {
-    if (!userSearch.trim()) return users
-    const q = userSearch.toLowerCase().trim()
-    return users.filter(
-      (u) =>
-        (u.name && u.name.toLowerCase().includes(q)) ||
-        (u.email && u.email.toLowerCase().includes(q)),
-    )
-  }, [users, userSearch])
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -142,11 +125,17 @@ export function CheckerAssignmentFormLayer({ module: initialModule }: CheckerAss
         accessToken,
         targetKind === 'user' ? { module, checkerUserId } : { module, checkerRoleId },
       )
-      toast.success(
-        result.isRole
-          ? `Anyone with the '${result.checkerName}' role (${result.memberCount ?? 0} active) is now a checker for '${module}'.`
-          : `${result.checkerName} is now a checker for '${module}'.`,
-      )
+      // The server reports an idempotent no-op distinctly, so a second attempt says so rather than
+      // implying something changed.
+      if (result.alreadyAssigned) {
+        toast.success(`${result.checkerName} is already a checker for '${module}'.`)
+      } else {
+        toast.success(
+          result.isRole
+            ? `Anyone with the '${result.checkerName}' role (${result.memberCount ?? 0} active) is now a checker for '${module}'.`
+            : `${result.checkerName} is now a checker for '${module}'.`,
+        )
+      }
       invalidate(TOPICS.checkerAssignments)
       popLayer()
     } catch (err) {
@@ -192,7 +181,6 @@ export function CheckerAssignmentFormLayer({ module: initialModule }: CheckerAss
                   className={`${styles.dropdownTrigger} ${moduleDropdownOpen ? styles.dropdownTriggerOpen : ''}`}
                   onClick={() => {
                     setModuleDropdownOpen(!moduleDropdownOpen)
-                    setUserDropdownOpen(false)
                     if (!moduleDropdownOpen) setModuleSearch('')
                   }}
                   aria-haspopup="listbox"
@@ -306,16 +294,19 @@ export function CheckerAssignmentFormLayer({ module: initialModule }: CheckerAss
                 <label className={styles.label}>
                   <span>Select Checker Role <span className={styles.req}>*</span></span>
                 </label>
-                <select
-                  className={styles.roleSelect}
-                  value={checkerRoleId}
-                  onChange={(e) => setCheckerRoleId(e.target.value)}
-                >
-                  <option value="">-- Select a role --</option>
-                  {roles.map((r) => (
-                    <option key={r.id} value={r.id}>{r.name}</option>
-                  ))}
-                </select>
+                <AsyncSearchSelect
+                  value={checkerRoleId || null}
+                  selected={selectedRole}
+                  onChange={(id, option) => {
+                    setCheckerRoleId(id ?? '')
+                    setSelectedRole(option)
+                  }}
+                  onSearch={searchRoles}
+                  placeholder="-- Select a role --"
+                  searchPlaceholder="Type a role name to search..."
+                  emptyMessage="No roles found"
+                  required
+                />
                 <p className={styles.hint}>
                   Every active member of this role can approve requests for this module. A request is
                   never routed to its own maker, even if they hold the role.
@@ -323,104 +314,27 @@ export function CheckerAssignmentFormLayer({ module: initialModule }: CheckerAss
               </div>
             )}
 
-            {/* Checker User Dropdown */}
-            <div className={styles.inputGroup} style={targetKind === 'role' ? { display: 'none' } : undefined}>
-              <label className={styles.label}>
-                <span>Select Checker User <span className={styles.req}>*</span></span>
-              </label>
-
-              <div className={styles.dropdownWrap} ref={userDropdownRef}>
-                <button
-                  type="button"
-                  className={`${styles.dropdownTrigger} ${userDropdownOpen ? styles.dropdownTriggerOpen : ''}`}
-                  onClick={() => {
-                    setUserDropdownOpen(!userDropdownOpen)
-                    setModuleDropdownOpen(false)
-                    if (!userDropdownOpen) setUserSearch('')
+            {targetKind === 'user' && (
+              <div className={styles.inputGroup}>
+                <label className={styles.label}>
+                  <span>Select Checker User <span className={styles.req}>*</span></span>
+                </label>
+                <AsyncSearchSelect
+                  value={checkerUserId || null}
+                  selected={selectedUser}
+                  onChange={(id, option) => {
+                    setCheckerUserId(id ?? '')
+                    setSelectedUser(option)
                   }}
-                  aria-haspopup="listbox"
-                  aria-expanded={userDropdownOpen}
-                  disabled={loadingUsers}
-                >
-                  <div className={styles.triggerLeft}>
-                    {selectedUser ? (
-                      <>
-                        <div className={styles.triggerAvatar}>
-                          {getInitials(selectedUser.name, selectedUser.email)}
-                        </div>
-                        <span className={styles.triggerUserName}>{selectedUser.name || 'Unnamed User'}</span>
-                        <span className={styles.triggerUserEmail}>({selectedUser.email})</span>
-                      </>
-                    ) : (
-                      <span className={styles.triggerPlaceholder}>
-                        {loadingUsers ? 'Loading users list…' : '-- Select an approver checker --'}
-                      </span>
-                    )}
-                  </div>
-                  <Icon.ChevronDown
-                    width={13}
-                    height={13}
-                    className={`${styles.triggerChevron} ${userDropdownOpen ? styles.triggerChevronOpen : ''}`}
-                  />
-                </button>
-
-                {userDropdownOpen && (
-                  <div className={styles.dropdownMenu} role="listbox">
-                    <div className={styles.dropdownSearchWrap}>
-                      <input
-                        type="text"
-                        className={styles.dropdownSearchInput}
-                        placeholder="Type user name or email to search..."
-                        value={userSearch}
-                        onChange={(e) => setUserSearch(e.target.value)}
-                        autoFocus
-                      />
-                      <Icon.Search width={12} height={12} className={styles.dropdownSearchIcon} />
-                    </div>
-
-                    <div className={styles.dropdownList}>
-                      {loadingUsers ? (
-                        <div className={styles.dropdownEmpty}>Loading active users list…</div>
-                      ) : filteredUsers.length === 0 ? (
-                        <div className={styles.dropdownEmpty}>
-                          No active users found matching &quot;{userSearch}&quot;
-                        </div>
-                      ) : (
-                        filteredUsers.map((u) => {
-                          const isSelected = checkerUserId === u.id
-                          return (
-                            <div
-                              key={u.id}
-                              className={`${styles.dropdownItem} ${isSelected ? styles.dropdownItemSelected : ''}`}
-                              role="option"
-                              aria-selected={isSelected}
-                              onClick={() => {
-                                setCheckerUserId(u.id)
-                                setUserDropdownOpen(false)
-                                setUserSearch('')
-                              }}
-                            >
-                              <div className={styles.dropdownItemLeft}>
-                                <div className={styles.dropdownAvatar}>
-                                  {getInitials(u.name, u.email)}
-                                </div>
-                                <div className={styles.dropdownInfo}>
-                                  <span className={styles.dropdownName}>{u.name || 'Unnamed User'}</span>
-                                  <span className={styles.dropdownEmail}>{u.email}</span>
-                                </div>
-                              </div>
-                              {isSelected && (
-                                <Icon.CheckCircle width={14} height={14} className={styles.dropdownCheckIcon} />
-                              )}
-                            </div>
-                          )
-                        })
-                      )}
-                    </div>
-                  </div>
-                )}
+                  onSearch={searchUsers}
+                  placeholder="-- Select an approver checker --"
+                  searchPlaceholder="Type user name or email to search..."
+                  emptyMessage="No active users found"
+                  showAvatar
+                  required
+                />
               </div>
-            </div>
+            )}
           </div>
         </div>
 
