@@ -6,6 +6,7 @@ import CaseDetailsModal from '../components/CaseDetailsModal';
 import { ArrowLeft, Search, Eye, MessageSquare, RefreshCw, X, ChevronLeft, ChevronRight, Clock, AlertTriangle } from 'lucide-react';
 import type { IndividualProfile, CorporateProfile } from '../types/api';
 import { getFriendlyErrorMessage } from '../utils/errorMessages';
+import { C360CardListSkeleton } from '../components/common/PageSkeletons';
 
 const getStatusBadge = (status?: string | null) => {
   const s = status?.toLowerCase() || 'new';
@@ -253,12 +254,7 @@ export default function AllInteractions() {
 
         {/* Table Content */}
         {loading ? (
-          <div style={{ padding: '60px 0', textAlign: 'center', color: '#94a3b8', fontSize: '13.5px' }}>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
-              <RefreshCw size={18} className="animate-spin" style={{ color: '#2563eb' }} />
-              <span>Loading interaction and case logs...</span>
-            </div>
-          </div>
+          <C360CardListSkeleton />
         ) : interactionsError ? (
           // A genuine fetch failure used to fall straight into the "no logs found" empty state below
           // — indistinguishable from a customer who simply has no interaction history.

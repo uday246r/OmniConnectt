@@ -3,6 +3,7 @@ import { Settings, Eye, EyeOff, Save, RefreshCw, GripVertical, AlertCircle, Chec
 import { api } from '../services/api';
 import { isApprovalPending } from '../types/api';
 import type { FieldConfig, FieldConfigProfileType, MaskingRule } from '../types/api';
+import { C360FieldSettingsSkeleton } from '../components/common/PageSkeletons';
 
 const MASKING_RULE_LABELS: Record<MaskingRule, string> = {
   None: 'No masking',
@@ -164,10 +165,7 @@ export default function FieldSettings() {
       </div>
 
       {loading ? (
-        <div className="loading-overlay" style={{ height: '30vh' }}>
-          <div className="spinner"></div>
-          <p style={{ fontWeight: 600, color: '#374151' }}>Loading field settings…</p>
-        </div>
+        <C360FieldSettingsSkeleton />
       ) : (
         sections.map(({ section, fields: sectionFields }) => (
           <div className="c360-table-container" key={section}>

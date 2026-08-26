@@ -6,6 +6,7 @@ import ProductDetailsModal from '../components/ProductDetailsModal';
 import { ArrowLeft, Search, Eye, Layers, RefreshCw, X, ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react';
 import type { CorporateProfile, IndividualProfile } from '../types/api';
 import { getFriendlyErrorMessage } from '../utils/errorMessages';
+import { C360CardListSkeleton } from '../components/common/PageSkeletons';
 
 export default function AllProducts() {
   const { profile, customerType } = useCustomerStore();
@@ -230,12 +231,7 @@ export default function AllProducts() {
 
         {/* Table Content */}
         {loading ? (
-          <div style={{ padding: '60px 0', textAlign: 'center', color: '#94a3b8', fontSize: '13.5px' }}>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
-              <RefreshCw size={18} className="animate-spin" style={{ color: '#2563eb' }} />
-              <span>Loading customer product accounts...</span>
-            </div>
-          </div>
+          <C360CardListSkeleton />
         ) : error ? (
           // A genuine fetch failure used to fall straight into the "no products found" empty state
           // below — indistinguishable from a customer who simply has zero product accounts. This

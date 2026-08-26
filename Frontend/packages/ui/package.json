@@ -7,6 +7,14 @@
   "types": "./index.ts",
   "exports": {
     ".": "./index.ts",
-    "./validation": "./src/validation/index.ts"
+    "./validation": "./src/validation/index.ts",
+    "./skeleton": "./src/skeleton/index.ts",
+    "./skeleton.css": "./src/skeleton/Skeleton.module.css"
+  },
+  "peerDependencies": {
+    "react": ">=19"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.17"
   }
 }

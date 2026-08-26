@@ -228,11 +228,11 @@
   padding: 3px 9px;
   white-space: nowrap;
 }
-.action_Create  { background: #ecfdf5; color: #059669; border-color: #a7f3d0; }
-.action_Update  { background: #eff6ff; color: #2563eb; border-color: #bfdbfe; }
-.action_Delete  { background: #fef2f2; color: #dc2626; border-color: #fecaca; }
-.action_Enable  { background: #f0fdfa; color: #0d9488; border-color: #99f6e4; }
-.action_Disable { background: #fffbeb; color: #d97706; border-color: #fde68a; }
+.action_Create  { background: var(--omni-color-action-create-bg);  color: var(--omni-color-action-create-text); }
+.action_Update  { background: var(--omni-color-action-update-bg);  color: var(--omni-color-action-update-text); }
+.action_Delete  { background: var(--omni-color-action-delete-bg);  color: var(--omni-color-action-delete-text); }
+.action_Enable  { background: var(--omni-color-action-enable-bg);  color: var(--omni-color-action-enable-text); }
+.action_Disable { background: var(--omni-color-action-disable-bg); color: var(--omni-color-action-disable-text); }
 
 .mutedText { color: #94a3b8; font-size: 11.5px; }
 .emptyCell { text-align: center; padding: 48px 24px; color: #94a3b8; font-size: 13px; font-weight: 500; }

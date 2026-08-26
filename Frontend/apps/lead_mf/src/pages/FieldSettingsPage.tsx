@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Settings, Save, AlertCircle, CheckCircle2, Eye, EyeOff, RefreshCw } from 'lucide-react';
 import { apiClient, isApprovalPending } from '../api/apiClient';
 import type { LeadFieldConfig } from '../config/fieldControlRegistry';
+import { FieldSettingsSkeleton } from '../components/common/PageSkeletons';
 
 /**
  * Lead Management's own Field Settings admin page — a separate implementation from Customer 360's
@@ -213,10 +214,7 @@ export const FieldSettingsPage: React.FC = () => {
       )}
 
       {loading ? (
-        <div style={{ padding: '60px 0', textAlign: 'center', color: '#94a3b8', fontSize: '13.5px' }}>
-          <RefreshCw size={18} className="animate-spin" style={{ color: '#2563eb' }} />
-          <div style={{ marginTop: '8px' }}>Loading field settings…</div>
-        </div>
+        <FieldSettingsSkeleton />
       ) : (
         sections.map((section) => (
           <div

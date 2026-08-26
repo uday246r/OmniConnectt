@@ -1,0 +1,242 @@
+/* ══════════════════════════════════════════════════════════
+   SKELETON SHIMMER — shared loading placeholders
+   Uses CSS custom props from theme so colours adapt automatically.
+   ══════════════════════════════════════════════════════════ */
+
+/* ── Base shimmer ─────────────────────────────────────────── */
+.shimmer {
+  position: relative;
+  overflow: hidden;
+  background: #eaecf0;
+  border-radius: var(--omni-radius-sm, 6px);
+}
+
+.shimmer::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.62) 50%,
+    transparent 100%
+  );
+  animation: shimmer-sweep 1.4s ease-in-out infinite;
+}
+
+@keyframes shimmer-sweep {
+  100% { transform: translateX(100%); }
+}
+
+/* ── Shape variants ─────────────────────────────────────────── */
+.block  { width: 100%; height: 100%; }
+.avatar { border-radius: 50%; flex-shrink: 0; }
+.square { border-radius: 10px; flex-shrink: 0; }
+.pill   { border-radius: 999px; }
+
+.text {
+  height: 0.82em;
+  border-radius: 4px;
+}
+
+/* ── Text group ─────────────────────────────────────────────── */
+.textGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* ── Table skeleton ─────────────────────────────────────────── */
+.table {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+
+.tableRow {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.tableCell {
+  height: 13px;
+  flex: 1;
+  border-radius: 4px;
+}
+
+/* ── Card-level skeleton wrappers ─────────────────────────── */
+/* These define the same outer dimensions as the real cards */
+.userCardSkel {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 16px;
+  background: #ffffff;
+  border: 1px solid #eaecf0;
+  border-radius: 14px;
+  animation: skFadeIn 0.3s ease both;
+}
+
+.roleCardSkel {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 16px;
+  background: #ffffff;
+  border: 1px solid #eaecf0;
+  border-radius: 14px;
+  animation: skFadeIn 0.3s ease both;
+}
+
+.appCardSkel {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 13px 18px;
+  background: #ffffff;
+  border: 1px solid #eaecf0;
+  border-radius: 14px;
+  animation: skFadeIn 0.3s ease both;
+}
+
+.statCardSkel {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px;
+  background: #ffffff;
+  border: 1px solid #eaecf0;
+  border-radius: 14px;
+  animation: skFadeIn 0.3s ease both;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Stat card top accent bar */
+.statCardSkel::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: #e2e8f0;
+  border-radius: 14px 14px 0 0;
+}
+
+.auditRowSkel {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-bottom: 1px solid #f1f5f9;
+  animation: skFadeIn 0.3s ease both;
+}
+
+.activityItemSkel {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #f1f5f9;
+  animation: skFadeIn 0.3s ease both;
+}
+
+.quickActionSkel {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  background: #ffffff;
+  border: 1px solid #eaecf0;
+  border-radius: 14px;
+  animation: skFadeIn 0.3s ease both;
+}
+
+/* ── Donut chart skeleton — mirrors DashboardPage.module.css
+   .donutContainer/.donutSvgWrap/.legendList exactly ───────── */
+.donutSkelContainer {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  min-height: 180px;
+  animation: skFadeIn 0.3s ease both;
+}
+
+.donutSkelRingWrap {
+  position: relative;
+  width: 148px;
+  height: 148px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.donutSkelCenter {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.legendSkelList {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  flex: 1;
+}
+
+.legendSkelItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dashWidgetSkel {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  animation: skFadeIn 0.3s ease both;
+}
+
+/* ── Content fade-in after load ─────────────────────────── */
+@keyframes skFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.contentFadeIn {
+  animation: skFadeIn 0.25s ease both;
+}
+
+/* ── Reduced motion ─────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .shimmer::after {
+    animation: none;
+    background: rgba(255, 255, 255, 0.4);
+  }
+  .userCardSkel,
+  .roleCardSkel,
+  .appCardSkel,
+  .statCardSkel,
+  .auditRowSkel,
+  .activityItemSkel,
+  .quickActionSkel,
+  .dashWidgetSkel,
+  .donutSkelContainer,
+  .contentFadeIn {
+    animation: none;
+  }
+}

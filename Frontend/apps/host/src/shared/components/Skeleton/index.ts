@@ -1,11 +1,13 @@
-export { SkeletonBlock } from './SkeletonBlock'
-export type { SkeletonBlockProps } from './SkeletonBlock'
-export { SkeletonText } from './SkeletonText'
-export type { SkeletonTextProps } from './SkeletonText'
-export { SkeletonAvatar } from './SkeletonAvatar'
-export type { SkeletonAvatarProps } from './SkeletonAvatar'
-export { SkeletonTable } from './SkeletonTable'
-export type { SkeletonTableProps } from './SkeletonTable'
+/*
+ * The four primitives now live in @omniremit/ui so the remotes use the same ones rather than their
+ * own copies — re-exported here so every existing host import keeps working unchanged.
+ *
+ * The card-level skeletons below stay local on purpose: each is an exact shape match for a specific
+ * host card, which is what makes them worth having (no layout shift when the real content arrives),
+ * and that shape is not something a remote would ever want.
+ */
+export { SkeletonBlock, SkeletonText, SkeletonAvatar, SkeletonTable } from '@omniremit/ui/skeleton'
+export type { SkeletonBlockProps } from '@omniremit/ui/skeleton'
 
 // Card-level skeletons — exact shape matches for zero CLS
 export { SkeletonUserCard } from './SkeletonUserCard'

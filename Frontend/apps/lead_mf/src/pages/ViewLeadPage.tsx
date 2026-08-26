@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { LeadTableSkeleton } from '../components/common/PageSkeletons';
 import {
   Eye,
   Edit3,
@@ -419,12 +420,7 @@ export const ViewLeadPage: React.FC = () => {
 
         {/* Table Content */}
         {isLoadingLeads ? (
-          <div style={{ padding: '60px 0', textAlign: 'center', color: '#94a3b8', fontSize: '13.5px' }}>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
-              <RefreshCw size={18} className="animate-spin" style={{ color: '#2563eb' }} />
-              <span>Loading lead records from database...</span>
-            </div>
-          </div>
+          <LeadTableSkeleton rows={pageSize > 10 ? 10 : pageSize} />
         ) : leads.length === 0 ? (
           <div style={{ padding: '64px 20px', textAlign: 'center', color: '#64748b' }}>
             <div style={{ fontSize: '32px', marginBottom: '8px' }}>📂</div>

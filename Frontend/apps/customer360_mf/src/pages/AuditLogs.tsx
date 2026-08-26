@@ -25,6 +25,7 @@ import {
 import { api, ApiError } from '../services/api';
 import type { AuditLog } from '../types/api';
 import { getFriendlyErrorMessage } from '../utils/errorMessages';
+import { C360TableSkeleton } from '../components/common/PageSkeletons';
 
 const getActionBadge = (action?: string) => {
   const a = (action || '').toLowerCase();
@@ -321,10 +322,7 @@ export default function AuditLogs() {
 
         {/* Table / Empty State */}
         {loading && logs.length === 0 ? (
-          <div style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>
-            <RefreshCw size={24} className="animate-spin" style={{ margin: '0 auto 12px', color: '#2563eb' }} />
-            <p style={{ margin: 0, fontSize: '13.5px', fontWeight: 500 }}>Loading Customer 360° audit logs...</p>
-          </div>
+          <C360TableSkeleton columns={6} />
         ) : logs.length === 0 ? (
           <div style={{ padding: '48px 20px', textAlign: 'center', color: '#64748b' }}>
             <ShieldCheck size={36} style={{ margin: '0 auto 10px', color: '#94a3b8', opacity: 0.7 }} />

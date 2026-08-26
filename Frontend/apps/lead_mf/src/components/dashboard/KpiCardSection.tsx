@@ -1,6 +1,7 @@
 import React from 'react';
 import { Users, UserPlus, Hourglass, CheckCircle2, TrendingUp } from 'lucide-react';
 import { useLeadStore } from '../../store/useLeadStore';
+import { SkeletonBlock } from '@omniremit/ui/skeleton';
 
 const formatKpiValue = (val: number | null | undefined, isPercentage = false): string => {
   if (val === null || val === undefined) return '-';
@@ -132,7 +133,7 @@ export const KpiCardSection: React.FC = () => {
       >
         {KPI_CONFIG.map((kpi) => {
           const rawVal = kpiSummary[kpi.key];
-          const displayVal = isLoadingDashboard ? '...' : formatKpiValue(rawVal as number, kpi.isPercentage);
+          const displayVal = formatKpiValue(rawVal as number, kpi.isPercentage);
 
           return (
             <div key={kpi.key} className="kpi-card">
@@ -184,7 +185,11 @@ export const KpiCardSection: React.FC = () => {
                     fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
                   }}
                 >
-                  {displayVal}
+                  {/*
+                    A shimmer the size of the number, not a literal '...' — three dots read as a real
+                    value that happens to be dots, and swapping them for a long figure resized the card.
+                  */}
+                  {isLoadingDashboard ? <SkeletonBlock width={84} height={26} radius="7px" /> : displayVal}
                 </span>
               </div>
 
