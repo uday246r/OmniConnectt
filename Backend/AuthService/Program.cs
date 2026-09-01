@@ -15,9 +15,14 @@ using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 
-// Load Backend/AuthService/.env (git-ignored) into process environment variables before the host
-// reads configuration, so ConnectionStrings__AuthDb etc. resolve the same way real env vars would
-// in a deployed environment. Safe to skip silently if the file doesn't exist yet.
+foreach (var path in new[] {
+    Path.Combine(AppContext.BaseDirectory, ".env"),
+    Path.Combine(Directory.GetCurrentDirectory(), "Backend", "AuthService", ".env"),
+    Path.Combine(Directory.GetCurrentDirectory(), ".env")
+})
+{
+    if (File.Exists(path)) { Env.Load(path); break; }
+}
 Env.TraversePath().Load();
 
 var builder = WebApplication.CreateBuilder(args);
@@ -59,7 +64,7 @@ var isDbConfigured = !string.IsNullOrWhiteSpace(connectionString);
  * constructor - they take only DbContextOptions, which is what pooling requires.
  */
 builder.Services.AddDbContextPool<AuthDbContext>(options =>
-    options.UseNpgsql(isDbConfigured ? connectionString : "Host=unconfigured;Database=unconfigured;Username=unconfigured;Password=unconfigured"));
+    options.UseSqlServer(isDbConfigured ? connectionString : "Server=unconfigured;Database=unconfigured;Trusted_Connection=True;TrustServerCertificate=True;"));
 
 builder.Services.AddScoped<PasswordHasher>();
 builder.Services.AddScoped<SecretProtector>();

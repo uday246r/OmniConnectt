@@ -9,7 +9,7 @@ public class ModuleRegistryDbContextFactory : IDesignTimeDbContextFactory<Module
     public ModuleRegistryDbContext CreateDbContext(string[] args)
     {
         var optionsBuilder = new DbContextOptionsBuilder<ModuleRegistryDbContext>();
-        optionsBuilder.UseNpgsql("Host=localhost;Database=omniremit_registry_designtime;Username=design;Password=design");
+        optionsBuilder.UseSqlServer("Server=localhost;Database=omniremit_registry_designtime;Trusted_Connection=True;TrustServerCertificate=True;");
         return new ModuleRegistryDbContext(optionsBuilder.Options);
     }
 }

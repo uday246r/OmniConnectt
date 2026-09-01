@@ -339,7 +339,8 @@ public static class AuthDbSeeder
         ILogger logger,
         CancellationToken ct)
     {
-        const string bootstrapEmail = "superadmin@omniremit.local";
+        const string bootstrapEmail = "superadmin@omniconnect.com";
+        const string bootstrapPassword = "Admin@123456";
 
         if (await db.Users.AnyAsync(ct))
         {
@@ -353,7 +354,6 @@ public static class AuthDbSeeder
         }
 
         var now = DateTimeOffset.UtcNow;
-        var tempPassword = TemporaryPasswordGenerator.Generate();
         var hasher = new PasswordHasher();
 
         var user = new User
@@ -364,19 +364,18 @@ public static class AuthDbSeeder
             PasswordHash = string.Empty,
             Status = UserStatus.Active,
             RoleId = superAdminRole.Id,
-            MustChangePassword = true,
+            MustChangePassword = false,
             CreatedAt = now,
             UpdatedAt = now,
         };
-        user.PasswordHash = hasher.Hash(user, tempPassword);
+        user.PasswordHash = hasher.Hash(user, bootstrapPassword);
 
         db.Users.Add(user);
         await db.SaveChangesAsync(ct);
 
-        logger.LogWarning(
-            "Seeded bootstrap Super Admin account. Email: {Email} | Temporary password: {TempPassword} " +
-            "— sign in and change it immediately; this is logged only once, on first startup against an empty database.",
+        logger.LogInformation(
+            "Seeded default Super Admin account. Email: {Email} | Password: {Password}",
             bootstrapEmail,
-            tempPassword);
+            bootstrapPassword);
     }
 }

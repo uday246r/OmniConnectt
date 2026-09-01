@@ -1,5 +1,6 @@
 using System.Data.Common;
 using AuthService.Application.DTOs;
+using AuthService.Domain.Enums;
 using AuthService.Infrastructure;
 using AuthService.Infrastructure.Seed;
 using Microsoft.EntityFrameworkCore;
@@ -54,159 +55,62 @@ public class DashboardAppService(AuthDbContext db)
         var currentPeriodStart = now.AddDays(-TrendWindowDays);
         var previousPeriodStart = now.AddDays(-TrendWindowDays * 2);
 
-        // Only the permitted sections contribute a projection. NULL columns are read back as nulls,
-        // which is exactly the "you may not see this" signal the DTO already uses.
-        var projections = new List<string>();
-
-        if (canViewUsers)
-        {
-            projections.Add(@"(SELECT count(*) FROM ""Users"" WHERE NOT ""IsDeleted"") AS users");
-            projections.Add(@"(SELECT count(*) FROM ""Users"" WHERE NOT ""IsDeleted"" AND ""Status"" = 'Active') AS active_users");
-            projections.Add(@"(SELECT count(*) FROM ""Users"" WHERE NOT ""IsDeleted"" AND ""CreatedAt"" >= @currentStart) AS users_current");
-            projections.Add(@"(SELECT count(*) FROM ""Users"" WHERE NOT ""IsDeleted"" AND ""CreatedAt"" >= @previousStart AND ""CreatedAt"" < @currentStart) AS users_previous");
-        }
-
-        if (canViewRoles)
-        {
-            projections.Add(@"(SELECT count(*) FROM ""Roles"") AS roles");
-            projections.Add(@"(SELECT count(*) FROM ""Roles"" WHERE ""CreatedAt"" >= @currentStart) AS roles_current");
-            projections.Add(@"(SELECT count(*) FROM ""Roles"" WHERE ""CreatedAt"" >= @previousStart AND ""CreatedAt"" < @currentStart) AS roles_previous");
-        }
-
-        if (canViewAudit)
-        {
-            projections.Add(@"(SELECT count(*) FROM ""AuditLogs"") AS audit_events");
-            projections.Add(@"(SELECT count(*) FROM ""AuditLogs"" WHERE ""OccurredAt"" >= @currentStart) AS audit_current");
-            projections.Add(@"(SELECT count(*) FROM ""AuditLogs"" WHERE ""OccurredAt"" >= @previousStart AND ""OccurredAt"" < @currentStart) AS audit_previous");
-        }
-
-        // The donut is a breakdown of users BY role, so it needs both permissions. Users with no role
-        // are surfaced honestly as "No role" rather than dropped, so the slices always add up to the
-        // total printed in the centre.
-        if (canViewUsers && canViewRoles)
-        {
-            projections.Add(@"(
-                SELECT coalesce(json_agg(json_build_object('roleName', role_name, 'userCount', user_count)
-                                         ORDER BY user_count DESC, role_name), '[]'::json)
-                FROM (
-                    SELECT coalesce(r.""Name"", 'No role') AS role_name, count(*) AS user_count
-                    FROM ""Users"" u
-                    LEFT JOIN ""Roles"" r ON r.""Id"" = u.""RoleId""
-                    WHERE NOT u.""IsDeleted""
-                    GROUP BY coalesce(r.""Name"", 'No role')
-                ) d
-            ) AS role_distribution");
-        }
-
-        if (canViewAudit)
-        {
-            // Scoped to the current window so the ranking reflects what is being used NOW, rather than
-            // being permanently dominated by whichever service logged the most since installation.
-            projections.Add($@"(
-                SELECT coalesce(json_agg(json_build_object('serviceName', service_name, 'eventCount', event_count)
-                                         ORDER BY event_count DESC, service_name), '[]'::json)
-                FROM (
-                    SELECT ""ServiceName"" AS service_name, count(*) AS event_count
-                    FROM ""AuditLogs""
-                    WHERE ""OccurredAt"" >= @currentStart
-                    GROUP BY ""ServiceName""
-                    ORDER BY count(*) DESC, ""ServiceName""
-                    LIMIT {TopServices}
-                ) s
-            ) AS service_activity");
-        }
-
-        var sql = "SELECT " + string.Join(",\n       ", projections);
-
         int? users = null, activeUsers = null, roles = null, auditEvents = null;
         TrendDto? usersTrend = null, rolesTrend = null, auditTrend = null;
         IReadOnlyList<RoleDistributionDto> roleDistribution = [];
         IReadOnlyList<ServiceActivityDto> serviceActivity = [];
 
-        var connection = db.Database.GetDbConnection();
-        await using var command = connection.CreateCommand();
-        command.CommandText = sql;
-        AddParameter(command, "currentStart", currentPeriodStart);
-        AddParameter(command, "previousStart", previousPeriodStart);
-
-        // EF owns the connection's lifetime; open it only if it is not already.
-        var openedHere = connection.State != System.Data.ConnectionState.Open;
-        if (openedHere)
+        if (canViewUsers)
         {
-            await connection.OpenAsync(ct);
+            users = await db.Users.CountAsync(u => !u.IsDeleted, ct);
+            activeUsers = await db.Users.CountAsync(u => !u.IsDeleted && u.Status == UserStatus.Active, ct);
+            var usersCurrent = await db.Users.CountAsync(u => !u.IsDeleted && u.CreatedAt >= currentPeriodStart, ct);
+            var usersPrev = await db.Users.CountAsync(u => !u.IsDeleted && u.CreatedAt >= previousPeriodStart && u.CreatedAt < currentPeriodStart, ct);
+            usersTrend = BuildTrend(usersCurrent, usersPrev);
         }
 
-        try
+        if (canViewRoles)
         {
-            await using var reader = await command.ExecuteReaderAsync(ct);
-            if (await reader.ReadAsync(ct))
-            {
-                if (canViewUsers)
-                {
-                    users = GetInt(reader, "users");
-                    activeUsers = GetInt(reader, "active_users");
-                    usersTrend = BuildTrend(GetInt(reader, "users_current") ?? 0, GetInt(reader, "users_previous") ?? 0);
-                }
-
-                if (canViewRoles)
-                {
-                    roles = GetInt(reader, "roles");
-                    rolesTrend = BuildTrend(GetInt(reader, "roles_current") ?? 0, GetInt(reader, "roles_previous") ?? 0);
-                }
-
-                if (canViewAudit)
-                {
-                    auditEvents = GetInt(reader, "audit_events");
-                    auditTrend = BuildTrend(GetInt(reader, "audit_current") ?? 0, GetInt(reader, "audit_previous") ?? 0);
-                    serviceActivity = ReadJson<ServiceActivityDto>(reader, "service_activity");
-                }
-
-                if (canViewUsers && canViewRoles)
-                {
-                    roleDistribution = ReadJson<RoleDistributionDto>(reader, "role_distribution");
-                }
-            }
+            roles = await db.Roles.CountAsync(ct);
+            var rolesCurrent = await db.Roles.CountAsync(r => r.CreatedAt >= currentPeriodStart, ct);
+            var rolesPrev = await db.Roles.CountAsync(r => r.CreatedAt >= previousPeriodStart && r.CreatedAt < currentPeriodStart, ct);
+            rolesTrend = BuildTrend(rolesCurrent, rolesPrev);
         }
-        finally
+
+        if (canViewAudit)
         {
-            if (openedHere)
-            {
-                await connection.CloseAsync();
-            }
+            auditEvents = await db.AuditLogs.CountAsync(ct);
+            var auditCurrent = await db.AuditLogs.CountAsync(a => a.OccurredAt >= currentPeriodStart, ct);
+            var auditPrev = await db.AuditLogs.CountAsync(a => a.OccurredAt >= previousPeriodStart && a.OccurredAt < currentPeriodStart, ct);
+            auditTrend = BuildTrend(auditCurrent, auditPrev);
+
+            serviceActivity = (await db.AuditLogs
+                .Where(a => a.OccurredAt >= currentPeriodStart)
+                .GroupBy(a => a.ServiceName)
+                .Select(g => new { ServiceName = g.Key, EventCount = g.Count() })
+                .OrderByDescending(x => x.EventCount)
+                .ThenBy(x => x.ServiceName)
+                .Take(TopServices)
+                .ToListAsync(ct))
+                .Select(x => new ServiceActivityDto(x.ServiceName, x.EventCount))
+                .ToList();
+        }
+
+        if (canViewUsers && canViewRoles)
+        {
+            roleDistribution = (await db.Users
+                .Where(u => !u.IsDeleted)
+                .GroupBy(u => u.Role != null ? u.Role.Name : "No role")
+                .Select(g => new { RoleName = g.Key, UserCount = g.Count() })
+                .OrderByDescending(x => x.UserCount)
+                .ThenBy(x => x.RoleName)
+                .ToListAsync(ct))
+                .Select(x => new RoleDistributionDto(x.RoleName, x.UserCount))
+                .ToList();
         }
 
         return new DashboardStatsDto(
             users, activeUsers, roles, auditEvents, usersTrend, rolesTrend, auditTrend, roleDistribution, serviceActivity);
-    }
-
-    private static void AddParameter(DbCommand command, string name, DateTimeOffset value)
-    {
-        var p = command.CreateParameter();
-        p.ParameterName = name;
-        p.Value = value;
-        command.Parameters.Add(p);
-    }
-
-    /// <summary>count(*) comes back as bigint; the DTO uses int, which is ample for these figures.</summary>
-    private static int? GetInt(DbDataReader reader, string column)
-    {
-        var i = reader.GetOrdinal(column);
-        return reader.IsDBNull(i) ? null : Convert.ToInt32(reader.GetValue(i));
-    }
-
-    private static IReadOnlyList<T> ReadJson<T>(DbDataReader reader, string column)
-    {
-        var i = reader.GetOrdinal(column);
-        if (reader.IsDBNull(i))
-        {
-            return [];
-        }
-
-        var json = reader.GetString(i);
-        return System.Text.Json.JsonSerializer.Deserialize<List<T>>(
-                   json,
-                   new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true })
-               ?? [];
     }
 
     /// <summary>

@@ -11,9 +11,14 @@ using backend.Infrastructure;
 using backend.Middleware;
 using backend.Options;
 
-// Load Backend/Customer360Service/.env (git-ignored) before configuration is read — matches
-// AuthService/ModuleRegistry/LeadService's Program.cs exactly. Replaces the previous hand-rolled
-// line-by-line loader (same behavior, one well-tested implementation instead of a bespoke one).
+foreach (var path in new[] {
+    Path.Combine(AppContext.BaseDirectory, ".env"),
+    Path.Combine(Directory.GetCurrentDirectory(), "Backend", "Customer360Service", ".env"),
+    Path.Combine(Directory.GetCurrentDirectory(), ".env")
+})
+{
+    if (File.Exists(path)) { Env.Load(path); break; }
+}
 Env.TraversePath().Load();
 
 var builder = WebApplication.CreateBuilder(args);
@@ -37,7 +42,7 @@ var isDbConfigured = !string.IsNullOrWhiteSpace(connectionString);
  * constructor - they take only DbContextOptions, which is what pooling requires.
  */
 builder.Services.AddDbContextPool<Customer360DbContext>(options =>
-    options.UseNpgsql(isDbConfigured ? connectionString : "Host=unconfigured;Database=unconfigured;Username=unconfigured;Password=unconfigured"));
+    options.UseSqlServer(isDbConfigured ? connectionString : "Server=unconfigured;Database=unconfigured;Trusted_Connection=True;TrustServerCertificate=True;"));
 
 // ---------------------------------------------------------------------------
 // Controllers + JSON serialization
@@ -103,13 +108,10 @@ var jwtAudience = jwtSection["Audience"] ?? "omniremit-host";
 RSA validationRsa;
 if (!string.IsNullOrWhiteSpace(configuredPublicKeyPem))
 {
-    var rsa = RSA.Create();
-    rsa.ImportFromPem(configuredPublicKeyPem.Replace("\\n", "\n"));
-    validationRsa = rsa;
+    validationRsa = Customer360Service.Infrastructure.RsaKeyLoader.LoadPublicKey(configuredPublicKeyPem);
 }
 else
 {
-    // Ephemeral key so the service boots cleanly before Jwt__SigningKeyPublic is provided
     validationRsa = RSA.Create(2048);
 }
 

@@ -1,7 +1,6 @@
 <Solution>
   <Project Path="AuthService/AuthService.csproj" />
   <Project Path="ModuleRegistry/ModuleRegistry.csproj" />
-  <Project Path="EmployeeService/EmployeeService.csproj" />
   <Project Path="Customer360Service/backend.csproj" />
   <Project Path="LeadService/LeadManagement.Api.csproj" />
 </Solution>

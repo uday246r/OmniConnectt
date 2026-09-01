@@ -65,10 +65,9 @@ builder.Services.AddDbContextPool<ApplicationDbContext>(options =>
     var connectionString = builder.Configuration.GetConnectionString("LeadDb")
         ?? builder.Configuration.GetConnectionString("DefaultConnection");
 
-    if (!string.IsNullOrWhiteSpace(connectionString))
-    {
-        options.UseNpgsql(connectionString);
-    }
+    options.UseSqlServer(!string.IsNullOrWhiteSpace(connectionString)
+        ? connectionString
+        : "Server=unconfigured;Database=unconfigured;Trusted_Connection=True;TrustServerCertificate=True;");
 });
 
 
@@ -117,13 +116,10 @@ var jwtAudience = jwtSection["Audience"] ?? "omniremit-host";
 RSA validationRsa;
 if (!string.IsNullOrWhiteSpace(configuredPublicKeyPem))
 {
-    var rsa = RSA.Create();
-    rsa.ImportFromPem(configuredPublicKeyPem.Replace("\\n", "\n"));
-    validationRsa = rsa;
+    validationRsa = LeadManagement.Api.Infrastructure.RsaKeyLoader.LoadPublicKey(configuredPublicKeyPem);
 }
 else
 {
-    // Ephemeral key so the app can boot cleanly before Jwt__SigningKeyPublic is configured
     validationRsa = RSA.Create(2048);
 }
 

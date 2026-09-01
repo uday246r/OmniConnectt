@@ -84,4 +84,7 @@ public class ApprovalRequest
     /// endpoint can tell "already collected" (410 Gone) apart from "there was never one here" (404),
     /// which a null ciphertext alone cannot distinguish.</summary>
     public DateTimeOffset? TempPasswordRevealedAt { get; set; }
+
+    /// <summary>SQL Server rowversion column for optimistic concurrency handling on decisions.</summary>
+    public byte[]? RowVersion { get; set; }
 }

@@ -9,12 +9,11 @@
   },
   "scripts": {
     "dev": "pnpm --filter host dev",
+    "dev:all": "pnpm -r --parallel dev",
     "dev:host": "pnpm --filter host dev",
-    "dev:employee": "pnpm --filter employee-mf dev",
     "dev:lead": "pnpm --filter lead-mf dev",
     "dev:customer360": "pnpm --filter customer360-mf dev",
     "build": "pnpm --filter host build",
-    "build:employee": "pnpm --filter employee-mf build",
     "build:lead": "pnpm --filter lead-mf build",
     "build:customer360": "pnpm --filter customer360-mf build",
     "build:all": "pnpm -r build",
