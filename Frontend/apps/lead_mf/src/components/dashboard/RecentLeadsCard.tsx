@@ -1,6 +1,10 @@
 import React from 'react';
 import { Eye, ArrowRight, Clock } from 'lucide-react';
+import { DataTable } from '@omniremit/ui';
+import card from '../../shared/dashboardCard.module.css';
 import { useLeadStore } from '../../store/useLeadStore';
+import styles from './RecentLeadsCard.module.css';
+import { LeadStatusBadge } from '../../shared/LeadStatusBadge';
 
 const getInitials = (name: string): string => {
   if (!name) return '??';
@@ -9,20 +13,6 @@ const getInitials = (name: string): string => {
     return (parts[0][0] + parts[1][0]).toUpperCase();
   }
   return name.slice(0, 2).toUpperCase();
-};
-
-const getStatusBadge = (status?: string) => {
-  const s = status?.toLowerCase() || 'new';
-  if (s.includes('convert')) {
-    return { bg: '#d1fae5', text: '#065f46', dot: '#059669', label: status || 'Converted' };
-  }
-  if (s.includes('progress')) {
-    return { bg: '#fef3c7', text: '#92400e', dot: '#d97706', label: status || 'In Progress' };
-  }
-  if (s.includes('reject')) {
-    return { bg: '#fee2e2', text: '#991b1b', dot: '#dc2626', label: status || 'Rejected' };
-  }
-  return { bg: '#eff6ff', text: '#1d4ed8', dot: '#2563eb', label: status || 'New' };
 };
 
 export const RecentLeadsCard: React.FC = () => {
@@ -42,42 +32,19 @@ export const RecentLeadsCard: React.FC = () => {
 
   return (
     <div
-      style={{
-        background: '#ffffff',
-        borderRadius: '16px',
-        border: '1px solid #eaecf0',
-        padding: '20px 24px',
-        boxShadow: '0 1px 4px rgba(15, 23, 42, 0.04)',
-        display: 'flex',
-        flexDirection: 'column',
-        minHeight: '280px',
-        overflow: 'hidden',
-        boxSizing: 'border-box',
-      }}
+      className={`${card.card} ${styles.card}`}
     >
       {/* Header */}
       <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: '18px',
-        }}
+        className={styles.header}
       >
         <div>
           <h2
-            style={{
-              fontSize: '14.5px',
-              fontWeight: 700,
-              color: '#0f172a',
-              margin: 0,
-              letterSpacing: '-0.02em',
-              fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
-            }}
+            className={card.cardTitle}
           >
             Recent Lead Submissions
           </h2>
-          <p style={{ fontSize: '12px', color: '#64748b', margin: '2px 0 0 0' }}>
+          <p className={card.cardSubtitle}>
             Latest incoming customer financing inquiries
           </p>
         </div>
@@ -85,27 +52,7 @@ export const RecentLeadsCard: React.FC = () => {
         <button
           type="button"
           onClick={handleViewAll}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '6px',
-            background: '#eff6ff',
-            border: 'none',
-            borderRadius: '8px',
-            color: '#1d4ed8',
-            fontSize: '12.5px',
-            fontWeight: 600,
-            padding: '6px 14px',
-            cursor: 'pointer',
-            transition: 'all 0.15s ease',
-            fontFamily: 'inherit',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = '#dbeafe';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = '#eff6ff';
-          }}
+          className={styles.viewAllBtn}
         >
           <span>View Directory</span>
           <ArrowRight size={13} />
@@ -114,42 +61,41 @@ export const RecentLeadsCard: React.FC = () => {
 
       {/* Table Content */}
       {isLoadingDashboard ? (
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', fontSize: '13px', padding: '32px 0' }}>
+        <div className={styles.state}>
           Loading recent leads...
         </div>
       ) : recentLeads.length === 0 ? (
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', fontSize: '13px', padding: '32px 0' }}>
-          <Clock size={28} style={{ opacity: 0.4, marginBottom: '8px' }} />
+        <div className={styles.state}>
+          <Clock size={28} className={styles.stateIcon} />
           <span>No recent leads recorded in this period.</span>
         </div>
       ) : (
-        <div style={{ overflowX: 'auto', borderRadius: '10px', border: '1px solid #f1f5f9' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', textAlign: 'left' }}>
+        <div className={styles.tableFrame}>
+          <DataTable bare>
             <thead>
-              <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
-                <th style={{ padding: '10px 14px', fontWeight: 600, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.04em', color: '#64748b' }}>
+              <tr>
+                <th>
                   Customer
                 </th>
-                <th style={{ padding: '10px 14px', fontWeight: 600, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.04em', color: '#64748b' }}>
+                <th>
                   Product
                 </th>
-                <th style={{ padding: '10px 14px', fontWeight: 600, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.04em', color: '#64748b' }}>
+                <th>
                   Branch / State
                 </th>
-                <th style={{ padding: '10px 14px', fontWeight: 600, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.04em', color: '#64748b' }}>
+                <th>
                   Status
                 </th>
-                <th style={{ padding: '10px 14px', fontWeight: 600, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.04em', color: '#64748b' }}>
+                <th>
                   Date
                 </th>
-                <th style={{ padding: '10px 14px', fontWeight: 600, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.04em', color: '#64748b', textAlign: 'right' }}>
+                <th className={styles.thRight}>
                   Action
                 </th>
               </tr>
             </thead>
             <tbody>
               {recentLeads.map((lead) => {
-                const statusInfo = getStatusBadge(lead.status);
                 const initials = getInitials(lead.name);
 
                 /*
@@ -164,130 +110,56 @@ export const RecentLeadsCard: React.FC = () => {
                 return (
                   <tr
                     key={lead.id}
-                    style={{
-                      borderBottom: '1px solid #f1f5f9',
-                      transition: 'background 0.12s ease',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = '#f8fafc';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = 'transparent';
-                    }}
                   >
                     {/* Customer Name with Avatar */}
-                    <td style={{ padding: '12px 14px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <td className={styles.cell}>
+                      <div className={styles.customer}>
                         <div
-                          style={{
-                            width: '32px',
-                            height: '32px',
-                            borderRadius: '50%',
-                            background: '#eff6ff',
-                            color: '#1d4ed8',
-                            fontSize: '11.5px',
-                            fontWeight: 700,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            flexShrink: 0,
-                            border: '1px solid #bfdbfe',
-                          }}
+                          className={styles.avatar}
                         >
                           {initials}
                         </div>
                         <div>
-                          <div style={{ fontWeight: 600, color: '#0f172a' }}>{lead.name}</div>
+                          <div className={styles.customerName}>{lead.name}</div>
                           {/* LeadRecord has no `leadReference` field — `id` is the real identifier. */}
                           {lead.id && (
-                            <div style={{ fontSize: '11px', color: '#64748b' }}>{lead.id}</div>
+                            <div className={styles.customerId}>{lead.id}</div>
                           )}
                         </div>
                       </div>
                     </td>
 
                     {/* Product */}
-                    <td style={{ padding: '12px 14px' }}>
+                    <td className={styles.cell}>
                       <span
-                        style={{
-                          padding: '3px 8px',
-                          borderRadius: '6px',
-                          background: '#f1f5f9',
-                          color: '#334155',
-                          fontSize: '12px',
-                          fontWeight: 500,
-                        }}
+                        className={styles.productChip}
                       >
                         {lead.product}
                       </span>
                     </td>
 
                     {/* Branch */}
-                    <td style={{ padding: '12px 14px', color: '#475569', fontSize: '12.5px' }}>
+                    <td className={`${styles.cell} ${styles.mutedCell}`}>
                       {lead.branch || 'Not Assigned'}
                     </td>
 
                     {/* Status Pill Badge */}
-                    <td style={{ padding: '12px 14px' }}>
-                      <span
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '5px',
-                          padding: '2.5px 9px',
-                          borderRadius: '999px',
-                          background: statusInfo.bg,
-                          color: statusInfo.text,
-                          fontSize: '11.5px',
-                          fontWeight: 600,
-                        }}
-                      >
-                        <span
-                          style={{
-                            width: '5px',
-                            height: '5px',
-                            borderRadius: '50%',
-                            background: statusInfo.dot,
-                          }}
-                        />
-                        {statusInfo.label}
-                      </span>
+                    <td className={styles.cell}>
+                      <LeadStatusBadge status={lead.status} />
                     </td>
 
                     {/* Date */}
-                    <td style={{ padding: '12px 14px', color: '#64748b', fontSize: '12px' }}>
+                    <td className={`${styles.cell} ${styles.dateCell}`}>
                       {lead.createdDate}
                     </td>
 
                     {/* Action Button */}
-                    <td style={{ padding: '12px 14px', textAlign: 'right' }}>
+                    <td className={`${styles.cell} ${styles.cellRight}`}>
                       <button
                         type="button"
                         onClick={(e) => handleActionClick(e, lead)}
                         title="View Full Lead Profile"
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                          padding: '5px 10px',
-                          borderRadius: '6px',
-                          border: '1px solid #e2e8f0',
-                          background: '#ffffff',
-                          color: '#1d4ed8',
-                          fontSize: '12px',
-                          fontWeight: 600,
-                          cursor: 'pointer',
-                          transition: 'all 0.12s ease',
-                          fontFamily: 'inherit',
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.background = '#eff6ff';
-                          e.currentTarget.style.borderColor = '#bfdbfe';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.background = '#ffffff';
-                          e.currentTarget.style.borderColor = '#e2e8f0';
-                        }}
+                        className={styles.rowAction}
                       >
                         <Eye size={13} />
                         <span>View</span>
@@ -297,7 +169,7 @@ export const RecentLeadsCard: React.FC = () => {
                 );
               })}
             </tbody>
-          </table>
+          </DataTable>
         </div>
       )}
     </div>

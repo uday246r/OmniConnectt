@@ -27,9 +27,13 @@
   --bg-sidebar: var(--omni-color-surface, #ffffff);
   --bg-input: var(--omni-color-surface, #ffffff);
 
-  /* Text Colors */
-  --text-primary: var(--omni-color-text-primary, #1e293b);
-  --text-secondary: var(--omni-color-text-secondary, #64748b);
+  /* Text Colors
+     Fallbacks corrected to the host's real values: #1e293b/#64748b were a slate-scale step off from
+     theme.css's #0f172a/#475569, so standalone rendering was subtly lower-contrast than inside the
+     shell. Inside the host these lines never mattered — the alias resolves — which is exactly why
+     the drift went unnoticed. */
+  --text-primary: var(--omni-color-text-primary, #0f172a);
+  --text-secondary: var(--omni-color-text-secondary, #475569);
   --text-muted: var(--omni-color-text-muted, #94a3b8);
   --text-heading: var(--omni-color-text-primary, #0f172a);
   --text-danger: var(--omni-color-danger, #dc2626);
@@ -50,7 +54,9 @@
 
   /* Radii */
   --radius-sm: var(--omni-radius-sm, 6px);
-  --radius-md: 10px;
+  /* Was a hardcoded 10px — the one radius in this file that was never aliased, so every control
+     using it sat 2px rounder than the equivalent host control. */
+  --radius-md: var(--omni-radius-md, 8px);
   --radius-lg: var(--omni-radius-lg, 12px);
   --radius-xl: var(--omni-radius-xl, 16px);
 }
@@ -82,7 +88,27 @@
   .lead-skel::after { animation: none; background: rgba(255, 255, 255, 0.4); }
 }
 
-* {
+/*
+ * The universal reset, at ZERO specificity.
+ *
+ * Written with the scope id already inside `:where()` for two reasons. First, the
+ * `selector.includes(prefix)` guard in postcss.config.cjs leaves an already-prefixed selector
+ * alone, so this is not rewritten into `#lead-mf-scope *`. Second — and this is the point —
+ * `:where()` contributes nothing to specificity, so the whole selector scores 0-0-0.
+ *
+ * As a plain `*` it was prefixed to `#lead-mf-scope *`, which scores 1-0-0 on the id and so beat
+ * EVERY single-class rule inside this remote — including every component in @omniremit/ui. The
+ * shared PageHeader's 28px/32px padding, Button's `0 18px`, Badge's `2px 12px` and DataTable's
+ * cell padding were all being flattened to zero, which is why the page banner sat flush against
+ * the edge of the card while the identical component in the host and in customer360_mf did not.
+ * (customer360_mf never had the bug: its reset sets only box-sizing.)
+ *
+ * At 0-0-0 the reset still applies to anything that has no other rule — which is all a reset is
+ * for — and now loses every tie to an actual component stylesheet.
+ */
+:where(#lead-mf-scope) *,
+:where(#lead-mf-scope) *::before,
+:where(#lead-mf-scope) *::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
@@ -247,14 +273,11 @@ html, body {
   font-weight: 700;
 }
 
-
-
 .app-container {
   display: flex;
   min-height: 100%;
   width: 100%;
 }
-
 
 /* Fixed White Sidebar with Translucent Blue Accents */
 .sidebar {
@@ -893,56 +916,6 @@ html, body {
 }
 
 /* Submit Button — Host shimmer gradient (matches Button.primary exactly) */
-.submit-btn-primary {
-  width: 100%;
-  height: 48px;
-  background: linear-gradient(135deg, #2f72f5 0%, #1d4ed8 100%);
-  color: #ffffff;
-  border: 1px solid transparent;
-  border-radius: 12px;
-  font-size: 15px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  font-family: inherit;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.18), 0 4px 12px rgba(37, 99, 235, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.14);
-  transition: background 160ms ease, box-shadow 160ms ease, transform 100ms ease;
-  margin-top: 24px;
-  position: relative;
-  overflow: hidden;
-}
-
-.submit-btn-primary::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(115deg, transparent 25%, rgba(255, 255, 255, 0.13) 50%, transparent 75%);
-  transform: translateX(-110%);
-  transition: none;
-}
-
-.submit-btn-primary:hover:not(:disabled)::before {
-  transform: translateX(110%);
-  transition: transform 0.52s ease;
-}
-
-.submit-btn-primary:hover:not(:disabled) {
-  background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
-  box-shadow: 0 2px 4px rgba(15, 23, 42, 0.2), 0 8px 20px rgba(37, 99, 235, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.14);
-}
-
-.submit-btn-primary:active:not(:disabled) {
-  transform: scale(0.977);
-}
-
-.submit-btn-primary:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
 
 /* Toast / Alert Notification */
 .toast-notification {
@@ -1108,55 +1081,6 @@ html, body {
   }
 }
 
-.lead-status-badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 3px 10px;
-  border-radius: 20px;
-  font-size: 11.5px;
-  font-weight: 600;
-  white-space: nowrap;
-  flex-shrink: 0;
-  letter-spacing: 0.2px;
-}
-
-/* ============================================================
-   CREATE LEAD DRAWER — Right-Side Panel (Customer 360 Pattern)
-   ============================================================ */
-
-.drawer-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(15, 23, 42, 0.45);
-  backdrop-filter: blur(4px);
-  z-index: 1200;
-  display: flex;
-  justify-content: flex-end;
-  animation: drawerOverlayFadeIn 0.2s ease;
-}
-
-@keyframes drawerOverlayFadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-.create-lead-drawer,
-.lead-details-drawer {
-  width: min(740px, 95vw);
-  height: 100vh;
-  background: #ffffff;
-  display: flex;
-  flex-direction: column;
-  box-shadow: -12px 0 60px rgba(15, 23, 42, 0.22), -2px 0 10px rgba(15, 23, 42, 0.08);
-  animation: drawerSlideIn 0.28s cubic-bezier(0.16, 1, 0.3, 1);
-  position: relative;
-  overflow: hidden;
-  box-sizing: border-box;
-}
-
 @keyframes drawerSlideIn {
   from {
     transform: translateX(100%);
@@ -1166,554 +1090,9 @@ html, body {
   }
 }
 
-.drawer-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  padding: 22px 28px 20px;
-  border-bottom: 1px solid var(--border-subtle);
-  flex-shrink: 0;
-}
-
-/* Blue drawer header — Radiant Hero Gradient */
-.drawer-header-blue {
-  position: relative;
-  overflow: hidden;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 22px 28px 20px;
-  background: var(--header-gradient);
-  border-bottom: none;
-  flex-shrink: 0;
-  box-shadow: 0 4px 16px rgba(37, 99, 235, 0.24);
-}
-
-.drawer-header-blue::before {
-  content: '';
-  position: absolute;
-  top: -50px;
-  right: -50px;
-  width: 200px;
-  height: 200px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(255, 255, 255, 0.14) 0%, transparent 70%);
-  pointer-events: none;
-}
-
-.drawer-header-blue::after {
-  content: '';
-  position: absolute;
-  bottom: -60px;
-  left: 30px;
-  width: 160px;
-  height: 160px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(255, 255, 255, 0.08) 0%, transparent 70%);
-  pointer-events: none;
-}
-
-.drawer-header-blue .drawer-header-content {
-  position: relative;
-  z-index: 1;
-}
-
-.drawer-header-blue .drawer-title {
-  font-size: 18.5px;
-  font-weight: 700;
-  color: #ffffff;
-  margin: 0;
-  letter-spacing: -0.02em;
-  line-height: 1.25;
-}
-
-.drawer-header-blue .drawer-subtitle {
-  font-size: 12.5px;
-  color: rgba(255, 255, 255, 0.84);
-  margin-top: 4px;
-}
-
-.drawer-header-blue .drawer-close-btn {
-  position: relative;
-  z-index: 1;
-  width: 36px;
-  height: 36px;
-  border-radius: 9px;
-  background: rgba(255, 255, 255, 0.16);
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  color: #ffffff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all 140ms ease;
-  flex-shrink: 0;
-  margin-left: 12px;
-}
-
-.drawer-header-blue .drawer-close-btn:hover {
-  background: rgba(255, 255, 255, 0.3);
-  border-color: rgba(255, 255, 255, 0.45);
-  transform: scale(1.05);
-}
-
-.drawer-header-content {
-  flex: 1;
-}
-
-.drawer-title {
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--text-heading);
-  margin: 0;
-  letter-spacing: -0.2px;
-}
-
-.drawer-subtitle {
-  font-size: 13px;
-  color: var(--text-secondary);
-  margin-top: 4px;
-}
-
-.drawer-close-btn {
-  background: #f8fafc;
-  border: 1px solid var(--border-subtle);
-  border-radius: 8px;
-  width: 36px;
-  height: 36px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  color: var(--text-secondary);
-  transition: all 0.15s ease;
-  flex-shrink: 0;
-  margin-left: 12px;
-}
-
-.drawer-close-btn:hover {
-  background: #f1f5f9;
-  color: var(--text-heading);
-  border-color: #cbd5e1;
-}
-
-.drawer-body {
-  flex: 1;
-  overflow-y: auto;
-  padding: 24px 28px;
-  overscroll-behavior: contain;
-}
-
-/* Lead Details drawer body uses subtle grey background for card contrast */
-.lead-details-drawer .drawer-body {
-  background: var(--bg-app);
-  padding: 24px 24px;
-}
-
-.drawer-footer {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 12px;
-  padding: 16px 28px;
-  border-top: 1px solid var(--border-subtle);
-  background: #ffffff;
-  flex-shrink: 0;
-}
-
-.drawer-btn-cancel {
-  height: 42px;
-  padding: 0 20px;
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
-  font-size: 14px;
-  font-weight: 600;
-  color: #0f172a;
-  cursor: pointer;
-  font-family: inherit;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
-  transition: background 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.drawer-btn-cancel:hover {
-  background: #f8fafc;
-  border-color: #c8d4e0;
-  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.08);
-}
-
-.drawer-btn-create {
-  height: 42px;
-  padding: 0 20px;
-  background: linear-gradient(135deg, #2f72f5 0%, #1d4ed8 100%);
-  color: #ffffff;
-  border: 1px solid transparent;
-  border-radius: 12px;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  font-family: inherit;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.18), 0 4px 12px rgba(37, 99, 235, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.14);
-  transition: background 160ms ease, box-shadow 160ms ease, transform 100ms ease;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  position: relative;
-  overflow: hidden;
-}
-
-.drawer-btn-create:hover {
-  background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
-  box-shadow: 0 2px 4px rgba(15, 23, 42, 0.2), 0 8px 20px rgba(37, 99, 235, 0.42);
-}
-
-.drawer-btn-create:active {
-  transform: scale(0.977);
-}
-
-.drawer-btn-danger {
-  height: 42px;
-  padding: 0 20px;
-  background: linear-gradient(135deg, #f43f5e, #e11d48);
-  color: #ffffff;
-  border: none;
-  border-radius: 12px;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  font-family: inherit;
-  box-shadow: 0 2px 8px rgba(244, 63, 94, 0.28);
-  transition: background 160ms ease, box-shadow 160ms ease, transform 100ms ease;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.drawer-btn-danger:hover {
-  background: linear-gradient(135deg, #e11d48, #be123c);
-  box-shadow: 0 4px 14px rgba(244, 63, 94, 0.38);
-}
-
-.drawer-btn-danger:active {
-  transform: scale(0.977);
-}
-
 /* Wider content viewport for Lead Directory */
 .lead-directory-page .form-card {
   max-width: none;
-}
-
-/* ============================================================
-   LEAD TABLE — Enterprise data table for scalable lead directory
-   ============================================================ */
-
-/* Table wrapper — unified card container for controls + table + pagination */
-.lead-table-wrapper {
-  background: #ffffff;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-card);
-  overflow: hidden;
-}
-
-/* Table Controls Bar: Search + Records-per-page */
-.lead-table-controls {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 0;
-  padding: 14px 20px;
-  background: #ffffff;
-  border: 1px solid var(--border-subtle);
-  border-bottom: none;
-  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
-  box-shadow: var(--shadow-card);
-  flex-shrink: 0;
-}
-
-.lead-table-search {
-  position: relative;
-  display: flex;
-  align-items: center;
-  background: var(--bg-app);
-  border: 1px solid var(--border-input);
-  border-radius: var(--radius-md);
-  padding: 7px 14px;
-  width: 300px;
-  transition: all 0.18s ease;
-}
-
-.lead-table-search:focus-within {
-  border-color: var(--border-focus);
-  background: #ffffff;
-  box-shadow: var(--shadow-focus);
-  width: 360px;
-}
-
-.lead-table-search-icon {
-  color: var(--text-muted);
-  flex-shrink: 0;
-}
-
-.lead-table-search-input {
-  border: none;
-  background: transparent;
-  padding-left: 8px;
-  font-size: 13px;
-  outline: none;
-  width: 100%;
-  color: var(--text-primary);
-  font-family: inherit;
-}
-
-.lead-table-search-input::placeholder {
-  color: var(--text-muted);
-}
-
-.lead-table-records-select {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12.5px;
-  color: var(--text-secondary);
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
-.lead-table-records-select select {
-  height: 32px;
-  padding: 4px 8px;
-  background: #ffffff;
-  border: 1px solid var(--border-input);
-  border-radius: var(--radius-sm);
-  font-size: 12.5px;
-  color: var(--text-primary);
-  font-family: inherit;
-  cursor: pointer;
-  outline: none;
-  transition: border-color 0.15s ease;
-}
-
-.lead-table-records-select select:focus {
-  border-color: var(--border-focus);
-  box-shadow: var(--shadow-focus);
-}
-
-/* Table Container */
-.lead-table-container {
-  background: #ffffff;
-  border: 1px solid var(--border-subtle);
-  border-top: none;
-  overflow-x: auto;
-  overflow-y: auto;
-  flex: 1;
-  min-height: 0;
-  box-shadow: var(--shadow-card);
-}
-
-.lead-table {
-  width: 100%;
-  border-collapse: collapse;
-  table-layout: auto;
-}
-
-.lead-table thead {
-  position: sticky;
-  top: 0;
-  z-index: 2;
-}
-
-.lead-table th {
-  background: #f8fafc;
-  padding: 11px 16px;
-  text-align: left;
-  font-size: 10.5px;
-  font-weight: 600;
-  color: var(--text-muted);
-  letter-spacing: 0.6px;
-  text-transform: uppercase;
-  border-bottom: 1px solid var(--border-subtle);
-  white-space: nowrap;
-  user-select: none;
-}
-
-.lead-table th:first-child {
-  padding-left: 20px;
-}
-
-.lead-table th:last-child {
-  padding-right: 20px;
-  text-align: center;
-}
-
-.lead-table td {
-  padding: 12px 16px;
-  font-size: 13px;
-  color: var(--text-primary);
-  border-bottom: 1px solid var(--border-subtle);
-  vertical-align: middle;
-  white-space: nowrap;
-}
-
-.lead-table td:first-child {
-  padding-left: 20px;
-}
-
-.lead-table td:last-child {
-  padding-right: 20px;
-  text-align: center;
-}
-
-.lead-table tbody tr {
-  transition: background 0.1s ease;
-}
-
-.lead-table tbody tr:hover {
-  background: rgba(37, 99, 235, 0.04);
-}
-
-.lead-table tbody tr:last-child td {
-  border-bottom: none;
-}
-
-/* Lead name cell with avatar */
-.lead-table-name-cell {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.lead-table-avatar {
-  width: 30px;
-  height: 30px;
-  min-width: 30px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #ffffff;
-  font-size: 10.5px;
-  font-weight: 700;
-  letter-spacing: 0.3px;
-  flex-shrink: 0;
-}
-
-.lead-table-name-text {
-  font-weight: 600;
-  color: var(--text-heading);
-  font-size: 13px;
-  line-height: 1.3;
-}
-
-.lead-table-ic {
-  font-size: 12px;
-  color: var(--text-secondary);
-  font-family: 'SF Mono', 'Fira Code', monospace;
-  letter-spacing: 0.3px;
-}
-
-/* View action button */
-.lead-table-view-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 5px 12px;
-  background: transparent;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-sm);
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--brand-blue-accent);
-  cursor: pointer;
-  font-family: inherit;
-  transition: all 0.15s ease;
-}
-
-.lead-table-view-btn:hover {
-  background: var(--brand-blue-translucent);
-  border-color: var(--brand-blue-accent);
-  color: var(--brand-primary);
-}
-
-/* Empty state */
-.lead-table-empty {
-  padding: 56px 20px;
-  text-align: center;
-  color: var(--text-muted);
-  font-size: 13px;
-  background: #ffffff;
-  border: 1px solid var(--border-subtle);
-  border-top: none;
-  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
-  box-shadow: var(--shadow-card);
-}
-
-/* Pagination Bar */
-.lead-table-pagination {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 20px;
-  background: #ffffff;
-  border: 1px solid var(--border-subtle);
-  border-top: none;
-  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
-  font-size: 12.5px;
-  color: var(--text-secondary);
-  box-shadow: var(--shadow-card);
-  flex-shrink: 0;
-}
-
-.lead-table-pagination-info {
-  font-size: 12.5px;
-  color: var(--text-muted);
-}
-
-.lead-table-pagination-controls {
-  display: flex;
-  align-items: center;
-  gap: 3px;
-}
-
-.lead-table-page-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 32px;
-  height: 32px;
-  padding: 0 10px;
-  background: #ffffff;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-sm);
-  font-size: 12.5px;
-  font-weight: 500;
-  color: var(--text-secondary);
-  cursor: pointer;
-  font-family: inherit;
-  transition: all 0.12s ease;
-  white-space: nowrap;
-}
-
-.lead-table-page-btn:hover:not(:disabled) {
-  background: var(--bg-app);
-  border-color: var(--border-input);
-  color: var(--text-primary);
-}
-
-.lead-table-page-btn:disabled {
-  opacity: 0.35;
-  cursor: not-allowed;
-}
-
-.lead-table-page-btn.active {
-  background: var(--brand-blue-translucent);
-  border-color: var(--brand-blue-accent);
-  color: var(--brand-blue-accent);
-  font-weight: 600;
 }
 
 /* ============================================================
@@ -1812,7 +1191,9 @@ html, body {
   border-radius: 12px;
   padding: 12px 14px;
   display: flex;
-  align-items: center;
+  /* Top-aligned, not centred: the value may now run to two lines, and centring would float the
+     icon tile against the middle of the text block rather than the label it belongs to. */
+  align-items: flex-start;
   gap: 12px;
   box-shadow: 0 1px 4px rgba(15, 23, 42, 0.04);
   transition: all 180ms ease;
@@ -1852,13 +1233,26 @@ html, body {
   white-space: nowrap;
 }
 
+/*
+ * Wraps to two lines rather than truncating at one.
+ *
+ * These carry branch and officer names — "Johor Bahru Main Hub", "Azman bin Ibrahim" — which
+ * `white-space: nowrap` cut to "Johor Bahru Main ..." and "Azman bin Ibrahi...". Truncating a
+ * person's name in a three-across grid loses the actual information the card exists to show; two
+ * lines fit comfortably in the card's height. The `title` attribute on the element still carries
+ * the full value for anything longer.
+ */
 .lead-kpi-value {
   font-size: 13.5px;
   font-weight: 700;
   color: #0f172a;
-  white-space: nowrap;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
 }
 
 .lead-section-card {
@@ -2007,45 +1401,6 @@ html, body {
   overflow-wrap: anywhere;
 }
 
-.lead-drawer-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 14px 28px;
-  border-top: 1px solid #e2e8f0;
-  background: #ffffff;
-  flex-shrink: 0;
-}
-
-.lead-footer-meta {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 11.5px;
-  color: #64748b;
-}
-
-.lead-footer-close-btn {
-  height: 38px;
-  padding: 0 20px;
-  background: #ffffff;
-  border: 1.5px solid #e2e8f0;
-  border-radius: 10px;
-  font-size: 13px;
-  font-weight: 600;
-  color: #334155;
-  cursor: pointer;
-  transition: all 120ms ease;
-  font-family: inherit;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
-}
-
-.lead-footer-close-btn:hover {
-  background: #f8fafc;
-  border-color: #cbd5e1;
-  color: #0f172a;
-}
-
 /* Responsive: smaller screens. Drawer width is deliberately NOT overridden here anymore — like the
    host's own SettingsDrawer and customer360_mf's drawer, `width: min(800px, 96vw)` on the base rule
    above already shrinks correctly on its own as the viewport narrows, without a second fixed-width
@@ -2072,26 +1427,9 @@ html, body {
   .form-card {
     padding: 16px 14px;
   }
-  /* Drawer body padding */
-  .drawer-body {
-    padding: 16px 16px;
-  }
-  .drawer-header, .drawer-header-blue {
-    padding: 18px 18px 16px;
-  }
-  .drawer-footer {
-    padding: 12px 16px;
-  }
 }
 
 @media (max-width: 1024px) {
-  .lead-table-search {
-    width: 220px;
-  }
-
-  .lead-table-search:focus-within {
-    width: 260px;
-  }
 }
 
 @media (max-width: 768px) {
@@ -2101,26 +1439,6 @@ html, body {
     padding: 18px 18px !important;
     gap: 14px !important;
   }
-
-  .lead-table-controls {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 10px;
-  }
-
-  .lead-table-search {
-    width: 100%;
-  }
-
-  .lead-table-search:focus-within {
-    width: 100%;
-  }
-
-  .lead-table-pagination {
-    flex-direction: column;
-    gap: 10px;
-    text-align: center;
-  }
 }
 
 /* ==========================================================================
@@ -2128,50 +1446,6 @@ html, body {
    with no CSS behind them at all. Built from the tokens already declared at
    the top of this file, not a new palette.
    ========================================================================== */
-
-.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 9px 18px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border-input);
-  background: var(--bg-card);
-  color: var(--text-primary);
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
-}
-
-.btn:hover {
-  border-color: var(--brand-primary);
-  color: var(--brand-primary);
-}
-
-.btn:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-
-.btn-primary {
-  background: var(--brand-primary);
-  border-color: var(--brand-primary);
-  color: #ffffff;
-}
-
-.btn-primary:hover {
-  background: var(--brand-primary-hover);
-  border-color: var(--brand-primary-hover);
-  color: #ffffff;
-}
-
-.btn-secondary {
-  background: var(--bg-card);
-  border-color: var(--border-input);
-  color: var(--text-secondary);
-}
 
 @keyframes lead-spin {
   to {
@@ -2209,153 +1483,6 @@ html, body {
 .highlighted {
   background: var(--brand-blue-translucent);
   color: var(--brand-primary);
-}
-
-/* ============================================================
-   AUDIT RECORD DETAILS DRAWER — Host App Standard Styling
-   ============================================================ */
-
-.audit-details-drawer {
-  width: min(740px, 95vw);
-  height: 100vh;
-  background: #ffffff;
-  display: flex;
-  flex-direction: column;
-  box-shadow: -12px 0 60px rgba(15, 23, 42, 0.22), -2px 0 10px rgba(15, 23, 42, 0.08);
-  animation: drawerSlideIn 0.28s cubic-bezier(0.16, 1, 0.3, 1);
-  position: relative;
-  box-sizing: border-box;
-  overflow: hidden;
-}
-
-.audit-drawer-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 22px 28px 20px;
-  background: var(--header-gradient);
-  color: #ffffff;
-  flex-shrink: 0;
-  position: relative;
-  overflow: hidden;
-  box-shadow: 0 4px 16px rgba(37, 99, 235, 0.24);
-}
-
-.audit-drawer-header::before {
-  content: '';
-  position: absolute;
-  top: -50px;
-  right: -50px;
-  width: 200px;
-  height: 200px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(255, 255, 255, 0.14) 0%, transparent 70%);
-  pointer-events: none;
-}
-
-.audit-drawer-header::after {
-  content: '';
-  position: absolute;
-  bottom: -60px;
-  left: 30px;
-  width: 160px;
-  height: 160px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(255, 255, 255, 0.08) 0%, transparent 70%);
-  pointer-events: none;
-}
-
-.audit-header-glow {
-  position: absolute;
-  top: -30px;
-  right: 60px;
-  width: 120px;
-  height: 120px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(255, 255, 255, 0.16) 0%, rgba(255, 255, 255, 0) 70%);
-  pointer-events: none;
-}
-
-.audit-header-left {
-  display: flex;
-  align-items: center;
-  gap: 15px;
-  flex: 1;
-  min-width: 0;
-  position: relative;
-  z-index: 1;
-}
-
-.audit-header-icon-box {
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.18);
-  border: 1.5px solid rgba(255, 255, 255, 0.32);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #ffffff;
-  flex-shrink: 0;
-  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.12);
-}
-
-.audit-header-text {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  min-width: 0;
-}
-
-.audit-header-title {
-  font-size: 18.5px;
-  font-weight: 700;
-  color: #ffffff;
-  margin: 0;
-  letter-spacing: -0.02em;
-  line-height: 1.25;
-}
-
-.audit-header-subtitle {
-  font-size: 12.5px;
-  color: rgba(255, 255, 255, 0.84);
-  margin: 0;
-  line-height: 1.35;
-}
-
-.audit-header-close-btn {
-  width: 36px;
-  height: 36px;
-  border-radius: 9px;
-  background: rgba(255, 255, 255, 0.16);
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  color: #ffffff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all 140ms ease;
-  flex-shrink: 0;
-  margin-left: 12px;
-  position: relative;
-  z-index: 1;
-}
-
-.audit-header-close-btn:hover {
-  background: rgba(255, 255, 255, 0.3);
-  border-color: rgba(255, 255, 255, 0.45);
-  transform: scale(1.05);
-}
-
-.audit-drawer-body {
-  flex: 1;
-  overflow-y: auto;
-  padding: 20px 26px 24px;
-  background: #f0f4fa;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  overscroll-behavior: contain;
 }
 
 .audit-drawer-section {
@@ -2524,53 +1651,6 @@ html, body {
   margin: 0;
   font-weight: 600;
   overflow-wrap: anywhere;
-}
-
-.audit-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 3px 9px;
-  border-radius: 6px;
-  font-size: 11.5px;
-  font-weight: 600;
-  letter-spacing: 0.01em;
-}
-
-.audit-badge-primary {
-  background: #eff6ff;
-  color: #1d4ed8;
-  border: 1px solid #bfdbfe;
-}
-
-.audit-badge-success {
-  background: #ecfdf5;
-  color: #047857;
-  border: 1px solid #a7f3d0;
-}
-
-.audit-badge-danger {
-  background: #fef2f2;
-  color: #dc2626;
-  border: 1px solid #fecaca;
-}
-
-.audit-badge-dot {
-  width: 5.5px;
-  height: 5.5px;
-  border-radius: 50%;
-  background: currentColor;
-}
-
-.audit-action-badge {
-  font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
-  font-size: 11.5px;
-  font-weight: 600;
-  padding: 2.5px 8px;
-  border-radius: 6px;
-  border: 1px solid #dbeafe;
-  background: #eff6ff;
-  color: #1d4ed8;
 }
 
 .audit-timeline {
@@ -2803,65 +1883,6 @@ html, body {
   box-shadow: 0 0 4px rgba(59, 130, 246, 0.6);
 }
 
-.audit-diffs-table-wrap {
-  border: 1.5px solid #e2e8f0;
-  border-radius: 11px;
-  overflow: hidden;
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.03);
-}
-
-.audit-diffs-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 12.5px;
-}
-
-.audit-diffs-table th {
-  padding: 9px 14px;
-  text-align: left;
-  font-size: 10px;
-  font-weight: 700;
-  color: #64748b;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  background: #f8fafc;
-  border-bottom: 1px solid #e2e8f0;
-}
-
-.audit-diffs-table td {
-  padding: 9px 14px;
-  vertical-align: middle;
-  border-bottom: 1px solid #f1f5f9;
-}
-
-.audit-diffs-table tr:last-child td {
-  border-bottom: none;
-}
-
-.audit-diff-field-cell {
-  font-weight: 600;
-  color: #1e293b;
-}
-
-.audit-diff-prev-cell {
-  color: #dc2626;
-  background: #fef2f2;
-  font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace;
-  font-size: 11.5px;
-  border-radius: 5px;
-  padding: 3px 8px;
-}
-
-.audit-diff-new-cell {
-  color: #15803d;
-  background: #f0fdf4;
-  font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace;
-  font-size: 11.5px;
-  font-weight: 600;
-  border-radius: 5px;
-  padding: 3px 8px;
-}
-
 .audit-payload-code-box {
   background: #f8fafc;
   border: 1.5px solid #e2e8f0;
@@ -2879,41 +1900,10 @@ html, body {
   overflow-y: auto;
 }
 
-.audit-drawer-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 14px 28px;
-  border-top: 1px solid #e2e8f0;
-  background: #ffffff;
-  flex-shrink: 0;
-}
-
 .audit-footer-meta {
   display: flex;
   align-items: center;
   gap: 8px;
   font-size: 11.5px;
   color: #64748b;
-}
-
-.audit-footer-close-btn {
-  height: 38px;
-  padding: 0 20px;
-  background: #ffffff;
-  border: 1.5px solid #e2e8f0;
-  border-radius: 10px;
-  font-size: 13px;
-  font-weight: 600;
-  color: #334155;
-  cursor: pointer;
-  transition: all 120ms ease;
-  font-family: inherit;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
-}
-
-.audit-footer-close-btn:hover {
-  background: #f8fafc;
-  border-color: #cbd5e1;
-  color: #0f172a;
 }

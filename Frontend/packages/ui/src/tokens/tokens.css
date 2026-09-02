@@ -1,0 +1,206 @@
+/*
+ * Standalone fallback values for the OmniRemit design tokens.
+ *
+ * WHY THIS FILE EXISTS
+ * --------------------
+ * The host defines every `--omni-*` token on `:root` (apps/host/src/shared/styles/theme.css), and
+ * because custom properties inherit, a remote rendered inside the host document already receives
+ * them for free. That is the primary mechanism and it needs nothing from this file.
+ *
+ * This file covers the one case inheritance cannot: a remote running on its own — `vite preview` on
+ * :5002, a Vercel preview URL, a component opened outside the shell — where there is no host `:root`
+ * and every `var(--omni-*)` would resolve to nothing, silently collapsing the UI to unstyled
+ * defaults.
+ *
+ * WHY @layer, AND WHY IT IS LOAD-BEARING
+ * --------------------------------------
+ * These values must never win over the host's. That is harder than it looks: both remotes run
+ * `postcss-prefix-selector`, whose transform rewrites a bare `:root` to `#lead-mf-scope` /
+ * `#customer360-mf-scope`. An id selector has specificity (1,0,0) against the host `:root`'s (0,1,0),
+ * so a plain `:root { --omni-...: ... }` here would come out MORE specific than the host's real
+ * theme and override it — the remote would pin itself to these frozen values and stop tracking the
+ * host, which is the exact opposite of the intent.
+ *
+ * Cascade layers fix this at a level specificity cannot reach: unlayered declarations always beat
+ * layered ones, whatever their specificity. The host's theme.css is unlayered, so it wins here even
+ * after the id rewrite. Do not remove the `@layer` wrapper, and do not add these tokens to an
+ * unlayered rule.
+ *
+ * Values are copied verbatim from the host's theme.css so standalone rendering is pixel-identical to
+ * rendering inside the shell. theme.css remains the source of truth; if a value changes there and
+ * matters standalone, mirror it here.
+ */
+
+@layer omni-fallback {
+  :root {
+    /* ---- Brand scale (blue) ---- */
+    --omni-color-primary-50: #eff6ff;
+    --omni-color-primary-100: #dbeafe;
+    --omni-color-primary-200: #bfdbfe;
+    --omni-color-primary-300: #93c5fd;
+    --omni-color-primary-400: #60a5fa;
+    --omni-color-primary-500: #3b82f6;
+    --omni-color-primary-600: #2563eb;
+    --omni-color-primary-700: #1d4ed8;
+    --omni-color-primary-800: #1e3a8a;
+    --omni-color-primary-900: #172554;
+
+    /* ---- Neutrals ---- */
+    --omni-color-surface: #ffffff;
+    --omni-color-surface-alt: #f8fafc;
+    --omni-color-surface-sunken: #f8fafc;
+    --omni-color-border: #e2e8f0;
+    --omni-color-border-strong: #cbd5e1;
+    --omni-color-text-primary: #0f172a;
+    --omni-color-text-secondary: #475569;
+    --omni-color-text-muted: #94a3b8;
+    --omni-color-text-on-primary: #ffffff;
+
+    /* ---- Status scales ---- */
+    --omni-color-danger-50: #fef2f2;
+    --omni-color-danger-100: #fee2e2;
+    --omni-color-danger-200: #fecaca;
+    --omni-color-danger-300: #fca5a5;
+    --omni-color-danger-400: #f87171;
+    --omni-color-danger-500: #ef4444;
+    --omni-color-danger-600: #dc2626;
+    --omni-color-danger-700: #b91c1c;
+    --omni-color-danger-800: #991b1b;
+    --omni-color-danger-900: #7f1d1d;
+
+    --omni-color-success-50: #ecfdf5;
+    --omni-color-success-100: #d1fae5;
+    --omni-color-success-200: #a7f3d0;
+    --omni-color-success-300: #6ee7b7;
+    --omni-color-success-400: #34d399;
+    --omni-color-success-500: #10b981;
+    --omni-color-success-600: #059669;
+    --omni-color-success-700: #047857;
+    --omni-color-success-800: #065f46;
+    --omni-color-success-900: #064e3b;
+
+    --omni-color-warning-50: #fffbeb;
+    --omni-color-warning-100: #fef3c7;
+    --omni-color-warning-200: #fde68a;
+    --omni-color-warning-300: #fcd34d;
+    --omni-color-warning-400: #fbbf24;
+    --omni-color-warning-500: #f59e0b;
+    --omni-color-warning-600: #d97706;
+    --omni-color-warning-700: #b45309;
+    --omni-color-warning-800: #92400e;
+    --omni-color-warning-900: #78350f;
+
+    /* ---- Status aliases ---- */
+    --omni-color-success: var(--omni-color-success-600);
+    --omni-color-success-bg: var(--omni-color-success-100);
+    --omni-color-success-text: var(--omni-color-success-800);
+
+    --omni-color-warning: var(--omni-color-warning-600);
+    --omni-color-warning-bg: var(--omni-color-warning-100);
+    --omni-color-warning-text: var(--omni-color-warning-800);
+
+    --omni-color-danger: var(--omni-color-danger-600);
+    --omni-color-danger-bg: var(--omni-color-danger-100);
+    --omni-color-danger-text: var(--omni-color-danger-800);
+
+    --omni-color-info: #2563eb;
+    --omni-color-info-bg: #dbeafe;
+    --omni-color-info-text: #1e40af;
+
+    /* ---- Spacing scale ---- */
+    --omni-space-1: 4px;
+    --omni-space-2: 8px;
+    --omni-space-3: 12px;
+    --omni-space-4: 16px;
+    --omni-space-5: 20px;
+    --omni-space-6: 24px;
+    --omni-space-7: 32px;
+    --omni-space-8: 48px;
+
+    /* ---- Radius scale ---- */
+    --omni-radius-sm: 6px;
+    --omni-radius-md: 8px;
+    --omni-radius-lg: 12px;
+    --omni-radius-xl: 16px;
+    --omni-radius-pill: 999px;
+
+    /* ---- Shadow scale ---- */
+    --omni-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
+    --omni-shadow-md: 0 4px 12px rgba(15, 23, 42, 0.08);
+    --omni-shadow-lg: 0 12px 32px rgba(15, 23, 42, 0.12);
+
+    /* ---- Typography ---- */
+    --omni-font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --omni-font-size-xs: 12px;
+    --omni-font-size-sm: 13px;
+    --omni-font-size-md: 14px;
+    --omni-font-size-lg: 16px;
+    --omni-font-size-xl: 20px;
+    --omni-font-size-2xl: 28px;
+    --omni-font-weight-regular: 400;
+    --omni-font-weight-medium: 500;
+    --omni-font-weight-semibold: 600;
+    --omni-font-weight-bold: 700;
+    --omni-line-height-tight: 1.25;
+    --omni-line-height-normal: 1.5;
+
+    /* ---- Composite surfaces ---- */
+    --omni-gradient-page-header: linear-gradient(135deg, #1e3a8a 0%, #2563eb 50%, #3b82f6 100%);
+    --omni-gradient-hero: linear-gradient(120deg, #1e3a8a 0%, #1e40af 30%, #2563eb 65%, #3b82f6 100%);
+    --omni-gradient-primary-btn: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+    --omni-shadow-page-header: 0 8px 30px rgba(37, 99, 235, 0.28), 0 2px 6px rgba(37, 99, 235, 0.15);
+
+    --omni-color-on-header-text: #ffffff;
+    --omni-color-on-header-muted: rgba(255, 255, 255, 0.85);
+    --omni-color-on-header-surface: rgba(255, 255, 255, 0.18);
+    --omni-color-on-header-border: rgba(255, 255, 255, 0.3);
+
+    --omni-color-live-dot: #34d399;
+    --omni-color-live-dot-glow: rgba(52, 211, 153, 0.9);
+
+    /* ---- Approval action pills ---- */
+    --omni-color-action-create-bg: #ecfdf5;
+    --omni-color-action-create-text: #059669;
+    --omni-color-action-update-bg: #eff6ff;
+    --omni-color-action-update-text: #2563eb;
+    --omni-color-action-delete-bg: #fef2f2;
+    --omni-color-action-delete-text: #dc2626;
+    --omni-color-action-enable-bg: #ecfdf5;
+    --omni-color-action-enable-text: #047857;
+    --omni-color-action-disable-bg: #fff7ed;
+    --omni-color-action-disable-text: #c2410c;
+
+    /* ---- Motion ---- */
+    --omni-transition-fast: 120ms ease;
+    --omni-transition-base: 180ms ease;
+
+    /* ---- Z-index scale ---- */
+    --omni-z-dropdown: 100;
+    --omni-z-sticky: 200;
+    --omni-z-drawer: 300;
+    --omni-z-modal: 400;
+    --omni-z-toast: 500;
+  }
+}
+
+/*
+ * ── Standalone page backdrop ──────────────────────────────────────────────────────────────────
+ *
+ * Only ever visible when a remote is served on its own (`vite preview`, a Vercel preview URL).
+ * Inside the host, the host's own unlayered `body` rule wins over anything in this layer, so this
+ * is inert there — which is the whole reason the file is layered.
+ *
+ * It is needed because `postcss-prefix-selector` rewrites a remote's own `html, body { ... }` to
+ * `#<app>-mf-scope { ... }`: correct inside the host (the rule must not escape the remote's
+ * subtree), but it means the real <body> is left with no background at all. On a machine set to a
+ * dark colour scheme the browser then paints the page black behind the app's white cards. This
+ * file is in the prefixer's `ignoreFiles`, so its `body` selector survives as written.
+ */
+@layer omni-fallback {
+  body {
+    background-color: var(--omni-color-surface-sunken, #f8fafc);
+    color: var(--omni-color-text-primary, #0f172a);
+    font-family: var(--omni-font-family, 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif);
+    -webkit-font-smoothing: antialiased;
+  }
+}

@@ -1,0 +1,278 @@
+/*
+ * Styles extracted from this component's former inline blocks. Values map to platform
+ * tokens where an exact equivalent exists.
+ */
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.row {
+  width: 50px;
+  height: 50px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.18);
+  border: 1.5px solid rgba(255, 255, 255, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--omni-color-surface);
+  flex-shrink: 0;
+}
+
+
+.row2 {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #16a34a;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.row3 {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #b45309;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.row4 {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--omni-color-danger-600);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.box {
+  height: 30vh;
+}
+
+.text {
+  font-weight: 600;
+  color: #374151;
+}
+
+.box2 {
+  width: 32px;
+}
+
+.box3 {
+  width: 90px;
+  text-align: center;
+}
+
+.box4 {
+  width: 90px;
+}
+
+.box5 {
+  width: 100px;
+  text-align: center;
+}
+
+.box6 {
+  width: 260px;
+}
+
+.box7 {
+  width: 110px;
+}
+
+
+.rule2 {
+  text-align: center;
+}
+
+/* Save button in the section toolbar. */
+
+.saveBtn:hover:not(:disabled) { background: var(--omni-color-primary-700); }
+.saveBtn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* Per-field visibility toggle. */
+
+/* ── Profile-type segmented control ───────────────────────────────────────────────────────────
+ * Grey track, one filled segment. This replaces `.panel` + two `.saveBtn`s: every segment used to
+ * carry the solid primary fill, so both read as selected and the track behind them never showed.
+ */
+.segmented {
+  display: inline-flex;
+  gap: 4px;
+  background: var(--omni-color-surface-alt);
+  border: 1px solid var(--omni-color-border);
+  padding: 4px;
+  border-radius: var(--omni-radius-lg);
+}
+
+.segment {
+  padding: var(--omni-space-2) 18px;
+  border: none;
+  border-radius: var(--omni-radius-md);
+  background: transparent;
+  color: var(--omni-color-text-secondary);
+  font-family: inherit;
+  font-size: var(--omni-font-size-sm);
+  font-weight: var(--omni-font-weight-semibold);
+  cursor: pointer;
+  transition: background var(--omni-transition-fast), color var(--omni-transition-fast);
+}
+
+.segment:hover:not(.segmentActive) {
+  background: var(--omni-color-surface);
+  color: var(--omni-color-text-primary);
+}
+
+.segmentActive {
+  background: var(--omni-color-primary-600);
+  color: var(--omni-color-text-on-primary, #ffffff);
+  box-shadow: 0 1px 3px rgba(37, 99, 235, 0.32);
+}
+
+.segment:focus-visible {
+  outline: 2px solid var(--omni-color-primary-600);
+  outline-offset: 2px;
+}
+
+/* ── Field group ──────────────────────────────────────────────────────────────────────────────
+ * Just a title plus the table. The card frame, the border and the horizontal scroll all belong to
+ * the shared DataTable; the old `.c360-table-container` wrapper drew a second frame around it and
+ * its `overflow: hidden` clipped DataTable's own scroller, which made the Masking Rule and Visible
+ * Chars columns unreachable at this width.
+ */
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--omni-space-3);
+}
+
+/* Same uppercase micro-heading lead_mf's Field Settings uses, so the two screens read alike. */
+.sectionTitle {
+  margin: 0;
+  font-size: 11px;
+  font-weight: var(--omni-font-weight-bold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--omni-color-text-secondary);
+}
+
+/* A field that is switched off still lists its settings, just muted. Was an inline opacity. */
+.rowHidden {
+  opacity: 0.5;
+}
+
+/*
+ * Field controls — identical chrome to lead_mf's Field Settings, which is the point: the same
+ * screen in two apps was rendering the same controls two different ways. The masking dropdown and
+ * the sensitive checkbox are now the shared `Select` and `Checkbox`; these cover what is left.
+ */
+.numberInput {
+  box-sizing: border-box;
+  width: 64px;
+  height: 32px;
+  padding: 0 8px;
+  text-align: center;
+  border: 1.5px solid var(--omni-color-border);
+  border-radius: 8px;
+  background: var(--omni-color-surface);
+  color: var(--omni-color-text-primary);
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.numberInput:focus {
+  border-color: var(--omni-color-primary-600);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.numberInput:disabled {
+  background: var(--omni-color-surface-alt);
+  color: var(--omni-color-text-muted);
+  cursor: not-allowed;
+}
+
+.checkboxCell {
+  display: inline-flex;
+  justify-content: center;
+}
+
+/* Show/hide as a tinted tile rather than a bare glyph — matches lead_mf's. */
+.visibilityToggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 1.5px solid transparent;
+  border-radius: 8px;
+  background: var(--omni-color-surface-alt);
+  color: var(--omni-color-text-muted);
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+
+.visibilityToggle:hover {
+  background: var(--omni-color-border);
+  color: var(--omni-color-text-primary);
+}
+
+.visibilityToggleOn {
+  background: var(--omni-color-primary-50);
+  border-color: #bfdbfe;
+  color: var(--omni-color-primary-600);
+}
+
+.visibilityToggle:focus-visible {
+  outline: 2px solid var(--omni-color-primary-600);
+  outline-offset: 1px;
+}
+
+/* Same chrome and width as lead_mf's Field Settings label input. */
+.labelInput {
+  box-sizing: border-box;
+  width: 180px;
+  height: 32px;
+  padding: 0 10px;
+  border: 1.5px solid var(--omni-color-border);
+  border-radius: 8px;
+  background: var(--omni-color-surface);
+  color: var(--omni-color-text-primary);
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.labelInput:focus {
+  border-color: var(--omni-color-primary-600);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+/*
+ * The profile-type row.
+ *
+ * Its own class rather than `c360-search-panel` + a module override. That global sets
+ * `flex-direction: column` and the module class set `row`; both land at the same specificity and
+ * index.css is bundled last, so the global won and the segmented control sat centred in a
+ * full-width card with dead space either side. Owning the element outright settles it.
+ */
+.profileBar {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  gap: var(--omni-space-4);
+  flex-wrap: wrap;
+  background: var(--omni-color-surface);
+  border: 1px solid var(--omni-color-border);
+  border-radius: var(--omni-radius-lg);
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.04);
+  padding: var(--omni-space-4) var(--omni-space-5);
+}

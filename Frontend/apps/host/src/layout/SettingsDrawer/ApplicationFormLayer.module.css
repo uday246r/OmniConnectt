@@ -508,3 +508,65 @@
   transform: translateY(-1px);
 }
 
+.afl1 {
+  pointer-events: none;
+}
+
+.afl2 {
+  opacity: 0.55;
+}
+
+.afl3 {
+  display: flex;
+  flex-direction: column;
+  gap: 6;
+}
+
+.afl4 {
+  width: 34;
+  height: 34;
+  border-radius: 10;
+  background: rgba(255,255,255,0.18);
+}
+
+.afl5 {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 14;
+}
+
+.afl6 {
+  background: var(--omni-color-surface);
+  border: 1px solid #eaecf0;
+  border-radius: 14;
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14;
+}
+
+.afl7 {
+  display: flex;
+  flex-direction: column;
+  gap: 10;
+}
+
+.afl8 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12;
+}
+
+.afl9 {
+  display: flex;
+  flex-direction: column;
+  gap: 5;
+}
+
+.afl10 {
+  flex-shrink: 0;
+  display: flex;
+}

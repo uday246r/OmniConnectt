@@ -16,6 +16,8 @@ import {
   canManageFieldSettings,
 } from '../../api/hostBridge';
 import type { NavigationPage } from '../../types/lead';
+import styles from './HostSidebarLeadNav.module.css';
+import { NavItem } from '@omniremit/ui';
 
 interface SubNavItem {
   id: NavigationPage;
@@ -28,7 +30,6 @@ export const HostSidebarLeadNav: React.FC = () => {
   const { activePage, setActivePage, leads, totalRecords } = useLeadStore();
   const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
   const [isExpanded, setIsExpanded] = useState(true);
-  const [hoveredId, setHoveredId] = useState<string | null>(null);
   const chevronBtnRef = useRef<HTMLButtonElement | null>(null);
 
   const userCanViewDashboard = canViewDashboard();
@@ -216,110 +217,26 @@ export const HostSidebarLeadNav: React.FC = () => {
   return ReactDOM.createPortal(
     <div
       id="lead-mf-scope"
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '2px',
-        width: 'calc(100% - 24px)',
-        paddingLeft: '10px',
-        borderLeft: '2px solid #e2e8f0',
-        marginLeft: '22px',
-        marginTop: '2px',
-        marginBottom: '6px',
-        boxSizing: 'border-box',
-      }}
+      className={styles.subnav}
     >
       {visibleItems.map((item) => {
         const isActive = activePage === item.id;
-        const isHovered = hoveredId === item.id;
         const count = item.id === 'view-lead' && recordCount > 0 ? recordCount : null;
 
         return (
-          <button
+          <NavItem
             key={item.id}
-            type="button"
+            id={`host-subnav-${item.id}`}
+            icon={item.icon}
+            label={item.label}
+            active={isActive}
+            trailing={count !== null ? <span className={styles.navCount}>{count}</span> : undefined}
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
               setActivePage(item.id);
             }}
-            onMouseEnter={() => setHoveredId(item.id)}
-            onMouseLeave={() => setHoveredId(null)}
-            id={`host-subnav-${item.id}`}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              width: '100%',
-              padding: '7px 10px',
-              borderRadius: '8px',
-              border: 'none',
-              background: isActive
-                ? '#eff6ff'
-                : isHovered
-                ? '#f8fafc'
-                : 'transparent',
-              color: isActive
-                ? '#1d4ed8'
-                : isHovered
-                ? '#0f172a'
-                : '#475569',
-              fontSize: '13px',
-              fontWeight: isActive ? 600 : 500,
-              cursor: 'pointer',
-              transition: 'all 120ms ease',
-              textAlign: 'left',
-              fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
-              letterSpacing: '-0.01em',
-              boxSizing: 'border-box',
-              outline: 'none',
-            }}
-          >
-            <span
-              style={{
-                width: '16px',
-                height: '16px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: isActive
-                  ? '#2563eb'
-                  : isHovered
-                  ? '#475569'
-                  : '#94a3b8',
-                transition: 'color 120ms ease',
-                flexShrink: 0,
-              }}
-            >
-              {item.icon}
-            </span>
-            <span
-              style={{
-                flex: 1,
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-              }}
-            >
-              {item.label}
-            </span>
-            {count !== null && (
-              <span
-                style={{
-                  marginLeft: 'auto',
-                  padding: '1px 6px',
-                  borderRadius: '10px',
-                  background: '#dbeafe',
-                  color: '#1d4ed8',
-                  fontSize: '10.5px',
-                  fontWeight: 700,
-                  lineHeight: 1.4,
-                }}
-              >
-                {count}
-              </span>
-            )}
-          </button>
+          />
         );
       })}
     </div>,

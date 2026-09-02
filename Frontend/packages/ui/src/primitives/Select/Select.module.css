@@ -1,0 +1,75 @@
+/*
+ * A native <select> wearing the platform's field chrome.
+ *
+ * Native on purpose: the options list is rendered by the OS, which gives correct keyboard
+ * behaviour, mobile pickers and screen-reader support for free. Only the closed control is styled.
+ * `appearance: none` removes the platform's own arrow so a consistent chevron can be drawn, since
+ * that arrow is what made the same dropdown look like a Windows control in one app and a rounded
+ * field in another.
+ *
+ * Chrome copied from the host's `CheckerAssignmentFormLayer.module.css` `.select`.
+ */
+.wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+}
+
+.select {
+  width: 100%;
+  box-sizing: border-box;
+  appearance: none;
+  -webkit-appearance: none;
+  border: 1.5px solid var(--omni-color-border);
+  border-radius: 8px;
+  background: var(--omni-color-surface);
+  color: var(--omni-color-text-primary);
+  font-family: inherit;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.select:focus-visible {
+  border-color: var(--omni-color-primary-600);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.select:disabled {
+  background: var(--omni-color-surface-alt);
+  color: var(--omni-color-text-muted);
+  cursor: not-allowed;
+}
+
+/* Sizes. Right padding always clears the chevron. */
+.sm {
+  height: 32px;
+  padding: 0 28px 0 10px;
+  font-size: 12px;
+}
+.md {
+  height: 36px;
+  padding: 0 30px 0 12px;
+  font-size: 13px;
+}
+.lg {
+  height: 42px;
+  padding: 0 32px 0 14px;
+  font-size: 14px;
+  border-radius: 10px;
+}
+
+.chevron {
+  position: absolute;
+  right: 10px;
+  display: flex;
+  align-items: center;
+  color: var(--omni-color-text-muted);
+  pointer-events: none;
+}
+
+.wrap:has(.select:disabled) .chevron {
+  opacity: 0.5;
+}

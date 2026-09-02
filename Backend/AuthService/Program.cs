@@ -64,7 +64,23 @@ var isDbConfigured = !string.IsNullOrWhiteSpace(connectionString);
  * constructor - they take only DbContextOptions, which is what pooling requires.
  */
 builder.Services.AddDbContextPool<AuthDbContext>(options =>
-    options.UseSqlServer(isDbConfigured ? connectionString : "Server=unconfigured;Database=unconfigured;Trusted_Connection=True;TrustServerCertificate=True;"));
+    options.UseSqlServer(
+        isDbConfigured ? connectionString : "Server=unconfigured;Database=unconfigured;Trusted_Connection=True;TrustServerCertificate=True;",
+        /*
+         * Transient-fault resiliency for Azure SQL — see LeadService/Program.cs for the full
+         * rationale (serverless auto-pause returns error 40613 on the first connection after idle,
+         * which without retry hard-fails the startup migration below).
+         *
+         * NOTE: enabling this makes EF refuse a user-initiated transaction unless it runs inside an
+         * execution strategy. This solution has exactly one — ApprovalAppService.ApproveAsync — and
+         * it is wrapped accordingly. Any NEW BeginTransaction in this service must do the same, or
+         * it will throw "The configured execution strategy 'SqlServerRetryingExecutionStrategy' does
+         * not support user-initiated transactions." at runtime.
+         */
+        sqlOptions => sqlOptions.EnableRetryOnFailure(
+            maxRetryCount: 6,
+            maxRetryDelay: TimeSpan.FromSeconds(20),
+            errorNumbersToAdd: null)));
 
 builder.Services.AddScoped<PasswordHasher>();
 builder.Services.AddScoped<SecretProtector>();
@@ -291,10 +307,32 @@ if (!isDbConfigured)
 }
 else
 {
-    using var scope = app.Services.CreateScope();
-    var db = scope.ServiceProvider.GetRequiredService<AuthDbContext>();
-    await db.Database.MigrateAsync();
-    await AuthDbSeeder.SeedAsync(db, app.Logger);
+    /*
+     * Migration/seed failure must not kill the process.
+     *
+     * This block previously let any exception escape Main, so a database that was merely
+     * UNREACHABLE — an Azure SQL firewall rule that no longer covers the developer's current IP
+     * (error 40615), or a serverless tier still resuming from auto-pause (error 40613) — took the
+     * whole service down with an unhandled exception at startup. That contradicts the design stated
+     * a few lines above: the app is meant to boot and serve /health even when the database is not
+     * usable, so an orchestrator gets an honest unhealthy signal instead of a crash loop.
+     *
+     * LeadService already did exactly this; the other services did not. Logged as Error (not
+     * Warning) because a failure here does mean DB-backed endpoints will not work.
+     */
+    try
+    {
+        using var scope = app.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AuthDbContext>();
+        await db.Database.MigrateAsync();
+        await AuthDbSeeder.SeedAsync(db, app.Logger);
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogError(ex,
+            "Database migration/seed failed — the service will still start, but every DB-backed " +
+            "endpoint will fail and /health will report Unhealthy until the database is reachable.");
+    }
 }
 
 if (string.IsNullOrWhiteSpace(configuredPublicKeyPem))

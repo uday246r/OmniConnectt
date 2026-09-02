@@ -1,0 +1,272 @@
+import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
+import { classNames } from '../../utils/classNames'
+import styles from './ColumnFilter.module.css'
+
+export interface ColumnFilterOption {
+  /** The value written back through `onChange`. The empty string means "no filter". */
+  value: string
+  label: ReactNode
+  /** Optional leading glyph or colour swatch. */
+  icon?: ReactNode
+}
+
+export interface ColumnFilterProps {
+  /** The column heading, e.g. "STATUS". Rendered uppercase by the stylesheet. */
+  label: ReactNode
+  /** Currently selected value; the empty string means unfiltered. */
+  value: string
+  onChange: (value: string) => void
+  options: ColumnFilterOption[]
+  /** Popover heading. Defaults to `Filter {label}`. */
+  title?: ReactNode
+  /** Label for the "no filter" row. Omit to hide that row. */
+  allLabel?: ReactNode
+  /** Show a type-to-search box above the list. Worth it past roughly ten options. */
+  searchable?: boolean
+  /**
+   * The typed text IS the filter, rather than a way to narrow `options`.
+   *
+   * For columns with no fixed vocabulary — a customer name, an IC number, a phone. Submits on
+   * Enter or on blur so a keystroke does not fire a request per character; the host's equivalent
+   * columns filtered as-you-type against an already-loaded page, which is not what these do.
+   */
+  freeText?: boolean
+  searchPlaceholder?: string
+  /** Shown when a search matches nothing. */
+  emptyHint?: ReactNode
+  className?: string
+}
+
+/**
+ * A table column header that filters its own column.
+ *
+ * Renders the `<th>` itself, so a caller writes `<ColumnFilter … />` where it would have written
+ * `<th>STATUS</th>`.
+ *
+ * The host had this on its Approval Center and Audit Logs — two hand-maintained copies of ~15 CSS
+ * rules and the same open/close, click-outside and Escape handling each time. Neither remote had it
+ * at all: lead_mf's Lead Directory had a single global "Filter" button and customer360_mf's tables
+ * had nothing, so filtering a column was something you could do in the host and not one click away
+ * in a remote.
+ *
+ * Open/closed state is owned here rather than lifted to the table, because the only thing a table
+ * ever did with it was "close the others" — which a single open popover per instance plus
+ * click-outside already gives you.
+ */
+export function ColumnFilter({
+  label,
+  value,
+  onChange,
+  options,
+  title,
+  allLabel = 'All',
+  searchable,
+  freeText,
+  searchPlaceholder = 'Type to search…',
+  emptyHint,
+  className,
+}: ColumnFilterProps) {
+  const [open, setOpen] = useState(false)
+  const [search, setSearch] = useState('')
+  const rootRef = useRef<HTMLTableCellElement>(null)
+  const popoverRef = useRef<HTMLDivElement>(null)
+  const popoverId = useId()
+
+  /*
+   * The popover is PORTALLED to <body> and positioned from the trigger's viewport rect.
+   *
+   * As a plain absolutely-positioned child of the <th> it was clipped by DataTable's own
+   * `overflow-x: auto` scroll container — a scroll container establishes a clipping box, and no
+   * amount of z-index escapes it. In the Lead Directory it rendered as a half-visible box sliced
+   * off at the table edge.
+   *
+   * Portalling puts it outside every remote's `#…-mf-scope`, which is safe here specifically
+   * because this is a CSS Module: modules are excluded from the scope prefixer and hash to unique
+   * names, and the `--omni-*` tokens live on the real `:root`. A GLOBAL stylesheet would lose its
+   * styling here; this does not.
+   */
+  const [coords, setCoords] = useState<{ top: number; left: number } | null>(null)
+
+  useLayoutEffect(() => {
+    if (!open) return
+    const update = () => {
+      const rect = rootRef.current?.getBoundingClientRect()
+      if (!rect) return
+      // Keep it on screen: 260px is the popover's min-width plus its border.
+      const left = Math.min(rect.left, window.innerWidth - 268)
+      setCoords({ top: rect.bottom + 6, left: Math.max(8, left) })
+    }
+    update()
+    window.addEventListener('resize', update)
+    window.addEventListener('scroll', update, true)
+    return () => {
+      window.removeEventListener('resize', update)
+      window.removeEventListener('scroll', update, true)
+    }
+  }, [open])
+
+  // Close on outside click or Escape. Every host copy re-implemented the first half of this and
+  // none of them handled Escape, so an open popover could only be dismissed by clicking away.
+  useEffect(() => {
+    if (!open) return
+    function onPointerDown(e: MouseEvent) {
+      const t = e.target as Node
+      // The popover is portalled, so it is NOT inside rootRef any more — both must be checked, or
+      // clicking anything in the popover would close it before the click landed.
+      if (!rootRef.current?.contains(t) && !popoverRef.current?.contains(t)) setOpen(false)
+    }
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') setOpen(false)
+    }
+    document.addEventListener('mousedown', onPointerDown)
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('mousedown', onPointerDown)
+      document.removeEventListener('keydown', onKeyDown)
+    }
+  }, [open])
+
+  useEffect(() => {
+    if (open) {
+      // Free-text columns open showing what is currently filtering them, so the box can be edited
+      // or emptied. Option lists open with an empty query.
+      if (freeText) setSearch(value)
+    } else {
+      setSearch('')
+    }
+  }, [open, freeText, value])
+
+  const isFiltered = value !== ''
+  const needle = search.trim().toLowerCase()
+  const visible = freeText
+    ? []
+    : needle
+      ? options.filter((o) => String(o.label ?? o.value).toLowerCase().includes(needle))
+      : options
+
+  function pick(next: string) {
+    onChange(next)
+    setOpen(false)
+  }
+
+  /**
+   * Apply the typed text. Does NOT close — closing is the trigger's job, or the outside-click
+   * handler's.
+   *
+   * It used to close, and that made a free-text column impossible to dismiss from its own header.
+   * `mousedown` on the trigger blurs the input first, so the sequence ran: blur -> setOpen(false),
+   * then the trigger's click -> setOpen(o => !o) with `o` already false -> true. The popover shut
+   * and reopened in the same gesture, which is what "the arrow doesn't close it" was.
+   */
+  function commitFreeText() {
+    const next = search.trim()
+    if (next !== value) onChange(next)
+  }
+
+  return (
+    <th ref={rootRef} className={classNames(styles.th, className)}>
+      <button
+        type="button"
+        className={classNames(styles.trigger, isFiltered && styles.triggerActive)}
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        aria-controls={open ? popoverId : undefined}
+      >
+        <span>{label}</span>
+        <svg
+          className={classNames(styles.icon, open && styles.iconOpen)}
+          width="12"
+          height="12"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
+        {isFiltered && <span className={styles.dot} aria-hidden="true" />}
+      </button>
+
+      {open && coords && createPortal(
+        <div
+          ref={popoverRef}
+          className={styles.popover}
+          id={popoverId}
+          style={{ top: coords.top, left: coords.left }}
+        >
+          <div className={styles.header}>
+            <span className={styles.title}>{title ?? <>Filter {label}</>}</span>
+            {isFiltered && (
+              <button type="button" className={styles.clearBtn} onClick={() => pick('')}>
+                Reset
+              </button>
+            )}
+          </div>
+
+          {(searchable || freeText) && (
+            <input
+              type="text"
+              className={styles.input}
+              placeholder={searchPlaceholder}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={
+                freeText
+                  ? (e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault()
+                        commitFreeText()
+                        setOpen(false)
+                      }
+                    }
+                  : undefined
+              }
+              onBlur={freeText ? commitFreeText : undefined}
+              autoFocus
+            />
+          )}
+
+          {freeText ? (
+            <p className={styles.emptyHint}>{emptyHint ?? 'Press Enter to apply.'}</p>
+          ) : (
+          <div className={styles.list}>
+            {allLabel !== undefined && !needle && (
+              <button
+                type="button"
+                className={classNames(styles.item, !isFiltered && styles.itemActive)}
+                onClick={() => pick('')}
+              >
+                <span>{allLabel}</span>
+              </button>
+            )}
+            {visible.length === 0 ? (
+              <div className={styles.emptyHint}>
+                {emptyHint ?? `No matches for "${search}"`}
+              </div>
+            ) : (
+              visible.map((o) => (
+                <button
+                  key={o.value}
+                  type="button"
+                  className={classNames(styles.item, value === o.value && styles.itemActive)}
+                  onClick={() => pick(o.value)}
+                >
+                  {o.icon}
+                  <span>{o.label}</span>
+                </button>
+              ))
+            )}
+          </div>
+          )}
+        </div>,
+        document.body
+      )}
+    </th>
+  )
+}
+
+export { styles as columnFilterStyles }

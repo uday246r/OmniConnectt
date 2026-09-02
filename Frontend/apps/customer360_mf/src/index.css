@@ -29,7 +29,10 @@
   --primary-500: var(--omni-color-primary-500, #3b82f6);
   --primary-600: var(--omni-color-primary-600, #2563eb);
   --primary-700: var(--omni-color-primary-700, #1d4ed8);
-  --primary-800: #1e40af;
+  /* Aliased like the rest of the ramp. Note the host's --omni-color-primary-800 is #1e3a8a, a
+     deeper navy than the #1e40af this file used, so the literal is kept as the fallback and the
+     host value wins inside the shell — matching every other step of the scale. */
+  --primary-800: var(--omni-color-primary-800, #1e40af);
   --primary-900: var(--omni-color-primary-800, #1e3a8a);
 
   --surface-ground: var(--omni-color-surface-alt, #f8fafc);
@@ -43,6 +46,9 @@
   --border-focus: var(--omni-color-primary-600, #2563eb);
 
   --text-heading: var(--omni-color-text-primary, #0f172a);
+  /* The one text token that was never aliased. It sits between the host's text-primary (#0f172a)
+     and text-secondary (#475569); kept as its own value, but declared here alongside the aliases so
+     it is visible as a deliberate exception rather than an oversight. */
   --text-body: #334155;
   --text-secondary: var(--omni-color-text-secondary, #64748b);
   --text-muted: var(--omni-color-text-muted, #94a3b8);
@@ -240,69 +246,6 @@
    exactly: 42px height, 18px horizontal padding, 12px radius, 14px/600 text, same gradient and
    shadow depth. Was 44px/20px/10px(fixed, not even the design-token radius)/13.5px — close but
    never quite the same numbers as the same button anywhere in the host. */
-.c360-btn-primary {
-  height: 42px;
-  padding: 0 18px;
-  border-radius: var(--radius-lg);
-  border: 1px solid transparent;
-  background: linear-gradient(135deg, #2f72f5 0%, #1d4ed8 100%);
-  color: #ffffff;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  box-shadow:
-    0 1px 2px rgba(15, 23, 42, 0.18),
-    0 4px 12px rgba(37, 99, 235, 0.32),
-    inset 0 1px 0 rgba(255, 255, 255, 0.14);
-  transition: background 0.16s ease, box-shadow 0.16s ease, transform 0.1s ease;
-  white-space: nowrap;
-}
-
-.c360-btn-primary:hover:not(:disabled) {
-  background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
-  box-shadow:
-    0 2px 4px rgba(15, 23, 42, 0.2),
-    0 8px 20px rgba(37, 99, 235, 0.42),
-    inset 0 1px 0 rgba(255, 255, 255, 0.14);
-}
-
-.c360-btn-primary:active:not(:disabled) {
-  transform: scale(0.977);
-}
-
-.c360-btn-primary:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  box-shadow: none;
-}
-
-.c360-btn-secondary {
-  height: 42px;
-  padding: 0 16px;
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--border-subtle);
-  background: #ffffff;
-  color: var(--text-heading);
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
-  transition: all 0.15s ease;
-  white-space: nowrap;
-}
-
-.c360-btn-secondary:hover {
-  background: #f8fafc;
-  border-color: #cbd5e1;
-}
 
 /* Empty Search State */
 .c360-empty-prompt {
@@ -513,52 +456,6 @@
   box-shadow: var(--shadow-card-hover);
 }
 
-/* Tables */
-.c360-table-container {
-  background: #ffffff;
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--border-subtle);
-  box-shadow: var(--shadow-card);
-  overflow: hidden;
-}
-
-.c360-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13px;
-  text-align: left;
-}
-
-/* Matches host's Table.module.css th/td exactly: 12px/16px padding, 12px/600 uppercase header text
-   at 0.03em tracking, and one consistent border color (was 11.5px/700/0.04em with a lighter, ad-hoc
-   #f1f5f9 for the body rows that didn't match the header's own border, or the host's). */
-.c360-table th {
-  background: #f8fafc;
-  padding: 12px 16px;
-  font-size: 12px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  color: var(--text-secondary);
-  border-bottom: 1px solid var(--border-subtle);
-  white-space: nowrap;
-}
-
-.c360-table td {
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--border-subtle);
-  color: var(--text-heading);
-  vertical-align: middle;
-}
-
-.c360-table tbody tr:hover {
-  background: #f8fafc;
-}
-
-.c360-table tbody tr:last-child td {
-  border-bottom: none;
-}
-
 /* Pagination — same visual pattern as the host's own AuditLogsPage pagination bar, so this table's
    paging controls read as the same platform convention, not an app-specific one-off. */
 .c360-pagination {
@@ -709,57 +606,9 @@
   font-size: 14px;
 }
 
-/* ---- buttons ---- */
-
-.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 8px 16px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border-medium);
-  background: var(--surface-card);
-  color: var(--text-body);
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
-}
-
-.btn:hover {
-  border-color: var(--primary-400);
-  color: var(--primary-700);
-}
-
-.btn:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-
-/* Same gradient as .c360-btn-primary — host's primary button is never a flat fill, only ever this
-   gradient, at every size. */
-.btn-primary,
-.btn.btn-primary {
-  background: linear-gradient(135deg, #2f72f5 0%, #1d4ed8 100%);
-  border-color: transparent;
-  color: #ffffff;
-  box-shadow: var(--shadow-primary-btn);
-}
-
-.btn-primary:hover,
-.btn.btn-primary:hover {
-  background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
-  border-color: var(--primary-700);
-  color: #ffffff;
-}
-
-.btn-secondary,
-.btn.btn-secondary {
-  background: var(--primary-50);
-  border-color: var(--primary-200);
-  color: var(--primary-700);
-}
+/* ---- buttons ----
+   Nothing here any more. Every button in this app renders `<Button>` from @omniremit/ui, so the
+   gradient, sizes, hover and focus rings are the host's, not a copy of them. */
 
 /* ---- spinners / loading / empty / error states ---- */
 
@@ -869,68 +718,15 @@
    component's own "Hero Banner — Host Pattern" comment — the intent to match
    the host was already there, the CSS backing it just never got written. */
 
-.c360-hero-banner {
-  position: relative;
-  overflow: hidden;
-  display: flex;
-  align-items: center;
-  /* flex-wrap so the right-side action (Export CSV / New Search / etc.) drops below the
-     icon+title block instead of forcing the row — and the whole page — wider than the
-     viewport on a narrow screen. */
-  flex-wrap: wrap;
-  justify-content: space-between;
-  gap: 16px 24px;
-  padding: 28px 32px;
-  border-radius: var(--radius-xl);
-  background: linear-gradient(120deg, var(--primary-800) 0%, var(--primary-600) 45%, var(--primary-500) 100%);
-  box-shadow: 0 4px 20px rgba(37, 99, 235, 0.25), 0 1px 4px rgba(37, 99, 235, 0.15);
-  color: #ffffff;
-}
-
 /* The icon+title flex group every .c360-hero-banner uses (Customer360, AuditLogs, AllProducts,
    AllInteractions, FieldSettings) — was inline-styled per page with no min-width:0, so as a flex
    item it refused to shrink below its title/subtitle's un-wrapped content width. That's the actual
    root cause of the banner (and the whole page under it) rendering wider than the viewport. */
-.c360-hero-left {
-  display: flex;
-  align-items: center;
-  gap: 18px;
-  position: relative;
-  z-index: 1;
-  min-width: 0;
-  flex: 1 1 260px;
-}
-
-.c360-hero-title {
-  margin: 0;
-  font-size: 21px;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-  color: #ffffff;
-}
-
-.c360-hero-subtitle {
-  margin: 4px 0 0;
-  font-size: 13px;
-  color: rgba(255, 255, 255, 0.82);
-}
 
 @media (max-width: 640px) {
   .c360-hero-banner { padding: 20px 20px; }
   .c360-hero-title { font-size: 18px; }
   .c360-hero-subtitle { font-size: 12.5px; }
-}
-
-.c360-hero-pill {
-  display: inline-flex;
-  align-items: center;
-  padding: 3px 12px;
-  border-radius: var(--radius-pill);
-  background: rgba(255, 255, 255, 0.18);
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  font-size: 11.5px;
-  font-weight: 600;
-  color: #ffffff;
 }
 
 /* ---- right-side drawer / modal (CaseDetailsModal.tsx, ProductDetailsModal.tsx) ---- */
@@ -1197,37 +993,6 @@
    "border: transparent by default, only the neutral-equivalent variant gets a visible border"
    convention (host's colored variants — success/warning/danger/info — never show a border; c360's
    active/pending/wip previously all had one, which host's design never does). */
-.status-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 12px;
-  border-radius: var(--radius-pill);
-  font-size: 12px;
-  font-weight: 600;
-  border: 1px solid transparent;
-}
-
-.status-active {
-  background: #ecfdf5;
-  color: #047857;
-}
-
-.status-validated {
-  background: var(--surface-alt);
-  color: var(--text-secondary);
-  border-color: var(--border-medium);
-}
-
-.status-pending {
-  background: #fffbeb;
-  color: #b45309;
-}
-
-.status-wip {
-  background: var(--primary-50);
-  color: var(--primary-700);
-}
 
 .data-table-container {
   overflow-x: auto;
@@ -1329,14 +1094,6 @@
 
 .left-tab-btn svg {
   flex-shrink: 0;
-}
-
-/* ---- data table (Customer360.tsx's own tables, distinct from .c360-table) ---- */
-
-.table-responsive-wrapper {
-  overflow-x: auto;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
 }
 
 .data-table {
@@ -1578,6 +1335,9 @@
 .audit-overview-col {
   display: flex;
   flex-direction: column;
+  /* Explicit, rather than leaning on each card's own margin — the two drawer columns then keep the
+     same rhythm even when one has more rows than the other. */
+  gap: 10px;
 }
 
 .audit-overview-col-divider {
@@ -1698,43 +1458,6 @@
   color: #0f172a;
   margin: 0;
   font-weight: 600;
-}
-
-.audit-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 3px 9px;
-  border-radius: 999px;
-  font-size: 11.5px;
-  font-weight: 700;
-  white-space: nowrap;
-}
-
-.audit-badge-primary {
-  background: #eff6ff;
-  color: #1d4ed8;
-  border: 1px solid #bfdbfe;
-}
-
-.audit-badge-success {
-  background: #ecfdf5;
-  color: #047857;
-  border: 1px solid #a7f3d0;
-}
-
-.audit-badge-danger {
-  background: #fff1f2;
-  color: #be123c;
-  border: 1px solid #fecdd3;
-}
-
-.audit-badge-dot {
-  width: 5.5px;
-  height: 5.5px;
-  border-radius: 50%;
-  background: currentColor;
-  flex-shrink: 0;
 }
 
 .audit-action-badge {
@@ -1982,11 +1705,17 @@
   border: 1px solid #1e293b;
 }
 
+/*
+ * `flex-end`, not `space-between`. The footer has exactly ONE child — the close button — and
+ * space-between pins a lone child to the start, so "Close Details" sat at the far LEFT while the
+ * host's audit drawer and lead_mf's lead drawer both put it on the right. Padding matches the
+ * body's 24px inset rather than 28px, so the button lines up with the cards above it.
+ */
 .audit-drawer-footer {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 14px 28px;
+  justify-content: flex-end;
+  padding: 16px 24px;
   border-top: 1px solid #e2e8f0;
   background: #ffffff;
   flex-shrink: 0;
@@ -2000,23 +1729,37 @@
   color: #64748b;
 }
 
-.audit-footer-close-btn {
-  height: 38px;
-  padding: 0 20px;
-  background: #ffffff;
-  border: 1.5px solid #e2e8f0;
-  border-radius: 10px;
-  font-size: 13px;
-  font-weight: 600;
-  color: #334155;
-  cursor: pointer;
-  transition: all 120ms ease;
-  font-family: inherit;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+/*
+ * Card frames around tables.
+ *
+ * These were removed with the .c360-table rules when those tables moved to @omniremit/ui's
+ * DataTable, but they are the surrounding CARD, not the table — without them the tables lost their
+ * white surface, border and shadow. Restored, now pointing at the platform tokens.
+ */
+/*
+ * The card frame around a table page's toolbar + table.
+ *
+ * A COLUMN, explicitly. The `.spread` class that used to be applied here alongside it is a
+ * toolbar rule — `display: flex` with `justify-content: space-between` — so the card laid its
+ * toolbar and its table out SIDE BY SIDE, squeezing the toolbar to ~370px of a 1228px card and
+ * wrapping the Refresh button onto its own line. `.spread` now lives on the toolbar where it
+ * belongs (as `c360Common.toolbar`).
+ *
+ * `overflow` must not be hidden: that clips the shared DataTable's own horizontal scroll
+ * container, which is how Field Settings lost its right-hand columns entirely.
+ */
+.c360-table-container {
+  background: var(--omni-color-surface, #ffffff);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-subtle);
+  box-shadow: var(--shadow-card);
+  display: flex;
+  flex-direction: column;
+  overflow: visible;
 }
 
-.audit-footer-close-btn:hover {
-  background: #f8fafc;
-  border-color: #cbd5e1;
-  color: #0f172a;
+.table-responsive-wrapper {
+  overflow-x: auto;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
 }

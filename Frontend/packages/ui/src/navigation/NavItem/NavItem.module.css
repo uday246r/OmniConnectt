@@ -1,0 +1,78 @@
+/*
+ * The sidebar navigation row.
+ *
+ * Copied verbatim from the host's `Sidebar.module.css` `.navItem`, which is the design reference.
+ * Both remotes portal their own sub-navigation INTO that same sidebar, so their rows sit directly
+ * beneath the host's — which made the drift very visible once you looked:
+ *
+ *              host .navItem        remote .navBtn
+ *   padding    8px 10px             7px 10px
+ *   gap        9px                  var(--omni-space-2)  (8px)
+ *   font-size  13.5px               var(--omni-font-size-sm)
+ *   radius     8px                  var(--omni-radius-md)
+ *
+ * Every row in one sidebar now measures the same, whichever app put it there. The host keeps its
+ * NavLink markup and imports these classes through `navItemStyles`; the remotes render <NavItem>.
+ */
+.navItem {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  color: #475569;
+  font-size: 13.5px;
+  font-weight: 500;
+  text-decoration: none;
+  transition: background 120ms ease, color 120ms ease;
+  letter-spacing: -0.01em;
+  margin-bottom: 1px;
+  /* Needed only by the remotes, whose rows are <button>s rather than <a>s. Inert on an anchor. */
+  width: 100%;
+  border: none;
+  background: transparent;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+.navItem:hover {
+  background: #f8fafc;
+  color: #0f172a;
+}
+
+/* Active — blue filled */
+.navItemActive,
+.navItemActive:hover {
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-weight: 600;
+}
+
+.navItemActive .navIcon { color: #2563eb; }
+
+.navIcon {
+  width: 17px;
+  height: 17px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #94a3b8;
+  transition: color 120ms ease;
+}
+
+.navItem:hover .navIcon { color: #475569; }
+
+.navLabel {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.navItem:focus-visible {
+  outline: 2px solid var(--omni-color-primary-600);
+  outline-offset: -2px;
+}

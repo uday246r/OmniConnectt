@@ -3,6 +3,8 @@ import { useProductStore } from '../store/productStore';
 import { useCustomerStore } from '../store/customerStore';
 import { X, Landmark, FileText, DollarSign, Percent, CreditCard, Coins, TrendingUp, ScrollText, Calendar } from 'lucide-react';
 import type { AnyProductFields, ProductDetailType, CorporateProfile } from '../types/api';
+import { StatusBadge } from '../shared/StatusBadge';
+import { formatValue, formatCurrency as formatMoney } from '../shared/formatValue';
 
 // ---------------------------------------------------------------------------
 // Product type detection — mirrors the routing logic in productStore.ts
@@ -41,31 +43,9 @@ export default function ProductDetailsModal() {
   // same as before this file was typed).
   const profileCountry = (profile as CorporateProfile | null)?.country;
 
-  const formatValue = (val: unknown): string => {
-    if (val === null || val === undefined) return '-';
-    const s = String(val).trim();
-    if (s === '' || s.toLowerCase() === 'null' || s.toLowerCase() === 'undefined') {
-      return '-';
-    }
-    return s;
-  };
-
-  const formatCurrency = (val: unknown): string => {
-    const formatted = formatValue(val);
-    if (formatted === '-') return '-';
-    if (formatted.includes('MYR') || formatted.includes('SGD') || formatted.includes('RM') || formatted.includes('$')) {
-      return formatted;
-    }
-    const cleanVal = formatted.replace(/,/g, '');
-    if (!isNaN(Number(cleanVal)) && cleanVal !== '') {
-      const num = parseFloat(cleanVal);
-      const formattedNum = num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-      const currency = (profileCountry || '').toUpperCase() === 'SG' ? 'SGD' : 'MYR';
-      return `${currency} ${formattedNum}`;
-    }
-    const currency = (profileCountry || '').toUpperCase() === 'SG' ? 'SGD' : 'MYR';
-    return `${currency} ${formatted}`;
-  };
+  // formatValue/formatCurrency now come from src/shared — they were duplicated verbatim in
+  // four components. Currency is bound to this modal's profile country once, here.
+  const formatCurrency = (val: unknown) => formatMoney(val, profileCountry);
 
   if (!modalOpen) return null;
 
@@ -99,9 +79,7 @@ export default function ProductDetailsModal() {
               <Field label="Product Name">{formatValue(d.productName)}</Field>
               <Field label="Account Number">{formatValue(d.accountNumber || d.accountNo)}</Field>
               <Field label="Account Status">
-                <span className={`status-badge ${(d.derivedAccountStatus || '').toLowerCase().includes('active') ? 'status-active' : 'status-validated'}`}>
-                  {formatValue(d.derivedAccountStatus)}
-                </span>
+                <StatusBadge status={d.derivedAccountStatus} />
               </Field>
               <Field label="Balances">{formatCurrency(d.balances)}</Field>
               <Field label="Placement Amount">{formatCurrency(d.placementAmount)}</Field>
@@ -146,9 +124,7 @@ export default function ProductDetailsModal() {
               <Field label="Account No">{formatValue(d.accountNo || d.accountNumber)}</Field>
               <Field label="Card No">{formatValue(d.cardNo)}</Field>
               <Field label="Card Status">
-                <span className={`status-badge ${(d.cardStatus || '').toLowerCase().includes('active') ? 'status-active' : 'status-validated'}`}>
-                  {formatValue(d.cardStatus)}
-                </span>
+                <StatusBadge status={d.cardStatus} />
               </Field>
               <Field label="Credit Limit">{formatCurrency(d.creditLimit)}</Field>
               <Field label="Outstanding">{formatCurrency(d.outstanding)}</Field>
@@ -189,9 +165,7 @@ export default function ProductDetailsModal() {
             <Field label="Product Name">{formatValue(d.productName)}</Field>
             <Field label="Account No">{formatValue(d.accountNo || d.accountNumber)}</Field>
             <Field label="Financing Status">
-              <span className={`status-badge ${(d.financingStatus || d.derivedAccountStatus || '').toLowerCase().includes('active') ? 'status-active' : 'status-validated'}`}>
-                {formatValue(d.financingStatus || d.derivedAccountStatus)}
-              </span>
+              <StatusBadge status={d.financingStatus || d.derivedAccountStatus} />
             </Field>
             <Field label="Outstanding">{formatCurrency(d.outstanding || d.balances)}</Field>
             <Field label="Financing Amount">{formatCurrency(d.financingAmount || d.placementAmount)}</Field>
@@ -255,11 +229,7 @@ export default function ProductDetailsModal() {
                 <span className="account-num-text">{formatValue(d.accountNo || d.accountNumber)}</span>
               </Field>
               <Field label="Card Status">
-                <span
-                  className={`status-badge ${(d.cardStatus || '').toLowerCase().includes('active') ? 'status-active' : 'status-validated'}`}
-                >
-                  {formatValue(d.cardStatus)}
-                </span>
+                <StatusBadge status={d.cardStatus} />
               </Field>
               <Field label="Card Issuance Date">{formatValue(d.cardIssuanceDate)}</Field>
               <Field label="Card Expiry Date">{formatValue(d.cardExpiredDate)}</Field>
@@ -297,11 +267,7 @@ export default function ProductDetailsModal() {
             </Field>
             <Field label="Account Type">{formatValue(d.accountType)}</Field>
             <Field label="Status">
-              <span
-                className={`status-badge ${(d.status || '').toLowerCase().includes('active') || (d.status || '').toLowerCase().includes('confirm') ? 'status-active' : 'status-validated'}`}
-              >
-                {formatValue(d.status)}
-              </span>
+              <StatusBadge status={d.status} />
             </Field>
             <Field label="XAU Balance (Gram)">{formatValue(d.xauBalance)}</Field>
             <Field label="Total Amount (RM)">{formatCurrency(d.totalAmount)}</Field>
@@ -371,11 +337,7 @@ export default function ProductDetailsModal() {
                 <span className="account-num-text">{formatValue(d.accountNumber || d.accountNo)}</span>
               </Field>
               <Field label="Account Status">
-                <span
-                  className={`status-badge ${(d.derivedAccountStatus || '').toLowerCase().includes('active') ? 'status-active' : 'status-validated'}`}
-                >
-                  {formatValue(d.derivedAccountStatus)}
-                </span>
+                <StatusBadge status={d.derivedAccountStatus} />
               </Field>
               <Field label="Tenure">{formatValue(d.tenure)}</Field>
               <Field label="Maturity Date">{formatValue(d.maturityDate)}</Field>
@@ -412,11 +374,7 @@ export default function ProductDetailsModal() {
               <span className="account-num-text">{formatValue(d.accountNo || d.accountNumber)}</span>
             </Field>
             <Field label="Financing Status">
-              <span
-                className={`status-badge ${(d.financingStatus || '').toLowerCase().includes('active') ? 'status-active' : 'status-validated'}`}
-              >
-                {formatValue(d.financingStatus)}
-              </span>
+              <StatusBadge status={d.financingStatus} />
             </Field>
             <Field label="Tenure (Months)">{formatValue(d.tenure)}</Field>
             <Field label="Maturity Date">{formatValue(d.maturityDate)}</Field>
@@ -501,11 +459,7 @@ export default function ProductDetailsModal() {
             </Field>
             <Field label="Payment Mode">{formatValue(d.paymentMode)}</Field>
             <Field label="Certificate Status">
-              <span
-                className={`status-badge ${(d.certificateStatus || '').toLowerCase().includes('active') ? 'status-active' : 'status-validated'}`}
-              >
-                {formatValue(d.certificateStatus)}
-              </span>
+              <StatusBadge status={d.certificateStatus} />
             </Field>
           </div>
         </div>

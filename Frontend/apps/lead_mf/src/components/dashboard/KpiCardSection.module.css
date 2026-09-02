@@ -1,0 +1,129 @@
+/*
+ * Styles extracted from this component's former inline blocks. Values map to platform
+ * tokens where an exact equivalent exists; the rest are the original literals.
+ */
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 16px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.cardTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.cardLabel {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--omni-color-text-secondary);
+  letter-spacing: 0.01em;
+  text-align: right;
+}
+
+.valueRow {
+  display: flex;
+  align-items: baseline;
+}
+
+.trendUp {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--omni-color-success-600);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+.caption {
+  font-size: 11px;
+  color: var(--omni-color-text-muted);
+  font-weight: 500;
+}
+
+.iconWrap {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.value {
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--omni-color-text-primary);
+  line-height: 1;
+  letter-spacing: -0.03em;
+}
+
+/*
+ * KPI cards.
+ *
+ * These rules were previously a template string injected as `<style>{ACCENT_BARS_CSS}</style>` at
+ * render time — shipping a stylesheet through JSX, which meant the `!important` flags below were
+ * needed to out-rank nothing in particular, and the rules re-entered the document on every mount.
+ * As a real module they cascade normally, so the !importants are gone.
+ */
+.card {
+  background: var(--omni-color-surface);
+  border: 1px solid #eaecf0;
+  border-radius: 14px;
+  padding: 18px var(--omni-space-5) var(--omni-space-4);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  position: relative;
+  overflow: hidden;
+  transition: box-shadow 150ms ease, transform 150ms ease;
+  cursor: default;
+  box-sizing: border-box;
+}
+
+/* Coloured accent bar across the top of each card. */
+.card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  border-radius: 14px 14px 0 0;
+}
+
+.card:nth-child(1)::before { background: linear-gradient(90deg, var(--omni-color-primary-600), var(--omni-color-primary-400)); }
+.card:nth-child(2)::before { background: linear-gradient(90deg, #7c3aed, #a78bfa); }
+.card:nth-child(3)::before { background: linear-gradient(90deg, var(--omni-color-warning-600), var(--omni-color-warning-400)); }
+.card:nth-child(4)::before { background: linear-gradient(90deg, var(--omni-color-success-600), var(--omni-color-success-400)); }
+.card:nth-child(5)::before { background: linear-gradient(90deg, #0d9488, #2dd4bf); }
+
+.card:hover {
+  box-shadow: 0 6px 20px rgba(15, 23, 42, 0.08);
+  transform: translateY(-1px);
+}
+
+/* Same breakpoints as the host's own .statCardsGrid — five cards would otherwise squeeze
+   themselves illegibly narrow rather than wrapping the way the host's stat grid does. */
+@media (max-width: 1100px) {
+  .grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 600px) {
+  .grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 480px) {
+  .grid { gap: 10px; }
+  .card { padding: 14px var(--omni-space-4) var(--omni-space-3); }
+  .card .value { font-size: 24px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card { transition: none; }
+  .card:hover { transform: none; }
+}

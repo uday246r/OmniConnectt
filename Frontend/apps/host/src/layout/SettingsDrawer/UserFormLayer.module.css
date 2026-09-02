@@ -1431,3 +1431,145 @@
   text-overflow: ellipsis;
   max-width: 280px;
 }
+.ufl1 {
+  pointer-events: none;
+}
+
+.ufl2 {
+  opacity: 0.55;
+}
+
+.ufl3 {
+  display: flex;
+  flex-direction: column;
+  gap: 6;
+}
+
+.ufl4 {
+  width: 34;
+  height: 34;
+  border-radius: 10;
+  background: rgba(255,255,255,0.18);
+}
+
+.ufl5 {
+  display: flex;
+  gap: 8;
+  padding: 14px 24px 0;
+  align-items: center;
+}
+
+.ufl6 {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 14;
+}
+
+.ufl7 {
+  background: var(--omni-color-surface);
+  border: 1px solid #eaecf0;
+  border-radius: 14;
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14;
+}
+
+.ufl8 {
+  display: flex;
+  flex-direction: column;
+  gap: 10;
+}
+
+.ufl9 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12;
+}
+
+.ufl10 {
+  display: flex;
+  flex-direction: column;
+  gap: 5;
+}
+
+.ufl11 {
+  background: var(--omni-color-surface);
+  border: 1px solid #eaecf0;
+  border-radius: 14;
+  padding: 18px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.ufl12 {
+  color: var(--omni-color-primary-600);
+  flex-shrink: 0;
+}
+
+.ufl13 {
+  margin-top: 8px;
+}
+
+.ufl14 {
+  font-size: 13px;
+  padding: 16px 18px;
+}
+
+.ufl15 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #f1f5f9;
+  padding-bottom: 8px;
+}
+
+.ufl16 {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.ufl17 {
+  font-size: 11px;
+  color: var(--omni-color-text-secondary);
+}
+
+.ufl18 {
+  color: var(--omni-color-success-600);
+  margin-right: 8px;
+}
+
+.ufl19 {
+  color: var(--omni-color-danger-600);
+}
+
+.ufl20 {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.ufl21 {
+  font-size: 11px;
+  font-weight: 600;
+  color: #065f46;
+  display: block;
+  margin-bottom: 6px;
+}
+
+.ufl22 {
+  font-size: 11px;
+  font-weight: 600;
+  color: #991b1b;
+  display: block;
+  margin-bottom: 6px;
+}
+
+.ufl23 {
+  margin-top: 10px;
+}

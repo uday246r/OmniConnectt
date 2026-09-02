@@ -66,7 +66,8 @@ export function AppShell({ apps, appsError, userName, settingsAccess, canAccessA
         apps={apps}
         error={appsError}
         canAccessAuditLogs={canAccessAuditLogs}
-        canAccessApprovals={canAccessApprovals}        mobileOpen={sidebarOpen}
+        canAccessApprovals={canAccessApprovals}
+        mobileOpen={sidebarOpen}
         onMobileClose={closeSidebar}
       />
 

@@ -1,10 +1,9 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { useAuthStore } from '../../auth/store/authStore'
-import { Badge, type BadgeTone } from '../../../shared/components/Badge/Badge'
+import { Badge, Button, ColumnFilter, DataTable, FilterBar, Icon, PageHeader, Pagination, RowsPerPage, SearchField, readStoredPageSize, type ActiveFilter, type BadgeTone } from '@omniremit/ui'
 import { SkeletonBlock } from '../../../shared/components/Skeleton'
-import { approvalsApi, type ApprovalStatus, type RevealTempPasswordResponse } from '../api/approvalsApi'
+import { approvalsApi, type ApprovalRequestListItemDto, type ApprovalStatus, type RevealTempPasswordResponse } from '../api/approvalsApi'
 import { useApprovalRequests } from '../hooks/useApprovalRequests'
-import { Icon } from '../../../shared/components/Icon/Icon'
 import { ApiError } from '../../../shared/api/httpClient'
 import styles from './MyRequestsPage.module.css'
 import { TOPICS, useDataRevision } from '../../../shared/stores/invalidationStore'
@@ -95,7 +94,7 @@ function formatModuleName(rawModule: string | null | undefined): string {
   if (!rawModule) return '—'
   const normalized = rawModule.toLowerCase().trim()
   if (SHORT_MODULE_MAP[normalized]) return SHORT_MODULE_MAP[normalized]
-  
+
   let cleaned = rawModule
     .replace(/^host\.settings\./i, '')
     .replace(/^settings\./i, '')
@@ -125,6 +124,45 @@ const FILTERS: { key: ApprovalStatus | 'all'; label: string }[] = [
   { key: 'Rejected', label: 'Rejected' },
 ]
 
+type SummaryTone = 'iconAmber' | 'iconGreen' | 'iconRed' | 'iconBlue'
+
+const SUMMARY_CARDS: {
+  key: string
+  label: string
+  tone: SummaryTone
+  icon: ReactNode
+  count: (items: ApprovalRequestListItemDto[], total: number) => number
+}[] = [
+  {
+    key: 'pending',
+    label: 'Pending',
+    tone: 'iconAmber',
+    icon: <Icon.Clock width={20} height={20} />,
+    count: (items) => items.filter((r) => r.status === 'Pending').length,
+  },
+  {
+    key: 'approved',
+    label: 'Approved',
+    tone: 'iconGreen',
+    icon: <Icon.CheckCircle width={20} height={20} />,
+    count: (items) => items.filter((r) => r.status === 'Approved').length,
+  },
+  {
+    key: 'rejected',
+    label: 'Rejected',
+    tone: 'iconRed',
+    icon: <Icon.AlertCircle width={20} height={20} />,
+    count: (items) => items.filter((r) => r.status === 'Rejected').length,
+  },
+  {
+    key: 'total',
+    label: 'Total Submitted',
+    tone: 'iconBlue',
+    icon: <Icon.FileText width={20} height={20} />,
+    count: (_items, total) => total,
+  },
+]
+
 /**
  * The maker dashboard — every authenticated user's own submitted requests, regardless of whether they
  * hold Approval Center access (see approvalsApi.listMine's own doc comment: it's scoped to the caller's
@@ -134,8 +172,23 @@ export function MyRequestsPage() {
   const accessToken = useAuthStore((s) => s.accessToken)
 
   const [statusFilter, setStatusFilter] = useState<ApprovalStatus | 'all'>('all')
+  /*
+   * One box, every column. This page was the only table in the platform with no search at all —
+   * you could filter by status and page through, and that was it. It spans the same fields the
+   * table renders, so what you type is what you can see.
+   */
+  const [search, setSearch] = useState('')
+  /*
+   * Per-column filters, matching Approval Center. Status stays SERVER-side (the endpoint takes it);
+   * the rest narrow the fetched page, and each offers the values actually present rather than an
+   * empty box.
+   */
+  const [moduleFilter, setModuleFilter] = useState('')
+  const [actionFilter, setActionFilter] = useState('')
+  const [checkerFilter, setCheckerFilter] = useState('')
   const [page, setPage] = useState(1)
-  const [pageSize] = useState(DEFAULT_PAGE_SIZE)
+  // Opens at whatever size this user last chose here — see RowsPerPage's storageKey.
+  const [pageSize, setPageSize] = useState(() => readStoredPageSize('host.myRequests', DEFAULT_PAGE_SIZE))
   const [refreshKey, setRefreshKey] = useState(0)
   const dataRevision = useDataRevision(TOPICS.approvals)
 
@@ -191,72 +244,187 @@ export function MyRequestsPage() {
     setRefreshKey((k) => k + 1) // re-sync with server truth after the optimistic hide
   }
 
+  const optionsFrom = (pick: (r: ApprovalRequestListItemDto) => string | null | undefined) => {
+    if (items === null) return []
+    const seen = new Map<string, string>()
+    for (const r of items) {
+      const v = (pick(r) ?? '').trim()
+      if (v && !seen.has(v.toLowerCase())) seen.set(v.toLowerCase(), v)
+    }
+    return [...seen.values()].sort((a, b) => a.localeCompare(b)).map((v) => ({ value: v, label: v }))
+  }
+  const moduleOptions = optionsFrom((r) => formatModuleName(r.module))
+  const actionOptions = optionsFrom((r) => r.action)
+  const checkerOptions = optionsFrom((r) => r.checkerName)
+
+  /* Narrows the page already fetched — the endpoint takes status and paging only. */
+  const visibleItems =
+    items === null
+      ? null
+      : items.filter((r) => {
+          if (moduleFilter && formatModuleName(r.module) !== moduleFilter) return false
+          if (actionFilter && r.action !== actionFilter) return false
+          if (checkerFilter && (r.checkerName ?? '') !== checkerFilter) return false
+          const q = search.trim().toLowerCase()
+          if (!q) return true
+          return [
+            formatModuleName(r.module),
+            r.action,
+            r.entityLabel,
+            r.checkerName,
+            r.rejectionReason,
+            r.status,
+          ]
+            .some((v) => (v ?? '').toString().toLowerCase().includes(q))
+        })
+
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
 
   return (
     <div className={styles.page}>
-      <div className={styles.header}>
-        <div className={styles.titleGroup}>
-          <div className={styles.titleHeaderRow}>
-            <h1 className={styles.title}>My Requests</h1>
-            <span className={styles.liveStreamBadge}>
-              <span className={styles.liveDot} />
-              Live Status
-            </span>
-          </div>
-          <p className={styles.subtitle}>Every action you've submitted for approval — status, assigned checker, and rejection reasons if any.</p>
-        </div>
-        <button type="button" className={styles.refreshBtn} onClick={() => setRefreshKey((k) => k + 1)}>
-          <Icon.Activity width={15} height={15} />
-          <span>Refresh</span>
-        </button>
-      </div>
-
-      <div className={styles.filterPills} role="tablist" aria-label="Filter by status">
-        {FILTERS.map((f) => (
-          <button
-            key={f.key}
+      {/* Same banner as Approval Center and Audit Logs. This page's header was a third hand-rolled
+          copy, and the one that had drifted furthest — a plain white bar where its siblings carried
+          the blue gradient. */}
+      <PageHeader
+        title="My Requests"
+        pill={
+          <>
+            <span className={styles.liveDot} />
+            Live Status
+          </>
+        }
+        subtitle="Every action you've submitted for approval — status, assigned checker, and rejection reasons if any."
+        actions={
+          <Button
             type="button"
-            role="tab"
-            aria-selected={statusFilter === f.key}
-            className={statusFilter === f.key ? styles.pillActive : styles.pill}
-            onClick={() => setStatusFilter(f.key)}
+            variant="onHeader"
+            onClick={() => setRefreshKey((k) => k + 1)}
+            leadingIcon={<Icon.Activity width={15} height={15} />}
           >
-            {f.label}
-          </button>
+            Refresh
+          </Button>
+        }
+      />
+
+      {/*
+        * Summary metrics. Both sibling pages — Approval Center and Audit Logs — open with a row of
+        * these and this one went straight from the banner to a filter strip, which is why it read
+        * as a thinner page than its siblings. Counts come from the loaded page, so they describe
+        * exactly what the table below is showing.
+        */}
+      <div className={styles.summaryGrid}>
+        {SUMMARY_CARDS.map((card) => (
+          <div key={card.key} className={styles.summaryCard}>
+            <div className={`${styles.summaryIcon} ${styles[card.tone]}`}>{card.icon}</div>
+            <div className={styles.summaryContent}>
+              <span className={styles.summaryLabel}>{card.label}</span>
+              <span className={styles.summaryValue}>
+                {items === null ? '—' : card.count(items, total)}
+              </span>
+            </div>
+          </div>
         ))}
       </div>
+
+      <div className={styles.toolbar}>
+        <SearchField
+          className={styles.search}
+          placeholder="Search module, action, record, checker, reason…"
+          value={search}
+          onValueChange={setSearch}
+        />
+        <div className={styles.toolbarActions}>
+          <RowsPerPage
+            storageKey="host.myRequests"
+            value={pageSize}
+            onChange={(n) => {
+              setPageSize(n)
+              setPage(1)
+            }}
+          />
+        </div>
+      </div>
+
+      <FilterBar
+        filters={[
+          statusFilter !== 'all' && {
+            key: 'status',
+            label: 'Status',
+            value: statusFilter,
+            onRemove: () => setStatusFilter('all'),
+          },
+          moduleFilter && { key: 'module', label: 'Module', value: moduleFilter, onRemove: () => setModuleFilter('') },
+          actionFilter && { key: 'action', label: 'Action', value: actionFilter, onRemove: () => setActionFilter('') },
+          checkerFilter && { key: 'checker', label: 'Checker', value: checkerFilter, onRemove: () => setCheckerFilter('') },
+          search && { key: 'search', label: 'Search', value: `"${search}"`, onRemove: () => setSearch('') },
+        ].filter(Boolean) as ActiveFilter[]}
+        onClearAll={() => {
+          setStatusFilter('all')
+          setModuleFilter('')
+          setActionFilter('')
+          setCheckerFilter('')
+          setSearch('')
+        }}
+      />
+
 
       {error && <div className={styles.errorBanner}>{error}</div>}
       {revealError && <div className={styles.errorBanner}>{revealError}</div>}
 
-      <div className={styles.tableContainer}>
-        <table className={styles.table}>
+      {/* Shared chrome. This page had a THIRD variant of the same table — 11px header padding and a
+          1px #eaecf0 rule against the 12px / 1.5px #e2e8f0 used by Audit Logs and Approval Center —
+          so it now renders from the same source as its sibling pages. */}
+      <DataTable minWidth={780}>
           <thead>
             <tr>
-              <th>SUBMITTED</th>
-              <th>MODULE</th>
-              <th>ACTION</th>
-              <th>ENTITY</th>
-              <th>CHECKER</th>
-              <th>STATUS</th>
+              <th>DATE SUBMITTED</th>
+              <ColumnFilter
+                label="Module"
+                value={moduleFilter}
+                onChange={setModuleFilter}
+                options={moduleOptions}
+                allLabel="All Modules"
+                searchable={moduleOptions.length > 6}
+              />
+              <ColumnFilter
+                label="Action"
+                value={actionFilter}
+                onChange={setActionFilter}
+                options={actionOptions}
+                allLabel="All Actions"
+                searchable={actionOptions.length > 6}
+              />
+              <th>RECORD</th>
+              <ColumnFilter
+                label="Checker"
+                value={checkerFilter}
+                onChange={setCheckerFilter}
+                options={checkerOptions}
+                allLabel="Everyone"
+                searchable={checkerOptions.length > 6}
+              />
+              <ColumnFilter
+                label="Status"
+                value={statusFilter === 'all' ? '' : statusFilter}
+                onChange={(v) => setStatusFilter((v || 'all') as ApprovalStatus | 'all')}
+                options={FILTERS.filter((f) => f.key !== 'all').map((f) => ({ value: f.key, label: f.label }))}
+                allLabel="All Statuses"
+              />
               <th>PASSWORD</th>
               <th>REJECTION REASON</th>
             </tr>
           </thead>
           <tbody>
-            {items === null ? (
+            {visibleItems === null ? (
               Array.from({ length: pageSize }).map((_, i) => (
                 <tr key={i}><td colSpan={8}><SkeletonBlock height={20} radius="4px" /></td></tr>
               ))
-            ) : items.length === 0 ? (
-              <tr>
-                <td colSpan={8} className={styles.emptyCell}>
-                  {statusFilter === 'all' ? "You haven't submitted any requests yet." : `No ${statusFilter.toLowerCase()} requests.`}
-                </td>
-              </tr>
+            ) : visibleItems.length === 0 ? (
+              <DataTable.Empty colSpan={8}>
+                {statusFilter === 'all' ? "You haven't submitted any requests yet." : `No ${statusFilter.toLowerCase()} requests.`}
+              </DataTable.Empty>
             ) : (
-              items.map((r) => {
+              visibleItems.map((r) => {
                 const ActionIcon = ACTION_ICONS[r.action] ?? Icon.Edit
                 return (
                   <tr key={r.id}>
@@ -303,20 +471,15 @@ export function MyRequestsPage() {
               })
             )}
           </tbody>
-        </table>
-      </div>
+      </DataTable>
 
-      {total > pageSize && (
-        <div className={styles.pagination}>
-          <button type="button" className={styles.pageBtn} disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
-            &lt; Previous
-          </button>
-          <span className={styles.pageIndicator}>Page {page} of {totalPages}</span>
-          <button type="button" className={styles.pageBtn} disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>
-            Next &gt;
-          </button>
-        </div>
-      )}
+      <Pagination
+        page={page}
+        pageSize={pageSize}
+        total={total}
+        itemLabel="request"
+        onPageChange={setPage}
+      />
 
       {revealed && (
         <div className={styles.modalBackdrop} onClick={closeRevealModal}>

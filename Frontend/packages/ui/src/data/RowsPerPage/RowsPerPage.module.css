@@ -1,0 +1,46 @@
+/*
+ * "ROWS [10 v]" — the page-size control, in the TABLE TOOLBAR rather than the footer.
+ *
+ * Copied from the host's Audit Logs `.rowsDropdownWrap` / `.rowsDropdownLabel`, which is the
+ * reference. It sits at the top with the other table controls because that is where you decide how
+ * much to see before you start reading — having to scroll past the whole table to change it, then
+ * scroll back, is the wrong order of operations.
+ */
+.wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.label {
+  font-size: 11.5px;
+  font-weight: var(--omni-font-weight-bold);
+  color: var(--omni-color-text-secondary);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.select {
+  min-width: 76px;
+}
+
+/*
+ * The free-number entry, shown only when "Custom" is picked. Styled as an active field — it appears
+ * because the user asked for it, so it carries the focus ring from the moment it mounts.
+ * Copied from the host's `.rowsCustomInput`.
+ */
+.customInput {
+  width: 76px;
+  box-sizing: border-box;
+  padding: 6px 9px;
+  border: 1.5px solid #93c5fd;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: var(--omni-font-weight-semibold);
+  font-family: inherit;
+  color: var(--omni-color-text-primary);
+  background: var(--omni-color-surface);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}

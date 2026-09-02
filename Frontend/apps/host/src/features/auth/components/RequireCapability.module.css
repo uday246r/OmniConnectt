@@ -1,0 +1,7 @@
+/*
+ * Hydration placeholder shown while the session's permissions are still being resolved.
+ * Was an inline padding on the wrapper.
+ */
+.hydrating {
+  padding: var(--omni-space-6);
+}

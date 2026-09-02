@@ -37,7 +37,7 @@ export function LoginPage({ onSubmit, onGoogleCredential, loading, errorMessage 
       <div className={styles.formPanel}>
         <div className={styles.formCardContainer}>
           <form className={styles.formCard} onSubmit={handleSubmit} noValidate>
-            
+
             {/* Top Brand Badge — same OmniConnect mark as the Sidebar */}
             <div className={styles.brandBadge}>
               <BrandMark size={40} />

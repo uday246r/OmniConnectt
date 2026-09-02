@@ -241,7 +241,8 @@ function AuthenticatedShell() {
       userName={user?.name}
       settingsAccess={settingsAccess}
       canAccessAuditLogs={canAccessAuditLogs}
-      canAccessApprovals={canAccessApprovals}      onLogout={() => {
+      canAccessApprovals={canAccessApprovals}
+      onLogout={() => {
         void logout().then(() => navigate('/login', { replace: true }))
       }}
     />

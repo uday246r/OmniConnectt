@@ -1,0 +1,89 @@
+/*
+ * A search box that owns its own input.
+ *
+ * WHY THIS EXISTS AS A COMPONENT rather than a class you add to an <input>:
+ * the remotes wrote `className={`form-input ${shell.searchInput}`}`, pairing a GLOBAL class with a
+ * module class meant to refine it — `.searchInput` set `padding-left: 38px` to clear the icon while
+ * `.form-input` set `padding: 0 14px`. Both end up at the same specificity, so the winner came down
+ * to which stylesheet the bundler emitted last, and it was the global one. The icon rendered on top
+ * of the placeholder text in the Lead Directory and the Customer 360 audit search. Owning the input
+ * here removes the argument instead of trying to win it.
+ */
+.wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.input {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--omni-color-surface-alt);
+  border: 1.5px solid var(--omni-color-border);
+  border-radius: var(--omni-radius-lg, 12px);
+  color: var(--omni-color-text-primary);
+  font-family: inherit;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  outline: none;
+  transition: border-color 160ms ease, background 160ms ease, box-shadow 160ms ease;
+}
+
+.input::placeholder {
+  color: var(--omni-color-text-muted);
+}
+
+.input:focus {
+  border-color: var(--omni-color-primary-600);
+  background: var(--omni-color-surface);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+/* Sizes. Left padding always clears the icon; right padding clears the clear-button when present. */
+.md {
+  height: 40px;
+  font-size: 13px;
+  padding: 0 14px 0 38px;
+}
+.md.clearable { padding-right: 36px; }
+
+.sm {
+  height: 34px;
+  font-size: 12px;
+  border-radius: 9px;
+  padding: 0 12px 0 32px;
+}
+.sm.clearable { padding-right: 32px; }
+
+.icon {
+  position: absolute;
+  left: 14px;
+  display: flex;
+  align-items: center;
+  color: var(--omni-color-text-muted);
+  pointer-events: none;
+}
+.sm ~ .icon { left: 11px; }
+
+.clear {
+  position: absolute;
+  right: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--omni-color-text-muted);
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease;
+}
+
+.clear:hover {
+  background: var(--omni-color-surface-alt);
+  color: var(--omni-color-text-primary);
+}

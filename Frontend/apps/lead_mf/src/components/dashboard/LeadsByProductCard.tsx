@@ -1,5 +1,7 @@
 import React from 'react';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from 'recharts';
+import card from '../../shared/dashboardCard.module.css';
+import styles from './LeadsByProductCard.module.css';
 import { useLeadStore } from '../../store/useLeadStore';
 
 export const LeadsByProductCard: React.FC = () => {
@@ -9,34 +11,17 @@ export const LeadsByProductCard: React.FC = () => {
   return (
     /* widgetCard */
     <div
-      style={{
-        background: '#ffffff',
-        border: '1px solid #eaecf0',
-        borderRadius: '16px',
-        padding: '20px 24px',
-        boxShadow: '0 1px 4px rgba(15, 23, 42, 0.04)',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '16px',
-        boxSizing: 'border-box',
-      }}
+      className={card.card}
     >
       {/* widgetHeader */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px' }}>
+      <div className={card.cardHeader}>
         <div>
           <h2
-            style={{
-              fontSize: '14.5px',
-              fontWeight: 700,
-              color: '#0f172a',
-              margin: 0,
-              letterSpacing: '-0.02em',
-              fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
-            }}
+            className={card.cardTitle}
           >
             Leads by Product
           </h2>
-          <p style={{ fontSize: '12px', color: '#64748b', margin: '3px 0 0', fontWeight: 400 }}>
+          <p className={card.cardSubtitle}>
             Product distribution across applications
           </p>
         </div>
@@ -44,35 +29,21 @@ export const LeadsByProductCard: React.FC = () => {
 
       {isLoadingDashboard ? (
         <div
-          style={{
-            height: '180px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: '#94a3b8',
-            fontSize: '13px',
-          }}
+          className={card.chartState}
         >
           Loading product distribution...
         </div>
       ) : leadsByProduct.length === 0 ? (
         <div
-          style={{
-            height: '180px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: '#94a3b8',
-            fontSize: '13px',
-          }}
+          className={card.chartState}
         >
           No product distribution data available.
         </div>
       ) : (
         /* donutContainer */
-        <div style={{ display: 'flex', alignItems: 'center', gap: '24px', minHeight: '180px' }}>
+        <div className={card.chartBody}>
           {/* Donut SVG Wrap */}
-          <div style={{ position: 'relative', width: '148px', height: '148px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <div className={styles.donutWrap}>
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
@@ -106,37 +77,15 @@ export const LeadsByProductCard: React.FC = () => {
 
             {/* donutCenter */}
             <div
-              style={{
-                position: 'absolute',
-                inset: 0,
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                pointerEvents: 'none',
-              }}
+              className={styles.donutCenter}
             >
               <span
-                style={{
-                  fontSize: '24px',
-                  fontWeight: 800,
-                  color: '#0f172a',
-                  lineHeight: 1,
-                  letterSpacing: '-0.03em',
-                  fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
-                }}
+                className={styles.donutTotal}
               >
                 {totalLeads.toLocaleString()}
               </span>
               <span
-                style={{
-                  fontSize: '11px',
-                  color: '#94a3b8',
-                  fontWeight: 600,
-                  marginTop: '3px',
-                  letterSpacing: '0.04em',
-                  textTransform: 'uppercase',
-                }}
+                className={styles.donutLabel}
               >
                 Total
               </span>
@@ -145,61 +94,32 @@ export const LeadsByProductCard: React.FC = () => {
 
           {/* legendList */}
           <div
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '10px',
-              flex: 1,
-              maxHeight: '200px',
-              overflowY: 'auto',
-            }}
+            className={styles.legend}
           >
             {leadsByProduct.map((item, idx) => (
               /* legendItem */
               <div
                 key={idx}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: '8px',
-                }}
+                className={styles.legendRow}
               >
                 {/* legendLeft */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+                <div className={styles.legendLeft}>
                   <span
-                    style={{
-                      width: '8px',
-                      height: '8px',
-                      borderRadius: '50%',
-                      backgroundColor: item.color,
-                      flexShrink: 0,
-                    }}
+                    className={styles.legendSwatch}
+                    style={{ '--legend-color': item.color } as React.CSSProperties}
                   />
                   <span
-                    style={{
-                      fontSize: '12.5px',
-                      fontWeight: 500,
-                      color: '#334155',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                    }}
+                    className={styles.legendName}
                   >
                     {item.productName}
                   </span>
                 </div>
                 {/* legendStat */}
                 <span
-                  style={{
-                    fontSize: '12px',
-                    fontWeight: 700,
-                    color: '#0f172a',
-                    whiteSpace: 'nowrap',
-                  }}
+                  className={styles.legendStat}
                 >
                   {item.count}{' '}
-                  <span style={{ color: '#64748b', fontWeight: 500 }}>({item.percentage}%)</span>
+                  <span className={styles.legendPct}>({item.percentage}%)</span>
                 </span>
               </div>
             ))}

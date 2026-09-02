@@ -13,7 +13,7 @@ export function SkeletonText({ lines = 1, lastLineWidth = '70%' }: SkeletonTextP
         <div
           key={i}
           className={[styles.shimmer, styles.text].join(' ')}
-          style={{ width: i === lines - 1 && lines > 1 ? lastLineWidth : '100%' }}
+          style={{ '--sk-width': i === lines - 1 && lines > 1 ? lastLineWidth : '100%' } as React.CSSProperties}
         />
       ))}
     </div>

@@ -861,3 +861,6 @@
   .header { flex-direction: column; align-items: flex-start; gap: 10px; }
   .createButton { align-self: flex-end; }
 }
+
+.clickable { cursor: pointer; }
+.notClickable { cursor: default; }

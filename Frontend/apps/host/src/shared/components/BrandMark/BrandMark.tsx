@@ -15,7 +15,7 @@ export function BrandMark({ size = 34, variant = 'solid', className }: BrandMark
   return (
     <div
       className={classNames(styles.mark, variant === 'inverted' && styles.inverted, className)}
-      style={{ width: size, height: size }}
+      style={{ '--mark-size': typeof size === 'number' ? `${size}px` : size } as React.CSSProperties}
       aria-hidden="true"
     >
       <svg width={iconSize} height={iconSize} viewBox="0 0 36 36" fill="none">

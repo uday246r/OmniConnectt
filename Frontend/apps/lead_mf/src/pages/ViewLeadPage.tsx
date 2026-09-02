@@ -12,7 +12,10 @@ import {
   FolderKanban,
   X,
 } from 'lucide-react';
+import { Button, ColumnFilter, DataTable, EmptyState, FilterBar, PageHeader, Pagination, RowsPerPage, SearchField, type ActiveFilter } from '@omniremit/ui';
 import { useLeadStore } from '../store/useLeadStore';
+import styles from './ViewLeadPage.module.css';
+import shell from '../shared/leadPage.module.css';
 import { LeadDetailsDrawer } from '../components/lead/LeadDetailsDrawer';
 import { EditReasonDrawer } from '../components/lead/EditReasonDrawer';
 import { EditLeadDrawer } from '../components/lead/EditLeadDrawer';
@@ -21,6 +24,7 @@ import { LeadFilterPopover } from '../components/lead/LeadFilterPopover';
 import { canEditLead, canDeleteLead, canCreateLead } from '../api/hostBridge';
 import { isFieldVisible } from '../config/fieldControlRegistry';
 import { applyMaskingRule, formatFieldValue } from '../utils/fieldMasking';
+import { formatPhone } from '../shared/formatPhone';
 
 /** Renders '-' for genuinely empty values, else the masked/raw value per the common field config —
  * the View Leads table only ever reflects the common-field subset (see commonFieldConfig's own doc
@@ -51,6 +55,20 @@ const getInitials = (name: string): string => {
   return name.slice(0, 2).toUpperCase();
 };
 
+/* Column key -> the name shown on its filter chip. */
+const TOOLBAR_FILTER_LABELS: { field: string; label: string }[] = [
+  { field: 'name', label: 'Customer' },
+  { field: 'icNumber', label: 'IC Number' },
+  { field: 'phone', label: 'Contact' },
+  { field: 'product', label: 'Product' },
+  { field: 'branch', label: 'Branch' },
+  { field: 'createdFrom', label: 'Created From' },
+  { field: 'createdTo', label: 'Created To' },
+  { field: 'status', label: 'Status' },
+  { field: 'salesExecutive', label: 'Executive' },
+  { field: 'state', label: 'State' },
+];
+
 export const ViewLeadPage: React.FC = () => {
   const {
     leads,
@@ -63,7 +81,10 @@ export const ViewLeadPage: React.FC = () => {
     setSearchQuery,
     products,
     states,
+    branches,
     filterRules,
+    setColumnFilter,
+    clearAllFilters,
     setPage,
     setPageSize,
     fetchLeads,
@@ -103,279 +124,91 @@ export const ViewLeadPage: React.FC = () => {
   };
 
   const activeFilterCount = filterRules.filter((r) => r.value && r.value.trim().length > 0).length;
+
+  // Per-column filters read and write the same rule list the toolbar's Filter popover edits, so the
+  // two stay in sync: setting Product in the header shows up as an active rule in the popover and
+  // counts toward "Filters (n)".
+  const columnValue = (field: string) => filterRules.find((r) => r.field === field)?.value ?? '';
+  const toOptions = (list: { value?: string; label?: string }[]) =>
+    list.map((o) => ({ value: String(o.value ?? o.label ?? ''), label: o.label ?? String(o.value ?? '') }));
   const startIndex = totalRecords > 0 ? (currentPage - 1) * pageSize + 1 : 0;
   const endIndex = Math.min(currentPage * pageSize, totalRecords);
 
   return (
-    <div
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '20px',
-        maxWidth: '1340px',
-        width: '100%',
-        paddingBottom: '32px',
-        fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
-        boxSizing: 'border-box',
-      }}
-    >
-      {/* Hero Banner — Host Pattern */}
-      <div
-        style={{
-          borderRadius: '18px',
-          padding: '24px 30px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: '20px',
-          flexWrap: 'wrap',
-          position: 'relative',
-          overflow: 'hidden',
-          background: 'linear-gradient(120deg, #1e40af 0%, #2563eb 45%, #3b82f6 100%)',
-          boxShadow: '0 4px 20px rgba(37, 99, 235, 0.25), 0 1px 4px rgba(37, 99, 235, 0.15)',
-          boxSizing: 'border-box',
-        }}
-      >
-        {/* Background decorative glass circles — matching host's exact sizes/offsets/opacity */}
-        <div
-          style={{
-            position: 'absolute',
-            top: '-50px',
-            right: '-50px',
-            width: '220px',
-            height: '220px',
-            borderRadius: '50%',
-            background: 'rgba(255, 255, 255, 0.07)',
-            pointerEvents: 'none',
-          }}
-        />
-        <div
-          style={{
-            position: 'absolute',
-            bottom: '-60px',
-            right: '120px',
-            width: '160px',
-            height: '160px',
-            borderRadius: '50%',
-            background: 'rgba(255, 255, 255, 0.05)',
-            pointerEvents: 'none',
-          }}
-        />
-
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '18px',
-            minWidth: 0,
-            position: 'relative',
-            zIndex: 1,
-          }}
-        >
-          <div
-            style={{
-              width: '50px',
-              height: '50px',
-              borderRadius: '14px',
-              background: 'rgba(255, 255, 255, 0.18)',
-              border: '1.5px solid rgba(255, 255, 255, 0.3)',
-              backdropFilter: 'blur(8px)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#ffffff',
-              flexShrink: 0,
-              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
-            }}
-          >
-            <FolderKanban size={24} />
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <h1
-                style={{
-                  fontSize: '20px',
-                  fontWeight: 800,
-                  color: '#ffffff',
-                  margin: 0,
-                  letterSpacing: '-0.025em',
-                  lineHeight: 1.2,
-                  fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
-                }}
-              >
-                Lead Directory
-              </h1>
-              <span
-                style={{
-                  padding: '3px 10px',
-                  borderRadius: '999px',
-                  background: 'rgba(255, 255, 255, 0.2)',
-                  color: '#ffffff',
-                  fontSize: '11.5px',
-                  fontWeight: 700,
-                  border: '1px solid rgba(255, 255, 255, 0.3)',
-                  backdropFilter: 'blur(4px)',
-                }}
-              >
-                {totalRecords} Total Records
-              </span>
-            </div>
-            <p
-              style={{
-                fontSize: '13px',
-                color: 'rgba(255, 255, 255, 0.85)',
-                margin: 0,
-              }}
+    <div className={shell.page}>
+      {/* Hero banner — @omniremit/ui PageHeader. This screen previously hand-rolled the banner,
+          its two decorative blooms and a white CTA with three JS mouse handlers, at a radius,
+          padding, gradient angle and title size that had all drifted from the host's. */}
+      <PageHeader
+        icon={<FolderKanban size={24} />}
+        title="Lead Directory"
+        pill={`${totalRecords} Total Records`}
+        subtitle="Browse, filter, inspect and manage customer financing applications across all branches"
+        actions={
+          canCreateLead() ? (
+            <Button
+              type="button"
+              variant="onHeader"
+              onClick={() => setActivePage('create-lead')}
+              leadingIcon={<UserPlus size={15} />}
             >
-              Browse, filter, inspect and manage customer financing applications across all branches
-            </p>
-          </div>
-        </div>
-
-        {/* Right side: Quick Action Button */}
-        {canCreateLead() && (
-          <button
-            type="button"
-            onClick={() => setActivePage('create-lead')}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '7px',
-              height: '40px',
-              padding: '0 18px',
-              borderRadius: '12px',
-              border: '1px solid rgba(255, 255, 255, 0.35)',
-              background: 'rgba(255, 255, 255, 0.95)',
-              color: '#1d4ed8',
-              fontSize: '13.5px',
-              fontWeight: 700,
-              cursor: 'pointer',
-              boxShadow: '0 2px 10px rgba(0, 0, 0, 0.12)',
-              transition: 'all 0.15s ease',
-              fontFamily: 'inherit',
-              position: 'relative',
-              zIndex: 1,
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = '#ffffff';
-              e.currentTarget.style.transform = 'translateY(-1px)';
-              e.currentTarget.style.boxShadow = '0 4px 16px rgba(0, 0, 0, 0.18)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.95)';
-              e.currentTarget.style.transform = 'none';
-              e.currentTarget.style.boxShadow = '0 2px 10px rgba(0, 0, 0, 0.12)';
-            }}
-          >
-            <UserPlus size={15} />
-            <span>Create Lead</span>
-          </button>
-        )}
-      </div>
+              Create Lead
+            </Button>
+          ) : null
+        }
+      />
 
       {/* Main Table Container Card */}
-      <div
-        style={{
-          background: '#ffffff',
-          borderRadius: '16px',
-          border: '1px solid #eaecf0',
-          boxShadow: '0 1px 4px rgba(15, 23, 42, 0.04)',
-          /* overflow must NOT be hidden here — that would clip the inner overflowX:auto scroll container */
-          overflow: 'visible',
-          boxSizing: 'border-box',
-          display: 'flex',
-          flexDirection: 'column',
+      {/*
+        * Active-filter readout. Column filters and the toolbar popover both write into the same
+        * `filterRules`, so this is the one place that shows what is actually in force — without it
+        * a filter set from a column header is invisible unless you reopen that column.
+        */}
+      <FilterBar
+        filters={[
+          ...TOOLBAR_FILTER_LABELS.map(({ field, label }) => {
+            const value = columnValue(field);
+            return value
+              ? { key: field, label, value, onRemove: () => setColumnFilter(field, '') }
+              : null;
+          }),
+          localSearch && {
+            key: 'search',
+            label: 'Search',
+            value: `"${localSearch}"`,
+            onRemove: () => handleClearSearch(),
+          },
+        ].filter(Boolean) as ActiveFilter[]}
+        onClearAll={() => {
+          clearAllFilters();
+          setLocalSearch('');
         }}
-      >
+      />
+
+      <div className={shell.card}>
         {/* Table Controls Toolbar */}
-        <div
-          style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            gap: '12px',
-            padding: '16px 20px',
-            borderBottom: '1px solid #eaecf0',
-            background: '#ffffff',
-          }}
-        >
+        <div className={shell.toolbar}>
           {/* Left Controls: Search Bar */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, maxWidth: '420px' }}>
-            <form onSubmit={handleSearchSubmit} style={{ position: 'relative', width: '100%' }}>
-              <Search
-                size={15}
-                style={{
-                  position: 'absolute',
-                  left: '14px',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  color: '#94a3b8',
-                  pointerEvents: 'none',
-                }}
-              />
-              <input
-                type="text"
+          <div className={shell.toolbarLeft}>
+            <form onSubmit={handleSearchSubmit} className={shell.searchForm}>
+              <SearchField
                 placeholder="Search name, IC, phone, branch..."
                 value={localSearch}
-                onChange={(e) => setLocalSearch(e.target.value)}
-                className="form-input"
-                style={{
-                  height: '40px',
-                  paddingLeft: '38px',
-                  paddingRight: localSearch ? '34px' : '14px',
-                  fontSize: '13px',
-                }}
+                onValueChange={(v) => (v === '' ? handleClearSearch() : setLocalSearch(v))}
               />
-              {localSearch && (
-                <button
-                  type="button"
-                  onClick={handleClearSearch}
-                  style={{
-                    position: 'absolute',
-                    right: '10px',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    background: 'none',
-                    border: 'none',
-                    color: '#94a3b8',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    padding: '2px',
-                  }}
-                >
-                  <X size={14} />
-                </button>
-              )}
             </form>
           </div>
 
           {/* Right Controls: Filter + Refresh */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+          <div className={shell.toolbarRight}>
             {/* Filter Popover Button */}
-            <div style={{ position: 'relative' }} ref={filterAnchorRef}>
+            <div className={shell.filterAnchor} ref={filterAnchorRef}>
               <button
                 type="button"
                 onClick={() => setShowFilters(!showFilters)}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '7px',
-                  height: '40px',
-                  padding: '0 16px',
-                  borderRadius: '12px',
-                  border: activeFilterCount > 0 ? '1.5px solid #2563eb' : '1.5px solid #e2e8f0',
-                  background: showFilters || activeFilterCount > 0 ? '#eff6ff' : '#ffffff',
-                  color: showFilters || activeFilterCount > 0 ? '#1d4ed8' : '#334155',
-                  fontSize: '13px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease',
-                  fontFamily: 'inherit',
-                  boxShadow: '0 1px 2px rgba(15, 23, 42, 0.04)',
-                }}
+                className={`${shell.toolbarBtn} ${shell.filterBtn}${
+                  showFilters || activeFilterCount > 0 ? ` ${shell.filterBtnActive}` : ''
+                }`}
               >
                 <Filter size={14} />
                 <span>{activeFilterCount > 0 ? `Filters (${activeFilterCount})` : 'Filter'}</span>
@@ -385,82 +218,103 @@ export const ViewLeadPage: React.FC = () => {
             </div>
 
             {/* Refresh Button */}
-            <button
+            <RowsPerPage storageKey="lead.directory" value={pageSize} onChange={(n) => { setPageSize(n); setPage(1); }} />
+
+            <Button
               type="button"
+              variant="secondary"
+              size="sm"
               onClick={() => fetchLeads()}
-              title="Reload Lead Data"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: '40px',
-                height: '40px',
-                borderRadius: '12px',
-                border: '1.5px solid #e2e8f0',
-                background: '#ffffff',
-                color: '#475569',
-                cursor: 'pointer',
-                transition: 'all 0.15s ease',
-                boxShadow: '0 1px 2px rgba(15, 23, 42, 0.04)',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = '#f8fafc';
-                e.currentTarget.style.borderColor = '#c8d4e0';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = '#ffffff';
-                e.currentTarget.style.borderColor = '#e2e8f0';
-              }}
+              leadingIcon={<RefreshCw size={15} className={isLoadingLeads ? 'animate-spin' : ''} />}
             >
-              <RefreshCw size={15} className={isLoadingLeads ? 'animate-spin' : ''} />
-            </button>
+              Refresh
+            </Button>
           </div>
         </div>
 
         {/* Table Content */}
         {isLoadingLeads ? (
-          <div style={{ padding: '60px 0', textAlign: 'center', color: '#94a3b8', fontSize: '13.5px' }}>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
-              <RefreshCw size={18} className="animate-spin" style={{ color: '#2563eb' }} />
+          <div className={shell.loadingRow}>
+            <div className={shell.loadingInner}>
+              <RefreshCw size={18} className={`animate-spin ${shell.loadingSpinner}`} />
               <span>Loading lead records from database...</span>
             </div>
           </div>
         ) : leads.length === 0 ? (
-          <div style={{ padding: '64px 20px', textAlign: 'center', color: '#64748b' }}>
-            <div style={{ fontSize: '32px', marginBottom: '8px' }}>📂</div>
-            <div style={{ fontSize: '16px', fontWeight: 700, color: '#0f172a', marginBottom: '4px' }}>
-              No leads found
-            </div>
-            <div style={{ fontSize: '13px', color: '#64748b' }}>
-              {activeFilterCount > 0 || localSearch
+          <EmptyState
+            icon={<FolderKanban size={32} />}
+            title="No leads found"
+            description={
+              activeFilterCount > 0 || localSearch
                 ? 'Try adjusting your search query or filter criteria.'
-                : 'Get started by creating your first lead application.'}
-            </div>
-          </div>
+                : 'Get started by creating your first lead application.'
+            }
+          />
         ) : (
-          <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-            <table style={{ width: '100%', minWidth: '780px', borderCollapse: 'collapse', fontSize: '13px', textAlign: 'left' }}>
+          <DataTable bare minWidth={780}>
               <thead>
-                <tr style={{ background: 'linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%)', borderBottom: '1px solid #eaecf0' }}>
-                  <th style={{ padding: '13px 18px', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.06em', color: '#475569', whiteSpace: 'nowrap' }}>
-                    Customer Details
-                  </th>
-                  <th style={{ padding: '13px 18px', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.06em', color: '#475569', whiteSpace: 'nowrap' }}>
-                    IC Number
-                  </th>
-                  <th style={{ padding: '13px 18px', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.06em', color: '#475569', whiteSpace: 'nowrap' }}>
-                    Contact
-                  </th>
-                  <th style={{ padding: '13px 18px', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.06em', color: '#475569', whiteSpace: 'nowrap' }}>
-                    Product
-                  </th>
-                  <th style={{ padding: '13px 18px', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.06em', color: '#475569', whiteSpace: 'nowrap' }}>
-                    Branch
-                  </th>
-                  <th style={{ padding: '13px 18px', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.06em', color: '#475569', whiteSpace: 'nowrap' }}>
-                    Created Date
-                  </th>
-                  <th style={{ padding: '13px 18px', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.06em', color: '#475569', whiteSpace: 'nowrap', textAlign: 'right' }}>
+                <tr>
+                  <ColumnFilter
+                    label="Customer Details"
+                    title="Filter Name"
+                    value={columnValue('name')}
+                    onChange={(v) => setColumnFilter('name', v)}
+                    options={[]}
+                    allLabel={undefined}
+                    freeText
+                    searchPlaceholder="Type a customer name…"
+                    emptyHint="Press Enter to filter by name."
+                  />
+                  <ColumnFilter
+                    label="IC Number"
+                    title="Filter IC Number"
+                    value={columnValue('icNumber')}
+                    onChange={(v) => setColumnFilter('icNumber', v)}
+                    options={[]}
+                    allLabel={undefined}
+                    freeText
+                    searchPlaceholder="Type an IC number…"
+                    emptyHint="Press Enter to filter by IC number."
+                  />
+                  <ColumnFilter
+                    label="Contact"
+                    title="Filter Phone"
+                    value={columnValue('phone')}
+                    onChange={(v) => setColumnFilter('phone', v)}
+                    options={[]}
+                    allLabel={undefined}
+                    freeText
+                    searchPlaceholder="Type a phone number…"
+                    emptyHint="Press Enter to filter by phone."
+                  />
+                  <ColumnFilter
+                    label="Product"
+                    value={columnValue('product')}
+                    onChange={(v) => setColumnFilter('product', v)}
+                    options={toOptions(products)}
+                    allLabel="All Products"
+                    searchable={products.length > 10}
+                  />
+                  <ColumnFilter
+                    label="Branch"
+                    value={columnValue('branch')}
+                    onChange={(v) => setColumnFilter('branch', v)}
+                    options={toOptions(branches)}
+                    allLabel="All Branches"
+                    searchable={branches.length > 10}
+                  />
+                  <ColumnFilter
+                    label="Created Date"
+                    title="Created On or After"
+                    value={columnValue('createdFrom')}
+                    onChange={(v) => setColumnFilter('createdFrom', v)}
+                    options={[]}
+                    allLabel={undefined}
+                    freeText
+                    searchPlaceholder="YYYY-MM-DD"
+                    emptyHint="Enter a date, then press Enter."
+                  />
+                  <th className={styles.thRight}>
                     Actions
                   </th>
                 </tr>
@@ -471,82 +325,66 @@ export const ViewLeadPage: React.FC = () => {
                   const avatarColor = AVATAR_COLORS[idx % AVATAR_COLORS.length];
 
                   return (
-                    <tr
-                      key={lead.id}
-                      id={`lead-row-${lead.id}`}
-                      style={{
-                        borderBottom: '1px solid #f1f5f9',
-                        transition: 'background 0.12s ease',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.background = '#f8fafc';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.background = 'transparent';
-                      }}
-                    >
+                    <tr key={lead.id} id={`lead-row-${lead.id}`}>
                       {/* Customer — avatar + name only, no ID badge */}
-                      <td style={{ padding: '13px 18px', verticalAlign: 'middle' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '11px' }}>
+                      <td>
+                        <div className={styles.customerCell}>
+                          {/* Avatar palette is chosen per row from AVATAR_COLORS, so the three
+                              colours arrive as CSS custom properties; the declarations that use
+                              them live in ViewLeadPage.module.css. */}
                           <div
-                            style={{
-                              width: '34px',
-                              height: '34px',
-                              borderRadius: '50%',
-                              background: avatarColor.bg,
-                              color: avatarColor.text,
-                              fontSize: '11.5px',
-                              fontWeight: 700,
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              flexShrink: 0,
-                              border: `1px solid ${avatarColor.border}`,
-                            }}
+                            className={styles.avatar}
+                            style={
+                              {
+                                '--lead-avatar-bg': avatarColor.bg,
+                                '--lead-avatar-text': avatarColor.text,
+                                '--lead-avatar-border': avatarColor.border,
+                              } as React.CSSProperties
+                            }
                           >
                             {initials}
                           </div>
                           {/* Only the customer name — ID removed per user request */}
-                          <span style={{ fontWeight: 600, color: '#0f172a' }}>{lead.name}</span>
+                          <span className={styles.customerName}>{lead.name}</span>
                         </div>
                       </td>
 
                       {/* IC Number — masked per Field Settings when the field is marked Sensitive */}
-                      <td style={{ padding: '13px 18px', verticalAlign: 'middle' }}>
+                      <td>
                         {isFieldVisible(commonFieldConfig, 'icNumber') && (
-                          <div style={{ color: '#0f172a', fontWeight: 500, fontSize: '13px', fontFamily: "'SF Mono', 'Fira Code', monospace" }}>
+                          <div className={styles.monoValue}>
                             {renderMaskedCell(commonFieldConfig, 'icNumber', lead.icNumber)}
                           </div>
                         )}
                       </td>
 
                       {/* Contact */}
-                      <td style={{ padding: '13px 18px', verticalAlign: 'middle' }}>
+                      <td>
                         {isFieldVisible(commonFieldConfig, 'phoneNumber') && (
-                          <div style={{ color: '#0f172a', fontWeight: 500 }}>{lead.phone}</div>
+                          <div className={styles.strongValue}>{formatPhone(lead.phone)}</div>
                         )}
                       </td>
 
                       {/* Product */}
-                      <td style={{ padding: '13px 18px', verticalAlign: 'middle' }}>
-                        <div style={{ fontWeight: 600, color: '#0f172a' }}>{lead.product}</div>
+                      <td>
+                        <div className={styles.productValue}>{lead.product}</div>
                       </td>
 
                       {/* Branch */}
-                      <td style={{ padding: '13px 18px', verticalAlign: 'middle' }}>
+                      <td>
                         {isFieldVisible(commonFieldConfig, 'branch') && (
-                          <div style={{ color: '#0f172a', fontWeight: 500 }}>{lead.branch || 'Not Assigned'}</div>
+                          <div className={styles.strongValue}>{lead.branch || 'Not Assigned'}</div>
                         )}
                       </td>
 
                       {/* Created Date */}
-                      <td style={{ padding: '13px 18px', verticalAlign: 'middle', color: '#64748b', fontSize: '12.5px', whiteSpace: 'nowrap' }}>
+                      <td className={styles.dateCell}>
                         {lead.createdDate}
                       </td>
 
                       {/* Action Buttons */}
-                      <td style={{ padding: '13px 18px', textAlign: 'right', verticalAlign: 'middle' }}>
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                      <td className={styles.actionsCellTd}>
+                        <div className={styles.actions}>
                           {/* View — text + icon */}
                           <button
                             type="button"
@@ -556,25 +394,7 @@ export const ViewLeadPage: React.FC = () => {
                             }}
                             id={`view-lead-${lead.id}`}
                             title="View Lead Details"
-                            style={{
-                              padding: '5px 11px',
-                              borderRadius: '8px',
-                              background: '#eff6ff',
-                              border: '1px solid #bfdbfe',
-                              color: '#1d4ed8',
-                              cursor: 'pointer',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              gap: '4px',
-                              fontSize: '12px',
-                              fontWeight: 600,
-                              transition: 'all 0.12s ease',
-                              fontFamily: 'inherit',
-                              whiteSpace: 'nowrap',
-                            }}
-                            onMouseEnter={(e) => { e.currentTarget.style.background = '#dbeafe'; }}
-                            onMouseLeave={(e) => { e.currentTarget.style.background = '#eff6ff'; }}
+                            className={`${styles.rowAction} ${styles.actionView}`}
                           >
                             <Eye size={13} />
                             <span>View</span>
@@ -590,22 +410,7 @@ export const ViewLeadPage: React.FC = () => {
                               }}
                               id={`edit-lead-${lead.id}`}
                               title="Edit Lead"
-                              style={{
-                                width: '30px',
-                                height: '30px',
-                                borderRadius: '8px',
-                                background: '#fefce8',
-                                border: '1px solid #fef08a',
-                                color: '#a16207',
-                                cursor: 'pointer',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                flexShrink: 0,
-                                transition: 'all 0.12s ease',
-                              }}
-                              onMouseEnter={(e) => { e.currentTarget.style.background = '#fef9c3'; e.currentTarget.style.borderColor = '#fde047'; }}
-                              onMouseLeave={(e) => { e.currentTarget.style.background = '#fefce8'; e.currentTarget.style.borderColor = '#fef08a'; }}
+                              className={`${styles.rowAction} ${styles.actionEdit}`}
                             >
                               <Edit3 size={14} />
                             </button>
@@ -621,22 +426,7 @@ export const ViewLeadPage: React.FC = () => {
                               }}
                               id={`delete-lead-${lead.id}`}
                               title="Delete Lead"
-                              style={{
-                                width: '30px',
-                                height: '30px',
-                                borderRadius: '8px',
-                                background: '#fff1f2',
-                                border: '1px solid #fecdd3',
-                                color: '#be185d',
-                                cursor: 'pointer',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                flexShrink: 0,
-                                transition: 'all 0.12s ease',
-                              }}
-                              onMouseEnter={(e) => { e.currentTarget.style.background = '#ffe4e6'; e.currentTarget.style.borderColor = '#fda4af'; }}
-                              onMouseLeave={(e) => { e.currentTarget.style.background = '#fff1f2'; e.currentTarget.style.borderColor = '#fecdd3'; }}
+                              className={`${styles.rowAction} ${styles.actionDelete}`}
                             >
                               <Trash2 size={14} />
                             </button>
@@ -647,111 +437,16 @@ export const ViewLeadPage: React.FC = () => {
                   );
                 })}
               </tbody>
-            </table>
-          </div>
+          </DataTable>
         )}
 
-        {/* Footer Pagination Toolbar */}
-        {totalRecords > 0 && (
-          <div
-            style={{
-              padding: '14px 20px',
-              borderTop: '1px solid #eaecf0',
-              display: 'flex',
-              flexWrap: 'wrap',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: '12px',
-              background: '#f8fafc',
-              fontSize: '13px',
-              color: '#64748b',
-            }}
-          >
-            <div>
-              Showing <strong style={{ color: '#0f172a' }}>{startIndex}</strong> to{' '}
-              <strong style={{ color: '#0f172a' }}>{endIndex}</strong> of{' '}
-              <strong style={{ color: '#0f172a' }}>{totalRecords}</strong> records
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-              {/* Records Per Page */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span>Per page:</span>
-                <select
-                  value={pageSize}
-                  onChange={(e) => {
-                    setPageSize(Number(e.target.value));
-                    setPage(1);
-                  }}
-                  style={{
-                    padding: '5px 10px',
-                    borderRadius: '8px',
-                    border: '1.5px solid #e2e8f0',
-                    background: '#ffffff',
-                    fontSize: '12.5px',
-                    color: '#0f172a',
-                    cursor: 'pointer',
-                    outline: 'none',
-                    fontWeight: 500,
-                  }}
-                >
-                  <option value={10}>10</option>
-                  <option value={20}>20</option>
-                  <option value={50}>50</option>
-                </select>
-              </div>
-
-              {/* Prev / Next Page Buttons */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <button
-                  type="button"
-                  disabled={currentPage <= 1}
-                  onClick={() => setPage(currentPage - 1)}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    width: '32px',
-                    height: '32px',
-                    borderRadius: '8px',
-                    border: '1.5px solid #e2e8f0',
-                    background: '#ffffff',
-                    color: '#0f172a',
-                    cursor: currentPage <= 1 ? 'not-allowed' : 'pointer',
-                    opacity: currentPage <= 1 ? 0.4 : 1,
-                    transition: 'all 0.12s ease',
-                  }}
-                >
-                  <ChevronLeft size={14} />
-                </button>
-                <span style={{ fontWeight: 600, color: '#0f172a', padding: '0 4px' }}>
-                  {currentPage} / {totalPages || 1}
-                </span>
-                <button
-                  type="button"
-                  disabled={currentPage >= totalPages}
-                  onClick={() => setPage(currentPage + 1)}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    width: '32px',
-                    height: '32px',
-                    borderRadius: '8px',
-                    border: '1.5px solid #e2e8f0',
-                    background: '#ffffff',
-                    color: '#0f172a',
-                    cursor: currentPage >= totalPages ? 'not-allowed' : 'pointer',
-                    opacity: currentPage >= totalPages ? 0.4 : 1,
-                    transition: 'all 0.12s ease',
-                  }}
-                >
-                  <ChevronRight size={14} />
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+        <Pagination
+          page={currentPage}
+          pageSize={pageSize}
+          total={totalRecords}
+          itemLabel="lead"
+          onPageChange={setPage}
+        />
       </div>
 
       {/* Drawers */}

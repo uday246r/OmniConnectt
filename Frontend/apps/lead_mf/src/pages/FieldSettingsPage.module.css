@@ -1,0 +1,218 @@
+/*
+ * Field Settings page.
+ *
+ * Banner comes from @omniremit/ui's PageHeader and the table from DataTable (`bare`, since each
+ * section card already draws its own frame). What remains here is the product tab strip, the
+ * status banners and the per-cell form controls.
+ */
+
+/* ── Product tab strip ───────────────────────────────────────── */
+.productTabs {
+  display: inline-flex;
+  gap: var(--omni-space-1);
+  background: #f1f5f9;
+  padding: var(--omni-space-1);
+  border-radius: 10px;
+  width: fit-content;
+  flex-wrap: wrap;
+}
+
+.productTab {
+  padding: var(--omni-space-2) var(--omni-space-4);
+  border-radius: 7px;
+  border: none;
+  font-size: 12.5px;
+  font-weight: var(--omni-font-weight-semibold);
+  font-family: inherit;
+  cursor: pointer;
+  background: transparent;
+  color: var(--omni-color-text-secondary);
+  box-shadow: none;
+  transition: background var(--omni-transition-fast), color var(--omni-transition-fast);
+}
+
+.productTab:hover {
+  color: var(--omni-color-text-primary);
+}
+
+.productTabActive,
+.productTabActive:hover {
+  background: var(--omni-color-surface);
+  color: var(--omni-color-primary-600);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+}
+
+/* ── Status banners ──────────────────────────────────────────── */
+.banner {
+  display: flex;
+  align-items: center;
+  gap: var(--omni-space-2);
+  padding: 10px var(--omni-space-4);
+  border-radius: 10px;
+  font-size: var(--omni-font-size-sm);
+  font-weight: var(--omni-font-weight-semibold);
+}
+
+.bannerSuccess {
+  background: var(--omni-color-success-50);
+  border: 1px solid var(--omni-color-success-200);
+  color: var(--omni-color-success-700);
+}
+
+.bannerPending {
+  background: var(--omni-color-warning-50);
+  border: 1px solid var(--omni-color-warning-200);
+  color: var(--omni-color-warning-800);
+}
+
+.bannerError {
+  background: var(--omni-color-danger-50);
+  border: 1px solid var(--omni-color-danger-200);
+  color: var(--omni-color-danger-600);
+}
+
+/* ── Loading ─────────────────────────────────────────────────── */
+.loading {
+  padding: 60px 0;
+  text-align: center;
+  color: var(--omni-color-text-muted);
+  font-size: 13.5px;
+}
+
+.loadingSpinner {
+  color: var(--omni-color-primary-600);
+}
+
+.loadingText {
+  margin-top: var(--omni-space-2);
+}
+
+/* ── Section cards ───────────────────────────────────────────── */
+.sectionCard {
+  background: var(--omni-color-surface);
+  border-radius: var(--omni-radius-xl);
+  border: 1px solid #eaecf0;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.04);
+  overflow: hidden;
+}
+
+/* Uppercase micro-heading, the same treatment the platform's table headers use, so a section
+   label and the column labels beneath it belong to the same system instead of competing. */
+.sectionTitle {
+  padding: 12px var(--omni-space-5);
+  border-bottom: 1px solid #eaecf0;
+  background: linear-gradient(180deg, var(--omni-color-surface-alt) 0%, #f1f5f9 100%);
+  font-size: 11px;
+  font-weight: var(--omni-font-weight-bold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--omni-color-text-secondary);
+}
+
+/* ── Table cells ─────────────────────────────────────────────── */
+/* This table is denser than the platform default — it is a settings grid of form controls, not a
+   record listing — so its cells override DataTable's row padding. */
+.cell {
+  padding: 10px var(--omni-space-4);
+}
+
+/* A hidden field is dimmed rather than removed, so the operator can still see and re-enable it. */
+.rowHidden {
+  opacity: 0.55;
+}
+
+.apiField {
+  font-size: var(--omni-font-size-xs);
+  color: var(--omni-color-text-secondary);
+}
+
+.selectInput {
+  padding: 6px var(--omni-space-2);
+  border-radius: 7px;
+  border: 1px solid var(--omni-color-border-strong);
+  font-size: var(--omni-font-size-sm);
+  font-family: inherit;
+  cursor: pointer;
+}
+
+/* `disabled` on the control replaces the inline opacity ternaries the masking fields used. */
+.selectInput:disabled,
+
+/*
+ * Field inputs share one chrome, matching the platform's `Input` / `Select`: 1.5px border at the
+ * token colour, 8px radius, and a real focus ring. They previously had a 1px `border-strong`
+ * hairline and no focus state at all, so a focused cell was indistinguishable from an unfocused
+ * one — on a page that is nothing but editable cells.
+ */
+.labelInput,
+.orderInput,
+.numberInput {
+  box-sizing: border-box;
+  border: 1.5px solid var(--omni-color-border);
+  border-radius: 8px;
+  background: var(--omni-color-surface);
+  color: var(--omni-color-text-primary);
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.labelInput:focus,
+.orderInput:focus,
+.numberInput:focus {
+  border-color: var(--omni-color-primary-600);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.labelInput:disabled,
+.orderInput:disabled,
+.numberInput:disabled {
+  background: var(--omni-color-surface-alt);
+  color: var(--omni-color-text-muted);
+  cursor: not-allowed;
+}
+
+.labelInput { width: 180px; height: 32px; padding: 0 10px; }
+.orderInput,
+.numberInput { width: 64px; height: 32px; padding: 0 8px; text-align: center; }
+
+/* The Checkbox renders its own <label>; the cell only has to centre it. */
+.checkboxCell {
+  display: inline-flex;
+  justify-content: center;
+}
+
+/*
+ * Show/hide is the row's primary switch, so it reads as a control rather than a bare glyph — a
+ * tinted tile when visible, muted when not, matching the tone treatment used elsewhere.
+ */
+.visibilityToggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 1.5px solid transparent;
+  border-radius: 8px;
+  background: var(--omni-color-surface-alt);
+  color: var(--omni-color-text-muted);
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+
+.visibilityToggle:hover {
+  background: var(--omni-color-border);
+  color: var(--omni-color-text-primary);
+}
+
+.visibilityToggleOn {
+  background: var(--omni-color-primary-50);
+  border-color: #bfdbfe;
+  color: var(--omni-color-primary-600);
+}
+
+.visibilityToggle:focus-visible {
+  outline: 2px solid var(--omni-color-primary-600);
+  outline-offset: 1px;
+}

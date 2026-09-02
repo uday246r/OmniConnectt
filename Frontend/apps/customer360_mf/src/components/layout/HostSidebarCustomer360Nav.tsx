@@ -8,11 +8,13 @@ import {
 } from 'lucide-react';
 import { useNavigationStore, C360Page } from '../../store/navigationStore';
 import { useCustomerStore } from '../../store/customerStore';
+import styles from './HostSidebarCustomer360Nav.module.css';
 import {
   canViewProfile,
   canViewAuditLogs,
   canManageFieldSettings,
 } from '../../api/hostBridge';
+import { NavItem } from '@omniremit/ui';
 
 interface SubNavItem {
   id: C360Page;
@@ -27,7 +29,6 @@ export const HostSidebarCustomer360Nav: React.FC = () => {
   const { setCustomerType } = useCustomerStore();
   const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
   const [isExpanded, setIsExpanded] = useState(true);
-  const [hoveredId, setHoveredId] = useState<string | null>(null);
   const chevronBtnRef = useRef<HTMLButtonElement | null>(null);
 
   const userCanViewProfile = canViewProfile();
@@ -218,96 +219,27 @@ export const HostSidebarCustomer360Nav: React.FC = () => {
   return ReactDOM.createPortal(
     <div
       id="customer360-mf-scope"
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '2px',
-        width: 'calc(100% - 24px)',
-        paddingLeft: '10px',
-        borderLeft: '2px solid #e2e8f0',
-        marginLeft: '22px',
-        marginTop: '2px',
-        marginBottom: '6px',
-        boxSizing: 'border-box',
-      }}
+      className={styles.stack}
     >
       {visibleItems.map((item) => {
         const isActive =
           activePage === item.id ||
           (item.id === 'individual' && activePage === 'customer-360' && useCustomerStore.getState().customerType === 'individual') ||
           (item.id === 'non-individual' && activePage === 'customer-360' && useCustomerStore.getState().customerType === 'corporate');
-        const isHovered = hoveredId === item.id;
 
         return (
-          <button
+          <NavItem
             key={item.id}
-            type="button"
+            id={`host-subnav-${item.id}`}
+            icon={item.icon}
+            label={item.label}
+            active={isActive}
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
               item.onClick();
             }}
-            onMouseEnter={() => setHoveredId(item.id)}
-            onMouseLeave={() => setHoveredId(null)}
-            id={`host-subnav-${item.id}`}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              width: '100%',
-              padding: '7px 10px',
-              borderRadius: '8px',
-              border: 'none',
-              background: isActive
-                ? '#eff6ff'
-                : isHovered
-                ? '#f8fafc'
-                : 'transparent',
-              color: isActive
-                ? '#1d4ed8'
-                : isHovered
-                ? '#0f172a'
-                : '#475569',
-              fontSize: '13px',
-              fontWeight: isActive ? 600 : 500,
-              cursor: 'pointer',
-              transition: 'all 120ms ease',
-              textAlign: 'left',
-              fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
-              letterSpacing: '-0.01em',
-              boxSizing: 'border-box',
-              outline: 'none',
-            }}
-          >
-            <span
-              style={{
-                width: '16px',
-                height: '16px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: isActive
-                  ? '#2563eb'
-                  : isHovered
-                  ? '#475569'
-                  : '#94a3b8',
-                transition: 'color 120ms ease',
-                flexShrink: 0,
-              }}
-            >
-              {item.icon}
-            </span>
-            <span
-              style={{
-                flex: 1,
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-              }}
-            >
-              {item.label}
-            </span>
-          </button>
+          />
         );
       })}
     </div>,

@@ -1,0 +1,24 @@
+/*
+ * Styles extracted from this component's former inline blocks.
+ */
+
+.hintSpacer {
+  margin-top: 4px;
+}
+
+.hint {
+  font-size: 12px;
+  color: var(--omni-color-text-secondary);
+  margin-top: 2px;
+  font-weight: 400;
+}
+
+.monoValue {
+  font-family: monospace;
+  font-weight: 600;
+  color: #334155;
+}
+
+.largeText {
+  font-size: 15px;
+}

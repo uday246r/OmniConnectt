@@ -1,0 +1,43 @@
+/*
+ * Styles extracted from this component's former inline blocks.
+ */
+
+.stepSpacer {
+  margin-bottom: 8px;
+}
+
+.formFade {
+  animation: fadeInForm 0.25s ease-out;
+}
+
+.emptyIcon {
+  margin-top: 20px;
+  padding: 32px 24px;
+  text-align: center;
+  color: var(--omni-color-text-secondary);
+  font-size: 13.5px;
+  background: var(--omni-color-surface-alt);
+  border-radius: 12px;
+  border: 1.5px dashed #e2e8f0;
+  line-height: 1.6;
+}
+
+.emptyTitle {
+  font-size: 24px;
+  margin-bottom: 8px;
+}
+
+.emptyText {
+  font-weight: 600;
+  color: var(--omni-color-text-primary);
+  margin-bottom: 4px;
+}
+
+/*
+ * The submit button is the shared Button at size="lg" fullWidth; the only thing that was ever
+ * page-specific about `.submit-btn-primary` was this gap above it. Its other 20 declarations
+ * re-stated the shared primary button exactly (same gradient, shadow, radius, transition).
+ */
+.submit {
+  margin-top: var(--omni-space-6, 24px);
+}

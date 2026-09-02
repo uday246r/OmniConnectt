@@ -28,7 +28,8 @@ export function SettingsUsersTab() {
   // all, so an operator saw a live Delete button and a working deactivate toggle on their own row.
   const currentUserId = useAuthStore((s) => s.user?.id)
   const pushLayer = useSettingsDrawerStore((s) => s.pushLayer)
-  const dataRevision = useDataRevision(TOPICS.users)
+  const dataRevision = useDataRevision(TOPICS.users)
+
   const canCreate = isAdministrator || hasCapability('host.settings.users', 'Create')
   const canEdit = isAdministrator || hasCapability('host.settings.users', 'Edit')
   const canDelete = isAdministrator || hasCapability('host.settings.users', 'Delete')
@@ -288,9 +289,10 @@ export function SettingsUsersTab() {
 
                 <div className={styles.userMeta}>
                   <span
-                    className={isActive ? styles.activeBadge : styles.inactiveBadge}
+                    className={`${isActive ? styles.activeBadge : styles.inactiveBadge} ${
+                      canDisable && !isSelf ? styles.clickable : styles.notClickable
+                    }`}
                     onClick={() => !isSelf && handleToggleStatusClick(u)}
-                    style={{ cursor: canDisable && !isSelf ? 'pointer' : 'default' }}
                     title={
                       isSelf
                         ? 'You cannot change your own account status'

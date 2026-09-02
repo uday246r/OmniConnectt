@@ -13,6 +13,7 @@
   "dependencies": {
     "@module-federation/runtime": "^2.8.2",
     "@omniremit/federation-config": "workspace:*",
+    "@omniremit/ui": "workspace:*",
     "@tanstack/react-query": "^5.90.2",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",

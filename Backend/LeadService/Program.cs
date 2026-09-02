@@ -65,9 +65,31 @@ builder.Services.AddDbContextPool<ApplicationDbContext>(options =>
     var connectionString = builder.Configuration.GetConnectionString("LeadDb")
         ?? builder.Configuration.GetConnectionString("DefaultConnection");
 
-    options.UseSqlServer(!string.IsNullOrWhiteSpace(connectionString)
-        ? connectionString
-        : "Server=unconfigured;Database=unconfigured;Trusted_Connection=True;TrustServerCertificate=True;");
+    options.UseSqlServer(
+        !string.IsNullOrWhiteSpace(connectionString)
+            ? connectionString
+            : "Server=unconfigured;Database=unconfigured;Trusted_Connection=True;TrustServerCertificate=True;",
+        /*
+         * Transient-fault resiliency. REQUIRED against Azure SQL, not a nicety.
+         *
+         * The serverless tier auto-pauses after an idle period and takes tens of seconds to resume.
+         * The first connection after that window fails with error 40613, "Database '...' is not
+         * currently available. Please retry the connection later." — which is precisely what a
+         * developer sees on the first `dotnet run` of the day, and what a cold production instance
+         * sees after a quiet night. The connection string's own `Connection Timeout=30` is shorter
+         * than a typical resume, so a single attempt reliably loses that race.
+         *
+         * EF's SqlServerRetryingExecutionStrategy already classifies 40613 (and 40197/40501/49918
+         * and friends) as transient, so this turns a hard startup failure into a short wait. The
+         * delay is raised above the 30s default because a resume can legitimately take longer.
+         *
+         * Safe to enable here: this service issues no explicit BeginTransaction, so nothing needs
+         * wrapping in an execution strategy (contrast AuthService's ApprovalAppService.ApproveAsync).
+         */
+        sqlOptions => sqlOptions.EnableRetryOnFailure(
+            maxRetryCount: 6,
+            maxRetryDelay: TimeSpan.FromSeconds(20),
+            errorNumbersToAdd: null));
 });
 
 

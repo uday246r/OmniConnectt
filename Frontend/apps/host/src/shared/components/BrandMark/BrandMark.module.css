@@ -26,3 +26,5 @@
 .mark.inverted svg { filter: none; }
 .mark.inverted .strokeMain { stroke: #1d4ed8; }
 .mark.inverted .strokeFace { stroke: #2563eb; fill: rgba(37,99,235,0.14); }
+
+.mark { width: var(--mark-size); height: var(--mark-size); }

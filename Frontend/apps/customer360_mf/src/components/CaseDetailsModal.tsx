@@ -1,6 +1,7 @@
 import React from 'react';
 import { useInteractionStore } from '../store/interactionStore';
 import { X, FileText, User, ShieldAlert } from 'lucide-react';
+import { formatValue } from '../shared/formatValue';
 
 export default function CaseDetailsModal() {
   const { selectedCase, modalOpen, closeCaseModal } = useInteractionStore();
@@ -8,15 +9,6 @@ export default function CaseDetailsModal() {
   if (!modalOpen || !selectedCase) return null;
 
   // "-" is a display-only fallback for a missing value — never a sample/demo value.
-  const formatValue = (val: unknown): string => {
-    if (val === null || val === undefined) return '-';
-    const s = String(val).trim();
-    if (s === '' || s.toLowerCase() === 'null' || s.toLowerCase() === 'undefined') {
-      return '-';
-    }
-    return s;
-  };
-
   return (
     <div className="drawer-overlay" onClick={closeCaseModal}>
       <div className="drawer-content" onClick={(e) => e.stopPropagation()}>

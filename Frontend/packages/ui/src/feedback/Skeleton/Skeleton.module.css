@@ -1,0 +1,99 @@
+/*
+ * Shimmering loading placeholders — the generic primitives only.
+ *
+ * Values are the host's exactly (apps/host/src/shared/components/Skeleton/Skeleton.module.css):
+ * #eaecf0 base, a 1.4s ease-in-out white sweep at 62% opacity.
+ *
+ * SCOPE: only the shape-agnostic variants live here — block, text, avatar, table. The host's
+ * card-level skeletons (SkeletonUserCard, SkeletonStatCard, SkeletonDonutChart, ...) stay in the
+ * host: they exist to match the exact dimensions of specific host cards so there is no layout shift
+ * on load, which makes them page-specific by definition, not shared UI.
+ *
+ * Sizes arrive as custom-property hand-offs rather than inline declarations, per the repo's
+ * no-inline-CSS convention — the values are runtime props, but the declarations belong here.
+ */
+
+.shimmer {
+  position: relative;
+  overflow: hidden;
+  background: #eaecf0;
+  border-radius: var(--omni-radius-sm);
+}
+
+.shimmer::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.62) 50%,
+    transparent 100%
+  );
+  animation: omniShimmerSweep 1.4s ease-in-out infinite;
+}
+
+@keyframes omniShimmerSweep {
+  100% { transform: translateX(100%); }
+}
+
+/* ── Shape variants ─────────────────────────────────────────── */
+.block {
+  width: var(--omni-skeleton-width, 100%);
+  height: var(--omni-skeleton-height, 100%);
+  border-radius: var(--omni-skeleton-radius, var(--omni-radius-sm));
+}
+
+.avatar {
+  width: var(--omni-skeleton-size, 32px);
+  height: var(--omni-skeleton-size, 32px);
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.text {
+  width: var(--omni-skeleton-width, 100%);
+  height: 0.82em;
+  border-radius: 4px;
+}
+
+.textGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* ── Table placeholder ──────────────────────────────────────── */
+.table {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+
+.tableRow {
+  display: flex;
+  gap: var(--omni-space-3);
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.tableCell {
+  height: 13px;
+  flex: 1;
+  border-radius: 4px;
+}
+
+/* The first column carries the primary identifier and is visually wider in every real table. */
+.tableCellLead {
+  flex: 2;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shimmer::after {
+    animation: none;
+    background: rgba(255, 255, 255, 0.4);
+  }
+}

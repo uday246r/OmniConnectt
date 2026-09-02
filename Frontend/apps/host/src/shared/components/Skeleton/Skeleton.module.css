@@ -240,3 +240,303 @@
     animation: none;
   }
 }
+
+/* ── Extracted from SkeletonAppCard.tsx (formerly inline) ── */
+.sac1 {
+  width: 38;
+  height: 38;
+}
+
+.sac2 {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6;
+}
+
+.sac3 {
+  display: flex;
+  align-items: center;
+  gap: 8;
+}
+
+.sac4 {
+  width: 130;
+  height: 0.82em;
+}
+
+.sac5 {
+  width: 55;
+  height: 0.82em;
+}
+
+.sac6 {
+  width: 200;
+  height: 0.82em;
+}
+
+.sac7 {
+  display: flex;
+  align-items: center;
+  gap: 8;
+  flex-shrink: 0;
+}
+
+.sac8 {
+  width: 70;
+  height: 24;
+}
+
+.sac9 {
+  width: 28;
+  height: 28;
+  border-radius: 8;
+}
+
+
+/* ── Extracted from SkeletonAuditRow.tsx (formerly inline) ── */
+.sar1 {
+  width: 32;
+  height: 32;
+  flex-shrink: 0;
+}
+
+.sar2 {
+  flex: 0 0 140px;
+  display: flex;
+  flex-direction: column;
+  gap: 5;
+}
+
+.sar3 {
+  width: 80%;
+}
+
+.sar4 {
+  width: 60%;
+}
+
+.sar5 {
+  flex: 0 0 100px;
+}
+
+.sar6 {
+  width: 70%;
+}
+
+.sar7 {
+  flex: 0 0 110px;
+}
+
+.sar8 {
+  width: 90;
+  height: 22;
+}
+
+.sar9 {
+  flex: 0 0 90px;
+  margin-left: auto;
+}
+
+
+/* ── Extracted from SkeletonDashboardWidget.tsx (formerly inline) ── */
+.sdw1 {
+  width: 36;
+  height: 36;
+}
+
+.sdw2 {
+  display: flex;
+  flex-direction: column;
+  gap: 5;
+  flex: 1;
+}
+
+.sdw3 {
+  width: 55%;
+}
+
+.sdw4 {
+  width: 40%;
+}
+
+.sdw5 {
+  width: 58;
+  height: 20;
+  flex-shrink: 0;
+}
+
+
+/* ── Extracted from SkeletonDonutChart.tsx (formerly inline) ── */
+.sdc1 {
+  width: 28;
+  height: 1.1em;
+}
+
+.sdc2 {
+  width: 8;
+  height: 8;
+  flex-shrink: 0;
+}
+
+.sdc3 {
+  width: 34;
+  margin-left: auto;
+}
+
+
+/* ── Extracted from SkeletonOverviewActivity.tsx (formerly inline) ── */
+.soa1 {
+  width: 7;
+  height: 7;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-top: 5;
+}
+
+.soa2 {
+  display: flex;
+  flex-direction: column;
+  gap: 5;
+  flex: 1;
+}
+
+.soa3 {
+  width: 75%;
+}
+
+.soa4 {
+  width: 35%;
+}
+
+
+/* ── Extracted from SkeletonRoleCard.tsx (formerly inline) ── */
+.src1 {
+  width: 36;
+  height: 36;
+}
+
+.src2 {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6;
+}
+
+.src3 {
+  display: flex;
+  align-items: center;
+  gap: 8;
+}
+
+.src4 {
+  width: 100;
+  height: 0.82em;
+}
+
+.src5 {
+  width: 52;
+  height: 18;
+}
+
+.src6 {
+  width: 200;
+  height: 0.82em;
+}
+
+.src7 {
+  display: flex;
+  align-items: center;
+  gap: 8;
+  flex-shrink: 0;
+}
+
+.src8 {
+  width: 28;
+  height: 28;
+  border-radius: 8;
+}
+
+
+/* ── Extracted from SkeletonStatCard.tsx (formerly inline) ── */
+.ssc1 {
+  width: 36;
+  height: 36;
+}
+
+.ssc2 {
+  display: flex;
+  flex-direction: column;
+  gap: 6;
+  flex: 1;
+}
+
+.ssc3 {
+  width: 65%;
+  height: 0.75em;
+}
+
+.ssc4 {
+  width: 45%;
+  height: 1.2em;
+  border-radius: 5;
+}
+
+
+/* ── Extracted from SkeletonUserCard.tsx (formerly inline) ── */
+.suc1 {
+  width: 40;
+  height: 40;
+  flex-shrink: 0;
+}
+
+.suc2 {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6;
+}
+
+.suc3 {
+  display: flex;
+  align-items: center;
+  gap: 8;
+}
+
+.suc4 {
+  width: 110;
+  height: 0.82em;
+}
+
+.suc5 {
+  width: 58;
+  height: 20;
+}
+
+.suc6 {
+  width: 160;
+  height: 0.82em;
+}
+
+.suc7 {
+  display: flex;
+  align-items: center;
+  gap: 8;
+  flex-shrink: 0;
+}
+
+.suc8 {
+  width: 70;
+  height: 24;
+}
+
+.suc9 {
+  width: 28;
+  height: 28;
+  border-radius: 8;
+}
+
+/* Runtime dimensions arrive as custom properties, matching @omniremit/ui's Skeleton. */
+.avatar { width: var(--sk-size, 32px); height: var(--sk-size, 32px); }
+.text { width: var(--sk-width, 100%); }
+.tableCellLead { flex: 2; }

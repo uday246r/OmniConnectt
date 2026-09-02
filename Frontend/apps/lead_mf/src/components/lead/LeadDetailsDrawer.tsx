@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
+import { Button, Drawer } from '@omniremit/ui';
+import drawerLayout from '../../shared/drawerLayout.module.css';
+import styles from './LeadDetailsDrawer.module.css';
 import {
-  X,
   User,
   Package,
   Briefcase,
@@ -29,6 +31,8 @@ import {
 import { useLeadStore } from '../../store/useLeadStore';
 import { isFieldVisible, getFieldLabel, type LeadFieldConfig } from '../../config/fieldControlRegistry';
 import { applyMaskingRule, hasRevealableValue } from '../../utils/fieldMasking';
+import { Badge } from '@omniremit/ui';
+import { LeadStatusBadge } from '../../shared/LeadStatusBadge';
 
 const formatVal = (val?: string | null): string => {
   if (!val || !val.trim() || val.trim().toLowerCase() === 'null' || val.trim().toLowerCase() === 'undefined') {
@@ -73,23 +77,6 @@ const getInitials = (name: string): string => {
   return parts[0]?.substring(0, 2).toUpperCase() || '??';
 };
 
-const getStatusBadge = (status?: string) => {
-  const s = status?.toLowerCase() || 'new';
-  if (s.includes('convert')) {
-    return { bg: '#ecfdf5', text: '#047857', border: '#a7f3d0', dot: '#10b981', label: status || 'Converted' };
-  }
-  if (s.includes('progress')) {
-    return { bg: '#fffbeb', text: '#b45309', border: '#fde68a', dot: '#f59e0b', label: status || 'In Progress' };
-  }
-  if (s.includes('reject') || s.includes('cancel')) {
-    return { bg: '#fff1f2', text: '#be185d', border: '#fecdd3', dot: '#f43f5e', label: status || 'Rejected' };
-  }
-  if (s.includes('qualif') || s.includes('contact')) {
-    return { bg: '#ede9fe', text: '#6d28d9', border: '#ddd6fe', dot: '#8b5cf6', label: status || 'Contacted' };
-  }
-  return { bg: '#eff6ff', text: '#1d4ed8', border: '#bfdbfe', dot: '#2563eb', label: status || 'New' };
-};
-
 export const LeadDetailsDrawer: React.FC = () => {
   const { selectedLead, isDetailsDrawerOpen, closeDetailsDrawer, fieldConfig } = useLeadStore();
   const [revealed, setRevealed] = useState<Record<string, boolean>>({});
@@ -123,7 +110,6 @@ export const LeadDetailsDrawer: React.FC = () => {
 
   const leadIdStr = selectedLead.id ? String(selectedLead.id) : '';
   const initials = getInitials(selectedLead.name);
-  const statusInfo = getStatusBadge(selectedLead.status);
 
   const isHomeFinancing =
     fieldConfig.some((f) => f.apiField === 'propertyType') ||
@@ -199,17 +185,11 @@ export const LeadDetailsDrawer: React.FC = () => {
         <div className="lead-field-body">
           <span className="lead-field-label">{getFieldLabel(fieldConfig, apiField, label)}</span>
           <div
-            className="lead-field-value"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: '6px',
-              ...valueStyle,
-            }}
+            className={`lead-field-value ${styles.valueRow}`}
+            style={valueStyle}
           >
-            <span style={{ overflowWrap: 'anywhere' }}>{displayValue}</span>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+            <span className={styles.wrapAnywhere}>{displayValue}</span>
+            <div className={styles.inlineChip}>
               {canReveal && (
                 <button
                   type="button"
@@ -217,17 +197,7 @@ export const LeadDetailsDrawer: React.FC = () => {
                     e.stopPropagation();
                     toggleReveal(apiField);
                   }}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    cursor: 'pointer',
-                    color: '#94a3b8',
-                    display: 'flex',
-                    alignItems: 'center',
-                    padding: '2px',
-                    borderRadius: '4px',
-                    transition: 'color 0.12s ease',
-                  }}
+                  className={styles.iconBtn}
                   aria-label={revealed[apiField] ? 'Hide value' : 'Reveal value'}
                   title={revealed[apiField] ? 'Hide value' : 'Reveal sensitive value'}
                 >
@@ -241,17 +211,7 @@ export const LeadDetailsDrawer: React.FC = () => {
                     e.stopPropagation();
                     handleCopyText(apiField, raw);
                   }}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    cursor: 'pointer',
-                    color: isCopied ? '#059669' : '#94a3b8',
-                    display: 'flex',
-                    alignItems: 'center',
-                    padding: '2px',
-                    borderRadius: '4px',
-                    transition: 'color 0.12s ease',
-                  }}
+                  className={`${styles.iconBtn}${isCopied ? ` ${styles.iconBtnCopied}` : ''}`}
                   title="Copy value"
                 >
                   {isCopied ? <Check size={12} /> : <Copy size={12} />}
@@ -265,33 +225,35 @@ export const LeadDetailsDrawer: React.FC = () => {
   }
 
   return (
-    <div className="drawer-overlay" style={{ zIndex: 1200 }} onClick={handleOverlayClick}>
-      <div className="lead-details-drawer" onClick={(e) => e.stopPropagation()}>
-        {/* Radiant Gradient Header — Exact Host Aesthetic */}
-        <div className="audit-drawer-header">
-          <div className="audit-drawer-header::before" />
-          <div className="audit-header-glow" />
-          <div className="audit-header-left">
-            <div className="audit-header-icon-box">
-              <Shield size={22} />
-            </div>
-            <div className="audit-header-text">
-              <h2 className="audit-header-title">Lead Record Details</h2>
-              <p className="audit-header-subtitle">Viewing complete customer and financing application context</p>
-            </div>
+    <Drawer
+      open
+      onClose={closeDetailsDrawer}
+      closeLabel="Close details drawer"
+      title="Lead Record Details"
+      subtitle="Viewing complete customer and financing application context"
+      icon={<Shield size={22} />}
+      footer={
+        <div className={drawerLayout.footerSpread}>
+          <div className={styles.footerMeta}>
+            <span className={styles.leadId}>
+              Lead ID: {leadIdStr ? (leadIdStr.length > 16 ? `${leadIdStr.slice(0, 16)}…` : leadIdStr) : '—'}
+            </span>
+            <button
+              type="button"
+              onClick={handleCopyId}
+              className={`${styles.copyBtn}${copiedId ? ` ${styles.copyBtnCopied}` : ''}`}
+              title="Copy Lead ID"
+            >
+              {copiedId ? <Check size={13} /> : <Copy size={13} />}
+              <span>{copiedId ? 'Copied' : 'Copy ID'}</span>
+            </button>
           </div>
-          <button
-            type="button"
-            className="audit-header-close-btn"
-            onClick={closeDetailsDrawer}
-            aria-label="Close details drawer"
-          >
-            <X size={18} />
-          </button>
+          <Button type="button" variant="secondary" onClick={closeDetailsDrawer}>
+            Close Details
+          </Button>
         </div>
-
-        {/* Drawer Body - Scrollable */}
-        <div className="drawer-body">
+      }
+    >
           {/* Hero Identity / Overview Banner */}
           <div className="lead-hero-identity-card">
             <div className="lead-hero-left">
@@ -299,31 +261,13 @@ export const LeadDetailsDrawer: React.FC = () => {
               <div className="lead-hero-meta">
                 <h3 className="lead-hero-name">{selectedLead.name}</h3>
                 <div className="lead-hero-tags">
-                  <span
-                    className="audit-badge"
-                    style={{
-                      backgroundColor: statusInfo.bg,
-                      color: statusInfo.text,
-                      border: `1px solid ${statusInfo.border}`,
-                    }}
-                  >
-                    <span
-                      style={{
-                        width: '5.5px',
-                        height: '5.5px',
-                        borderRadius: '50%',
-                        backgroundColor: statusInfo.dot,
-                        flexShrink: 0,
-                      }}
-                    />
-                    {statusInfo.label}
-                  </span>
+                  <LeadStatusBadge status={selectedLead.status} />
 
                   {selectedLead.product && (
-                    <span className="audit-badge audit-badge-primary">
+                    <Badge tone="primary">
                       <Package size={11} />
                       {selectedLead.product}
-                    </span>
+                      </Badge>
                   )}
 
                   {selectedLead.createdDate && (
@@ -342,18 +286,13 @@ export const LeadDetailsDrawer: React.FC = () => {
             {/* KPI 1: Applied Amount */}
             <div className="lead-kpi-highlight-card">
               <div
-                className="lead-kpi-icon-box"
-                style={{
-                  background: 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)',
-                  color: '#059669',
-                  boxShadow: '0 1px 3px rgba(5, 150, 105, 0.15)',
-                }}
+                className={`lead-kpi-icon-box ${styles.tileSuccess}`}
               >
                 <CreditCard size={17} />
               </div>
               <div className="lead-kpi-body">
                 <span className="lead-kpi-label">Applied Financing</span>
-                <span className="lead-kpi-value" style={{ color: '#059669' }}>
+                <span className={`lead-kpi-value ${styles.valueSuccess}`}>
                   {formatRinggit(selectedLead.appliedAmount)}
                 </span>
               </div>
@@ -362,12 +301,7 @@ export const LeadDetailsDrawer: React.FC = () => {
             {/* KPI 2: Servicing Branch */}
             <div className="lead-kpi-highlight-card">
               <div
-                className="lead-kpi-icon-box"
-                style={{
-                  background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
-                  color: '#2563eb',
-                  boxShadow: '0 1px 3px rgba(37, 99, 235, 0.15)',
-                }}
+                className={`lead-kpi-icon-box ${styles.tileInfo}`}
               >
                 <Building size={17} />
               </div>
@@ -382,12 +316,7 @@ export const LeadDetailsDrawer: React.FC = () => {
             {/* KPI 3: Sales Executive */}
             <div className="lead-kpi-highlight-card">
               <div
-                className="lead-kpi-icon-box"
-                style={{
-                  background: 'linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%)',
-                  color: '#7c3aed',
-                  boxShadow: '0 1px 3px rgba(124, 58, 237, 0.15)',
-                }}
+                className={`lead-kpi-icon-box ${styles.tilePurple}`}
               >
                 <UserCheck size={17} />
               </div>
@@ -498,7 +427,7 @@ export const LeadDetailsDrawer: React.FC = () => {
                   </span>
                   <div className="lead-field-body">
                     <span className="lead-field-label">Product Type</span>
-                    <span className="lead-field-value" style={{ fontWeight: 600, color: '#1d4ed8' }}>
+                    <span className={`lead-field-value ${styles.valuePrimary}`}>
                       {formatVal(selectedLead.product)}
                     </span>
                   </div>
@@ -582,11 +511,10 @@ export const LeadDetailsDrawer: React.FC = () => {
                     <span className="lead-field-label">
                       {getFieldLabel(fieldConfig, 'agreedToPrivacyPolicy', 'Privacy Policy Agreement')}
                     </span>
-                    <div className="lead-field-value" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: '#15803d' }}>
-                      <span className="audit-badge audit-badge-success">
-                        <span className="audit-badge-dot" />
+                    <div className={`lead-field-value ${styles.successRow}`}>
+                      <Badge tone="success" dot>
                         Agreed &amp; Accepted
-                      </span>
+                      </Badge>
                     </div>
                   </div>
                 </div>
@@ -599,12 +527,7 @@ export const LeadDetailsDrawer: React.FC = () => {
                 <div className="lead-field-body">
                   <span className="lead-field-label">System Record Reference</span>
                   <span
-                    className="lead-field-value"
-                    style={{
-                      fontFamily: "'SF Mono', 'Fira Code', monospace",
-                      fontSize: '12px',
-                      color: '#475569',
-                    }}
+                    className={`lead-field-value ${styles.monoId}`}
                   >
                     {leadIdStr || '—'}
                   </span>
@@ -612,45 +535,6 @@ export const LeadDetailsDrawer: React.FC = () => {
               </div>
             </div>
           </section>
-        </div>
-
-        {/* Sticky Footer */}
-        <div className="lead-drawer-footer">
-          <div className="lead-footer-meta">
-            <span style={{ fontFamily: 'ui-monospace, monospace', color: '#94a3b8' }}>
-              Lead ID: {leadIdStr ? (leadIdStr.length > 16 ? `${leadIdStr.slice(0, 16)}…` : leadIdStr) : '—'}
-            </span>
-            <button
-              type="button"
-              onClick={handleCopyId}
-              style={{
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-                color: copiedId ? '#059669' : '#64748b',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '4px',
-                padding: '3px 6px',
-                fontSize: '11.5px',
-                fontWeight: 600,
-              }}
-              title="Copy Lead ID"
-            >
-              {copiedId ? <Check size={13} /> : <Copy size={13} />}
-              <span>{copiedId ? 'Copied' : 'Copy ID'}</span>
-            </button>
-          </div>
-
-          <button
-            type="button"
-            className="lead-footer-close-btn"
-            onClick={closeDetailsDrawer}
-          >
-            Close Details
-          </button>
-        </div>
-      </div>
-    </div>
+    </Drawer>
   );
 };

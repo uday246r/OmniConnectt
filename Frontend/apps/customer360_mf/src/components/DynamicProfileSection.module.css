@@ -1,0 +1,33 @@
+/*
+ * Styles extracted from this component's former inline blocks. Values map to platform
+ * tokens where an exact equivalent exists.
+ */
+
+.spread {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: 8px;
+}
+
+.rule {
+  overflow-wrap: anywhere;
+}
+
+.row {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px;
+  color: #004EEB;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.text {
+  color: #004EEB;
+  text-decoration: none;
+}

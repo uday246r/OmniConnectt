@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Calendar, ChevronDown, Check, RotateCcw } from 'lucide-react';
+import styles from './TimeRangeFilterDropdown.module.css';
 import { useLeadStore } from '../../store/useLeadStore';
 
 export interface TimeRangePreset {
@@ -108,53 +109,25 @@ export const TimeRangeFilterDropdown: React.FC = () => {
   };
 
   return (
-    <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', gap: '10px' }} ref={dropdownRef}>
+    <div className={styles.root} ref={dropdownRef}>
       {/* Main Filter Button - Matching Image */}
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: '8px',
-          padding: '8px 14px',
-          background: '#ffffff',
-          border: '1.5px solid #3b82f6',
-          borderRadius: '10px',
-          fontSize: '13.5px',
-          fontWeight: 600,
-          color: '#0f172a',
-          boxShadow: '0 2px 6px rgba(59, 130, 246, 0.12)',
-          cursor: 'pointer',
-          transition: 'all 0.15s ease',
-        }}
+        className={styles.trigger}
       >
-        <Calendar size={16} color="#2563eb" />
+        <Calendar size={16} className={styles.triggerIcon} />
         <span>{currentPresetLabel}</span>
-        <ChevronDown size={15} color="#64748b" style={{ transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s ease' }} />
+        <ChevronDown size={15} className={`${styles.chevron}${isOpen ? ` ${styles.chevronOpen}` : ''}`} />
       </button>
 
       {/* Reset Button */}
       <button
         type="button"
         onClick={resetDashboardFilters}
-        style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: '6px',
-          padding: '8px 14px',
-          background: '#ffffff',
-          border: '1px solid #cbd5e1',
-          borderRadius: '10px',
-          fontSize: '13px',
-          fontWeight: 600,
-          color: '#2563eb',
-          cursor: 'pointer',
-          boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
-          transition: 'all 0.15s ease',
-        }}
+        className={styles.resetBtn}
       >
-        <RotateCcw size={14} color="#2563eb" />
+        <RotateCcw size={14} />
         <span>Reset</span>
       </button>
 
@@ -166,24 +139,11 @@ export const TimeRangeFilterDropdown: React.FC = () => {
       {isOpen && coords && createPortal(
         <div
           ref={popoverRef}
-          style={{
-            position: 'fixed',
-            top: coords.top,
-            right: coords.right,
-            zIndex: 1200,
-            background: '#ffffff',
-            borderRadius: '16px',
-            boxShadow: '0 12px 32px -4px rgba(15, 23, 42, 0.15), 0 4px 12px rgba(0,0,0,0.06)',
-            border: '1px solid #e2e8f0',
-            display: 'flex',
-            width: '460px',
-            overflow: 'hidden',
-            padding: '12px',
-            gap: '16px',
-          }}
+          className={styles.panel}
+          style={{ '--range-top': `${coords.top}px`, '--range-right': `${coords.right}px` } as React.CSSProperties}
         >
           {/* Left Column: Presets List */}
-          <div style={{ flex: '1', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+          <div className={styles.presets}>
             {PRESETS.map((preset) => {
               const isSelected = activePreset === preset.id;
               return (
@@ -191,21 +151,7 @@ export const TimeRangeFilterDropdown: React.FC = () => {
                   key={preset.id}
                   type="button"
                   onClick={() => handleSelectPreset(preset.id)}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '8px 12px',
-                    borderRadius: '8px',
-                    border: 'none',
-                    background: isSelected ? '#eff6ff' : 'transparent',
-                    color: isSelected ? '#2563eb' : '#334155',
-                    fontWeight: isSelected ? 600 : 500,
-                    fontSize: '13px',
-                    textAlign: 'left',
-                    cursor: 'pointer',
-                    transition: 'background-color 0.15s ease',
-                  }}
+                  className={`${styles.preset}${isSelected ? ` ${styles.presetActive}` : ''}`}
                 >
                   <span>{preset.label}</span>
                   {isSelected && <Check size={15} color="#2563eb" />}
@@ -216,68 +162,35 @@ export const TimeRangeFilterDropdown: React.FC = () => {
 
           {/* Right Column: Custom Range Inputs */}
           <div
-            style={{
-              width: '210px',
-              borderLeft: '1px solid #f1f5f9',
-              paddingLeft: '16px',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'space-between',
-            }}
+            className={styles.custom}
           >
             <div>
-              <div style={{ fontSize: '13.5px', fontWeight: 700, color: '#0f172a', marginBottom: '14px' }}>
+              <div className={styles.customTitle}>
                 Custom Range
               </div>
 
-              <div style={{ marginBottom: '12px' }}>
-                <label style={{ display: 'block', fontSize: '12px', color: '#64748b', marginBottom: '4px', fontWeight: 500 }}>
+              <div className={styles.customField}>
+                <label className={styles.customLabel}>
                   From
                 </label>
-                <div style={{ position: 'relative' }}>
                   <input
                     type="date"
                     value={customStart}
                     onChange={(e) => setCustomStart(e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '7px 10px',
-                      borderRadius: '8px',
-                      border: '1px solid #cbd5e1',
-                      fontSize: '12.5px',
-                      color: '#0f172a',
-                      fontWeight: 500,
-                      outline: 'none',
-                      boxSizing: 'border-box',
-                      backgroundColor: '#f8fafc',
-                    }}
+                    className={styles.dateInput}
                   />
-                </div>
               </div>
 
-              <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', fontSize: '12px', color: '#64748b', marginBottom: '4px', fontWeight: 500 }}>
+              <div className={styles.customFieldLast}>
+                <label className={styles.customLabel}>
                   To
                 </label>
-                <div style={{ position: 'relative' }}>
                   <input
                     type="date"
                     value={customEnd}
                     onChange={(e) => setCustomEnd(e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '7px 10px',
-                      borderRadius: '8px',
-                      border: '1px solid #cbd5e1',
-                      fontSize: '12.5px',
-                      color: '#0f172a',
-                      fontWeight: 500,
-                      outline: 'none',
-                      boxSizing: 'border-box',
-                      backgroundColor: '#f8fafc',
-                    }}
+                    className={styles.dateInput}
                   />
-                </div>
               </div>
             </div>
 
@@ -286,19 +199,7 @@ export const TimeRangeFilterDropdown: React.FC = () => {
               type="button"
               onClick={handleApplyCustomRange}
               disabled={!customStart || !customEnd}
-              style={{
-                width: '100%',
-                padding: '9px 16px',
-                background: !customStart || !customEnd ? '#94a3b8' : '#2563eb',
-                border: 'none',
-                borderRadius: '8px',
-                color: '#ffffff',
-                fontSize: '13px',
-                fontWeight: 600,
-                cursor: !customStart || !customEnd ? 'not-allowed' : 'pointer',
-                boxShadow: '0 2px 6px rgba(37, 99, 235, 0.25)',
-                transition: 'background-color 0.15s ease',
-              }}
+              className={styles.applyBtn}
             >
               Apply
             </button>

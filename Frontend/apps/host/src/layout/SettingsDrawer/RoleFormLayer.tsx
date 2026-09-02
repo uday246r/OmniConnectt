@@ -468,39 +468,39 @@ export function RoleFormLayer({ roleId, initialTab }: RoleFormLayerProps) {
     return (
       <div className={styles.layer}>
         {/* Skeleton Header */}
-        <div className={styles.header} style={{ pointerEvents: 'none' }}>
+        <div className={`${styles.header} ${styles.rfl1}`} >
           <div className={styles.headerTitleWrap}>
-            <div className={styles.headerIconBox} style={{ opacity: 0.55 }}>
+            <div className={`${styles.headerIconBox} ${styles.rfl2}`} >
               <SkeletonBlock width={22} height={22} radius="6px" />
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <div className={styles.rfl3}>
               <SkeletonBlock width={140} height={16} radius="5px" />
               <SkeletonBlock width={210} height={12} radius="4px" />
             </div>
           </div>
-          <div style={{ width: 34, height: 34, borderRadius: 10, background: 'rgba(255,255,255,0.18)' }} />
+          <div className={styles.rfl4} />
         </div>
 
         {/* Tab bar skeleton */}
-        <div style={{ display: 'flex', gap: 4, padding: '0 24px', borderBottom: '1px solid #eaecf0', background: '#fff' }}>
+        <div className={styles.rfl5}>
           {[80, 110, 90, 80].map((w, i) => (
-            <div key={i} style={{ padding: '13px 4px', marginRight: 18 }}>
+            <div key={i} className={styles.rfl6}>
               <SkeletonBlock width={w} height={12} radius="4px" />
             </div>
           ))}
         </div>
 
         {/* Form body */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '16px 24px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div className={styles.rfl7}>
           {/* Card 1 — Basic fields */}
-          <div style={{ background: '#fff', border: '1px solid #eaecf0', borderRadius: 14, padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div className={styles.rfl8}>
             <SkeletonBlock width={120} height={13} radius="4px" />
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+            <div className={styles.rfl9}>
+              <div className={styles.rfl10}>
                 <SkeletonBlock width="30%" height={11} radius="3px" />
                 <SkeletonBlock width="100%" height={38} radius="9px" />
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+              <div className={styles.rfl10}>
                 <SkeletonBlock width="35%" height={11} radius="3px" />
                 <SkeletonBlock width="100%" height={66} radius="9px" />
               </div>
@@ -508,19 +508,19 @@ export function RoleFormLayer({ roleId, initialTab }: RoleFormLayerProps) {
           </div>
 
           {/* Card 2 — Permission matrix preview */}
-          <div style={{ background: '#fff', border: '1px solid #eaecf0', borderRadius: 14, overflow: 'hidden' }}>
-            <div style={{ padding: '12px 18px', background: 'linear-gradient(to right, #f8fafc, #f1f5f9)', borderBottom: '2px solid #eaecf0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div className={styles.rfl11}>
+            <div className={styles.rfl12}>
               <SkeletonBlock width={140} height={13} radius="4px" />
-              <div style={{ display: 'flex', gap: 8 }}>
+              <div className={styles.rfl13}>
                 {[60, 60, 60, 70].map((w, i) => (
                   <SkeletonBlock key={i} width={w} height={11} radius="3px" />
                 ))}
               </div>
             </div>
             {[1, 2, 3].map((i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', padding: '10px 18px', borderBottom: '1px solid #f1f5f9', gap: 16 }}>
+              <div key={i} className={styles.rfl14}>
                 <SkeletonBlock width="35%" height={12} radius="3px" />
-                <div style={{ display: 'flex', gap: 16, marginLeft: 'auto' }}>
+                <div className={styles.rfl15}>
                   {[0, 1, 2, 3].map((j) => (
                     <SkeletonBlock key={j} width={16} height={16} radius="4px" />
                   ))}
@@ -530,8 +530,8 @@ export function RoleFormLayer({ roleId, initialTab }: RoleFormLayerProps) {
           </div>
 
           {/* Card 3 — Admin toggle */}
-          <div style={{ background: '#fff', border: '1px solid #eaecf0', borderRadius: 14, padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+          <div className={styles.rfl16}>
+            <div className={styles.rfl10}>
               <SkeletonBlock width={130} height={13} radius="4px" />
               <SkeletonBlock width={220} height={11} radius="3px" />
             </div>
@@ -540,7 +540,7 @@ export function RoleFormLayer({ roleId, initialTab }: RoleFormLayerProps) {
         </div>
 
         {/* Bottom bar */}
-        <div className={styles.bottomBar} style={{ pointerEvents: 'none' }}>
+        <div className={`${styles.bottomBar} ${styles.rfl1}`} >
           <SkeletonBlock width={90} height={36} radius="9px" />
           <SkeletonBlock width={110} height={36} radius="9px" />
         </div>

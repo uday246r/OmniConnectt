@@ -405,7 +405,7 @@ export function SettingsCheckerAssignmentTab() {
                     </div>
                     <div className={styles.appSelectorItemRight}>
                       <span className={styles.appSelectorItemBadge}>{totalGatedModules} Gated</span>
-                      {selectedAppId === 'all' && <Icon.Check width={13} height={13} style={{ color: '#2563eb' }} />}
+                      {selectedAppId === 'all' && <Icon.Check width={13} height={13} className={styles.cat1} />}
                     </div>
                   </button>
 
@@ -439,7 +439,7 @@ export function SettingsCheckerAssignmentTab() {
                           <span className={styles.appSelectorItemBadge}>
                             {app.gatedCount}/{app.modules.length} Gated
                           </span>
-                          {isSelected && <Icon.Check width={13} height={13} style={{ color: '#2563eb' }} />}
+                          {isSelected && <Icon.Check width={13} height={13} className={styles.cat1} />}
                         </div>
                       </button>
                     )
@@ -463,10 +463,7 @@ export function SettingsCheckerAssignmentTab() {
             <Icon.ChevronDown
               width={13}
               height={13}
-              style={{
-                transform: allExpanded ? 'rotate(0deg)' : 'rotate(-90deg)',
-                transition: 'transform 0.15s ease',
-              }}
+              className={`${styles.expandChevron}${allExpanded ? '' : ` ${styles.expandChevronCollapsed}`}`}
             />
             <span>{allExpanded ? 'Collapse All' : 'Expand All'}</span>
           </button>
@@ -531,7 +528,7 @@ export function SettingsCheckerAssignmentTab() {
         {loading ? (
           Array.from({ length: 3 }).map((_, i) => (
             <div key={i} className={styles.skeletonCard}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div className={styles.cat2}>
                 <SkeletonBlock height={20} width="35%" />
                 <SkeletonBlock height={20} width="80px" radius="999px" />
               </div>
@@ -679,7 +676,7 @@ export function SettingsCheckerAssignmentTab() {
                           <div className={styles.checkersSection}>
                             {modAssignments.length === 0 ? (
                               <p className={styles.ungatedNotice}>
-                                <Icon.Info width={12} height={12} style={{ flexShrink: 0 }} />
+                                <Icon.Info width={12} height={12} className={styles.cat3} />
                                 <span>Not gated — direct apply.</span>
                               </p>
                             ) : (
@@ -754,14 +751,14 @@ export function SettingsCheckerAssignmentTab() {
           </>
         }
       >
-        <p style={{ margin: 0, fontSize: '13px', color: '#1e293b', lineHeight: 1.5 }}>
+        <p className={styles.cat4}>
           <strong>{pendingRemove?.checkerName}</strong> will no longer be an approver for{' '}
-          <code style={{ background: '#f1f5f9', padding: '1px 5px', borderRadius: '4px' }}>
+          <code className={styles.cat5}>
             {pendingRemove?.module}
           </code>
           .
         </p>
-        <p style={{ margin: '8px 0 0', fontSize: '12px', color: '#64748b', lineHeight: 1.4 }}>
+        <p className={styles.cat6}>
           Pending requests will reassign to remaining checkers, or the module will become ungated if no checkers remain.
         </p>
       </Modal>

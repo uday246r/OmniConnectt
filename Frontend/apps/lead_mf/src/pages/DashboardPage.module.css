@@ -1,0 +1,34 @@
+/*
+ * Lead dashboard page.
+ *
+ * The page column comes from the app-level leadPage shell. The chart-row breakpoint below replaces
+ * a `<style>` tag that this component injected into the document at render time to get the same
+ * effect — a real rule does the job without shipping CSS through JSX.
+ */
+
+/* An empty-state / placeholder panel used when a chart section has nothing to show. */
+.panel {
+  background: var(--omni-color-surface);
+  border-radius: var(--omni-radius-xl);
+  border: 1px solid #eaecf0;
+  min-height: 320px;
+}
+
+.chartRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--omni-space-5);
+}
+
+/* Was `.lead-dash-charts-grid { grid-template-columns: 1fr !important }` in the injected tag. */
+@media (max-width: 768px) {
+  .chartRow {
+    grid-template-columns: 1fr;
+  }
+}
+
+.section {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--omni-space-5);
+}

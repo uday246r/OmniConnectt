@@ -25,45 +25,45 @@ import {
 import { api, ApiError } from '../services/api';
 import type { AuditLog } from '../types/api';
 import { getFriendlyErrorMessage } from '../utils/errorMessages';
+import styles from './AuditLogs.module.css';
+import cc from '../shared/c360Common.module.css';
+import { ActorCell, Badge, Button, ColumnFilter, DataTable, EMPTY_VALUE, FilterBar, PageHeader, Pagination, RowAction, RowsPerPage, SearchField, formatAuditTimestamp, readStoredPageSize, type ActiveFilter, type BadgeTone } from '@omniremit/ui';
+import { resolveActor, shortId } from '../shared/resolveActor';
 
-const getActionBadge = (action?: string) => {
+/* Action -> platform badge tone. Was four hardcoded {bg,text,border,dot} palettes handed to the
+   pill through inline custom properties; the tones carry the same colours from the token set. */
+const actionTone = (action?: string): BadgeTone => {
   const a = (action || '').toLowerCase();
-  if (a.includes('create') || a.includes('add') || a.includes('insert')) {
-    return { bg: '#ecfdf5', text: '#047857', border: '#a7f3d0', dot: '#10b981' };
-  }
-  if (a.includes('edit') || a.includes('update') || a.includes('modify')) {
-    return { bg: '#eff6ff', text: '#1d4ed8', border: '#bfdbfe', dot: '#2563eb' };
-  }
-  if (a.includes('delete') || a.includes('remove') || a.includes('purge')) {
-    return { bg: '#fff1f2', text: '#be123c', border: '#fecdd3', dot: '#f43f5e' };
-  }
-  return { bg: '#eff6ff', text: '#1d4ed8', border: '#bfdbfe', dot: '#2563eb' };
+  if (a.includes('create') || a.includes('add') || a.includes('insert')) return 'success';
+  if (a.includes('delete') || a.includes('remove') || a.includes('purge')) return 'danger';
+  return 'primary';
 };
 
-function formatAuditTimestamp(iso?: string | null): string {
-  if (!iso) return '—';
-  try {
-    const date = new Date(iso);
-    if (Number.isNaN(date.getTime())) return String(iso);
-
-    return date.toLocaleString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-    });
-  } catch {
-    return String(iso);
-  }
-}
+/** A row's own outcome. Success unless the record says otherwise. */
+const isSuccessStatus = (status?: string) => {
+  const v = (status || '').toUpperCase();
+  return v === '' || v === 'SUCCESS';
+};
 
 function getActorInitial(name?: string | null): string {
   if (!name) return 'S';
   const parts = name.trim().split(/\s+/);
   return (parts[0]?.charAt(0) || 'S').toUpperCase();
 }
+
+/* The vocabulary the Action column filters on. Was a toolbar <select>; the host puts this control
+   in the column header instead, which is where it now lives. */
+const STATUS_FILTER_OPTIONS = [
+  { value: 'SUCCESS', label: 'Success' },
+  { value: 'FAILED', label: 'Failed' },
+];
+
+const ACTION_FILTER_OPTIONS = [
+  { value: 'VIEW', label: 'View Profile' },
+  { value: 'LOOKUP', label: 'Lookup Search' },
+  { value: 'UPDATE', label: 'Profile Update' },
+  { value: 'EXPORT', label: 'Data Export' },
+];
 
 export default function AuditLogs() {
   const [logs, setLogs] = useState<AuditLog[]>([]);
@@ -72,13 +72,65 @@ export default function AuditLogs() {
 
   // Pagination states
   const [pageNumber, setPageNumber] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  // Opens at whatever size this user last chose here.
+  const [pageSize, setPageSize] = useState(() => readStoredPageSize('c360.audit', 10));
   const [totalCount, setTotalCount] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
 
   // Filter states
   const [searchQuery, setSearchQuery] = useState('');
   const [actionFilter, setActionFilter] = useState('');
+  // Status has no server-side parameter, so it narrows the page already fetched. Kept explicit so
+  // nobody later assumes it paginates like `action` and `search` do.
+  const [statusFilter, setStatusFilter] = useState('');
+  // Client-side, like status: GET /v1/audit accepts `search` and `action` only, so these narrow the
+  // page already fetched rather than the query.
+  const [actorFilter, setActorFilter] = useState('');
+  const [customerFilter, setCustomerFilter] = useState('');
+
+  /*
+   * Actor and Customer offer the values that ACTUALLY appear in the loaded audit rows, so the list
+   * can never suggest something that returns nothing. Typing narrows it. Both were empty
+   * type-to-search boxes, which told you nothing about who or what was in the data.
+   */
+  const distinct = (pick: (l: AuditLog) => string | null | undefined) => {
+    const seen = new Map<string, string>();
+    for (const log of logs) {
+      const v = (pick(log) ?? '').trim();
+      if (v && !seen.has(v.toLowerCase())) seen.set(v.toLowerCase(), v);
+    }
+    return [...seen.values()].sort((a, b) => a.localeCompare(b)).map((v) => ({ value: v, label: v }));
+  };
+
+  /*
+   * Status, Actor and Customer filter CLIENT-SIDE — GET /v1/audit accepts `search` and `action`
+   * only — while paging is server-side. With a client filter on, the pager would claim
+   * "Showing 11 to 13 of 13" above rows that had all been filtered out. It now describes what is
+   * on screen instead, and server paging is suppressed while one is active.
+   */
+  const visibleLogs = logs.filter((log) => {
+    if (statusFilter && (isSuccessStatus(log.status) ? 'SUCCESS' : 'FAILED') !== statusFilter) return false;
+    if (actorFilter) {
+      const actor = resolveActor(log.user);
+      const hay = `${actor.name ?? ''} ${actor.id ?? ''} ${log.user ?? ''}`.toLowerCase();
+      if (!hay.includes(actorFilter.toLowerCase())) return false;
+    }
+    if (customerFilter) {
+      const hay = `${log.customerName ?? ''} ${log.customerId ?? ''}`.toLowerCase();
+      if (!hay.includes(customerFilter.toLowerCase())) return false;
+    }
+    return true;
+  });
+  const clientFiltered = Boolean(statusFilter || actorFilter || customerFilter);
+
+  const actorOptions = React.useMemo(
+    () => distinct((l) => resolveActor(l.user).name ?? l.user),
+    [logs]
+  );
+  const customerOptions = React.useMemo(
+    () => distinct((l) => l.customerName || l.customerId),
+    [logs]
+  );
 
   // Selected Log for Details Drawer
   const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null);
@@ -172,327 +224,239 @@ export default function AuditLogs() {
   };
 
   const isSuccess = (selectedLog?.status || '').toUpperCase() === 'SUCCESS' || !selectedLog?.status;
-  const actorName = selectedLog?.user || 'System Officer';
+  const resolvedActor = resolveActor(selectedLog?.user);
+  const actorName = resolvedActor.name ?? (resolvedActor.id ? `Officer ${shortId(resolvedActor.id)}` : 'System Officer');
   const actorInitial = getActorInitial(actorName);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+    <div className={styles.stack}>
       {/* Hero Banner — Host Pattern */}
-      <div className="c360-hero-banner">
-        <div style={{ position: 'absolute', top: '-40px', right: '-40px', width: '180px', height: '180px', borderRadius: '50%', background: 'rgba(255, 255, 255, 0.08)', pointerEvents: 'none' }} />
-        <div style={{ position: 'absolute', bottom: '-50px', right: '120px', width: '130px', height: '130px', borderRadius: '50%', background: 'rgba(255, 255, 255, 0.05)', pointerEvents: 'none' }} />
-
-        <div className="c360-hero-left">
-          <div
-            style={{
-              width: '50px',
-              height: '50px',
-              borderRadius: '14px',
-              background: 'rgba(255, 255, 255, 0.18)',
-              border: '1.5px solid rgba(255, 255, 255, 0.3)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#ffffff',
-              flexShrink: 0,
-            }}
+      <PageHeader
+        icon={<ShieldCheck size={24} />}
+        title="Customer 360° Audit Trail"
+        pill={`${totalCount || logs.length} Events Logged`}
+        subtitle="Immutable compliance and security logs of all customer profile lookups, views, and data access events"
+        actions={
+          <Button
+            variant="onHeader"
+            onClick={handleExportCSV}
+            disabled={logs.length === 0}
+            leadingIcon={<Download size={15} />}
           >
-            <ShieldCheck size={24} />
-          </div>
+            Export CSV
+          </Button>
+        }
+      />
 
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <h1 className="c360-hero-title">Customer 360° Audit Trail</h1>
-              <span className="c360-hero-pill">
-                {totalCount || logs.length} Events Logged
-              </span>
-            </div>
-            <p className="c360-hero-subtitle">
-              Immutable compliance and security logs of all customer profile lookups, views, and data access events
-            </p>
-          </div>
-        </div>
-
-        <button
-          type="button"
-          onClick={handleExportCSV}
-          disabled={logs.length === 0}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '7px',
-            height: '40px',
-            padding: '0 18px',
-            borderRadius: '12px',
-            border: '1px solid rgba(255, 255, 255, 0.35)',
-            background: 'rgba(255, 255, 255, 0.95)',
-            color: '#1d4ed8',
-            fontSize: '13.5px',
-            fontWeight: 700,
-            cursor: logs.length === 0 ? 'not-allowed' : 'pointer',
-            opacity: logs.length === 0 ? 0.6 : 1,
-            boxShadow: '0 2px 10px rgba(0, 0, 0, 0.12)',
-            transition: 'all 0.15s ease',
-            fontFamily: 'inherit',
-            flexShrink: 0,
-            position: 'relative',
-            zIndex: 1,
-          }}
-        >
-          <Download size={15} />
-          <span>Export CSV</span>
-        </button>
-      </div>
+      <FilterBar
+        filters={[
+          actionFilter && {
+            key: 'action',
+            label: 'Action',
+            value: ACTION_FILTER_OPTIONS.find((o) => o.value === actionFilter)?.label ?? actionFilter,
+            onRemove: () => setActionFilter(''),
+          },
+          actorFilter && { key: 'actor', label: 'Performed By', value: actorFilter, onRemove: () => setActorFilter('') },
+          customerFilter && { key: 'customer', label: 'Customer', value: customerFilter, onRemove: () => setCustomerFilter('') },
+          statusFilter && {
+            key: 'status',
+            label: 'Status',
+            value: STATUS_FILTER_OPTIONS.find((o) => o.value === statusFilter)?.label ?? statusFilter,
+            onRemove: () => setStatusFilter(''),
+          },
+          searchQuery && { key: 'search', label: 'Search', value: `"${searchQuery}"`, onRemove: () => setSearchQuery('') },
+        ].filter(Boolean) as ActiveFilter[]}
+        onClearAll={() => {
+          setActionFilter('');
+          setActorFilter('');
+          setCustomerFilter('');
+          setStatusFilter('');
+          setSearchQuery('');
+        }}
+      />
 
       {/* Main Table Card */}
       <div className="c360-table-container">
         {/* Controls Toolbar */}
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            gap: '12px',
-            padding: '16px 20px',
-            borderBottom: '1px solid #eaecf0',
-            background: '#ffffff',
-            flexWrap: 'wrap',
-          }}
+        <div className={cc.toolbar}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, maxWidth: '520px', flexWrap: 'wrap' }}>
-            <div className="c360-input-wrapper" style={{ flex: '1 1 240px' }}>
-              <Search size={16} className="c360-input-icon" />
-              <input
-                type="text"
+          <div className={cc.toolbarSearch}>
+            <div className={styles.rule}>
+              <SearchField
                 placeholder="Search audit trail by officer, customer, or description..."
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="c360-input"
+                onValueChange={setSearchQuery}
               />
             </div>
 
-            <select
-              value={actionFilter}
-              onChange={(e) => setActionFilter(e.target.value)}
-              className="c360-select"
-              style={{ width: '160px', flexShrink: 0 }}
-            >
-              <option value="">All Actions</option>
-              <option value="VIEW">View Profile</option>
-              <option value="LOOKUP">Lookup Search</option>
-              <option value="UPDATE">Profile Update</option>
-              <option value="EXPORT">Data Export</option>
-            </select>
           </div>
+
+          <div className={cc.toolbarActions}>
+          {/* Rows-per-page belongs with the table controls, not in the footer — the host's Audit
+              Logs is the reference for both the placement and the "ROWS" label. */}
+          <RowsPerPage storageKey="c360.audit" value={pageSize} onChange={(n) => { setPageSize(n); setPageNumber(1); }} />
 
           <button
             type="button"
             onClick={fetchLogs}
             disabled={loading}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              height: '38px',
-              padding: '0 14px',
-              borderRadius: '10px',
-              border: '1px solid #eaecf0',
-              background: '#ffffff',
-              color: '#334155',
-              fontSize: '13px',
-              fontWeight: 600,
-              cursor: 'pointer',
-              boxShadow: '0 1px 2px rgba(15, 23, 42, 0.05)',
-              fontFamily: 'inherit',
-            }}
+            className={styles.panel}
           >
             <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
             <span>Refresh</span>
           </button>
         </div>
+        </div>
 
         {/* Error Banner */}
         {error && (
-          <div style={{ padding: '16px 20px', background: '#fef2f2', borderBottom: '1px solid #fecaca', color: '#b91c1c', display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px' }}>
-            <AlertTriangle size={18} style={{ flexShrink: 0 }} />
+          <div className={styles.row4}>
+            <AlertTriangle size={18} className={styles.rule2} />
             <span>{error}</span>
           </div>
         )}
 
         {/* Table / Empty State */}
         {loading && logs.length === 0 ? (
-          <div style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>
-            <RefreshCw size={24} className="animate-spin" style={{ margin: '0 auto 12px', color: '#2563eb' }} />
-            <p style={{ margin: 0, fontSize: '13.5px', fontWeight: 500 }}>Loading Customer 360° audit logs...</p>
+          <div className={styles.text}>
+            <RefreshCw size={24} className={`animate-spin ${styles.text2}`} />
+            <p className={styles.rule3}>Loading Customer 360° audit logs...</p>
           </div>
         ) : logs.length === 0 ? (
-          <div style={{ padding: '48px 20px', textAlign: 'center', color: '#64748b' }}>
-            <ShieldCheck size={36} style={{ margin: '0 auto 10px', color: '#94a3b8', opacity: 0.7 }} />
-            <h3 style={{ margin: '0 0 4px', fontSize: '15px', color: '#0f172a', fontWeight: 600 }}>No audit logs found</h3>
-            <p style={{ margin: 0, fontSize: '13px', color: '#64748b' }}>
+          <div className={styles.text3}>
+            <ShieldCheck size={36} className={styles.muted} />
+            <h3 className={styles.text4}>No audit logs found</h3>
+            <p className={styles.text5}>
               {searchQuery || actionFilter ? 'Try clearing filters or search queries.' : 'No customer audit events recorded yet.'}
             </p>
           </div>
         ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table className="c360-table">
+          <DataTable>
               <thead>
                 <tr>
-                  <th>Timestamp</th>
-                  <th>Action</th>
-                  <th>Actor / Officer</th>
-                  <th>Customer Reference</th>
-                  <th>Description</th>
-                  <th>Status</th>
-                  <th style={{ textAlign: 'right' }}>Details</th>
+                  <th>Date &amp; Time</th>
+                  <ColumnFilter
+                    label="Performed By"
+                    title="Filter Performed By"
+                    value={actorFilter}
+                    onChange={setActorFilter}
+                    options={actorOptions}
+                    allLabel="Everyone"
+                    searchable={actorOptions.length > 6}
+                    searchPlaceholder="Type a name to narrow…"
+                    emptyHint="Nobody in this log matches that."
+                  />
+                  <ColumnFilter
+                    label="Action"
+                    value={actionFilter}
+                    onChange={setActionFilter}
+                    options={ACTION_FILTER_OPTIONS}
+                    allLabel="All Actions"
+                  />
+                  <ColumnFilter
+                    label="Customer Reference"
+                    title="Filter Customer"
+                    value={customerFilter}
+                    onChange={setCustomerFilter}
+                    options={customerOptions}
+                    allLabel="All Customers"
+                    searchable={customerOptions.length > 6}
+                    searchPlaceholder="Type to narrow customers…"
+                    emptyHint="No customer in this log matches that."
+                  />
+                  <th>What Happened</th>
+                  <ColumnFilter
+                    label="Status"
+                    value={statusFilter}
+                    onChange={setStatusFilter}
+                    options={STATUS_FILTER_OPTIONS}
+                    allLabel="All Statuses"
+                  />
+                  <th className={styles.rule4}>Details</th>
                 </tr>
               </thead>
               <tbody>
-                {logs.map((log, idx) => {
-                  const badge = getActionBadge(log.action);
+                {visibleLogs.map((log, idx) => {
+                  // Per ROW. This previously read the component-level `isSuccess`, which is derived
+                  // from `selectedLog` — the drawer's record — so every row in the table rendered
+                  // the status of whichever log happened to be selected.
+                  const rowSuccess = isSuccessStatus(log.status);
 
                   return (
                     <tr
                       key={idx}
-                      style={{ transition: 'background 0.12s ease' }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.background = '#f8fafc';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.background = 'transparent';
-                      }}
+                      className={styles.rule5}
                     >
-                      <td style={{ whiteSpace: 'nowrap', color: '#0f172a', fontWeight: 500 }}>
+                      <td className={styles.text6}>
                         {formatAuditTimestamp(log.timestamp)}
                       </td>
                       <td>
-                        <span
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '5px',
-                            padding: '3px 10px',
-                            borderRadius: '999px',
-                            background: badge.bg,
-                            color: badge.text,
-                            fontSize: '11.5px',
-                            fontWeight: 750,
-                            border: `1px solid ${badge.border}`,
-                          }}
-                        >
-                          <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: badge.dot }} />
-                          {(log.action || 'VIEW').toUpperCase()}
-                        </span>
+                        {(() => {
+                          const actor = resolveActor(log.user);
+                          return (
+                            <ActorCell
+                              name={actor.name ?? (actor.id ? null : 'System')}
+                              fallback={actor.id ? shortId(actor.id) : undefined}
+                            />
+                          );
+                        })()}
                       </td>
-                      <td style={{ fontWeight: 600, color: '#0f172a' }}>{log.user || 'System'}</td>
                       <td>
-                        <div style={{ fontWeight: 600, color: '#0f172a' }}>{log.customerName || '-'}</div>
-                        {log.customerId && (
-                          <div style={{ fontSize: '11.5px', color: '#64748b', fontFamily: "'SF Mono', 'Fira Code', monospace" }}>
-                            {log.customerId}
-                          </div>
+                        <Badge tone={actionTone(log.action)} dot>
+                          {(log.action || 'VIEW').toUpperCase()}
+                        </Badge>
+                      </td>
+                      {/* Customer reference. When there is no name — a failed lookup, a
+                          system-scope event — the identifier IS the reference, so it becomes the
+                          primary line instead of rendering a bare "-" above it. */}
+                      <td>
+                        {log.customerName ? (
+                          <>
+                            <div className={styles.text7}>{log.customerName}</div>
+                            {log.customerId && <div className={cc.monoMeta}>{log.customerId}</div>}
+                          </>
+                        ) : log.customerId ? (
+                          <div className={cc.monoMeta}>{log.customerId}</div>
+                        ) : (
+                          <span className={cc.mutedText}>{EMPTY_VALUE}</span>
                         )}
                       </td>
-                      <td style={{ color: '#334155', maxWidth: '280px' }}>{log.description || '-'}</td>
+                      <td className={styles.text8}>{log.description || '-'}</td>
                       <td>
-                        <span
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '5px',
-                            padding: '3px 9px',
-                            borderRadius: '999px',
-                            fontSize: '11.5px',
-                            fontWeight: 700,
-                            background: isSuccess ? '#ecfdf5' : '#fff1f2',
-                            color: isSuccess ? '#047857' : '#be123c',
-                            border: `1px solid ${isSuccess ? '#a7f3d0' : '#fecdd3'}`,
-                          }}
-                        >
-                          <span
-                            style={{
-                              width: '5px',
-                              height: '5px',
-                              borderRadius: '50%',
-                              backgroundColor: isSuccess ? '#10b981' : '#f43f5e',
-                            }}
-                          />
+                        <Badge tone={rowSuccess ? 'success' : 'danger'} dot>
                           {log.status || 'Success'}
-                        </span>
+                        </Badge>
                       </td>
-                      <td style={{ textAlign: 'right' }}>
-                        <button
-                          type="button"
+                      <td className={styles.rule4}>
+                        <RowAction
                           onClick={(e) => {
                             e.stopPropagation();
                             setSelectedLog(log);
                             setDetailsOpen(true);
                           }}
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                            padding: '5px 11px',
-                            borderRadius: '8px',
-                            border: '1px solid #bfdbfe',
-                            background: '#eff6ff',
-                            color: '#1d4ed8',
-                            fontSize: '12px',
-                            fontWeight: 600,
-                            cursor: 'pointer',
-                            fontFamily: 'inherit',
-                            transition: 'all 0.12s ease',
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.background = '#dbeafe';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.background = '#eff6ff';
-                          }}
-                        >
-                          <Eye size={13} />
-                          <span>Inspect</span>
-                        </button>
+                        />
                       </td>
                     </tr>
                   );
                 })}
               </tbody>
-            </table>
-          </div>
+            </DataTable>
         )}
       </div>
 
-      {/* Pagination */}
-      {totalCount > pageSize && (
-        <div className="c360-pagination">
-          <button
-            type="button"
-            className="c360-page-btn"
-            disabled={pageNumber <= 1}
-            onClick={() => setPageNumber((p) => p - 1)}
-          >
-            &lt; Previous
-          </button>
-          <span className="c360-page-indicator">
-            Page {pageNumber} of {totalPages}
-          </span>
-          <button
-            type="button"
-            className="c360-page-btn"
-            disabled={pageNumber >= totalPages}
-            onClick={() => setPageNumber((p) => p + 1)}
-          >
-            Next &gt;
-          </button>
-        </div>
-      )}
+      <Pagination
+        page={clientFiltered ? 1 : pageNumber}
+        pageSize={clientFiltered ? Math.max(visibleLogs.length, 1) : pageSize}
+        total={clientFiltered ? visibleLogs.length : totalCount}
+        itemLabel="event"
+        onPageChange={setPageNumber}
+      />
+
 
       {/* Details Drawer — Host & Lead Standard Structured Inspect Drawer */}
       {detailsOpen && selectedLog && (
         <div
-          className="drawer-overlay"
-          style={{ zIndex: 1200 }}
+          className={`drawer-overlay ${styles.rule6}`}
           onClick={() => setDetailsOpen(false)}
         >
           <div className="audit-details-drawer" onClick={(e) => e.stopPropagation()}>
@@ -537,9 +501,9 @@ export default function AuditLogs() {
                         <div className="audit-detail-row-body">
                           <dt className="audit-detail-row-label">Service</dt>
                           <dd className="audit-detail-row-value">
-                            <span className="audit-badge audit-badge-primary">
+                            <Badge tone="primary">
                               Customer360Service
-                            </span>
+                              </Badge>
                           </dd>
                         </div>
                       </div>
@@ -571,14 +535,9 @@ export default function AuditLogs() {
                         <div className="audit-detail-row-body">
                           <dt className="audit-detail-row-label">Result</dt>
                           <dd className="audit-detail-row-value">
-                            <span
-                              className={`audit-badge ${
-                                isSuccess ? 'audit-badge-success' : 'audit-badge-danger'
-                              }`}
-                            >
-                              <span className="audit-badge-dot" />
+                            <Badge tone={isSuccess ? 'success' : 'danger'} dot>
                               {isSuccess ? 'Success' : selectedLog.status || 'Failed'}
-                            </span>
+                            </Badge>
                           </dd>
                         </div>
                       </div>
@@ -609,7 +568,7 @@ export default function AuditLogs() {
                         <span className="audit-timeline-dot" />
                         <div className="audit-timeline-step-card">
                           <span className="audit-timeline-label">
-                            Triggered by {selectedLog.user || 'System Officer'}
+                            Triggered by {actorName}
                           </span>
                           <span className="audit-timeline-time">
                             <Clock size={12} />
@@ -655,7 +614,7 @@ export default function AuditLogs() {
                       <div className="audit-field-card-value">
                         <div className="audit-user-chip">
                           <span className="audit-user-avatar">{actorInitial}</span>
-                          <span>{selectedLog.user || 'System Officer'}</span>
+                          <span>{actorName}</span>
                         </div>
                       </div>
                     </div>
@@ -668,9 +627,9 @@ export default function AuditLogs() {
                     <div className="audit-field-card-body">
                       <span className="audit-field-card-label">Access Channel</span>
                       <span className="audit-field-card-value">
-                        <span className="audit-badge audit-badge-primary">
+                        <Badge tone="primary">
                           CRM Core Access
-                        </span>
+                          </Badge>
                       </span>
                     </div>
                   </div>
@@ -705,7 +664,7 @@ export default function AuditLogs() {
                     </span>
                     <div className="audit-field-card-body">
                       <span className="audit-field-card-label">Customer Name</span>
-                      <span className="audit-field-card-value" style={{ fontWeight: 600 }}>
+                      <span className={`audit-field-card-value ${styles.rule7}`}>
                         {selectedLog.customerName || 'General / System Scope'}
                       </span>
                     </div>
@@ -718,9 +677,9 @@ export default function AuditLogs() {
                     <div className="audit-field-card-body">
                       <span className="audit-field-card-label">Customer Type</span>
                       <span className="audit-field-card-value">
-                        <span className="audit-badge audit-badge-primary">
+                        <Badge tone="primary">
                           {selectedLog.customerType || 'Individual Profile'}
-                        </span>
+                          </Badge>
                       </span>
                     </div>
                   </div>
@@ -760,13 +719,9 @@ export default function AuditLogs() {
               meaningful is already presented as labelled fields above.
             */}
             <div className="audit-drawer-footer">
-              <button
-                type="button"
-                className="audit-footer-close-btn"
-                onClick={() => setDetailsOpen(false)}
-              >
+              <Button type="button" variant="secondary" onClick={() => setDetailsOpen(false)}>
                 Close Details
-              </button>
+              </Button>
             </div>
           </div>
         </div>

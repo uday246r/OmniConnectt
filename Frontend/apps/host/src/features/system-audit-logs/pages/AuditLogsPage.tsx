@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useAuthStore } from '../../auth/store/authStore'
-import { Badge, type BadgeTone } from '../../../shared/components/Badge/Badge'
+import { ActorCell, Badge, DataTable, FilterBar, PageHeader, Pagination, RowAction, RowsPerPage, formatAuditTimestamp, readStoredPageSize, type ActiveFilter, type BadgeTone } from '@omniremit/ui'
 import { SkeletonBlock } from '../../../shared/components/Skeleton'
 import { PermissionGate } from '../../../shared/components/PermissionGate/PermissionGate'
 import { ApiError } from '../../../shared/api/httpClient'
@@ -60,18 +60,8 @@ function formatActionLabel(action: string): string {
     .join(' ')
 }
 
-function formatTimestamp(iso: string) {
-  const date = new Date(iso)
-  if (Number.isNaN(date.getTime())) return iso
-
-  return date.toLocaleString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-}
+/* Audit timestamps come from @omniremit/ui so the two remotes render the same shape. */
+const formatTimestamp = formatAuditTimestamp
 
 interface ParsedUserAgent {
   browser: string
@@ -228,9 +218,7 @@ export function AuditLogsPage() {
   // Defaults to all activity, not to failures. See the tablist below for why.
   const [activeTab, setActiveTab] = useState<TabId>(TAB_IDS.auditEvents)
   const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
-  const [isCustomPageSize, setIsCustomPageSize] = useState(false)
-  const [customPageSizeInput, setCustomPageSizeInput] = useState('')
+  const [pageSize, setPageSize] = useState(() => readStoredPageSize('host.audit', DEFAULT_PAGE_SIZE))
 
   // Popover state
   const [activeHeaderFilter, setActiveHeaderFilter] = useState<string | null>(null)
@@ -543,28 +531,6 @@ export function AuditLogsPage() {
   }
 
   // Handler for the page-size preset or custom selection
-  function handlePageSizeSelect(value: string) {
-    if (value === 'custom') {
-      setIsCustomPageSize(true)
-      setCustomPageSizeInput(String(pageSize))
-    } else {
-      const size = Number(value)
-      setIsCustomPageSize(false)
-      setCustomPageSizeInput('')
-      setPageSize(size)
-      setPage(1)
-    }
-  }
-
-  function handleCustomPageSizeChange(val: string) {
-    setCustomPageSizeInput(val)
-    const parsed = parseInt(val, 10)
-    if (!Number.isNaN(parsed) && parsed >= 1 && parsed <= 500) {
-      setPageSize(parsed)
-      setPage(1)
-    }
-  }
-
   function clearAllFilters() {
     setService('')
     setServiceSearch('')
@@ -594,22 +560,20 @@ export function AuditLogsPage() {
   return (
     <div className={styles.page}>
       {/* Header */}
-      <div className={styles.header}>
-        <div className={styles.titleGroup}>
-          <div className={styles.titleHeaderRow}>
-            <h1 className={styles.title}>Audit Logs</h1>
-            <span className={styles.liveStreamBadge}>
-              <span className={styles.liveDot} />
-              Live Stream
-            </span>
-          </div>
-          <p className={styles.subtitle}>
-            Comprehensive real-time log of authentication events and administrative platform activities.
-          </p>
-        </div>
-
-        {/* Date Filter Pills */}
-        <div className={styles.dateRangeGroup} role="group" aria-label="Date range">
+      {/* This page's banner IS the platform reference — PageHeader was derived from it, so moving it
+          onto the shared component is byte-for-byte identical here and brings the three copies that
+          had drifted from it (Approval Center, and both of lead_mf's) into line. */}
+      <PageHeader
+        title="Audit Logs"
+        pill={
+          <>
+            <span className={styles.liveDot} />
+            Live Stream
+          </>
+        }
+        subtitle="Comprehensive real-time log of authentication events and administrative platform activities."
+        actions={
+          <div className={styles.dateRangeGroup} role="group" aria-label="Date range">
           {DATE_RANGES.map((r) => (
             <button
               key={r.key}
@@ -628,8 +592,9 @@ export function AuditLogsPage() {
               {r.label}
             </button>
           ))}
-        </div>
-      </div>
+          </div>
+        }
+      />
 
       {/* 4 Summary Stat Cards */}
       <div className={styles.summaryGrid}>
@@ -708,45 +673,16 @@ export function AuditLogsPage() {
 
         <div className={styles.toolbarActions}>
           {/* Rows-per-page dropdown */}
-          <div className={styles.rowsDropdownWrap}>
-            <label htmlFor="audit-rows-select" className={styles.rowsDropdownLabel}>
-              Rows
-            </label>
-            <div className={styles.rowsSelectWrap}>
-              <select
-                id="audit-rows-select"
-                className={styles.rowsSelect}
-                value={isCustomPageSize ? 'custom' : pageSize}
-                onChange={(e) => handlePageSizeSelect(e.target.value)}
-                aria-label="Rows per page"
-              >
-                {PAGE_SIZE_OPTIONS.map((s) => (
-                  <option key={s} value={s}>{s}</option>
-                ))}
-                <option value="custom">Custom</option>
-              </select>
-              <span className={styles.rowsSelectChevron} aria-hidden="true">▾</span>
-            </div>
-            {isCustomPageSize && (
-              <input
-                type="number"
-                min={1}
-                max={500}
-                className={styles.rowsCustomInput}
-                value={customPageSizeInput}
-                placeholder="e.g. 50"
-                onChange={(e) => handleCustomPageSizeChange(e.target.value)}
-                onBlur={() => {
-                  const parsed = parseInt(customPageSizeInput, 10)
-                  if (Number.isNaN(parsed) || parsed < 1 || parsed > 500) {
-                    setCustomPageSizeInput(String(pageSize))
-                  }
-                }}
-                aria-label="Custom row count"
-                autoFocus
-              />
-            )}
-          </div>
+          {/* The shared control — same presets and Custom entry this page defined, now with the
+              choice remembered per table so it survives navigation and reload. */}
+          <RowsPerPage
+            storageKey="host.audit"
+            value={pageSize}
+            onChange={(n) => {
+              setPageSize(n)
+              setPage(1)
+            }}
+          />
 
           <button
             type="button"
@@ -775,95 +711,41 @@ export function AuditLogsPage() {
         </div>
       </div>
 
-      {/* Active filters chip banner */}
-      {hasActiveFilters && (
-        <div className={styles.activeFiltersBar}>
-          <span className={styles.activeFiltersLabel}>Filters:</span>
-          {dateRange !== 'all' && (
-            <span className={styles.filterChip}>
-              <span>
-                Time: {dateRange === 'custom' ? `${customFrom || '…'} to ${customTo || '…'}` : (DATE_RANGES.find((d) => d.key === dateRange)?.label ?? dateRange)}
-              </span>
-              <button type="button" className={styles.filterChipRemove} onClick={() => { setDateRange('all'); setCustomFrom(''); setCustomTo('') }} aria-label="Remove date filter">
-                <Icon.X width={12} height={12} />
-              </button>
-            </span>
-          )}
-          {service && (
-            <span className={styles.filterChip}>
-              <span>Service: {service}</span>
-              <button type="button" className={styles.filterChipRemove} onClick={() => setService('')} aria-label="Remove service filter">
-                <Icon.X width={12} height={12} />
-              </button>
-            </span>
-          )}
-          {actorSearch && (
-            <span className={styles.filterChip}>
-              <span>Actor: "{actorSearch}"</span>
-              <button type="button" className={styles.filterChipRemove} onClick={() => setActorSearch('')} aria-label="Remove actor filter">
-                <Icon.X width={12} height={12} />
-              </button>
-            </span>
-          )}
-          {actionFilter && (
-            <span className={styles.filterChip}>
-              <span>Action: {formatActionLabel(actionFilter)}</span>
-              <button type="button" className={styles.filterChipRemove} onClick={() => setActionFilter('')} aria-label="Remove action filter">
-                <Icon.X width={12} height={12} />
-              </button>
-            </span>
-          )}
-          {entitySearch && (
-            <span className={styles.filterChip}>
-              <span>Entity: "{entitySearch}"</span>
-              <button type="button" className={styles.filterChipRemove} onClick={() => setEntitySearch('')} aria-label="Remove entity filter">
-                <Icon.X width={12} height={12} />
-              </button>
-            </span>
-          )}
-          {authMethodFilter && (
-            <span className={styles.filterChip}>
-              <span>Auth: {authMethodFilter}</span>
-              <button type="button" className={styles.filterChipRemove} onClick={() => setAuthMethodFilter('')} aria-label="Remove auth filter">
-                <Icon.X width={12} height={12} />
-              </button>
-            </span>
-          )}
-          {ipSearch && (
-            <span className={styles.filterChip}>
-              <span>IP: "{ipSearch}"</span>
-              <button type="button" className={styles.filterChipRemove} onClick={() => setIpSearch('')} aria-label="Remove IP filter">
-                <Icon.X width={12} height={12} />
-              </button>
-            </span>
-          )}
-          {deviceSearch && (
-            <span className={styles.filterChip}>
-              <span>Device: "{deviceSearch}"</span>
-              <button type="button" className={styles.filterChipRemove} onClick={() => setDeviceSearch('')} aria-label="Remove device filter">
-                <Icon.X width={12} height={12} />
-              </button>
-            </span>
-          )}
-          {resultFilter && (
-            <span className={styles.filterChip}>
-              <span>Result: {resultFilter}</span>
-              <button type="button" className={styles.filterChipRemove} onClick={() => setResultFilter('')} aria-label="Remove result filter">
-                <Icon.X width={12} height={12} />
-              </button>
-            </span>
-          )}
-          <button type="button" className={styles.clearAllBtn} onClick={clearAllFilters}>
-            Clear all
-          </button>
-        </div>
-      )}
+      {/* The shared FilterBar. This page WAS the only implementation of this control; it is now
+          the shared one, so every table in the platform can show what it is filtered by. */}
+      <FilterBar
+        filters={[
+          dateRange !== 'all' && {
+            key: 'time',
+            label: 'Time',
+            value:
+              dateRange === 'custom'
+                ? `${customFrom || '…'} to ${customTo || '…'}`
+                : (DATE_RANGES.find((d) => d.key === dateRange)?.label ?? dateRange),
+            onRemove: () => {
+              setDateRange('all')
+              setCustomFrom('')
+              setCustomTo('')
+            },
+          },
+          service && { key: 'service', label: 'Service', value: service, onRemove: () => setService('') },
+          actorSearch && { key: 'actor', label: 'Performed By', value: `"${actorSearch}"`, onRemove: () => setActorSearch('') },
+          actionFilter && { key: 'action', label: 'Action', value: actionFilter, onRemove: () => setActionFilter('') },
+          entitySearch && { key: 'entity', label: 'Record', value: `"${entitySearch}"`, onRemove: () => setEntitySearch('') },
+          authMethodFilter && { key: 'auth', label: 'Auth', value: authMethodFilter, onRemove: () => setAuthMethodFilter('') },
+          ipSearch && { key: 'ip', label: 'IP', value: `"${ipSearch}"`, onRemove: () => setIpSearch('') },
+          deviceSearch && { key: 'device', label: 'Device', value: `"${deviceSearch}"`, onRemove: () => setDeviceSearch('') },
+          resultFilter && { key: 'result', label: 'Result', value: resultFilter, onRemove: () => setResultFilter('') },
+        ].filter(Boolean) as ActiveFilter[]}
+        onClearAll={clearAllFilters}
+      />
 
       {error && <div className={styles.errorBanner}>{error}</div>}
 
-      {/* Logs Table Container */}
-      <div className={styles.tableContainer}>
-        <table className={styles.logTable}>
+      {/* Logs Table — chrome from @omniremit/ui so the host, Approval Center and both remotes all
+          render the same table. This page's own `.tableContainer`/`.logTable` were the origin of
+          that shared style; the duplicate copy in ApprovalCenterPage.module.css is now gone too. */}
+      <DataTable minWidth={720} reserveHeight>
           <thead>
             {isLoginTab ? (
               <tr>
@@ -914,7 +796,7 @@ export function AuditLogsPage() {
                             value={customDraftFrom || customFrom}
                             onChange={(e) => setCustomDraftFrom(e.target.value)}
                           />
-                          <span style={{ fontSize: '11px', color: '#94a3b8' }}>to</span>
+                          <span className={styles.alp1}>to</span>
                           <input
                             type="date"
                             className={styles.dateInput}
@@ -946,14 +828,14 @@ export function AuditLogsPage() {
                     className={`${styles.thFilterBtn} ${actorSearch ? styles.thFilterBtnActive : ''}`}
                     onClick={() => setActiveHeaderFilter((c) => (c === 'actor' ? null : 'actor'))}
                   >
-                    <span>ACTOR / EMAIL</span>
+                    <span>PERFORMED BY</span>
                     <Icon.ChevronDown width={12} height={12} className={`${styles.filterIcon} ${activeHeaderFilter === 'actor' ? styles.filterIconActive : ''}`} />
                     {actorSearch && <span className={styles.filterDot} />}
                   </button>
                   {activeHeaderFilter === 'actor' && (
                     <div className={styles.filterPopover}>
                       <div className={styles.popoverHeader}>
-                        <span className={styles.popoverTitle}>Filter Actor / Email</span>
+                        <span className={styles.popoverTitle}>Filter Performed By</span>
                         {actorSearch && <button type="button" className={styles.popoverClearBtn} onClick={() => setActorSearch('')}>Reset</button>}
                       </div>
                       <input
@@ -1236,7 +1118,7 @@ export function AuditLogsPage() {
                             value={customDraftFrom || customFrom}
                             onChange={(e) => setCustomDraftFrom(e.target.value)}
                           />
-                          <span style={{ fontSize: '11px', color: '#94a3b8' }}>to</span>
+                          <span className={styles.alp1}>to</span>
                           <input
                             type="date"
                             className={styles.dateInput}
@@ -1316,20 +1198,20 @@ export function AuditLogsPage() {
                     className={`${styles.thFilterBtn} ${actorSearch ? styles.thFilterBtnActive : ''}`}
                     onClick={() => setActiveHeaderFilter((c) => (c === 'actor' ? null : 'actor'))}
                   >
-                    <span>ACTOR</span>
+                    <span>PERFORMED BY</span>
                     <Icon.ChevronDown width={12} height={12} className={`${styles.filterIcon} ${activeHeaderFilter === 'actor' ? styles.filterIconActive : ''}`} />
                     {actorSearch && <span className={styles.filterDot} />}
                   </button>
                   {activeHeaderFilter === 'actor' && (
                     <div className={styles.filterPopover}>
                       <div className={styles.popoverHeader}>
-                        <span className={styles.popoverTitle}>Filter Actor</span>
+                        <span className={styles.popoverTitle}>Filter Performed By</span>
                         {actorSearch && <button type="button" className={styles.popoverClearBtn} onClick={() => setActorSearch('')}>Reset</button>}
                       </div>
                       <input
                         type="text"
                         className={styles.popoverInput}
-                        placeholder="Search actor name..."
+                        placeholder="Search by name..."
                         value={actorSearch}
                         onChange={(e) => setActorSearch(e.target.value)}
                         autoFocus
@@ -1414,7 +1296,7 @@ export function AuditLogsPage() {
                     className={`${styles.thFilterBtn} ${entitySearch ? styles.thFilterBtnActive : ''}`}
                     onClick={() => setActiveHeaderFilter((c) => (c === 'entity' ? null : 'entity'))}
                   >
-                    <span>ENTITY</span>
+                    <span>RECORD</span>
                     <Icon.ChevronDown width={12} height={12} className={`${styles.filterIcon} ${activeHeaderFilter === 'entity' ? styles.filterIconActive : ''}`} />
                     {entitySearch && <span className={styles.filterDot} />}
                   </button>
@@ -1487,11 +1369,9 @@ export function AuditLogsPage() {
                 </tr>
               ))
             ) : logs.length === 0 ? (
-              <tr>
-                <td colSpan={isLoginTab ? 7 : 6} className={styles.emptyCell}>
-                  No audit records found matching the selected filters.
-                </td>
-              </tr>
+              <DataTable.Empty colSpan={isLoginTab ? 7 : 6}>
+                No audit records found matching the selected filters.
+              </DataTable.Empty>
             ) : (
               logs.map((log) => {
                 const initial = (log.actorName || log.actorUserId || 'S').charAt(0).toUpperCase()
@@ -1500,12 +1380,7 @@ export function AuditLogsPage() {
                   <tr key={log.id}>
                     <td className={styles.timeCell}>{formatTimestamp(log.occurredAt)}</td>
                     <td>
-                      <div className={styles.actorCell}>
-                        <span className={styles.actorAvatar}>{initial}</span>
-                        <span className={styles.actorName}>
-                          {log.actorName ?? <span className={styles.mutedText}>Unknown</span>}
-                        </span>
-                      </div>
+                      <ActorCell name={log.actorName} />
                     </td>
                     <td>
                       <span className={styles.authPill}>{log.authMethod ?? 'Local'}</span>
@@ -1542,14 +1417,7 @@ export function AuditLogsPage() {
                       </Badge>
                     </td>
                     <td>
-                      <button
-                        type="button"
-                        className={styles.viewDetailBtn}
-                        onClick={() => setViewingLog(log)}
-                        title="View full details"
-                      >
-                        View
-                      </button>
+                      <RowAction onClick={() => setViewingLog(log)} title="View full details" />
                     </td>
                   </tr>
                 ) : (
@@ -1584,47 +1452,22 @@ export function AuditLogsPage() {
                       )}
                     </td>
                     <td>
-                      <button
-                        type="button"
-                        className={styles.viewDetailBtn}
-                        onClick={() => setViewingLog(log)}
-                        title="View full details"
-                      >
-                        View
-                      </button>
+                      <RowAction onClick={() => setViewingLog(log)} title="View full details" />
                     </td>
                   </tr>
                 )
               })
             )}
           </tbody>
-        </table>
-      </div>
+      </DataTable>
 
-      {/* Pagination */}
-      {total > pageSize && (
-        <div className={styles.pagination}>
-          <button
-            type="button"
-            className={styles.pageBtn}
-            disabled={page <= 1}
-            onClick={() => setPage((p) => p - 1)}
-          >
-            &lt; Previous
-          </button>
-          <span className={styles.pageIndicator}>
-            Page {page} of {totalPages}
-          </span>
-          <button
-            type="button"
-            className={styles.pageBtn}
-            disabled={page >= totalPages}
-            onClick={() => setPage((p) => p + 1)}
-          >
-            Next &gt;
-          </button>
-        </div>
-      )}
+      <Pagination
+        page={page}
+        pageSize={pageSize}
+        total={total}
+        itemLabel="event"
+        onPageChange={setPage}
+      />
 
       {/* Record details drawer — opened per row by its "View" button (or, on the Sign-ins tabs, the
           device cell). The SAME right-side drawer shell Settings and the System Audit Trail deep-link
@@ -1866,7 +1709,7 @@ export function AuditLogsPage() {
                     {(() => {
                       const parsed = parseUserAgent(viewingLog.userAgent)
                       return (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <div className={styles.alp2}>
                           <div className={styles.fieldCardGrid}>
                             <div className={styles.fieldCard}>
                               <span className={styles.fieldCardIcon}>
@@ -1903,7 +1746,7 @@ export function AuditLogsPage() {
 
                           {viewingLog.userAgent && (
                             <div>
-                              <div style={{ fontSize: '10px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px' }}>
+                              <div className={styles.alp3}>
                                 Raw User Agent
                               </div>
                               <pre className={styles.payloadCodeBox}>{viewingLog.userAgent}</pre>
@@ -1947,7 +1790,7 @@ export function AuditLogsPage() {
                         </div>
 
                         {viewingLog.entityId && (
-                          <div className={styles.fieldCard} style={{ gridColumn: '1 / -1' }}>
+                          <div className={`${styles.fieldCard} ${styles.alp4}`} >
                             <span className={styles.fieldCardIcon}>
                               <Icon.Key width={15} height={15} />
                             </span>

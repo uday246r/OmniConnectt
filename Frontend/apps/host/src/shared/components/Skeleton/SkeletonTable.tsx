@@ -12,7 +12,7 @@ export function SkeletonTable({ rows = 5, columns = 4 }: SkeletonTableProps) {
       {Array.from({ length: rows }, (_, r) => (
         <div key={r} className={styles.tableRow}>
           {Array.from({ length: columns }, (_, c) => (
-            <div key={c} className={[styles.shimmer, styles.tableCell].join(' ')} style={{ flex: c === 0 ? 2 : 1 }} />
+            <div key={c} className={[styles.shimmer, styles.tableCell, c === 0 ? styles.tableCellLead : ''].filter(Boolean).join(' ')} />
           ))}
         </div>
       ))}

@@ -3,6 +3,8 @@ import { Building2, Phone, DollarSign, Eye, EyeOff } from 'lucide-react';
 import type { CorporateProfile, ContactDetail } from '../types/api';
 import { maskPhone, maskTIN } from '../utils/masking';
 import { api } from '../services/api';
+import styles from './CompanyOverview.module.css';
+import { formatValue } from '../shared/formatValue';
 
 interface CompanyOverviewProps {
   profile: CorporateProfile | null;
@@ -18,7 +20,7 @@ export default function CompanyOverview({ profile, contactInfo }: CompanyOvervie
     if (!realVal || realVal.trim() === '' || realVal.toLowerCase() === 'null') return;
     const isRevealing = !revealed[fieldKey];
     setRevealed(prev => ({ ...prev, [fieldKey]: isRevealing }));
-    
+
     if (isRevealing) {
       try {
         await api.logAudit({
@@ -36,25 +38,16 @@ export default function CompanyOverview({ profile, contactInfo }: CompanyOvervie
     }
   };
 
-  const formatValue = (val: unknown): string => {
-    if (val === null || val === undefined) return '-';
-    const s = String(val).trim();
-    if (s === '' || s.toLowerCase() === 'null' || s.toLowerCase() === 'undefined') {
-      return '-';
-    }
-    return s;
-  };
-
   const formatAddress = (val: unknown): string => {
     return formatValue(val);
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div className={styles.stack}>
       {/* 3 columns layout: Legal, Financial, Contact */}
-      <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+      <div className={styles.row}>
         {/* Legal Information Column */}
-        <div style={{ flex: '1 1 300px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div className={styles.stack2}>
           <h4 className="info-section-title">
             <Building2 size={14} />
             Legal Information
@@ -72,12 +65,12 @@ export default function CompanyOverview({ profile, contactInfo }: CompanyOvervie
 
           <div className="info-card">
             <div className="info-label">Income Tax Number</div>
-            <div className="info-value" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: '8px' }}>
+            <div className={`info-value ${styles.spread}`}>
               <span>{revealed['tin'] ? formatValue(profile.tin) : maskTIN(profile.tin)}</span>
               {profile.tin && profile.tin.trim() !== '' && profile.tin.toLowerCase() !== 'null' && (
                 <button
                   onClick={() => handleToggleReveal('tin', 'Income Tax Number', profile.tin!)}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', color: '#004EEB', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                  className={styles.row2}
                   title={revealed['tin'] ? 'Hide details' : 'Reveal details'}
                 >
                   {revealed['tin'] ? <EyeOff size={15} /> : <Eye size={15} />}
@@ -98,7 +91,7 @@ export default function CompanyOverview({ profile, contactInfo }: CompanyOvervie
         </div>
 
         {/* Financial Information Column */}
-        <div style={{ flex: '1 1 300px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div className={styles.stack2}>
           <h4 className="info-section-title">
             <DollarSign size={14} />
             Financial Information
@@ -106,12 +99,12 @@ export default function CompanyOverview({ profile, contactInfo }: CompanyOvervie
 
           <div className="info-card">
             <div className="info-label">Vat Number</div>
-            <div className="info-value" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: '8px' }}>
+            <div className={`info-value ${styles.spread}`}>
               <span>{revealed['vat'] ? formatValue(profile.tin) : maskTIN(profile.tin)}</span>
               {profile.tin && profile.tin.trim() !== '' && profile.tin.toLowerCase() !== 'null' && (
                 <button
                   onClick={() => handleToggleReveal('vat', 'Vat Number', profile.tin!)}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', color: '#004EEB', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                  className={styles.row2}
                   title={revealed['vat'] ? 'Hide details' : 'Reveal details'}
                 >
                   {revealed['vat'] ? <EyeOff size={15} /> : <Eye size={15} />}
@@ -132,7 +125,7 @@ export default function CompanyOverview({ profile, contactInfo }: CompanyOvervie
         </div>
 
         {/* Contact Information Column */}
-        <div style={{ flex: '1 1 300px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div className={styles.stack2}>
           <h4 className="info-section-title">
             <Phone size={14} />
             Contact Information
@@ -150,12 +143,12 @@ export default function CompanyOverview({ profile, contactInfo }: CompanyOvervie
 
           <div className="info-card">
             <div className="info-label">Phone Number</div>
-            <div className="info-value" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: '8px' }}>
-              <span style={{ overflowWrap: 'anywhere' }}>{revealed['phoneCompany'] ? formatValue(contactInfo?.contactNumber) : maskPhone(contactInfo?.contactNumber)}</span>
+            <div className={`info-value ${styles.spread}`}>
+              <span className={styles.rule}>{revealed['phoneCompany'] ? formatValue(contactInfo?.contactNumber) : maskPhone(contactInfo?.contactNumber)}</span>
               {contactInfo?.contactNumber && contactInfo.contactNumber.trim() !== '' && contactInfo.contactNumber.toLowerCase() !== 'null' && (
                 <button
                   onClick={() => handleToggleReveal('phoneCompany', 'Company Phone Number', contactInfo.contactNumber!)}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', color: '#004EEB', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                  className={styles.row2}
                   title={revealed['phoneCompany'] ? 'Hide details' : 'Reveal details'}
                 >
                   {revealed['phoneCompany'] ? <EyeOff size={15} /> : <Eye size={15} />}
@@ -166,7 +159,7 @@ export default function CompanyOverview({ profile, contactInfo }: CompanyOvervie
 
           <div className="info-card">
             <div className="info-label">Address</div>
-            <div className="info-value" style={{ lineHeight: '1.4' }}>
+            <div className={`info-value ${styles.rule2}`}>
               {formatAddress(contactInfo?.fixedAddress)}
             </div>
           </div>

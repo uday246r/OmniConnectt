@@ -1,0 +1,40 @@
+/*
+ * Styles extracted from this component's former inline blocks.
+ */
+
+.subnav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: calc(100% - 24px);
+  padding-left: 10px;
+  border-left: 2px solid #e2e8f0;
+  margin-left: 22px;
+  margin-top: 2px;
+  margin-bottom: 6px;
+  box-sizing: border-box;
+}
+
+.navCount {
+  margin-left: auto;
+  padding: 1px 6px;
+  border-radius: 10px;
+  background: #dbeafe;
+  color: var(--omni-color-primary-700);
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+/*
+ * The sub-nav ROWS now come from `<NavItem>` in @omniremit/ui — the host's own sidebar rows use the
+ * same stylesheet, so a row measures identically whichever app contributed it. What remains here is
+ * only what is genuinely local to this sub-nav: the indented rail it sits in, and (lead_mf) the
+ * record-count pill.
+ *
+ * The old per-item hover was React state (`hoveredId` + onMouseEnter/onMouseLeave) re-rendering the
+ * whole list on every mouse move; it is CSS :hover in the shared component now.
+ *
+ * These render through a portal into the host's sidebar, OUTSIDE the remote's `#…-mf-scope` — a CSS
+ * Module still applies, because modules are excluded from the prefixer and hash to unique names.
+ */

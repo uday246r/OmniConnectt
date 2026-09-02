@@ -1,0 +1,234 @@
+/*
+ * The platform's canonical right-side drawer.
+ *
+ * Copied value-for-value from the host reference — `.overlayRoot` / `.backdrop` /
+ * `.drawerContainer` / `.header` in apps/host/src/layout/SettingsDrawer/SettingsDrawer.module.css.
+ *
+ * It replaces SEVEN hand-rolled implementations: five in lead_mf (LeadDetails, EditLead, DeleteLead,
+ * EditReason, AuditDetails) and one in customer360_mf, each re-declaring the same overlay, blue
+ * header and close button under the same class names. customer360's copy had already converged on
+ * the host's values (z-index 999, `inset: 0`); lead_mf's had drifted to z-index 1200 with longhand
+ * offsets. The host values win here.
+ *
+ * MOTION: the slide and fade are the host's exact curves. `slideIn` uses a decelerating
+ * cubic-bezier(0.16, 1, 0.3, 1) over 280ms — fast to start, settling softly, so the panel reads as
+ * arriving rather than snapping. Both are disabled under prefers-reduced-motion.
+ */
+
+.overlayRoot {
+  position: fixed;
+  inset: 0;
+  z-index: var(--omni-z-modal);
+  display: flex;
+  justify-content: flex-end;
+}
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(4px);
+  animation: omniDrawerFadeIn 0.2s ease-out;
+}
+
+@keyframes omniDrawerFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.container {
+  position: relative;
+  /* Width is a per-use decision (the settings drawer is 700px, a confirm drawer is far narrower),
+     so it arrives as a custom-property hand-off with the host's default baked in here. */
+  width: var(--omni-drawer-width, min(700px, 94vw));
+  height: 100vh;
+  background: var(--omni-color-surface-alt);
+  box-shadow:
+    -12px 0 60px rgba(15, 23, 42, 0.18),
+    -2px 0 8px rgba(15, 23, 42, 0.06);
+  display: flex;
+  flex-direction: column;
+  z-index: 1;
+  animation: omniDrawerSlideIn 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+  overflow: hidden;
+  font-family: var(--omni-font-family);
+}
+
+@keyframes omniDrawerSlideIn {
+  from { transform: translateX(100%); }
+  to   { transform: translateX(0); }
+}
+
+/* ── Header ─────────────────────────────────────────────────── */
+.header {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 22px 28px 20px;
+  background: var(--omni-gradient-hero);
+  flex-shrink: 0;
+}
+
+/*
+ * Destructive tone.
+ *
+ * NOT drift — a delete confirmation should not wear the same brand-blue chrome as an edit form, and
+ * lead_mf's DeleteLeadDrawer had already reached for `#7f1d1d` by overriding the blue header inline.
+ * That colour is the platform's own --omni-color-danger-900, so this promotes an ad-hoc override
+ * into a named variant rather than inventing a new one.
+ *
+ * Rendered as a gradient in the same shape as the hero so the two tones feel like one family.
+ */
+.headerDanger {
+  background: linear-gradient(
+    120deg,
+    var(--omni-color-danger-900) 0%,
+    var(--omni-color-danger-800) 55%,
+    var(--omni-color-danger-700) 100%
+  );
+}
+
+/* Two soft light blooms over the gradient. Both remotes reimplemented this same pair of radial
+   ::before/::after circles independently. */
+.header::before,
+.header::after {
+  content: '';
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.header::before {
+  top: -50px;
+  right: -50px;
+  width: 200px;
+  height: 200px;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.10) 0%, transparent 70%);
+}
+
+.header::after {
+  bottom: -60px;
+  left: 30px;
+  width: 160px;
+  height: 160px;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.06) 0%, transparent 70%);
+}
+
+.headerLeft {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+}
+
+/*
+ * Glass tile behind the header icon. Values are the host's `.headerIcon`; lead_mf's audit drawer had
+ * reimplemented the same treatment at 44px with a 1.5px border, so the two now match.
+ *
+ * Applied by the Drawer around whatever `icon` is passed, so a consumer supplies only the glyph and
+ * never has to recreate the chrome.
+ */
+.headerIcon {
+  width: 42px;
+  height: 42px;
+  border-radius: var(--omni-radius-lg);
+  background: var(--omni-color-on-header-surface);
+  color: var(--omni-color-on-header-text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  backdrop-filter: blur(8px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.25),
+    0 2px 8px rgba(0, 0, 0, 0.10);
+}
+
+.title {
+  font-size: 18px;
+  font-weight: var(--omni-font-weight-bold);
+  color: var(--omni-color-on-header-text);
+  margin: 0;
+  line-height: 1.2;
+  letter-spacing: -0.025em;
+}
+
+.subtitle {
+  font-size: var(--omni-font-size-xs);
+  color: rgba(255, 255, 255, 0.75); /* between on-header-muted (.85) and nothing; host value */
+  margin: 4px 0 0;
+  font-weight: var(--omni-font-weight-regular);
+  letter-spacing: 0.01em;
+}
+
+.closeBtn {
+  position: relative;
+  z-index: 1;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  color: var(--omni-color-on-header-muted);
+  padding: var(--omni-space-2);
+  cursor: pointer;
+  border-radius: 10px; /* off-scale: between --omni-radius-md (8) and -lg (12) */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 130ms ease, border-color 130ms ease, color 130ms ease;
+  backdrop-filter: blur(4px);
+  flex-shrink: 0;
+}
+
+.closeBtn:hover {
+  background: rgba(255, 255, 255, 0.26);
+  border-color: rgba(255, 255, 255, 0.38);
+  color: var(--omni-color-on-header-text);
+}
+
+.closeBtn:focus-visible {
+  outline: 2px solid var(--omni-color-on-header-text);
+  outline-offset: 2px;
+}
+
+/* ── Body ───────────────────────────────────────────────────── */
+.body {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--omni-space-4) 18px var(--omni-space-5);
+  background: #f0f4fa; /* host drawer body tint; not in the neutral scale */
+  scrollbar-width: thin;
+  scrollbar-color: #d1d9e6 transparent;
+}
+
+.body::-webkit-scrollbar { width: 5px; }
+.body::-webkit-scrollbar-thumb { background: #d1d9e6; border-radius: 5px; }
+
+/* ── Footer ─────────────────────────────────────────────────── */
+.footer {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--omni-space-3);
+  padding: var(--omni-space-4) 18px;
+  background: var(--omni-color-surface);
+  border-top: 1px solid var(--omni-color-border);
+}
+
+/* ── Responsive ─────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .container { width: 100vw; }
+  .header { padding: 18px 20px 16px; }
+  .body { padding: var(--omni-space-5) var(--omni-space-5) var(--omni-space-6); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .backdrop,
+  .container {
+    animation: none;
+  }
+}

@@ -1,0 +1,149 @@
+/*
+ * Recent Leads dashboard card — the table's surrounding frame only.
+ *
+ * The table itself uses @omniremit/ui's DataTable in `bare` mode: it takes the platform's header
+ * treatment, row rhythm and hover, but not the outer card chrome, because this card already draws
+ * its own lighter frame below. Using the full chrome here would nest two bordered boxes.
+ */
+
+.tableFrame {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border-radius: 10px;
+  border: 1px solid #f1f5f9;
+}
+
+/* This card is taller than the chart cards, so it sets its own floor. */
+.card {
+  min-height: 280px;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 18px;
+}
+
+/* "View Directory" — hover was a JS handler pair. */
+.viewAllBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--omni-color-primary-50);
+  border: none;
+  border-radius: var(--omni-radius-md);
+  color: var(--omni-color-primary-700);
+  font-size: 12.5px;
+  font-weight: var(--omni-font-weight-semibold);
+  padding: 6px 14px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background var(--omni-transition-fast);
+}
+
+.viewAllBtn:hover {
+  background: var(--omni-color-primary-100);
+}
+
+.state {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--omni-color-text-muted);
+  font-size: var(--omni-font-size-sm);
+  padding: var(--omni-space-7) 0;
+}
+
+.stateIcon {
+  opacity: 0.4;
+  margin-bottom: var(--omni-space-2);
+}
+
+/* ── Cells ───────────────────────────────────────────────────── */
+/* Denser than the platform default: this is a compact dashboard preview, not a full record list. */
+.cell {
+  padding: var(--omni-space-3) 14px;
+}
+
+.thRight,
+.cellRight {
+  text-align: right;
+}
+
+.customer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--omni-color-primary-50);
+  color: var(--omni-color-primary-700);
+  font-size: 11.5px;
+  font-weight: var(--omni-font-weight-bold);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border: 1px solid var(--omni-color-primary-200);
+}
+
+.customerName {
+  font-weight: var(--omni-font-weight-semibold);
+  color: var(--omni-color-text-primary);
+}
+
+.customerId {
+  font-size: 11px;
+  color: var(--omni-color-text-secondary);
+}
+
+.productChip {
+  padding: 3px var(--omni-space-2);
+  border-radius: var(--omni-radius-sm);
+  background: #f1f5f9;
+  color: #334155;
+  font-size: var(--omni-font-size-xs);
+  font-weight: var(--omni-font-weight-medium);
+}
+
+.mutedCell {
+  color: var(--text-secondary);
+  font-size: 12.5px;
+}
+
+.dateCell {
+  color: var(--omni-color-text-secondary);
+  font-size: var(--omni-font-size-xs);
+}
+
+/* Status colours are chosen per row, so they arrive as custom properties. */
+
+
+/* Row action — hover was a JS handler pair. */
+.rowAction {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--omni-space-1);
+  padding: 5px 10px;
+  border-radius: var(--omni-radius-sm);
+  border: 1px solid var(--omni-color-border);
+  background: var(--omni-color-surface);
+  color: var(--omni-color-primary-700);
+  font-size: var(--omni-font-size-xs);
+  font-weight: var(--omni-font-weight-semibold);
+  cursor: pointer;
+  font-family: inherit;
+  transition: background var(--omni-transition-fast), border-color var(--omni-transition-fast);
+}
+
+.rowAction:hover {
+  background: var(--omni-color-primary-50);
+  border-color: var(--omni-color-primary-200);
+}

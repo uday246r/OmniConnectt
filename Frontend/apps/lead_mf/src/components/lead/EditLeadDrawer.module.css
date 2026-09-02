@@ -1,0 +1,9 @@
+/*
+ * Styles extracted from this component's former inline blocks.
+ */
+
+.changeHint {
+  font-size: 13px;
+  color: var(--omni-color-primary-600);
+  margin-top: 2px;
+}

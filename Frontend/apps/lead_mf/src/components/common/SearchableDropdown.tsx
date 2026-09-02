@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ChevronDown, X, Check } from 'lucide-react';
 import { DropdownOption } from '../../types/lead';
+import styles from './SearchableDropdown.module.css';
 
 interface SearchableDropdownProps {
   id?: string;
@@ -134,33 +135,19 @@ export const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
         </label>
       )}
 
-      <div className="dropdown-container" style={{ position: 'relative' }}>
+      <div className={`dropdown-container ${styles.container}`}>
         {/* Unified Searchable Input Field */}
         <div
-          className={`dropdown-trigger ${isOpen ? 'open' : ''} ${error ? 'has-error' : ''}`}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            paddingRight: '12px',
-          }}
+          className={`dropdown-trigger ${isOpen ? 'open' : ''} ${error ? 'has-error' : ''} ${styles.trigger}`}
         >
           <input
             ref={inputRef}
             type="text"
-            className="form-input"
-            style={{
-              border: 'none',
-              outline: 'none',
-              padding: 0,
-              boxShadow: 'none',
-              background: 'transparent',
-              width: '100%',
-              minWidth: 0,
-              fontSize: '14px',
-              color: '#0f172a',
-              cursor: disabled ? 'not-allowed' : 'text',
-            }}
+            /* NOT `form-input`: the `.dropdown-trigger` wrapper already paints the field's
+               background, border and radius, so a second bordered box rendered inside it — the
+               "two input boxes" on the Create Lead product picker. `.input` deliberately sets
+               `border: none; background: transparent; padding: 0`, and lost to the global class. */
+            className={styles.input}
             placeholder={placeholder}
             value={isOpen ? searchTerm : selectedOption ? selectedOption.label : ''}
             onFocus={handleInputFocus}
@@ -169,20 +156,12 @@ export const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
             disabled={disabled}
           />
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginLeft: '8px' }}>
+          <div className={styles.triggerActions}>
             {selectedOption && !disabled && (
               <button
                 type="button"
                 onClick={handleClear}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: '#94a3b8',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  padding: '2px',
-                }}
+                className={styles.chevron}
                 title="Clear selection"
               >
                 <X size={14} />
@@ -190,12 +169,7 @@ export const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
             )}
             <ChevronDown
               size={16}
-              style={{
-                color: '#64748b',
-                transition: 'transform 0.2s',
-                transform: isOpen ? 'rotate(180deg)' : 'none',
-                pointerEvents: 'none',
-              }}
+              className={`${styles.chevronIcon}${isOpen ? ` ${styles.chevronOpen}` : ''}`}
             />
           </div>
         </div>
@@ -203,54 +177,23 @@ export const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
         {/* Dynamic Suggestions List */}
         {isOpen && (
           <div
-            className="dropdown-menu"
-            style={{
-              position: 'absolute',
-              top: '100%',
-              left: 0,
-              right: 0,
-              marginTop: '4px',
-              backgroundColor: '#ffffff',
-              borderRadius: '8px',
-              boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
-              border: '1px solid #e2e8f0',
-              zIndex: 100,
-              maxHeight: '220px',
-              overflowY: 'auto',
-              padding: '4px 0',
-            }}
+            className={`dropdown-menu ${styles.menu}`}
           >
             {options.length === 0 ? (
-              <div className="dropdown-empty-state" style={{ padding: '12px', textAlign: 'center', color: '#64748b', fontSize: '13px' }}>
+              <div className={`dropdown-empty-state ${styles.emptyState}`}>
                 {emptyMessage}
               </div>
             ) : filteredOptions.length === 0 ? (
-              <div className="dropdown-empty-state" style={{ padding: '12px', textAlign: 'center', color: '#64748b', fontSize: '13px' }}>
+              <div className={`dropdown-empty-state ${styles.emptyState}`}>
                 No matching options
               </div>
             ) : (
               filteredOptions.map((opt, idx) => (
                 <div
                   key={opt.value}
-                  className={`dropdown-option ${opt.value === value ? 'selected' : ''} ${
-                    idx === highlightedIndex ? 'highlighted' : ''
-                  }`}
-                  style={{
-                    padding: '8px 14px',
-                    fontSize: '13.5px',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    backgroundColor:
-                      opt.value === value
-                        ? '#eff6ff'
-                        : idx === highlightedIndex
-                        ? '#f1f5f9'
-                        : 'transparent',
-                    color: opt.value === value ? '#2563eb' : '#1e293b',
-                    fontWeight: opt.value === value ? 600 : 400,
-                  }}
+                  className={`dropdown-option ${styles.option} ${
+                    opt.value === value ? `selected ${styles.optionSelected}` : ''
+                  } ${idx === highlightedIndex ? `highlighted ${styles.optionHighlighted}` : ''}`}
                   onMouseDown={(e) => {
                     e.preventDefault(); // Prevent input blur before click registers
                     handleSelect(opt);
@@ -258,7 +201,7 @@ export const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
                   onMouseEnter={() => setHighlightedIndex(idx)}
                 >
                   <span>{opt.label}</span>
-                  {opt.value === value && <Check size={15} style={{ color: '#2563eb' }} />}
+                  {opt.value === value && <Check size={15} className={styles.optionMeta} />}
                 </div>
               ))
             )}

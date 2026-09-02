@@ -619,3 +619,22 @@
   color: var(--omni-color-success-700, #15803d);
   font-size: 13px;
 }
+
+/*
+ * App icon tile, tinted by registration status. Was a pair of nested inline ternaries on background
+ * and color; as modifiers the three states are legible and the default lives in one place.
+ */
+.appIconWrapActive {
+  background: #ede9fe;
+  color: #6366f1;
+}
+
+.appIconWrapMaintenance {
+  background: var(--omni-color-warning-50);
+  color: #f97316;
+}
+
+.appIconWrapDisabled {
+  background: #f1f5f9;
+  color: var(--omni-color-text-muted);
+}

@@ -1,0 +1,153 @@
+/*
+ * Styles extracted from this component's former inline blocks. Values map to platform
+ * tokens where an exact equivalent exists.
+ */
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.row {
+  width: 50px;
+  height: 50px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.18);
+  border: 1.5px solid rgba(255, 255, 255, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--omni-color-surface);
+  flex-shrink: 0;
+}
+
+.row2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.row3 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  max-width: 520px;
+  flex-wrap: wrap;
+}
+
+.rule {
+  flex: 1 1 240px;
+}
+
+.box {
+  width: 160px;
+  flex-shrink: 0;
+}
+
+.panel {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 38px;
+  padding: 0 14px;
+  border-radius: 10px;
+  border: 1px solid #eaecf0;
+  background: var(--omni-color-surface);
+  color: #334155;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+  font-family: inherit;
+}
+
+.row4 {
+  padding: 16px 20px;
+  background: #fef2f2;
+  border-bottom: 1px solid #fecaca;
+  color: #b91c1c;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+}
+
+.rule2 {
+  flex-shrink: 0;
+}
+
+.text {
+  padding: 40px;
+  text-align: center;
+  color: var(--omni-color-text-secondary);
+}
+
+.text2 {
+  margin: 0 auto 12px;
+  color: var(--omni-color-primary-600);
+}
+
+.rule3 {
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 500;
+}
+
+.text3 {
+  padding: 48px 20px;
+  text-align: center;
+  color: var(--omni-color-text-secondary);
+}
+
+.muted {
+  margin: 0 auto 10px;
+  color: var(--omni-color-text-muted);
+  opacity: 0.7;
+}
+
+.text4 {
+  margin: 0 0 4px;
+  font-size: 15px;
+  color: var(--omni-color-text-primary);
+  font-weight: 600;
+}
+
+.text5 {
+  margin: 0;
+  font-size: 13px;
+  color: var(--omni-color-text-secondary);
+}
+
+.rule4 {
+  text-align: right;
+}
+
+.rule5 {
+  transition: background 0.12s ease;
+}
+
+.text6 {
+  white-space: nowrap;
+  color: var(--omni-color-text-primary);
+  font-weight: 500;
+}
+
+.text7 {
+  font-weight: 600;
+  color: var(--omni-color-text-primary);
+}
+
+.text8 {
+  color: #334155;
+  max-width: 280px;
+}
+
+.rule6 {
+  z-index: 1200;
+}
+
+.rule7 {
+  font-weight: 600;
+}

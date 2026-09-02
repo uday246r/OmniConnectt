@@ -4,7 +4,6 @@
    a danger alert).
    ══════════════════════════════════════════════════════════ */
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
 .wrapper { position: relative; }
 
@@ -163,3 +162,7 @@
   .badge { animation: none; }
   .iconButton { transition: none; }
 }
+
+/* Empty-state icon tints. Were inline pairs; now modifiers so the two menus stay in step. */
+.emptyIconDanger { background: var(--omni-color-danger-50); color: var(--omni-color-danger-500); }
+.emptyIconSuccess { background: var(--omni-color-success-50); color: var(--omni-color-success-600); }

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useAuthStore } from '../../auth/store/authStore'
-import { Badge, type BadgeTone } from '../../../shared/components/Badge/Badge'
+import { Badge, DataTable, PageHeader, Pagination, RowAction, RowsPerPage, readStoredPageSize, type BadgeTone } from '@omniremit/ui'
 import { SkeletonBlock } from '../../../shared/components/Skeleton'
 import { ApiError } from '../../../shared/api/httpClient'
 import { useDebouncedValue } from '../../../shared/hooks/useDebouncedValue'
@@ -113,7 +113,7 @@ function formatModuleName(rawModule: string | null | undefined, _customMap?: Map
   if (!rawModule) return '—'
   const normalized = rawModule.toLowerCase().trim()
   if (SHORT_MODULE_MAP[normalized]) return SHORT_MODULE_MAP[normalized]
-  
+
   let cleaned = rawModule
     .replace(/^host\.settings\./i, '')
     .replace(/^settings\./i, '')
@@ -260,7 +260,7 @@ function renderFieldCardGrid(rows: { label: string; value: unknown }[]) {
         const { Icon: FieldIcon, bg, color } = getFieldIconMeta(label)
         return (
           <div key={label} className={styles.fieldCard}>
-            <span className={styles.fieldCardIcon} style={{ background: bg, color }}>
+            <span className={styles.fieldCardIcon} style={{ '--icon-bg': bg, '--icon-color': color } as React.CSSProperties}>
               <FieldIcon width={15} height={15} />
             </span>
             <div className={styles.fieldCardBody}>
@@ -489,9 +489,7 @@ export function ApprovalCenterPage() {
 
   const [activeTab, setActiveTab] = useState<TabId>(TAB_IDS.pending)
   const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
-  const [isCustomPageSize, setIsCustomPageSize] = useState(false)
-  const [customPageSizeInput, setCustomPageSizeInput] = useState('')
+  const [pageSize, setPageSize] = useState(() => readStoredPageSize('host.approvals', DEFAULT_PAGE_SIZE))
   const [activeHeaderFilter, setActiveHeaderFilter] = useState<string | null>(null)
 
   // Requested date filter
@@ -724,28 +722,6 @@ export function ApprovalCenterPage() {
   ])
 
   // Handler for the page-size preset or custom selection
-  function handlePageSizeSelect(value: string) {
-    if (value === 'custom') {
-      setIsCustomPageSize(true)
-      setCustomPageSizeInput(String(pageSize))
-    } else {
-      const size = Number(value)
-      setIsCustomPageSize(false)
-      setCustomPageSizeInput('')
-      setPageSize(size)
-      setPage(1)
-    }
-  }
-
-  function handleCustomPageSizeChange(val: string) {
-    setCustomPageSizeInput(val)
-    const parsed = parseInt(val, 10)
-    if (!Number.isNaN(parsed) && parsed >= 1 && parsed <= 500) {
-      setPageSize(parsed)
-      setPage(1)
-    }
-  }
-
   useEffect(() => {
     setPage(1)
   }, [
@@ -860,21 +836,19 @@ export function ApprovalCenterPage() {
   return (
     <div className={styles.page}>
       {/* Header */}
-      <div className={styles.header}>
-        <div className={styles.titleGroup}>
-          <div className={styles.titleHeaderRow}>
-            <h1 className={styles.title}>Approval Center</h1>
-            <span className={styles.liveStreamBadge}>
-              <span className={styles.liveDot} />
-              Live Governance
-            </span>
-          </div>
-          <p className={styles.subtitle}>
-            Review and decide on pending administrative requests across the platform.
-          </p>
-        </div>
-
-        <div className={styles.dateRangeGroup} role="group" aria-label="Quick date range">
+      {/* Same banner component as Audit Logs — this page previously carried its own copy of the
+          markup and CSS, which is how the two drifted apart in the first place. */}
+      <PageHeader
+        title="Approval Center"
+        pill={
+          <>
+            <span className={styles.liveDot} />
+            Live Governance
+          </>
+        }
+        subtitle="Review and decide on pending administrative requests across the platform."
+        actions={
+          <div className={styles.dateRangeGroup} role="group" aria-label="Quick date range">
           {DATE_RANGES.map((r) => (
             <button
               key={r.key}
@@ -893,8 +867,9 @@ export function ApprovalCenterPage() {
               {r.label}
             </button>
           ))}
-        </div>
-      </div>
+          </div>
+        }
+      />
 
       {/* Summary Metrics */}
       <div className={styles.summaryGrid}>
@@ -970,45 +945,16 @@ export function ApprovalCenterPage() {
 
         <div className={styles.toolbarActions}>
           {/* Rows-per-page dropdown */}
-          <div className={styles.rowsDropdownWrap}>
-            <label htmlFor="approvals-rows-select" className={styles.rowsDropdownLabel}>
-              Rows
-            </label>
-            <div className={styles.rowsSelectWrap}>
-              <select
-                id="approvals-rows-select"
-                className={styles.rowsSelect}
-                value={isCustomPageSize ? 'custom' : pageSize}
-                onChange={(e) => handlePageSizeSelect(e.target.value)}
-                aria-label="Rows per page"
-              >
-                {PAGE_SIZE_OPTIONS.map((s) => (
-                  <option key={s} value={s}>{s}</option>
-                ))}
-                <option value="custom">Custom</option>
-              </select>
-              <span className={styles.rowsSelectChevron} aria-hidden="true">▾</span>
-            </div>
-            {isCustomPageSize && (
-              <input
-                type="number"
-                min={1}
-                max={500}
-                className={styles.rowsCustomInput}
-                value={customPageSizeInput}
-                placeholder="e.g. 50"
-                onChange={(e) => handleCustomPageSizeChange(e.target.value)}
-                onBlur={() => {
-                  const parsed = parseInt(customPageSizeInput, 10)
-                  if (Number.isNaN(parsed) || parsed < 1 || parsed > 500) {
-                    setCustomPageSizeInput(String(pageSize))
-                  }
-                }}
-                aria-label="Custom row count"
-                autoFocus
-              />
-            )}
-          </div>
+          {/* The shared control — same presets and Custom entry this page defined, now with the
+              choice remembered per table so it survives navigation and reload. */}
+          <RowsPerPage
+            storageKey="host.approvals"
+            value={pageSize}
+            onChange={(n) => {
+              setPageSize(n)
+              setPage(1)
+            }}
+          />
 
           <label className={styles.assignedToMeToggle}>
             <input type="checkbox" checked={assignedToMeOnly} onChange={(e) => setAssignedToMeOnly(e.target.checked)} />
@@ -1114,9 +1060,10 @@ export function ApprovalCenterPage() {
 
       {error && <div className={styles.errorBanner}>{error}</div>}
 
-      {/* Table */}
-      <div className={styles.tableContainer}>
-        <table className={styles.logTable}>
+      {/* Table — shared chrome. This page's own `.tableContainer`/`.logTable` were a byte-for-byte
+          copy of the Audit Logs pair (only min-width differed), which is exactly the duplication
+          @omniremit/ui's DataTable exists to remove. */}
+      <DataTable minWidth={760} reserveHeight>
           <thead>
             <tr>
               {/* REQUESTED */}
@@ -1162,7 +1109,7 @@ export function ApprovalCenterPage() {
                           value={customDraftFrom || customFrom}
                           onChange={(e) => setCustomDraftFrom(e.target.value)}
                         />
-                        <span style={{ fontSize: '11px', color: '#94a3b8' }}>to</span>
+                        <span className={styles.rangeSeparator}>to</span>
                         <input
                           type="date"
                           className={styles.dateInput}
@@ -1292,7 +1239,7 @@ export function ApprovalCenterPage() {
                   className={`${styles.thFilterBtn} ${entitySearch ? styles.thFilterBtnActive : ''}`}
                   onClick={() => setActiveHeaderFilter((c) => (c === 'entity' ? null : 'entity'))}
                 >
-                  <span>ENTITY</span>
+                  <span>RECORD</span>
                   <Icon.ChevronDown width={12} height={12} className={`${styles.filterIcon} ${activeHeaderFilter === 'entity' ? styles.filterIconActive : ''}`} />
                   {entitySearch && <span className={styles.filterDot} />}
                 </button>
@@ -1531,7 +1478,7 @@ export function ApprovalCenterPage() {
                           value={decidedDraftFrom || decidedCustomFrom}
                           onChange={(e) => setDecidedDraftFrom(e.target.value)}
                         />
-                        <span style={{ fontSize: '11px', color: '#94a3b8' }}>to</span>
+                        <span className={styles.rangeSeparator}>to</span>
                         <input
                           type="date"
                           className={styles.dateInput}
@@ -1587,9 +1534,7 @@ export function ApprovalCenterPage() {
                 </tr>
               ))
             ) : items.length === 0 ? (
-              <tr>
-                <td colSpan={9} className={styles.emptyCell}>No approval requests found matching the selected filters.</td>
-              </tr>
+              <DataTable.Empty colSpan={9}>No approval requests found matching the selected filters.</DataTable.Empty>
             ) : (
               items.map((r) => {
                 const ActionIcon = ACTION_ICONS[r.action] ?? Icon.Edit
@@ -1635,31 +1580,22 @@ export function ApprovalCenterPage() {
                       {r.decidedAt ? formatDateOnly(r.decidedAt) : <span className={styles.mutedText}>—</span>}
                     </td>
                     <td>
-                      <button type="button" className={styles.viewDetailBtn} onClick={() => handleRowClick(r)}>
-                        <span>View</span>
-                        <Icon.ChevronRight width={12} height={12} />
-                      </button>
+                      <RowAction onClick={() => handleRowClick(r)} trailing={<Icon.ChevronRight width={12} height={12} />} />
                     </td>
                   </tr>
                 )
               })
             )}
           </tbody>
-        </table>
-      </div>
+      </DataTable>
 
-      {/* Pagination */}
-      {total > pageSize && (
-        <div className={styles.pagination}>
-          <button type="button" className={styles.pageBtn} disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
-            &lt; Previous
-          </button>
-          <span className={styles.pageIndicator}>Page {page} of {totalPages}</span>
-          <button type="button" className={styles.pageBtn} disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>
-            Next &gt;
-          </button>
-        </div>
-      )}
+      <Pagination
+        page={page}
+        pageSize={pageSize}
+        total={total ?? 0}
+        itemLabel="request"
+        onPageChange={setPage}
+      />
 
       {/* Detail drawer */}
       {viewingId && (
@@ -1716,7 +1652,7 @@ export function ApprovalCenterPage() {
                               <div className={styles.detailRow}>
                                 <span className={styles.detailIcon}><Icon.User width={15} height={15} /></span>
                                 <div className={styles.detailRowBody}>
-                                   <dt>Entity</dt>
+                                   <dt>Record</dt>
                                   <dd>{detail.entityType}{detail.entityLabel ? ` — ${detail.entityLabel}` : ''}</dd>
                                 </div>
                               </div>

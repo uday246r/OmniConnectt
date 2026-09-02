@@ -4,6 +4,7 @@ import { SkeletonBlock } from '../../shared/components/Skeleton'
 import { Icon } from '../../shared/components/Icon/Icon'
 import { resolveIcon } from '../../shared/components/Icon/resolveIcon'
 import { BrandMark } from '../../shared/components/BrandMark/BrandMark'
+import { navItemStyles } from '@omniremit/ui'
 import styles from './Sidebar.module.css'
 import { APP_NAME } from '../../shared/config/branding'
 
@@ -27,8 +28,14 @@ export interface SidebarProps {
   onMobileClose?: () => void
 }
 
+/*
+ * Row classes come from @omniremit/ui so the host's own nav rows and the sub-navigation rows the
+ * remotes portal into this very sidebar are the same stylesheet rather than two copies that had
+ * drifted on padding, gap, radius and font-size. The markup stays a NavLink — the chevron/portal
+ * coordination documented below depends on it.
+ */
 function navItemClass({ isActive }: { isActive: boolean }) {
-  return classNames(styles.navItem, isActive && styles.navItemActive)
+  return classNames(navItemStyles.navItem, isActive && navItemStyles.navItemActive)
 }
 
 // Each remote with an expandable sub-menu (Customer 360, Lead Management) injects its own chevron
@@ -78,10 +85,10 @@ export function Sidebar({ apps, canAccessAuditLogs, canAccessApprovals, error, m
         {/* Dashboard */}
         <div className={styles.sectionLabel}>Main</div>
         <NavLink to="/" end className={navItemClass}>
-          <span className={styles.navIcon} aria-hidden="true">
+          <span className={navItemStyles.navIcon} aria-hidden="true">
             <Icon.Home width={17} height={17} />
           </span>
-          <span className={styles.navLabel}>Dashboard</span>
+          <span className={navItemStyles.navLabel}>Dashboard</span>
         </NavLink>
 
         {/* Apps section — remote apps inject entries here */}
@@ -121,10 +128,10 @@ export function Sidebar({ apps, canAccessAuditLogs, canAccessApprovals, error, m
               title={isUnreachable ? `${app.displayName} is not responding` : undefined}
               onClick={forwardClickToChevron}
             >
-              <span className={styles.navIcon} aria-hidden="true">
+              <span className={navItemStyles.navIcon} aria-hidden="true">
                 <AppIcon width={17} height={17} />
               </span>
-              <span className={styles.navLabel}>{app.displayName}</span>
+              <span className={navItemStyles.navLabel}>{app.displayName}</span>
               {isUnreachable && (
                 <span className={styles.unreachableBadge} title="App server not responding">!</span>
               )}
@@ -142,10 +149,10 @@ export function Sidebar({ apps, canAccessAuditLogs, canAccessApprovals, error, m
           <div className={styles.sectionLabel}>System</div>
           {canAccessApprovals && (
             <NavLink to="/system/approvals" className={navItemClass}>
-              <span className={styles.navIcon} aria-hidden="true">
+              <span className={navItemStyles.navIcon} aria-hidden="true">
                 <Icon.UserCheck width={17} height={17} />
               </span>
-              <span className={styles.navLabel}>Approval Center</span>
+              <span className={navItemStyles.navLabel}>Approval Center</span>
             </NavLink>
           )}
           {/*
@@ -160,17 +167,17 @@ export function Sidebar({ apps, canAccessAuditLogs, canAccessApprovals, error, m
             smaller cost than an unreachable credential.
           */}
           <NavLink to="/my-requests" className={navItemClass}>
-            <span className={styles.navIcon} aria-hidden="true">
+            <span className={navItemStyles.navIcon} aria-hidden="true">
               <Icon.Clock width={17} height={17} />
             </span>
-            <span className={styles.navLabel}>My Requests</span>
+            <span className={navItemStyles.navLabel}>My Requests</span>
           </NavLink>
           {canAccessAuditLogs && (
             <NavLink to="/system/audit-logs" className={navItemClass}>
-              <span className={styles.navIcon} aria-hidden="true">
+              <span className={navItemStyles.navIcon} aria-hidden="true">
                 <Icon.FileText width={17} height={17} />
               </span>
-              <span className={styles.navLabel}>Audit Logs</span>
+              <span className={navItemStyles.navLabel}>Audit Logs</span>
             </NavLink>
           )}
         </div>

@@ -1,0 +1,192 @@
+/*
+ * Per-column table filter — the header cell doubles as the filter trigger, and the popover carries
+ * an optional type-to-search box over a list of options.
+ *
+ * Copied verbatim from the host's ApprovalCenterPage, which already had a second identical copy in
+ * its own AuditLogsPage. Neither remote had this at all: lead_mf's Lead Directory offered a single
+ * global "Filter" button in the toolbar and customer360_mf's tables offered nothing, so the same
+ * table interaction was available in the host and simply absent one click away in a remote.
+ */
+.th {
+  position: relative;
+  padding: 0 !important;
+}
+
+.trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 12px 16px;
+  background: none;
+  border: none;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--omni-color-text-secondary);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 140ms ease;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.trigger:hover {
+  color: #1e40af;
+  background: rgba(37, 99, 235, 0.06);
+}
+
+/* `!important` carried over from the host: the base `.trigger` colour is set on a rule of equal
+   specificity, and the active state must win regardless of stylesheet order. */
+.triggerActive {
+  color: var(--omni-color-primary-600) !important;
+  background: rgba(37, 99, 235, 0.1) !important;
+  font-weight: 800;
+}
+
+.icon {
+  color: var(--omni-color-text-muted);
+  transition: transform 140ms ease, color 120ms ease;
+  flex-shrink: 0;
+}
+
+.iconOpen {
+  transform: rotate(180deg);
+  color: var(--omni-color-primary-600);
+}
+
+/* Shown when the column carries a filter, so an active filter is visible with the popover shut. */
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--omni-color-primary-600);
+  box-shadow: 0 0 6px rgba(37, 99, 235, 0.6);
+  flex-shrink: 0;
+  display: inline-block;
+}
+
+/* Portalled to <body>, so it is positioned in viewport coordinates by the component — see the
+   note in ColumnFilter.tsx about DataTable's scroll container clipping an absolute child. */
+.popover {
+  position: fixed;
+  z-index: var(--omni-z-dropdown, 100);
+  min-width: 240px;
+  max-width: 320px;
+  background: var(--omni-color-surface);
+  border: 1.5px solid var(--omni-color-border);
+  border-radius: 14px;
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.14), 0 2px 8px rgba(15, 23, 42, 0.04);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  /* The <th> sets uppercase/tracking for the header label; the popover is body copy. */
+  text-transform: none;
+  letter-spacing: normal;
+  font-weight: normal;
+  animation: popoverFadeIn 140ms ease-out;
+}
+
+@keyframes popoverFadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .popover { animation: none; }
+  .iconOpen { transition: color 120ms ease; }
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #f1f5f9;
+  padding-bottom: 8px;
+}
+
+.title {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--omni-color-text-primary);
+}
+
+.clearBtn {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--omni-color-danger-600);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px 7px;
+  border-radius: 5px;
+  font-family: inherit;
+  transition: background 120ms ease;
+}
+
+.clearBtn:hover { background: var(--omni-color-danger-100); }
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #334155;
+  cursor: pointer;
+  transition: all 120ms ease;
+  background: none;
+  border: none;
+  width: 100%;
+  text-align: left;
+  font-family: inherit;
+}
+
+.item:hover {
+  background: var(--omni-color-surface-alt);
+  color: var(--omni-color-text-primary);
+}
+
+.itemActive {
+  background: var(--omni-color-primary-50);
+  color: var(--omni-color-primary-600);
+  font-weight: 700;
+}
+
+.input {
+  width: 100%;
+  padding: 7px 11px;
+  background: var(--omni-color-surface-alt);
+  border: 1.5px solid var(--omni-color-border);
+  border-radius: 8px;
+  font-size: 12px;
+  color: var(--omni-color-text-primary);
+  outline: none;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+
+.input:focus {
+  border-color: var(--omni-color-primary-600);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+  background: var(--omni-color-surface);
+}
+
+.emptyHint {
+  padding: 10px;
+  font-size: 12px;
+  color: var(--omni-color-text-muted);
+  text-align: center;
+}

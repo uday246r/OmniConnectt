@@ -4,6 +4,7 @@ import { useFieldReveal } from '../hooks/useFieldReveal';
 import DynamicProfileSection, { groupBySection } from './DynamicProfileSection';
 
 import { DEFAULT_INDIVIDUAL_FIELD_CONFIGS } from '../constants/defaultFieldConfigs';
+import styles from './IndividualDetails.module.css';
 
 interface IndividualDetailsProps {
   subTab: string;
@@ -63,7 +64,7 @@ export default function IndividualDetails({ subTab, profile, contactInfo, fieldC
   const grouped = groupBySection(configsForTab);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+    <div className={styles.stack}>
       {grouped.map(({ section, fields }) => (
         <DynamicProfileSection
           key={section}

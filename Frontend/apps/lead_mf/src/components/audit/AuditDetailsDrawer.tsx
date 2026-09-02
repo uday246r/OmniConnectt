@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { Button, Drawer } from '@omniremit/ui';
+import { LeadDiffTable } from '../../shared/LeadDiffTable';
 import {
-  X,
   Shield,
   ShieldCheck,
   Clock,
@@ -20,6 +21,8 @@ import {
 } from 'lucide-react';
 import { useLeadStore } from '../../store/useLeadStore';
 import type { FieldDiff } from '../../types/lead';
+import styles from './AuditDetailsDrawer.module.css';
+import { Badge } from '@omniremit/ui';
 
 function formatTimestamp(iso?: string | null): string {
   if (!iso) return '—';
@@ -170,32 +173,19 @@ export const AuditDetailsDrawer: React.FC = () => {
   };
 
   return (
-    <div className="drawer-overlay" style={{ zIndex: 1200 }} onClick={handleOverlayClick}>
-      <div className="audit-details-drawer" onClick={(e) => e.stopPropagation()}>
-        {/* Radiant Gradient Header — Exact Host Aesthetic */}
-        <div className="audit-drawer-header">
-          <div className="audit-header-glow" />
-          <div className="audit-header-left">
-            <div className="audit-header-icon-box">
-              <Shield size={22} />
-            </div>
-            <div className="audit-header-text">
-              <h2 className="audit-header-title">Audit Record Details</h2>
-              <p className="audit-header-subtitle">Full event context, actor, and execution metadata</p>
-            </div>
-          </div>
-          <button
-            type="button"
-            className="audit-header-close-btn"
-            onClick={closeAuditDetails}
-            aria-label="Close details drawer"
-          >
-            <X size={18} />
-          </button>
-        </div>
-
-        {/* Scrollable Body */}
-        <div className="audit-drawer-body">
+    <Drawer
+      open
+      onClose={closeAuditDetails}
+      closeLabel="Close details drawer"
+      title="Audit Record Details"
+      subtitle="Full event context, actor, and execution metadata"
+      icon={<Shield size={22} />}
+      footer={
+        <Button type="button" variant="secondary" onClick={closeAuditDetails}>
+          Close Details
+        </Button>
+      }
+    >
           {/* 1. Overview & Event Timeline (Two-Column Layout) */}
           <section className="audit-drawer-section">
             <div className="audit-overview-timeline-grid">
@@ -214,9 +204,9 @@ export const AuditDetailsDrawer: React.FC = () => {
                     <div className="audit-detail-row-body">
                       <dt className="audit-detail-row-label">Service</dt>
                       <dd className="audit-detail-row-value">
-                        <span className="audit-badge audit-badge-primary">
+                        <Badge tone="primary">
                           LeadService
-                        </span>
+                          </Badge>
                       </dd>
                     </div>
                   </div>
@@ -229,9 +219,9 @@ export const AuditDetailsDrawer: React.FC = () => {
                     <div className="audit-detail-row-body">
                       <dt className="audit-detail-row-label">Action</dt>
                       <dd className="audit-detail-row-value">
-                        <span className="audit-action-badge">
+                        <Badge tone="primary" className={styles.actionCode}>
                           {getActionLabel(selectedAuditLog.actionType)}
-                        </span>
+                          </Badge>
                       </dd>
                     </div>
                   </div>
@@ -248,14 +238,9 @@ export const AuditDetailsDrawer: React.FC = () => {
                     <div className="audit-detail-row-body">
                       <dt className="audit-detail-row-label">Result</dt>
                       <dd className="audit-detail-row-value">
-                        <span
-                          className={`audit-badge ${
-                            isSuccess ? 'audit-badge-success' : 'audit-badge-danger'
-                          }`}
-                        >
-                          <span className="audit-badge-dot" />
+                        <Badge tone={isSuccess ? 'success' : 'danger'} dot>
                           {isSuccess ? 'Success' : selectedAuditLog.status || 'Failed'}
-                        </span>
+                        </Badge>
                       </dd>
                     </div>
                   </div>
@@ -315,7 +300,7 @@ export const AuditDetailsDrawer: React.FC = () => {
 
                 {selectedAuditLog.reason && (
                   <div className="audit-reason-alert">
-                    <AlertTriangle size={15} style={{ color: '#d97706', flexShrink: 0, marginTop: 1 }} />
+                    <AlertTriangle size={15} className={styles.warnIcon} />
                     <div>
                       <strong>Audit Reason:</strong> &ldquo;{selectedAuditLog.reason}&rdquo;
                     </div>
@@ -355,9 +340,9 @@ export const AuditDetailsDrawer: React.FC = () => {
                 <div className="audit-field-card-body">
                   <span className="audit-field-card-label">User Role</span>
                   <span className="audit-field-card-value">
-                    <span className="audit-badge audit-badge-primary">
+                    <Badge tone="primary">
                       {selectedAuditLog.userRole || 'User'}
-                    </span>
+                      </Badge>
                   </span>
                 </div>
               </div>
@@ -393,9 +378,9 @@ export const AuditDetailsDrawer: React.FC = () => {
                 <div className="audit-field-card-body">
                   <span className="audit-field-card-label">Entity Type</span>
                   <span className="audit-field-card-value">
-                    <span className="audit-badge audit-badge-primary">
+                    <Badge tone="primary">
                       {selectedAuditLog.entityType || 'Lead'}
-                    </span>
+                      </Badge>
                   </span>
                 </div>
               </div>
@@ -422,47 +407,16 @@ export const AuditDetailsDrawer: React.FC = () => {
                 <GitCommit size={12} />
                 Field-Level Modification Diffs
               </h3>
-              <div className="audit-diffs-table-wrap">
-                <table className="audit-diffs-table">
-                  <thead>
-                    <tr>
-                      <th>Field</th>
-                      <th>Previous Value</th>
-                      <th>New Value</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {parsedDiffs.map((diff, idx) => (
-                      <tr key={idx}>
-                        <td className="audit-diff-field-cell">{diff.field}</td>
-                        <td className="audit-diff-prev-cell">{diff.previousValue}</td>
-                        <td className="audit-diff-new-cell">{diff.newValue}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <LeadDiffTable diffs={parsedDiffs} />
             </section>
           )}
 
-        </div>
-
-        {/*
-          Sticky Footer — the raw JSON payload dump, the "Copy JSON"/"Copy ID" controls and the
-          truncated record GUID were removed: this drawer is read by business users reviewing who
-          did what, and internal identifiers are noise they cannot act on. Everything meaningful is
-          already presented as labelled fields above.
-        */}
-        <div className="audit-drawer-footer">
-          <button
-            type="button"
-            className="audit-footer-close-btn"
-            onClick={closeAuditDetails}
-          >
-            Close Details
-          </button>
-        </div>
-      </div>
-    </div>
+      {/*
+        The footer's raw JSON payload dump, the "Copy JSON"/"Copy ID" controls and the truncated
+        record GUID were removed: this drawer is read by business users reviewing who did what, and
+        internal identifiers are noise they cannot act on. Everything meaningful is already
+        presented as labelled fields above. What remains is passed to the Drawer's `footer` slot.
+      */}
+    </Drawer>
   );
 };

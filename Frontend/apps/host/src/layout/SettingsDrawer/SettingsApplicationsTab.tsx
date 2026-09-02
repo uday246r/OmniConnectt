@@ -22,7 +22,8 @@ export function SettingsApplicationsTab() {
   const isAdministrator = Boolean(useAuthStore((s) => s.user)?.isAdministrator)
   const hasCapability = useAuthStore((s) => s.hasCapability)
   const pushLayer = useSettingsDrawerStore((s) => s.pushLayer)
-  const dataRevision = useDataRevision(TOPICS.applications)
+  const dataRevision = useDataRevision(TOPICS.applications)
+
   const canRegister = isAdministrator || hasCapability('host.settings.applications', 'Register') || hasCapability('host.settings.applications', 'Create')
   const canEdit = isAdministrator || hasCapability('host.settings.applications', 'Edit')
   const canDelete = isAdministrator || hasCapability('host.settings.applications', 'Delete') || hasCapability('host.settings.applications', 'Remove')
@@ -225,11 +226,13 @@ export function SettingsApplicationsTab() {
               <div key={app.id} className={styles.appCard}>
                 {/* App Icon */}
                 <div
-                  className={styles.appIconWrap}
-                  style={{
-                    background: isMaintenance ? '#fff7ed' : isDisabled ? '#f1f5f9' : '#ede9fe',
-                    color: isMaintenance ? '#f97316' : isDisabled ? '#94a3b8' : '#6366f1',
-                  }}
+                  className={`${styles.appIconWrap} ${
+                    isMaintenance
+                      ? styles.appIconWrapMaintenance
+                      : isDisabled
+                      ? styles.appIconWrapDisabled
+                      : styles.appIconWrapActive
+                  }`}
                 >
                   <Icon.Users width={20} height={20} />
                 </div>

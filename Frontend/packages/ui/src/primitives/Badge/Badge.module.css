@@ -1,0 +1,50 @@
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--omni-space-1);
+  padding: 2px var(--omni-space-3);
+  border-radius: var(--omni-radius-pill);
+  font-size: var(--omni-font-size-xs);
+  font-weight: var(--omni-font-weight-semibold);
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
+}
+
+.neutral {
+  background: var(--omni-color-surface-alt);
+  color: var(--omni-color-text-secondary);
+  border-color: var(--omni-color-border);
+}
+
+.success {
+  background: var(--omni-color-success-bg);
+  color: var(--omni-color-success-text);
+}
+
+.warning {
+  background: var(--omni-color-warning-bg);
+  color: var(--omni-color-warning-text);
+}
+
+.danger {
+  background: var(--omni-color-danger-bg);
+  color: var(--omni-color-danger-text);
+}
+
+.info {
+  background: var(--omni-color-info-bg);
+  color: var(--omni-color-info-text);
+}
+
+.primary {
+  background: var(--omni-color-primary-50);
+  color: var(--omni-color-primary-800);
+}

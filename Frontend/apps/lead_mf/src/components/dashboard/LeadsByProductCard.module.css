@@ -1,0 +1,95 @@
+/*
+ * Leads-by-Product donut card — the donut and its legend.
+ * Card shell, header and chart-state placeholders come from the app-level dashboardCard sheet.
+ */
+
+.donutWrap {
+  position: relative;
+  width: 148px;
+  height: 148px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* Total overlaid in the donut's hole. pointer-events off so it never blocks the chart's tooltips. */
+.donutCenter {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.donutTotal {
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--omni-color-text-primary);
+  line-height: 1;
+  letter-spacing: -0.03em;
+}
+
+.donutLabel {
+  font-size: 11px;
+  color: var(--omni-color-text-muted);
+  font-weight: var(--omni-font-weight-semibold);
+  margin-top: 3px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.legend {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.legendRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--omni-space-2);
+}
+
+.legendLeft {
+  display: flex;
+  align-items: center;
+  gap: var(--omni-space-2);
+  min-width: 0;
+}
+
+/* Series colour is data-driven, so it arrives as a custom property. */
+.legendSwatch {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: var(--legend-color);
+  flex-shrink: 0;
+}
+
+.legendName {
+  font-size: 12.5px;
+  font-weight: var(--omni-font-weight-medium);
+  color: #334155;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.legendStat {
+  font-size: var(--omni-font-size-xs);
+  font-weight: var(--omni-font-weight-bold);
+  color: var(--omni-color-text-primary);
+  white-space: nowrap;
+}
+
+.legendPct {
+  color: var(--omni-color-text-secondary);
+  font-weight: var(--omni-font-weight-medium);
+}

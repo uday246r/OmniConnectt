@@ -1,0 +1,535 @@
+/*
+ * Styles extracted from this component's former inline blocks. Values map to platform
+ * tokens where an exact equivalent exists.
+ */
+
+.spacer {
+  width: 150;
+  height: 14;
+  margin-bottom: 16;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 6;
+}
+
+.box {
+  width: 12;
+  height: 12;
+}
+
+.box2 {
+  width: 55%;
+  height: 0.7em;
+}
+
+.box3 {
+  width: 75%;
+  height: 1em;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  gap: 12;
+}
+
+.stack2 {
+  display: flex;
+  flex-direction: column;
+  gap: 4;
+  margin-top: 4;
+}
+
+.box4 {
+  width: 100%;
+  height: 1;
+  background: #F3F4F6;
+  margin: 4px 0;
+}
+
+.stack3 {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  gap: 8;
+}
+
+.spacer2 {
+  width: 80;
+  height: 80;
+  aspect-ratio: 1 / 1;
+  flex-shrink: 0;
+  margin-bottom: 16;
+}
+
+.spacer3 {
+  width: 72%;
+  height: 16;
+  margin-bottom: 8;
+}
+
+.spacer4 {
+  width: 52%;
+  margin-bottom: 14;
+}
+
+.spacer5 {
+  width: 130;
+  height: 22;
+  margin-bottom: 22;
+}
+
+.spacer6 {
+  width: 100%;
+  height: 1;
+  background: #E5E7EB;
+  margin-bottom: 16;
+}
+
+.spacer7 {
+  margin-bottom: 20;
+}
+
+.row2 {
+  width: 50px;
+  height: 50px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.18);
+  border: 1.5px solid rgba(255, 255, 255, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--omni-color-surface);
+  flex-shrink: 0;
+}
+
+.panel {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 40px;
+  padding: 0 18px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.95);
+  color: var(--omni-color-primary-700);
+  font-size: 13.5px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
+  transition: all 0.15s ease;
+  font-family: inherit;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 1;
+}
+
+.rule {
+  display: none;
+}
+
+.row3 {
+  margin-top: 12px;
+  color: var(--omni-color-danger-600);
+  font-size: 13px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.rule2 {
+  grid-column: span 2;
+}
+
+.spacer8 {
+  margin-top: 20;
+}
+
+.spacer9 {
+  margin-top: 12;
+}
+
+.avatar {
+  width: 80;
+  height: 80;
+  aspect-ratio: 1 / 1;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background-color: #004EEB;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--omni-color-surface);
+  font-size: 28;
+  font-weight: 700;
+  margin-bottom: 16;
+}
+
+.strong {
+  font-size: 18;
+  font-weight: 700;
+  color: #1F2937;
+  margin: 0 0 4px 0;
+  text-align: center;
+}
+
+.spacer10 {
+  font-size: 13;
+  color: #6B7280;
+  margin-bottom: 12;
+  text-align: center;
+}
+
+.strong2 {
+  font-size: 11;
+  font-weight: 700;
+  color: #004EEB;
+  background-color: #E6EEFF;
+  padding: 4px 12px;
+  border-radius: 16;
+  margin-bottom: 20;
+}
+
+.box5 {
+  width: 100%;
+  height: 1px;
+  background-color: #E5E7EB;
+  margin: 16px 0;
+}
+
+.strong3 {
+  justify-content: space-between;
+  font-weight: 800;
+  color: #374151;
+}
+
+.row4 {
+  display: flex;
+  align-items: center;
+  gap: 10;
+}
+
+.stack4 {
+  display: flex;
+  flex-direction: column;
+  gap: 4;
+  margin-top: 4;
+  padding-left: 12;
+}
+
+.box6 {
+  width: 100%;
+  height: 1px;
+  background-color: #F3F4F6;
+  margin: 4px 0;
+}
+
+.spread {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20;
+  gap: 16;
+}
+
+.rule3 {
+  position: relative;
+  flex-grow: 1;
+  max-width: 360;
+}
+
+.panel2 {
+  width: 100%;
+  height: 38;
+  padding: 0 12px;
+  border-radius: 6;
+  border: 1px solid #E5E7EB;
+  outline: none;
+  font-size: 13;
+}
+
+.row5 {
+  display: flex;
+  gap: 10;
+  align-items: center;
+}
+
+.rule4 {
+  margin-right: 6;
+}
+
+.row6 {
+  font-size: 13;
+  color: #6B7280;
+  display: flex;
+  align-items: center;
+  gap: 8;
+}
+
+.panel3 {
+  padding: 4px 8px;
+  border-radius: 4;
+  border: 1px solid #E5E7EB;
+  background-color: var(--omni-color-surface);
+  font-size: 13;
+}
+
+.panel4 {
+  width: 60;
+  height: 30;
+  padding: 0 8px;
+  border-radius: 4;
+  border: 1px solid #E5E7EB;
+  outline: none;
+  font-size: 13;
+}
+
+.panel5 {
+  display: flex;
+  gap: 16;
+  margin-top: -10;
+  margin-bottom: 20;
+  padding: 12;
+  background-color: #F9FAFB;
+  border-radius: 6;
+  border: 1px solid #E5E7EB;
+  align-items: center;
+}
+
+.stack5 {
+  display: flex;
+  flex-direction: column;
+  gap: 4;
+}
+
+.text {
+  font-size: 11;
+  font-weight: 600;
+  color: #6B7280;
+}
+
+.panel6 {
+  padding: 4px 8px;
+  border-radius: 4;
+  border: 1px solid #D1D5DB;
+  background-color: var(--omni-color-surface);
+  font-size: 12;
+  outline: none;
+}
+
+.row7 {
+  align-self: flex-end;
+  height: 28;
+  padding: 0 12px;
+  font-size: 12;
+  display: flex;
+  align-items: center;
+  background-color: var(--omni-color-surface);
+}
+
+.rule5 {
+  padding: 24;
+  text-align: center;
+}
+
+.row8 {
+  color: #004EEB;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4;
+}
+
+.row9 {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8;
+  margin-top: 20;
+}
+
+.avatar2 {
+  width: 32;
+  height: 32;
+  border-radius: 50%;
+  padding: 0;
+  justify-content: center;
+}
+
+.row10 {
+  display: flex;
+  gap: 24;
+  border-bottom: 1px solid #E5E7EB;
+  padding-bottom: 12;
+  margin-bottom: 24;
+}
+
+.rule6 {
+  max-height: 420px;
+  overflow-y: auto;
+}
+
+.box7 {
+  width: 100%;
+}
+
+.rule7 {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.strong4 {
+  font-weight: 700;
+  color: #004EEB;
+}
+
+.text2 {
+  text-align: center;
+  padding: 24;
+  color: #6B7280;
+}
+
+.stack6 {
+  display: flex;
+  flex-direction: column;
+  gap: 12;
+}
+
+.rule8 {
+  font-weight: 600;
+}
+
+.row11 {
+  display: flex;
+  align-items: center;
+  gap: 4;
+}
+
+.spread2 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.row12 {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px;
+  color: #004EEB;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.label {
+  display: flex;
+  align-items: center;
+  gap: 8;
+  color: #004EEB;
+  font-size: 13;
+  font-weight: 700;
+  text-transform: uppercase;
+  margin-bottom: 10;
+}
+
+/* ── State-driven controls ───────────────────────────────────────
+ * Each of these was an inline block of ternaries on backgroundColor / borderColor / color. As class
+ * modifiers they also gain a real :hover, which an inline style cannot express.
+ */
+
+.filterToggle {
+  height: 38px;
+  background-color: var(--omni-color-surface);
+  border-color: #e5e7eb;
+  color: #374151;
+}
+
+.filterToggleOn,
+.filterToggleOn:hover {
+  background-color: var(--omni-color-primary-50);
+  border-color: #004eeb;
+  color: #004eeb;
+}
+
+/* Pagination page circle. */
+.pageDot {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  padding: 0;
+  justify-content: center;
+  background-color: var(--omni-color-surface);
+  color: #374151;
+  border-color: #e5e7eb;
+}
+
+.pageDotActive,
+.pageDotActive:hover {
+  background-color: #004eeb;
+  color: var(--omni-color-surface);
+  border-color: #004eeb;
+}
+
+/* Underlined sub-tab. */
+.subTab {
+  font-weight: var(--omni-font-weight-bold);
+  font-size: var(--omni-font-size-sm);
+  color: #6b7280;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  padding-bottom: 10px;
+  background: none;
+  border-left: none;
+  border-right: none;
+  border-top: none;
+}
+
+.subTabActive {
+  color: #004eeb;
+  border-bottom-color: #004eeb;
+}
+
+/* Account status chip — active vs everything else. */
+
+/* Product type chip — deposit vs financing. */
+.typeChip {
+  padding: var(--omni-space-1) 10px;
+  border-radius: var(--omni-space-1);
+  font-size: var(--omni-font-size-xs);
+  font-weight: var(--omni-font-weight-semibold);
+  background-color: #fffbeb;
+  color: #b45309;
+}
+
+.typeChipDeposit {
+  background-color: var(--omni-color-primary-50);
+  color: #1e40af;
+}
+
+/* Search field that widens when no secondary-ID selector is shown. */
+.searchSpan {
+  grid-column: span 2;
+}
+
+.searchSpanNarrow {
+  grid-column: span 1;
+}
+
+/* Nested tree row; the indent is a runtime flag. */
+.treeRow {
+  height: 34px;
+  border-radius: var(--omni-radius-md);
+  margin-left: 0;
+}
+
+.treeRowIndent {
+  margin-left: var(--omni-space-3);
+}

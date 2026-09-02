@@ -28,7 +28,8 @@ export function SettingsRolesTab() {
   const currentUserRoleId = useAuthStore((s) => s.user?.roleId)
   const pushLayer = useSettingsDrawerStore((s) => s.pushLayer)
   // Bumped by every form layer that saves, so closing an editor refreshes this list.
-  const dataRevision = useDataRevision(TOPICS.roles)
+  const dataRevision = useDataRevision(TOPICS.roles)
+
   const canCreate = isAdministrator || hasCapability('host.settings.roles', 'Create')
   const canEdit = isAdministrator || hasCapability('host.settings.roles', 'Edit')
   const canDelete = isAdministrator || hasCapability('host.settings.roles', 'Delete')

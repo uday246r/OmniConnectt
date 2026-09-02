@@ -1,0 +1,90 @@
+/*
+ * Dashboard card shell, shared WITHIN lead_mf.
+ *
+ * All four dashboard cards (Leads by Product, Leads by Branch, Leads over Time, Recent Leads)
+ * declared this identical block inline — same background, border, radius, padding, shadow and gap.
+ * Application-level rather than global: the host's dashboard uses its own `.summaryCard` treatment
+ * with a coloured top accent, which is a different card.
+ */
+
+.card {
+  background: var(--omni-color-surface);
+  border: 1px solid #eaecf0;
+  border-radius: var(--omni-radius-xl);
+  padding: var(--omni-space-5) var(--omni-space-6);
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.04);
+  display: flex;
+  flex-direction: column;
+  gap: var(--omni-space-4);
+  box-sizing: border-box;
+}
+
+.cardHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--omni-space-3);
+}
+
+.cardTitle {
+  font-size: var(--omni-font-size-md);
+  font-weight: var(--omni-font-weight-bold);
+  color: var(--omni-color-text-primary);
+  margin: 0;
+  letter-spacing: -0.015em;
+}
+
+.cardSubtitle {
+  font-size: var(--omni-font-size-xs);
+  color: var(--omni-color-text-secondary);
+  margin: 2px 0 0;
+}
+
+/* "View all" style link in a card header. */
+.cardAction {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: none;
+  border: none;
+  padding: 0;
+  font-family: inherit;
+  font-size: var(--omni-font-size-xs);
+  font-weight: var(--omni-font-weight-semibold);
+  color: var(--omni-color-primary-600);
+  cursor: pointer;
+  transition: color var(--omni-transition-fast);
+}
+
+.cardAction:hover {
+  color: var(--omni-color-primary-700);
+}
+
+.cardEmpty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--omni-space-7) var(--omni-space-5);
+  color: var(--omni-color-text-muted);
+  font-size: var(--omni-font-size-sm);
+  gap: var(--omni-space-2);
+  text-align: center;
+}
+
+/* Chart-area placeholder used while a card is loading or has no data. */
+.chartState {
+  height: 180px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--omni-color-text-muted);
+  font-size: var(--omni-font-size-sm);
+}
+
+.chartBody {
+  display: flex;
+  align-items: center;
+  gap: var(--omni-space-6);
+  min-height: 180px;
+}

@@ -1,0 +1,139 @@
+/*
+ * Leads-by-Branch card — the scrolling branch list with its progress bars.
+ * Card shell and header come from the app-level dashboardCard sheet.
+ */
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--omni-space-2);
+  min-height: 200px;
+  max-height: 240px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--omni-color-border) transparent;
+}
+
+.listState {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--omni-color-text-muted);
+  font-size: var(--omni-font-size-sm);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--omni-space-3);
+  padding: 10px var(--omni-space-3);
+  border: 1px solid #eaecf0;
+  border-radius: 11px;
+  background: var(--omni-color-surface-alt);
+  transition: background 130ms ease, border-color 130ms ease;
+}
+
+/* Real :hover, replacing the JS handler pair this row previously carried. */
+.row:hover {
+  background: var(--omni-color-surface);
+  border-color: var(--omni-color-border-strong);
+}
+
+/* Per-branch colour is data-driven, so it arrives as a custom property. */
+.rowIcon {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  background: var(--branch-tint);
+  color: var(--branch-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.rowBody {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.rowTitleLine {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.rowName {
+  font-size: var(--omni-font-size-sm);
+  font-weight: var(--omni-font-weight-semibold);
+  color: var(--omni-color-text-primary);
+  letter-spacing: -0.01em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rowPct {
+  font-size: 10.5px;
+  color: var(--omni-color-text-muted);
+  font-weight: var(--omni-font-weight-medium);
+}
+
+.barTrack {
+  width: 100%;
+  height: 4px;
+  background: #f1f5f9;
+  border-radius: var(--omni-radius-pill);
+  overflow: hidden;
+}
+
+/* Width and colour are both computed per row. */
+.barFill {
+  height: 100%;
+  width: var(--bar-pct);
+  background: var(--branch-color);
+  border-radius: var(--omni-radius-pill);
+  transition: width 0.4s ease;
+}
+
+.countPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--omni-color-success-50);
+  color: var(--omni-color-success-600);
+  border-radius: var(--omni-radius-pill);
+  padding: 3px 9px;
+  font-size: 11px;
+  font-weight: var(--omni-font-weight-semibold);
+  flex-shrink: 0;
+}
+
+.countDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--omni-color-success-500);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .barFill { transition: none; }
+}
+
+.rankBadge {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  background: var(--branch-tint);
+  color: var(--branch-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: var(--omni-font-size-xs);
+  font-weight: 800;
+}

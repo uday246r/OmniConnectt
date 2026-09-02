@@ -8,7 +8,7 @@ export function SkeletonAvatar({ size = 32 }: SkeletonAvatarProps) {
   return (
     <div
       className={[styles.shimmer, styles.avatar].join(' ')}
-      style={{ width: size, height: size }}
+      style={{ '--sk-size': `${size}px` } as React.CSSProperties}
       aria-hidden="true"
     />
   )

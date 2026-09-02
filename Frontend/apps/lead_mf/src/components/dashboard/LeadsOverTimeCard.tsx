@@ -8,6 +8,8 @@ import {
   Tooltip,
   CartesianGrid,
 } from 'recharts';
+import card from '../../shared/dashboardCard.module.css';
+import styles from './LeadsOverTimeCard.module.css';
 import { useLeadStore } from '../../store/useLeadStore';
 
 const GRANULARITY_LABELS: Record<string, string> = {
@@ -23,41 +25,19 @@ export const LeadsOverTimeCard: React.FC = () => {
   return (
     /* widgetCard — matches host exactly */
     <div
-      style={{
-        background: '#ffffff',
-        border: '1px solid #eaecf0',
-        borderRadius: '16px',
-        padding: '20px 24px',
-        boxShadow: '0 1px 4px rgba(15, 23, 42, 0.04)',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '16px',
-        boxSizing: 'border-box',
-      }}
+      className={card.card}
     >
       {/* widgetHeader */}
       <div
-        style={{
-          display: 'flex',
-          alignItems: 'flex-start',
-          justifyContent: 'space-between',
-          gap: '12px',
-        }}
+        className={card.cardHeader}
       >
         <div>
           <h2
-            style={{
-              fontSize: '14.5px',
-              fontWeight: 700,
-              color: '#0f172a',
-              margin: 0,
-              letterSpacing: '-0.02em',
-              fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
-            }}
+            className={card.cardTitle}
           >
             Leads Over Time
           </h2>
-          <p style={{ fontSize: '12px', color: '#64748b', margin: '3px 0 0', fontWeight: 400 }}>
+          <p className={card.cardSubtitle}>
             Application submission trends
           </p>
         </div>
@@ -68,35 +48,7 @@ export const LeadsOverTimeCard: React.FC = () => {
           onChange={(e) =>
             setDashboardGranularity(e.target.value as 'daily' | 'weekly' | 'monthly')
           }
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '4px',
-            background: '#f8fafc',
-            border: '1px solid #e2e8f0',
-            borderRadius: '7px',
-            padding: '5px 10px',
-            fontSize: '12px',
-            fontWeight: 600,
-            color: '#475569',
-            cursor: 'pointer',
-            transition: 'background 130ms ease, color 130ms ease, border-color 130ms ease',
-            outline: 'none',
-            fontFamily: 'inherit',
-            appearance: 'none',
-            WebkitAppearance: 'none',
-            minWidth: '80px',
-          }}
-          onMouseEnter={(e) => {
-            (e.currentTarget as HTMLSelectElement).style.background = '#2563eb';
-            (e.currentTarget as HTMLSelectElement).style.color = '#ffffff';
-            (e.currentTarget as HTMLSelectElement).style.borderColor = '#2563eb';
-          }}
-          onMouseLeave={(e) => {
-            (e.currentTarget as HTMLSelectElement).style.background = '#f8fafc';
-            (e.currentTarget as HTMLSelectElement).style.color = '#475569';
-            (e.currentTarget as HTMLSelectElement).style.borderColor = '#e2e8f0';
-          }}
+          className={styles.granularitySelect}
         >
           <option value="daily">Daily</option>
           <option value="weekly">Weekly</option>
@@ -105,30 +57,16 @@ export const LeadsOverTimeCard: React.FC = () => {
       </div>
 
       {/* Chart */}
-      <div style={{ height: '200px', width: '100%' }}>
+      <div className={styles.chartArea}>
         {isLoadingDashboard ? (
           <div
-            style={{
-              height: '100%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#94a3b8',
-              fontSize: '13px',
-            }}
+            className={styles.chartState}
           >
             Loading trend data...
           </div>
         ) : leadsOverTime.length === 0 ? (
           <div
-            style={{
-              height: '100%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#94a3b8',
-              fontSize: '13px',
-            }}
+            className={styles.chartState}
           >
             No leads recorded in the selected period.
           </div>
@@ -183,8 +121,8 @@ export const LeadsOverTimeCard: React.FC = () => {
       </div>
 
       {/* Granularity label footer */}
-      <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 500, marginTop: '-8px' }}>
-        Showing: <strong style={{ color: '#64748b' }}>{GRANULARITY_LABELS[dashboardGranularity]}</strong> breakdown
+      <div className={styles.footnote}>
+        Showing: <strong className={styles.footnoteStrong}>{GRANULARITY_LABELS[dashboardGranularity]}</strong> breakdown
       </div>
     </div>
   );

@@ -242,34 +242,34 @@ export function ApplicationFormLayer({ appId }: ApplicationFormLayerProps) {
     return (
       <div className={styles.layer}>
         {/* Skeleton Header */}
-        <div className={styles.header} style={{ pointerEvents: 'none' }}>
+        <div className={`${styles.header} ${styles.afl1}`} >
           <div className={styles.headerTitleWrap}>
-            <div className={styles.headerIconBox} style={{ opacity: 0.55 }}>
+            <div className={`${styles.headerIconBox} ${styles.afl2}`} >
               <SkeletonBlock width={22} height={22} radius="6px" />
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <div className={styles.afl3}>
               <SkeletonBlock width={170} height={16} radius="5px" />
               <SkeletonBlock width={250} height={12} radius="4px" />
             </div>
           </div>
-          <div style={{ width: 34, height: 34, borderRadius: 10, background: 'rgba(255,255,255,0.18)' }} />
+          <div className={styles.afl4} />
         </div>
 
         {/* Form body */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '16px 24px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div className={styles.afl5}>
           {/* Card 1 */}
-          <div style={{ background: '#fff', border: '1px solid #eaecf0', borderRadius: 14, padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div className={styles.afl6}>
             <SkeletonBlock width={130} height={13} radius="4px" />
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div className={styles.afl7}>
+              <div className={styles.afl8}>
                 {[0, 1].map((i) => (
-                  <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                  <div key={i} className={styles.afl9}>
                     <SkeletonBlock width="45%" height={11} radius="3px" />
                     <SkeletonBlock width="100%" height={38} radius="9px" />
                   </div>
                 ))}
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+              <div className={styles.afl9}>
                 <SkeletonBlock width="30%" height={11} radius="3px" />
                 <SkeletonBlock width="100%" height={38} radius="9px" />
               </div>
@@ -277,10 +277,10 @@ export function ApplicationFormLayer({ appId }: ApplicationFormLayerProps) {
           </div>
 
           {/* Card 2 */}
-          <div style={{ background: '#fff', border: '1px solid #eaecf0', borderRadius: 14, padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div className={styles.afl6}>
             <SkeletonBlock width={160} height={13} radius="4px" />
             {[0, 1].map((i) => (
-              <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+              <div key={i} className={styles.afl9}>
                 <SkeletonBlock width="40%" height={11} radius="3px" />
                 <SkeletonBlock width="100%" height={38} radius="9px" />
               </div>
@@ -289,7 +289,7 @@ export function ApplicationFormLayer({ appId }: ApplicationFormLayerProps) {
         </div>
 
         {/* Bottom bar */}
-        <div className={styles.bottomBar} style={{ pointerEvents: 'none' }}>
+        <div className={`${styles.bottomBar} ${styles.afl1}`} >
           <SkeletonBlock width={90} height={36} radius="9px" />
           <SkeletonBlock width={110} height={36} radius="9px" />
         </div>
@@ -327,7 +327,7 @@ export function ApplicationFormLayer({ appId }: ApplicationFormLayerProps) {
       {/* Generic server error */}
       {error && (
         <div className={styles.errorAlert} role="alert">
-          <span style={{ flexShrink: 0, display: 'flex' }}><Icon.AlertCircle width={16} height={16} /></span>
+          <span className={styles.afl10}><Icon.AlertCircle width={16} height={16} /></span>
           <span>{error}</span>
         </div>
       )}

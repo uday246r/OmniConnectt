@@ -5,6 +5,25 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>OmniConnect</title>
+
+    <!--
+      Inter, declared once for the whole app.
+
+      This was previously an `@import url(...)` at the top of TWELVE separate CSS modules, in three
+      different weight combinations. Two problems with that: the browser cannot start fetching an
+      @import until it has downloaded and parsed the stylesheet containing it, so the font was
+      serialised behind every route's CSS chunk; and a route whose stylesheet happened to request
+      only 400-800 rendered weight 900 as a synthesised faux-bold.
+
+      The weight set here is the UNION of all three variants that were in use — 400-900 plus
+      italic 700 — so every glyph any stylesheet previously relied on is still available.
+    -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,700&display=swap"
+    />
   </head>
   <body>
     <div id="root"></div>

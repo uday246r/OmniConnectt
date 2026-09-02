@@ -1,0 +1,196 @@
+/*
+ * View Leads page.
+ *
+ * First CSS Module in lead_mf. This app previously had a single 2,919-line `index.css` carrying
+ * drawers, tables, buttons, badges, dashboard and layout together, plus 524 inline style blocks in
+ * JSX — which is how three different table header treatments coexisted here without anyone noticing.
+ * Page- and component-scoped stylesheets replace both.
+ *
+ * The table chrome itself is NOT here: it comes from @omniremit/ui's DataTable, so this page renders
+ * the same table as the host's Audit Logs and Approval Center. Only genuinely page-specific styling
+ * belongs below.
+ */
+
+/* The Actions column is right-aligned; everything else inherits DataTable's default. */
+.thRight {
+  text-align: right;
+}
+
+.actionsCell {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--omni-space-2);
+}
+
+/* ── Customer cell: avatar + name ────────────────────────────── */
+.customerCell {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+
+/*
+ * Avatar colours are picked per row from AVATAR_COLORS, so they arrive as custom-property
+ * hand-offs — the only inline form the repo convention allows for runtime values. The declarations
+ * that consume them live here.
+ */
+.avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--lead-avatar-bg);
+  color: var(--lead-avatar-text);
+  font-size: 11.5px;
+  font-weight: var(--omni-font-weight-bold);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  letter-spacing: 0.02em;
+}
+
+.customerName {
+  font-weight: var(--omni-font-weight-semibold);
+  color: var(--text-heading);
+  white-space: nowrap;
+}
+
+.mutedCell {
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+/* ── Page shell ──────────────────────────────────────────────── */
+
+/* ── Table card ──────────────────────────────────────────────── */
+
+
+
+
+/* ── Search ──────────────────────────────────────────────────── */
+
+
+
+/* Extra right padding only while the clear button is showing. */
+
+
+
+/* ── Toolbar controls ────────────────────────────────────────── */
+
+/*
+ * Filter / Refresh controls. The refresh button's hover was previously two JS handlers writing to
+ * element.style; it is a CSS :hover now.
+ */
+
+
+
+/* Filters applied, or the panel is open. */
+
+
+/* ── Loading ─────────────────────────────────────────────────── */
+
+
+
+/* ── Table cell contents ─────────────────────────────────────── */
+.monoValue {
+  color: var(--omni-color-text-primary);
+  font-weight: var(--omni-font-weight-medium);
+  font-size: var(--omni-font-size-sm);
+  font-family: 'SF Mono', 'Fira Code', ui-monospace, monospace;
+}
+
+/*
+ * Regular weight, not medium.
+ *
+ * Typographic hierarchy is copied from the host's audit table, where exactly ONE cell carries
+ * emphasis — `.actorName` at 600, the person the row is about — and every other column is 400-500.
+ * This table had the customer name at 600, the product at 600, and phone AND branch at 500, so
+ * five of six columns competed for attention and the table read as uniformly heavy. Phone and
+ * branch are plain data, the counterpart of the host's description cell, which is 400.
+ */
+.strongValue {
+  color: var(--omni-color-text-primary);
+}
+
+/* A category, not an identity — one step below the customer name, matching the host's `.timeCell`. */
+.productValue {
+  font-weight: var(--omni-font-weight-medium);
+  color: var(--omni-color-text-primary);
+}
+
+/* ── Row action buttons ──────────────────────────────────────── */
+.actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+/*
+ * Three tinted pill actions. Each previously carried a full inline style plus its own pair of JS
+ * mouse handlers writing background directly to the element; the hover is CSS now.
+ */
+.rowAction {
+  padding: 5px 11px;
+  border-radius: var(--omni-radius-md);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--omni-space-1);
+  font-size: var(--omni-font-size-xs);
+  font-weight: var(--omni-font-weight-semibold);
+  font-family: inherit;
+  white-space: nowrap;
+  transition: background var(--omni-transition-fast);
+}
+
+.actionView {
+  background: var(--omni-color-primary-50);
+  border: 1px solid var(--omni-color-primary-200);
+  color: var(--omni-color-primary-700);
+}
+.actionView:hover { background: var(--omni-color-primary-100); }
+
+.actionEdit {
+  background: #fefce8;
+  border: 1px solid #fef08a;
+  color: #a16207;
+}
+.actionEdit:hover { background: #fef9c3; border-color: #fde047; }
+
+.actionDelete {
+  background: #fff1f2;
+  border: 1px solid #fecdd3;
+  color: #be185d;
+}
+.actionDelete:hover { background: #ffe4e6; border-color: #fda4af; }
+
+/* Matches the host's `.timeCell`: 12px, medium, tightened. */
+.dateCell {
+  color: var(--omni-color-text-secondary);
+  font-size: 12px;
+  font-weight: var(--omni-font-weight-medium);
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
+.actionsCellTd {
+  text-align: right;
+}
+
+/* ── Pagination footer ───────────────────────────────────────── */
+
+
+
+
+
+
+
+.pageNavBtn:hover:not(:disabled) {
+  background: var(--omni-color-surface-alt);
+  border-color: var(--omni-color-border-strong);
+}
+
+/* `disabled` on the element replaces the inline opacity/cursor ternaries. */

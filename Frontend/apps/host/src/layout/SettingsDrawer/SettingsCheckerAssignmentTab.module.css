@@ -972,3 +972,39 @@
   background: var(--omni-color-danger-100);
   color: var(--omni-color-danger-700);
 }
+.cat1 {
+  color: var(--omni-color-primary-600);
+}
+
+.cat2 {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.cat3 {
+  flex-shrink: 0;
+}
+
+.cat4 {
+  margin: 0;
+  font-size: 13px;
+  color: #1e293b;
+  line-height: 1.5;
+}
+
+.cat5 {
+  background: #f1f5f9;
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+.cat6 {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--omni-color-text-secondary);
+  line-height: 1.4;
+}
+
+.expandChevron { transition: transform 0.15s ease; transform: rotate(0deg); }
+.expandChevronCollapsed { transform: rotate(-90deg); }
