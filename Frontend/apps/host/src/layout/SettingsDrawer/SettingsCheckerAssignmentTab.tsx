@@ -8,20 +8,11 @@ import { useClickOutside } from '../../shared/hooks/useClickOutside'
 import { Icon } from '../../shared/components/Icon/Icon'
 import { resolveIcon } from '../../shared/components/Icon/resolveIcon'
 import { SkeletonBlock } from '../../shared/components/Skeleton'
-import { Modal } from '../../shared/components/Modal/Modal'
-import { Button } from '../../shared/components/Button/Button'
 import { ApiError } from '../../shared/api/httpClient'
 import { toast } from '../../shared/stores/toastStore'
 import styles from './SettingsCheckerAssignmentTab.module.css'
 import { TOPICS, invalidate, useDataRevision } from '../../shared/stores/invalidationStore'
-
-function getInitials(name?: string): string {
-  if (!name || !name.trim()) return 'U'
-  const parts = name.trim().split(/\s+/)
-  if (parts.length >= 2) return `${parts[0][0]}${parts[1][0]}`.toUpperCase()
-  return name.substring(0, 2).toUpperCase()
-}
-
+import { Button, Modal, getInitials } from '@omniremit/ui'
 function getModuleIcon(key: string, label: string) {
   const lower = (key + ' ' + label).toLowerCase()
   if (lower.includes('user')) return <Icon.Users width={14} height={14} />

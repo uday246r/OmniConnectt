@@ -34,7 +34,7 @@
 .header::after {
   content: '';
   position: absolute;
-  border-radius: 50%;
+  border-radius: var(--omni-radius-circle);
   pointer-events: none;
 }
 
@@ -89,7 +89,7 @@
 .icon {
   width: 50px;
   height: 50px;
-  border-radius: 14px;
+  border-radius: var(--omni-radius-lg-plus);
   background: var(--omni-color-on-header-surface);
   border: 1.5px solid var(--omni-color-on-header-border);
   backdrop-filter: blur(8px);
@@ -126,12 +126,22 @@
 }
 
 .subtitle {
-  font-size: 13.5px;
+  font-size: var(--omni-font-size-sm-plus);
   color: var(--omni-color-on-header-muted);
   margin: 0;
   font-weight: var(--omni-font-weight-regular);
   max-width: 620px;
   line-height: 1.45;
+  /*
+   * Two lines maximum. `max-width` alone bounded the line length but not the line COUNT, so a long
+   * subtitle wrapped to three or four lines and stretched the blue banner down the page — most
+   * visible on Field Settings and My Requests.
+   */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 /* Glass pill beside the title — record counts, "live" indicators, environment tags. */
@@ -144,7 +154,7 @@
   backdrop-filter: blur(8px);
   padding: 3px 10px;
   border-radius: var(--omni-radius-pill);
-  font-size: 11px;
+  font-size: var(--omni-font-size-xs-minus);
   font-weight: var(--omni-font-weight-bold);
   color: var(--omni-color-on-header-text);
   letter-spacing: 0.03em;
@@ -163,6 +173,6 @@
     padding: 20px 22px;
   }
   .title {
-    font-size: 20px;
+    font-size: var(--omni-font-size-xl);
   }
 }

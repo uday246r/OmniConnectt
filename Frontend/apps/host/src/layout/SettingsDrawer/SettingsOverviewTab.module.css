@@ -11,9 +11,9 @@
 }
 
 .sectionTitle {
-  font-size: 15px;
-  font-weight: 700;
-  color: #0f172a;
+  font-size: var(--omni-font-size-md-plus);
+  font-weight: var(--omni-font-weight-bold);
+  color: var(--omni-color-text-primary);
   margin: 0;
   letter-spacing: -0.01em;
   border-left: 3px solid #2563eb;
@@ -21,7 +21,7 @@
 }
 
 .sectionSubtitle {
-  font-size: 12px;
+  font-size: var(--omni-font-size-xs);
   color: #64748b;
   margin: 0;
 }
@@ -42,9 +42,9 @@
 .statCard {
   position: relative;
   overflow: hidden;
-  background: #ffffff;
+  background: var(--omni-color-surface);
   border: 1px solid #eaecf0;
-  border-radius: 14px;
+  border-radius: var(--omni-radius-lg-plus);
   padding: 14px 14px 12px;
   display: flex;
   align-items: center;
@@ -81,7 +81,7 @@
 .iconWrap {
   width: 36px;
   height: 36px;
-  border-radius: 9px;
+  border-radius: var(--omni-radius-md-plus);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -94,22 +94,22 @@
 }
 
 .iconGreen {
-  background: #ecfdf5;
-  color: #10b981;
+  background: var(--omni-color-success-50);
+  color: var(--omni-color-success-500);
 }
 
 .iconBlue {
-  background: #eff6ff;
-  color: #3b82f6;
+  background: var(--omni-color-primary-50);
+  color: var(--omni-color-primary-500);
 }
 
 .iconEmerald {
-  background: #ecfdf5;
-  color: #059669;
+  background: var(--omni-color-success-50);
+  color: var(--omni-color-success-600);
 }
 
 .iconAmber {
-  background: #fff7ed;
+  background: var(--omni-color-action-disable-bg);
   color: #f97316;
 }
 
@@ -122,8 +122,8 @@
 }
 
 .statLabel {
-  font-size: 11px;
-  font-weight: 600;
+  font-size: var(--omni-font-size-xs-minus);
+  font-weight: var(--omni-font-weight-semibold);
   color: #64748b;
   white-space: nowrap;
   overflow: hidden;
@@ -131,9 +131,9 @@
 }
 
 .statValue {
-  font-size: 18px;
-  font-weight: 700;
-  color: #0f172a;
+  font-size: var(--omni-font-size-lg-plus);
+  font-weight: var(--omni-font-weight-bold);
+  color: var(--omni-color-text-primary);
   line-height: 1.1;
 }
 
@@ -146,8 +146,8 @@
 .pulsingDot {
   width: 7px;
   height: 7px;
-  border-radius: 50%;
-  background: #10b981;
+  border-radius: var(--omni-radius-circle);
+  background: var(--omni-color-success-500);
   box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
   animation: pulse 2s infinite;
   flex-shrink: 0;
@@ -166,9 +166,9 @@
 }
 
 .statValueHealthy {
-  font-size: 14px;
-  font-weight: 700;
-  color: #059669;
+  font-size: var(--omni-font-size-md);
+  font-weight: var(--omni-font-weight-bold);
+  color: var(--omni-color-success-600);
 }
 
 /* Two Columns Layout */
@@ -198,16 +198,16 @@
 }
 
 .panelTitle {
-  font-size: 13px;
-  font-weight: 700;
-  color: #0f172a;
+  font-size: var(--omni-font-size-sm);
+  font-weight: var(--omni-font-weight-bold);
+  color: var(--omni-color-text-primary);
   margin: 0;
   border-left: 3px solid #2563eb;
   padding-left: 10px;
 }
 
 .panelSubtitle {
-  font-size: 11px;
+  font-size: var(--omni-font-size-xs-minus);
   color: #64748b;
   margin: 0;
 }
@@ -217,9 +217,9 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
-  background: #ffffff;
+  background: var(--omni-color-surface);
   border: 1px solid #eaecf0;
-  border-radius: 14px;
+  border-radius: var(--omni-radius-lg-plus);
   padding: 14px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
   transition: all 0.15s ease;
@@ -249,17 +249,17 @@
 .dot {
   width: 7px;
   height: 7px;
-  border-radius: 50%;
+  border-radius: var(--omni-radius-circle);
   margin-top: 5px;
   flex-shrink: 0;
 }
 
 .dotGreen {
-  background: #10b981;
+  background: var(--omni-color-success-500);
 }
 
 .dotRed {
-  background: #ef4444;
+  background: var(--omni-color-danger-500);
 }
 
 .activityInfo {
@@ -271,8 +271,8 @@
 }
 
 .activityText {
-  font-size: 12px;
-  font-weight: 600;
+  font-size: var(--omni-font-size-xs);
+  font-weight: var(--omni-font-weight-semibold);
   color: #1e293b;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -280,8 +280,8 @@
 }
 
 .activityTime {
-  font-size: 11px;
-  color: #94a3b8;
+  font-size: var(--omni-font-size-xs-minus);
+  color: var(--omni-color-text-muted);
 }
 
 .viewAllButton {
@@ -291,16 +291,16 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  color: #2563eb;
-  font-size: 12px;
-  font-weight: 600;
+  color: var(--omni-color-primary-600);
+  font-size: var(--omni-font-size-xs);
+  font-weight: var(--omni-font-weight-semibold);
   cursor: pointer;
   align-self: flex-start;
   transition: color 0.15s ease;
 }
 
 .viewAllButton:hover {
-  color: #1d4ed8;
+  color: var(--omni-color-primary-700);
   text-decoration: underline;
 }
 
@@ -315,9 +315,9 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  background: #ffffff;
+  background: var(--omni-color-surface);
   border: 1px solid #eaecf0;
-  border-radius: 14px;
+  border-radius: var(--omni-radius-lg-plus);
   padding: 9px 12px;
   width: 100%;
   cursor: pointer;
@@ -327,8 +327,8 @@
 }
 
 .actionButton:hover {
-  background: #f8fafc;
-  border-color: #cbd5e1;
+  background: var(--omni-color-surface-alt);
+  border-color: var(--omni-color-border-strong);
   transform: translateX(2px);
   box-shadow: 0 4px 16px rgba(15, 23, 42, 0.08);
 }
@@ -336,7 +336,7 @@
 .actionIcon {
   width: 30px;
   height: 30px;
-  border-radius: 8px;
+  border-radius: var(--omni-radius-md);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -344,14 +344,14 @@
 }
 
 .actionLabel {
-  font-size: 12px;
-  font-weight: 600;
+  font-size: var(--omni-font-size-xs);
+  font-weight: var(--omni-font-weight-semibold);
   color: #1e293b;
   flex: 1;
 }
 
 .chevron {
-  color: #94a3b8;
+  color: var(--omni-color-text-muted);
 }
 
 /* Bottom Info Box */
@@ -359,12 +359,12 @@
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  background: #f8fafc;
+  background: var(--omni-color-surface-alt);
   border: 1px solid #eaecf0;
-  border-radius: 14px;
+  border-radius: var(--omni-radius-lg-plus);
   padding: 12px 14px;
-  color: #475569;
-  font-size: 12px;
+  color: var(--omni-color-text-secondary);
+  font-size: var(--omni-font-size-xs);
   line-height: 1.4;
   transition: all 0.15s ease;
 }

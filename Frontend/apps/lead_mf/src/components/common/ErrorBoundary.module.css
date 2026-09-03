@@ -6,13 +6,13 @@
   padding: 32px;
   text-align: center;
   background-color: var(--omni-color-surface);
-  border-radius: 8px;
+  border-radius: var(--omni-radius-md);
   margin: 24px;
   border: 1px solid #fee2e2;
 }
 
 .heading {
-  color: #ef4444;
+  color: var(--omni-color-danger-500);
   margin-bottom: 8px;
 }
 
@@ -26,6 +26,6 @@
   background-color: var(--omni-color-primary-600);
   color: var(--omni-color-surface);
   border: none;
-  border-radius: 6px;
+  border-radius: var(--omni-radius-sm);
   cursor: pointer;
 }

@@ -24,7 +24,7 @@
 }
 
 .content::-webkit-scrollbar       { width: 6px; }
-.content::-webkit-scrollbar-thumb { background: #d1d9e6; border-radius: 6px; }
+.content::-webkit-scrollbar-thumb { background: #d1d9e6; border-radius: var(--omni-radius-sm); }
 
 /* Mobile sidebar overlay backdrop */
 .sidebarBackdrop {

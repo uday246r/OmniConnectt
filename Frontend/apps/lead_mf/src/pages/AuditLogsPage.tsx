@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { ShieldCheck, Search, RefreshCw, Eye, Download, X, ChevronLeft, ChevronRight } from 'lucide-react';
-import { ActorCell, Badge, Button, ColumnFilter, DataTable, EmptyState, FilterBar, PageHeader, Pagination, RowAction, RowsPerPage, SearchField, SkeletonTable, formatAuditTimestamp, type ActiveFilter } from '@omniremit/ui';
+import { ShieldCheck, Search, RefreshCw, Eye, Download, X, ChevronLeft, ChevronRight } from '@omniremit/ui/icons';
+import { ActorCell, Badge, Button, ColumnFilter, DataTable, EmptyState, FilterBar, PageHeader, Pagination, ResponsiveRows, RowAction, RowsPerPage, SearchField, formatAuditTimestamp, type ActiveFilter } from '@omniremit/ui';
 import { useLeadStore } from '../store/useLeadStore';
 import styles from './AuditLogsPage.module.css';
 import shell from '../shared/leadPage.module.css';
@@ -185,7 +185,7 @@ const getActionBadge = (action: string) => {
         filters={[
           auditActionFilter && {
             key: 'action',
-            label: 'Action',
+            label: 'What Happened',
             value: ACTION_FILTER_OPTIONS.find((o) => o.value === auditActionFilter)?.label ?? auditActionFilter,
             onRemove: () => setAuditActionFilter(''),
           },
@@ -246,21 +246,7 @@ const getActionBadge = (action: string) => {
         </div>
 
         {/* Main Table */}
-        {isLoadingAuditLogs ? (
-          // Column-shaped, matching the real table's cells (host's AuditLogsPage skeleton rows use
-          // the same per-cell-shape convention) — a centered spinner+text row gave no sense of the
-          // table's structure while it loaded.
-          <DataTable bare>
-            <tbody>
-              <tr>
-                <td>
-                  {/* Column-shaped placeholder, same convention as the host's Audit Logs skeleton. */}
-                  <SkeletonTable rows={8} columns={5} />
-                </td>
-              </tr>
-            </tbody>
-          </DataTable>
-        ) : visibleLogs.length === 0 ? (
+        {!isLoadingAuditLogs && visibleLogs.length === 0 ? (
           <EmptyState
             icon={<ShieldCheck size={32} />}
             title="No audit logs found"
@@ -272,110 +258,129 @@ const getActionBadge = (action: string) => {
           />
         ) : (
           <DataTable bare>
-              <thead>
-                <tr>
-                  <th>
-                    Timestamp
-                  </th>
-                  <ColumnFilter
-                    label="Performed By"
-                    title="Filter Performed By"
-                    value={actorFilter}
-                    onChange={setActorFilter}
-                    options={actorOptions}
-                    allLabel="Everyone"
-                    searchable={actorOptions.length > 6}
-                    searchPlaceholder="Type a name to narrow…"
-                    emptyHint="Nobody in this log matches that."
-                  />
-                  <ColumnFilter
-                    label="Action"
-                    value={auditActionFilter}
-                    onChange={setAuditActionFilter}
-                    options={ACTION_FILTER_OPTIONS}
-                    allLabel="All Action Types"
-                  />
-                  <th>
-                    Event Description
-                  </th>
-                  <ColumnFilter
-                    label="Result & IP Address"
-                    title="Filter Status"
-                    value={statusFilter}
-                    onChange={setStatusFilter}
-                    options={STATUS_FILTER_OPTIONS}
-                    allLabel="All Statuses"
-                  />
-                  <th className={styles.thRight}>
-                    Details
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {visibleLogs.map((log) => {
-                  const badge = getActionBadge(log.actionType);
-
-                  return (
-                    <tr key={log.id}>
-                      {/* Timestamp */}
-                      <td className={styles.timestampCell}>
-                        {formatTimestamp(log.timestamp)}
-                      </td>
-
-                      {/* Actor & Role */}
-                      <td>
-                        <ActorCell name={log.userName || 'System'} meta={log.userRole || 'User'} />
-                      </td>
-
-                      {/* Action code */}
-                      <td>
-                        <span
-                          className={styles.actionChip}
-                          style={
-                            {
-                              '--audit-chip-bg': badge.bg,
-                              '--audit-chip-text': badge.text,
-                              '--audit-chip-border': badge.border,
-                            } as React.CSSProperties
-                          }
-                        >
-                          {getActionLabel(log.actionType)}
-                        </span>
-                      </td>
-
-                      {/* Description */}
-                      <td className={styles.descriptionCell}>
-                        <div>{log.description}</div>
-                        {log.reason && (
-                          <div className={styles.descriptionMeta}>
-                            Reason: {log.reason}
-                          </div>
-                        )}
-                      </td>
-
-                      {/* Status & IP */}
-                      <td>
-                        <Badge tone={log.status?.toUpperCase() === 'SUCCESS' ? 'success' : 'danger'} dot>
-                          {log.status}
-                        </Badge>
-                        <div className={styles.ipMeta}>
-                          {log.ipAddress || '127.0.0.1'}
-                        </div>
-                      </td>
-
-                      {/* Row action. The verb is "View" platform-wide — this said "Inspect". */}
-                      <td className={styles.cellRight}>
-                        <RowAction
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openAuditDetails(log);
-                          }}
-                        />
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
+            <ResponsiveRows
+              rows={visibleLogs}
+              rowKey={(log) => String(log.id)}
+              loading={isLoadingAuditLogs}
+              loadingRows={auditPageSize}
+              columns={[
+                {
+                  key: 'timestamp',
+                  label: 'Date & Time',
+                  priority: 'always',
+                  render: (log) => (
+                    <span className={styles.timestampCell}>{formatTimestamp(log.timestamp)}</span>
+                  ),
+                },
+                {
+                  key: 'actor',
+                  label: 'Performed By',
+                  priority: 'always',
+                  header: (
+                    <ColumnFilter
+                      key="actor"
+                      label="Performed By"
+                      title="Filter Performed By"
+                      value={actorFilter}
+                      onChange={setActorFilter}
+                      options={actorOptions}
+                      allLabel="Everyone"
+                      searchable={actorOptions.length > 6}
+                      searchPlaceholder="Type a name to narrow…"
+                      emptyHint="Nobody in this log matches that."
+                    />
+                  ),
+                  render: (log) => (
+                    <ActorCell name={log.userName || 'System'} meta={log.userRole || 'User'} />
+                  ),
+                },
+                {
+                  key: 'action',
+                  label: 'What Happened',
+                  priority: 'high',
+                  header: (
+                    <ColumnFilter
+                      key="action"
+                      label="What Happened"
+                      value={auditActionFilter}
+                      onChange={setAuditActionFilter}
+                      options={ACTION_FILTER_OPTIONS}
+                      allLabel="All Action Types"
+                    />
+                  ),
+                  render: (log) => {
+                    const badge = getActionBadge(log.actionType);
+                    return (
+                      <span
+                        className={styles.actionChip}
+                        style={
+                          {
+                            '--audit-chip-bg': badge.bg,
+                            '--audit-chip-text': badge.text,
+                            '--audit-chip-border': badge.border,
+                          } as React.CSSProperties
+                        }
+                      >
+                        {getActionLabel(log.actionType)}
+                      </span>
+                    );
+                  },
+                },
+                {
+                  key: 'description',
+                  clamp: true,
+                  label: 'Description',
+                  priority: 'low',
+                  render: (log) => (
+                    <div className={styles.descriptionCell}>
+                      <div>{log.description}</div>
+                      {log.reason && (
+                        <div className={styles.descriptionMeta}>Reason: {log.reason}</div>
+                      )}
+                    </div>
+                  ),
+                },
+                {
+                  key: 'status',
+                  label: 'Outcome & IP Address',
+                  priority: 'low',
+                  header: (
+                    <ColumnFilter
+                      key="status"
+                      label="Outcome & IP Address"
+                      title="Filter Outcome"
+                      value={statusFilter}
+                      onChange={setStatusFilter}
+                      options={STATUS_FILTER_OPTIONS}
+                      allLabel="All Statuses"
+                    />
+                  ),
+                  render: (log) => (
+                    <>
+                      <Badge tone={log.status?.toUpperCase() === 'SUCCESS' ? 'success' : 'danger'} dot>
+                        {log.status}
+                      </Badge>
+                      {log.ipAddress ? <div className={styles.ipMeta}>{log.ipAddress}</div> : null}
+                    </>
+                  ),
+                },
+                {
+                  key: 'details',
+                  label: 'Details',
+                  priority: 'always',
+                  align: 'right',
+                  /* The verb is "View" platform-wide — this said "Inspect". */
+                  render: (log) => (
+                    <RowAction
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openAuditDetails(log);
+                      }}
+                    />
+                  ),
+                },
+              ]}
+            />
           </DataTable>
         )}
 

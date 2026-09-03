@@ -5,7 +5,7 @@
 .warnIcon {
   color: var(--omni-color-warning-600);
   flex-shrink: 0;
-  margin-top: 1;
+  margin-top: 1px;
 }
 
 /*

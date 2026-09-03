@@ -3,6 +3,7 @@ import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from 'recharts';
 import card from '../../shared/dashboardCard.module.css';
 import styles from './LeadsByProductCard.module.css';
 import { useLeadStore } from '../../store/useLeadStore';
+import { SkeletonAvatar, SkeletonText } from '@omniremit/ui';
 
 export const LeadsByProductCard: React.FC = () => {
   const { leadsByProduct, kpiSummary, isLoadingDashboard } = useLeadStore();
@@ -28,10 +29,12 @@ export const LeadsByProductCard: React.FC = () => {
       </div>
 
       {isLoadingDashboard ? (
-        <div
-          className={card.chartState}
-        >
-          Loading product distribution...
+        /* Donut plus its legend rows — the two things this card actually draws. */
+        <div className={card.chartSkeleton}>
+          <SkeletonAvatar size={132} />
+          <div className={card.legendSkeleton}>
+            <SkeletonText lines={5} />
+          </div>
         </div>
       ) : leadsByProduct.length === 0 ? (
         <div

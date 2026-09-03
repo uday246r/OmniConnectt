@@ -118,9 +118,17 @@
     --omni-space-8: 48px;
 
     /* ---- Radius scale ---- */
+    /* Same reasoning as the type scale — these are the radii the product already uses. */
+    --omni-radius-xs: 4px;
+    --omni-radius-xs-plus: 5px;
+    --omni-radius-sm-minus: 7px;
     --omni-radius-sm: 6px;
     --omni-radius-md: 8px;
+    --omni-radius-md-plus: 9px;
+    --omni-radius-lg-minus: 10px;
     --omni-radius-lg: 12px;
+    --omni-radius-lg-plus: 14px;
+    --omni-radius-circle: 50%;
     --omni-radius-xl: 16px;
     --omni-radius-pill: 999px;
 
@@ -131,11 +139,34 @@
 
     /* ---- Typography ---- */
     --omni-font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    /* One monospace stack. Three different ones were in use — host, lead and customer360 each had
+       their own — so identifiers and codes rendered differently in each app. */
+    --omni-font-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+    /*
+     * The scale is dense between 9.5px and 14px because the product genuinely is: the host uses
+     * half-pixel optical sizing for dense UI (11.5px appears 101 times, 12.5px 79, 13.5px 45).
+     *
+     * These steps DOCUMENT the existing design rather than impose a new one. The alternative —
+     * rounding 11.5 to 12 — would have restyled the reference app in ~400 places to tidy a scale,
+     * which is the wrong way round.
+     *
+     * Do not add further values here. A new size should reuse a step or replace one.
+     */
+    --omni-font-size-3xs: 9.5px;
+    --omni-font-size-2xs: 10px;
+    --omni-font-size-2xs-plus: 10.5px;
+    --omni-font-size-xs-minus: 11px;
+    --omni-font-size-xs-plus: 11.5px;
     --omni-font-size-xs: 12px;
+    --omni-font-size-sm-minus: 12.5px;
     --omni-font-size-sm: 13px;
+    --omni-font-size-sm-plus: 13.5px;
     --omni-font-size-md: 14px;
+    --omni-font-size-md-plus: 15px;
     --omni-font-size-lg: 16px;
+    --omni-font-size-lg-plus: 18px;
     --omni-font-size-xl: 20px;
+    --omni-font-size-xl-plus: 22px;
     --omni-font-size-2xl: 28px;
     --omni-font-weight-regular: 400;
     --omni-font-weight-medium: 500;
@@ -173,6 +204,27 @@
     /* ---- Motion ---- */
     --omni-transition-fast: 120ms ease;
     --omni-transition-base: 180ms ease;
+
+    /* ---- Breakpoints ----
+     * Declared so every stylesheet can name the same widths instead of inventing its own. The repo
+     * currently hardcodes 20+ distinct values (1600, 1200, 1100, 1080, 1024, 960, 900, 860, 800,
+     * 768, 760, 720, 680, 640, 600, 580, 540, 520, 500, 480, 400, 380, 360), which is why nothing
+     * changes shape at the same moment.
+     *
+     * NOTE: `@media (max-width: var(--omni-bp-md))` is NOT valid CSS — custom properties are not
+     * allowed in media queries. These exist so JS (matchMedia, resize observers, the table's
+     * priority-column logic) and human authors share one vocabulary; in a stylesheet, write the
+     * matching literal and name it in a comment.
+     *
+     *   lg  1100px  side-by-side layouts collapse; the sidebar starts crowding wide tables
+     *   md   768px  sidebar becomes an off-canvas drawer; multi-column grids go single
+     *   sm   640px  drawers go full-bleed; toolbars stack
+     *   xs   480px  minimum supported width
+     */
+    --omni-bp-lg: 1100px;
+    --omni-bp-md: 768px;
+    --omni-bp-sm: 640px;
+    --omni-bp-xs: 480px;
 
     /* ---- Z-index scale ---- */
     --omni-z-dropdown: 100;

@@ -9,10 +9,10 @@
 .avatar {
   width: 30px;
   height: 30px;
-  border-radius: 9px;
+  border-radius: var(--omni-radius-md-plus);
   background: linear-gradient(135deg, #ede9fe 0%, #ddd6fe 100%);
   color: #6d28d9;
-  font-size: 12px;
+  font-size: var(--omni-font-size-xs);
   font-weight: var(--omni-font-weight-bold);
   display: flex;
   align-items: center;
@@ -36,14 +36,14 @@
 .name {
   font-weight: var(--omni-font-weight-semibold);
   color: var(--omni-color-text-primary);
-  font-size: 13px;
+  font-size: var(--omni-font-size-sm);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .meta {
-  font-size: 11.5px;
+  font-size: var(--omni-font-size-xs-plus);
   color: var(--omni-color-text-secondary);
   white-space: nowrap;
   overflow: hidden;
@@ -59,7 +59,7 @@
 .unknown {
   color: var(--omni-color-text-secondary);
   font-weight: var(--omni-font-weight-medium);
-  font-size: 12px;
+  font-size: var(--omni-font-size-xs);
   font-family: var(--omni-font-mono, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace);
   white-space: nowrap;
   overflow: hidden;

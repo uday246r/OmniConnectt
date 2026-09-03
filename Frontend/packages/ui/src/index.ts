@@ -60,6 +60,8 @@ export type { IconComponent } from './primitives/Icon/resolveIcon'
 
 // ── Data display ─────────────────────────────────────────────
 export { DataTable, DataTableEmpty, dataTableStyles } from './data/DataTable/DataTable'
+export { ResponsiveRows } from './data/DataTable/ResponsiveRows'
+export type { ResponsiveRowsProps, ResponsiveColumn, ColumnPriority } from './data/DataTable/ResponsiveRows'
 export type { DataTableProps, DataTableEmptyProps } from './data/DataTable/DataTable'
 
 export { Pagination } from './data/Pagination/Pagination'
@@ -84,6 +86,9 @@ export type { ActorCellProps } from './data/ActorCell/ActorCell'
 export type { EmptyStateProps } from './data/EmptyState/EmptyState'
 
 // ── Layout ───────────────────────────────────────────────────
+export { Card } from './layout/Card/Card'
+export type { CardProps } from './layout/Card/Card'
+
 export { PageHeader, pageHeaderStyles } from './layout/PageHeader/PageHeader'
 export type { PageHeaderProps } from './layout/PageHeader/PageHeader'
 
@@ -99,16 +104,22 @@ export { Modal } from './overlay/Modal/Modal'
 export type { ModalProps } from './overlay/Modal/Modal'
 
 // ── Feedback ─────────────────────────────────────────────────
-export { SkeletonBlock, SkeletonText, SkeletonAvatar, SkeletonTable } from './feedback/Skeleton/Skeleton'
+export { SkeletonBlock, SkeletonText, SkeletonAvatar, SkeletonTable, TableSkeleton } from './feedback/Skeleton/Skeleton'
 export type {
   SkeletonBlockProps,
   SkeletonTextProps,
   SkeletonAvatarProps,
   SkeletonTableProps,
+  TableSkeletonProps,
 } from './feedback/Skeleton/Skeleton'
 
 // ── Utilities ────────────────────────────────────────────────
 export { classNames } from './utils/classNames'
+
+export { getInitials } from './utils/getInitials'
+export type { GetInitialsOptions } from './utils/getInitials'
 export type { ClassValue } from './utils/classNames'
 
 export { formatDate, formatDateTime, formatTime, formatRelativeTime, formatAuditTimestamp, EMPTY_VALUE } from './utils/formatDate'
+export { DetailSection, DetailSections, DetailGrid, DetailField, isEmptyDetailValue } from './data/DetailPanel/DetailPanel'
+export type { DetailSectionProps, DetailFieldProps } from './data/DetailPanel/DetailPanel'

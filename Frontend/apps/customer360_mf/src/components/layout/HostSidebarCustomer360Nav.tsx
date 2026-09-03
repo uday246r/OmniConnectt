@@ -5,7 +5,7 @@ import {
   Building2,
   ShieldCheck,
   Settings,
-} from 'lucide-react';
+} from '@omniremit/ui/icons';
 import { useNavigationStore, C360Page } from '../../store/navigationStore';
 import { useCustomerStore } from '../../store/customerStore';
 import styles from './HostSidebarCustomer360Nav.module.css';

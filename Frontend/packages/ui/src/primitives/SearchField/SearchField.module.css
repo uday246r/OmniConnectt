@@ -24,7 +24,7 @@
   border-radius: var(--omni-radius-lg, 12px);
   color: var(--omni-color-text-primary);
   font-family: inherit;
-  font-weight: 400;
+  font-weight: var(--omni-font-weight-regular);
   letter-spacing: -0.01em;
   outline: none;
   transition: border-color 160ms ease, background 160ms ease, box-shadow 160ms ease;
@@ -43,15 +43,15 @@
 /* Sizes. Left padding always clears the icon; right padding clears the clear-button when present. */
 .md {
   height: 40px;
-  font-size: 13px;
+  font-size: var(--omni-font-size-sm);
   padding: 0 14px 0 38px;
 }
 .md.clearable { padding-right: 36px; }
 
 .sm {
   height: 34px;
-  font-size: 12px;
-  border-radius: 9px;
+  font-size: var(--omni-font-size-xs);
+  border-radius: var(--omni-radius-md-plus);
   padding: 0 12px 0 32px;
 }
 .sm.clearable { padding-right: 32px; }
@@ -76,7 +76,7 @@
   height: 20px;
   padding: 0;
   border: none;
-  border-radius: 50%;
+  border-radius: var(--omni-radius-circle);
   background: transparent;
   color: var(--omni-color-text-muted);
   cursor: pointer;

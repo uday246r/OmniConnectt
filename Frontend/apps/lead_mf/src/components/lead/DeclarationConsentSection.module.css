@@ -28,12 +28,12 @@
 }
 
 .errorText {
-  font-size: 12.5px;
+  font-size: var(--omni-font-size-sm-minus);
   color: var(--omni-color-text-secondary);
 }
 
 .noteText {
   color: var(--omni-color-primary-600);
   text-decoration: underline;
-  font-weight: 600;
+  font-weight: var(--omni-font-weight-semibold);
 }

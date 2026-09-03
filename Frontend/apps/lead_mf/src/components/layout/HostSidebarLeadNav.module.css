@@ -18,11 +18,11 @@
 .navCount {
   margin-left: auto;
   padding: 1px 6px;
-  border-radius: 10px;
-  background: #dbeafe;
+  border-radius: var(--omni-radius-lg-minus);
+  background: var(--omni-color-info-bg);
   color: var(--omni-color-primary-700);
-  font-size: 10.5px;
-  font-weight: 700;
+  font-size: var(--omni-font-size-2xs-plus);
+  font-weight: var(--omni-font-weight-bold);
   line-height: 1.4;
 }
 

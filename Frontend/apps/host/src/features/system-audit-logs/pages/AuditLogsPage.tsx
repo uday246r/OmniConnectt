@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useAuthStore } from '../../auth/store/authStore'
-import { ActorCell, Badge, DataTable, FilterBar, PageHeader, Pagination, RowAction, RowsPerPage, formatAuditTimestamp, readStoredPageSize, type ActiveFilter, type BadgeTone } from '@omniremit/ui'
-import { SkeletonBlock } from '../../../shared/components/Skeleton'
+import { ActorCell, Badge, DataTable, DetailField, DetailGrid, DetailSection, EMPTY_VALUE, FilterBar, PageHeader, Pagination, ResponsiveRows, RowAction, RowsPerPage, formatAuditTimestamp, readStoredPageSize, type ActiveFilter, type BadgeTone } from '@omniremit/ui'
 import { PermissionGate } from '../../../shared/components/PermissionGate/PermissionGate'
 import { ApiError } from '../../../shared/api/httpClient'
 import { useDebouncedValue } from '../../../shared/hooks/useDebouncedValue'
@@ -745,700 +744,700 @@ export function AuditLogsPage() {
       {/* Logs Table — chrome from @omniremit/ui so the host, Approval Center and both remotes all
           render the same table. This page's own `.tableContainer`/`.logTable` were the origin of
           that shared style; the duplicate copy in ApprovalCenterPage.module.css is now gone too. */}
-      <DataTable minWidth={720} reserveHeight>
-          <thead>
-            {isLoginTab ? (
-              <tr>
-                {/* TIME */}
-                <th className={styles.thFilterable}>
-                  <button
-                    type="button"
-                    className={`${styles.thFilterBtn} ${dateRange !== 'all' ? styles.thFilterBtnActive : ''}`}
-                    onClick={() => setActiveHeaderFilter((c) => (c === 'time' ? null : 'time'))}
-                  >
-                    <span>TIME</span>
-                    <Icon.ChevronDown width={12} height={12} className={`${styles.filterIcon} ${activeHeaderFilter === 'time' ? styles.filterIconActive : ''}`} />
-                    {dateRange !== 'all' && <span className={styles.filterDot} />}
-                  </button>
-                  {activeHeaderFilter === 'time' && (
-                    <div className={styles.filterPopover}>
-                      <div className={styles.popoverHeader}>
-                        <span className={styles.popoverTitle}>Filter Time</span>
-                        {dateRange !== 'all' && (
-                          <button
-                            type="button"
-                            className={styles.popoverClearBtn}
-                            onClick={() => { setDateRange('all'); setCustomFrom(''); setCustomTo(''); setCustomDraftFrom(''); setCustomDraftTo('') }}
-                          >
-                            Reset
-                          </button>
-                        )}
-                      </div>
-                      <div className={styles.popoverList}>
-                        {DATE_RANGES.map((r) => (
-                          <button
-                            key={r.key}
-                            type="button"
-                            className={`${styles.popoverItem} ${dateRange === r.key ? styles.popoverItemActive : ''}`}
-                            onClick={() => { setDateRange(r.key); setActiveHeaderFilter(null) }}
-                          >
-                            <span>{r.label}</span>
-                          </button>
-                        ))}
-                      </div>
-                      <div className={styles.popoverDivider} />
-                      <div className={styles.customDateSection}>
-                        <span className={styles.customDateLabel}>Custom Range</span>
-                        <div className={styles.customDateRow}>
-                          <input
-                            type="date"
-                            className={styles.dateInput}
-                            value={customDraftFrom || customFrom}
-                            onChange={(e) => setCustomDraftFrom(e.target.value)}
-                          />
-                          <span className={styles.alp1}>to</span>
-                          <input
-                            type="date"
-                            className={styles.dateInput}
-                            value={customDraftTo || customTo}
-                            onChange={(e) => setCustomDraftTo(e.target.value)}
-                          />
-                        </div>
+      <DataTable reserveHeight>
+          <ResponsiveRows
+            rows={logs ?? []}
+            rowKey={(log) => String(log.id)}
+            loading={logs === null}
+            loadingRows={pageSize > 15 ? 10 : pageSize}
+            empty="No audit records found matching the selected filters."
+            columns={
+              isLoginTab
+                ? [
+                  {
+                    key: 'time',
+                    label: 'TIME',
+                    priority: 'always',
+                    header: (
+                      <th className={styles.thFilterable}>
                         <button
                           type="button"
-                          className={styles.applyDateBtn}
-                          onClick={() => {
-                            setCustomFrom(customDraftFrom)
-                            setCustomTo(customDraftTo)
-                            setDateRange('custom')
-                            setActiveHeaderFilter(null)
-                          }}
+                          className={`${styles.thFilterBtn} ${dateRange !== 'all' ? styles.thFilterBtnActive : ''}`}
+                          onClick={() => setActiveHeaderFilter((c) => (c === 'time' ? null : 'time'))}
                         >
-                          Apply Custom Range
+                          <span>TIME</span>
+                          <Icon.ChevronDown width={12} height={12} className={`${styles.filterIcon} ${activeHeaderFilter === 'time' ? styles.filterIconActive : ''}`} />
+                          {dateRange !== 'all' && <span className={styles.filterDot} />}
                         </button>
-                      </div>
-                    </div>
-                  )}
-                </th>
-
-                {/* ACTOR / EMAIL */}
-                <th className={styles.thFilterable}>
-                  <button
-                    type="button"
-                    className={`${styles.thFilterBtn} ${actorSearch ? styles.thFilterBtnActive : ''}`}
-                    onClick={() => setActiveHeaderFilter((c) => (c === 'actor' ? null : 'actor'))}
-                  >
-                    <span>PERFORMED BY</span>
-                    <Icon.ChevronDown width={12} height={12} className={`${styles.filterIcon} ${activeHeaderFilter === 'actor' ? styles.filterIconActive : ''}`} />
-                    {actorSearch && <span className={styles.filterDot} />}
-                  </button>
-                  {activeHeaderFilter === 'actor' && (
-                    <div className={styles.filterPopover}>
-                      <div className={styles.popoverHeader}>
-                        <span className={styles.popoverTitle}>Filter Performed By</span>
-                        {actorSearch && <button type="button" className={styles.popoverClearBtn} onClick={() => setActorSearch('')}>Reset</button>}
-                      </div>
-                      <input
-                        type="text"
-                        className={styles.popoverInput}
-                        placeholder="Search name or email..."
-                        value={actorSearch}
-                        onChange={(e) => setActorSearch(e.target.value)}
-                        autoFocus
-                      />
-                      {availableActors.length > 0 && (
-                        <>
-                          <div className={styles.popoverDivider} />
-                          <span className={styles.customDateLabel}>Known Actors:</span>
-                          <div className={styles.userListSection}>
-                            {availableActors.map((a) => (
-                              <button
-                                key={a.id || a.name}
-                                type="button"
-                                className={`${styles.userItem} ${actorSearch.toLowerCase() === a.name.toLowerCase() ? styles.userItemActive : ''}`}
-                                onClick={() => { setActorSearch(a.name); setActiveHeaderFilter(null) }}
-                              >
-                                <div className={styles.userAvatarSmall}>
-                                  {a.name.charAt(0).toUpperCase()}
-                                </div>
-                                <span>{a.name}</span>
-                              </button>
-                            ))}
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  )}
-                </th>
-
-                {/* AUTH METHOD */}
-                <th className={styles.thFilterable}>
-                  <button
-                    type="button"
-                    className={`${styles.thFilterBtn} ${authMethodFilter ? styles.thFilterBtnActive : ''}`}
-                    onClick={() => setActiveHeaderFilter((c) => (c === 'authMethod' ? null : 'authMethod'))}
-                  >
-                    <span>AUTH METHOD</span>
-                    <Icon.ChevronDown width={12} height={12} className={`${styles.filterIcon} ${activeHeaderFilter === 'authMethod' ? styles.filterIconActive : ''}`} />
-                    {authMethodFilter && <span className={styles.filterDot} />}
-                  </button>
-                  {activeHeaderFilter === 'authMethod' && (
-                    <div className={styles.filterPopover}>
-                      <div className={styles.popoverHeader}>
-                        <span className={styles.popoverTitle}>Filter Auth Method</span>
-                        {authMethodFilter && <button type="button" className={styles.popoverClearBtn} onClick={() => setAuthMethodFilter('')}>Reset</button>}
-                      </div>
-                      <div className={styles.popoverList}>
-                        <button
-                          type="button"
-                          className={`${styles.popoverItem} ${!authMethodFilter ? styles.popoverItemActive : ''}`}
-                          onClick={() => { setAuthMethodFilter(''); setActiveHeaderFilter(null) }}
-                        >
-                          <span>All Methods</span>
-                        </button>
-                        {availableAuthMethods.map((m) => (
-                          <button
-                            key={m}
-                            type="button"
-                            className={`${styles.popoverItem} ${authMethodFilter.toLowerCase() === m.toLowerCase() ? styles.popoverItemActive : ''}`}
-                            onClick={() => { setAuthMethodFilter(m); setActiveHeaderFilter(null) }}
-                          >
-                            <span>{m}</span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </th>
-
-                {/* IP ADDRESS */}
-                <th className={styles.thFilterable}>
-                  <button
-                    type="button"
-                    className={`${styles.thFilterBtn} ${ipSearch ? styles.thFilterBtnActive : ''}`}
-                    onClick={() => setActiveHeaderFilter((c) => (c === 'ip' ? null : 'ip'))}
-                  >
-                    <span>IP ADDRESS</span>
-                    <Icon.ChevronDown width={12} height={12} className={`${styles.filterIcon} ${activeHeaderFilter === 'ip' ? styles.filterIconActive : ''}`} />
-                    {ipSearch && <span className={styles.filterDot} />}
-                  </button>
-                  {activeHeaderFilter === 'ip' && (
-                    <div className={styles.filterPopover}>
-                      <div className={styles.popoverHeader}>
-                        <span className={styles.popoverTitle}>Filter IP Address</span>
-                        {ipSearch && <button type="button" className={styles.popoverClearBtn} onClick={() => setIpSearch('')}>Reset</button>}
-                      </div>
-                      <input
-                        type="text"
-                        className={styles.popoverInput}
-                        placeholder="Search IP address..."
-                        value={ipSearch}
-                        onChange={(e) => setIpSearch(e.target.value)}
-                        autoFocus
-                      />
-                      {availableIps.length > 0 && (
-                        <>
-                          <div className={styles.popoverDivider} />
-                          <span className={styles.customDateLabel}>Known IPs:</span>
-                          <div className={styles.popoverList}>
-                            {availableIps.map((ip) => (
-                              <button
-                                key={ip}
-                                type="button"
-                                className={`${styles.popoverItem} ${ipSearch === ip ? styles.popoverItemActive : ''}`}
-                                onClick={() => { setIpSearch(ip); setActiveHeaderFilter(null) }}
-                              >
-                                <span>{ip}</span>
-                              </button>
-                            ))}
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  )}
-                </th>
-
-                {/* BROWSER / DEVICE */}
-                <th className={styles.thFilterable}>
-                  <button
-                    type="button"
-                    className={`${styles.thFilterBtn} ${deviceSearch ? styles.thFilterBtnActive : ''}`}
-                    onClick={() => setActiveHeaderFilter((c) => (c === 'device' ? null : 'device'))}
-                  >
-                    <span>BROWSER / DEVICE</span>
-                    <Icon.ChevronDown width={12} height={12} className={`${styles.filterIcon} ${activeHeaderFilter === 'device' ? styles.filterIconActive : ''}`} />
-                    {deviceSearch && <span className={styles.filterDot} />}
-                  </button>
-                  {activeHeaderFilter === 'device' && (
-                    <div className={`${styles.filterPopover} ${styles.popoverRight}`}>
-                      <div className={styles.popoverHeader}>
-                        <span className={styles.popoverTitle}>Filter Browser / Device</span>
-                        {deviceSearch && <button type="button" className={styles.popoverClearBtn} onClick={() => setDeviceSearch('')}>Reset</button>}
-                      </div>
-                      <input
-                        type="text"
-                        className={styles.popoverInput}
-                        placeholder="Search browser or OS..."
-                        value={deviceSearch}
-                        onChange={(e) => setDeviceSearch(e.target.value)}
-                        autoFocus
-                      />
-                      {(availableDevices.browsers.length > 0 || availableDevices.oses.length > 0) && (
-                        <div className={styles.popoverList}>
-                          {availableDevices.browsers.length > 0 && (
-                            <>
-                              <div className={styles.popoverDivider} />
-                              <span className={styles.customDateLabel}>Browsers:</span>
-                              {availableDevices.browsers.map((b) => (
+                        {activeHeaderFilter === 'time' && (
+                          <div className={styles.filterPopover}>
+                            <div className={styles.popoverHeader}>
+                              <span className={styles.popoverTitle}>Filter Time</span>
+                              {dateRange !== 'all' && (
                                 <button
-                                  key={b}
                                   type="button"
-                                  className={`${styles.popoverItem} ${deviceSearch.toLowerCase() === b.toLowerCase() ? styles.popoverItemActive : ''}`}
-                                  onClick={() => { setDeviceSearch(b); setActiveHeaderFilter(null) }}
+                                  className={styles.popoverClearBtn}
+                                  onClick={() => { setDateRange('all'); setCustomFrom(''); setCustomTo(''); setCustomDraftFrom(''); setCustomDraftTo('') }}
                                 >
-                                  <span>{b}</span>
+                                  Reset
+                                </button>
+                              )}
+                            </div>
+                            <div className={styles.popoverList}>
+                              {DATE_RANGES.map((r) => (
+                                <button
+                                  key={r.key}
+                                  type="button"
+                                  className={`${styles.popoverItem} ${dateRange === r.key ? styles.popoverItemActive : ''}`}
+                                  onClick={() => { setDateRange(r.key); setActiveHeaderFilter(null) }}
+                                >
+                                  <span>{r.label}</span>
                                 </button>
                               ))}
-                            </>
-                          )}
-                          {availableDevices.oses.length > 0 && (
-                            <>
-                              <div className={styles.popoverDivider} />
-                              <span className={styles.customDateLabel}>Operating Systems:</span>
-                              {availableDevices.oses.map((os) => (
+                            </div>
+                            <div className={styles.popoverDivider} />
+                            <div className={styles.customDateSection}>
+                              <span className={styles.customDateLabel}>Custom Range</span>
+                              <div className={styles.customDateRow}>
+                                <input
+                                  type="date"
+                                  className={styles.dateInput}
+                                  value={customDraftFrom || customFrom}
+                                  onChange={(e) => setCustomDraftFrom(e.target.value)}
+                                />
+                                <span className={styles.alp1}>to</span>
+                                <input
+                                  type="date"
+                                  className={styles.dateInput}
+                                  value={customDraftTo || customTo}
+                                  onChange={(e) => setCustomDraftTo(e.target.value)}
+                                />
+                              </div>
+                              <button
+                                type="button"
+                                className={styles.applyDateBtn}
+                                onClick={() => {
+                                  setCustomFrom(customDraftFrom)
+                                  setCustomTo(customDraftTo)
+                                  setDateRange('custom')
+                                  setActiveHeaderFilter(null)
+                                }}
+                              >
+                                Apply Custom Range
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </th>
+                    ),
+                    render: (log) => <span className={styles.timeCell}>{formatTimestamp(log.occurredAt)}</span>,
+                  },
+                  {
+                    key: 'actor',
+                    label: 'PERFORMED BY',
+                    priority: 'always',
+                    header: (
+                      <th className={styles.thFilterable}>
+                        <button
+                          type="button"
+                          className={`${styles.thFilterBtn} ${actorSearch ? styles.thFilterBtnActive : ''}`}
+                          onClick={() => setActiveHeaderFilter((c) => (c === 'actor' ? null : 'actor'))}
+                        >
+                          <span>PERFORMED BY</span>
+                          <Icon.ChevronDown width={12} height={12} className={`${styles.filterIcon} ${activeHeaderFilter === 'actor' ? styles.filterIconActive : ''}`} />
+                          {actorSearch && <span className={styles.filterDot} />}
+                        </button>
+                        {activeHeaderFilter === 'actor' && (
+                          <div className={styles.filterPopover}>
+                            <div className={styles.popoverHeader}>
+                              <span className={styles.popoverTitle}>Filter Performed By</span>
+                              {actorSearch && <button type="button" className={styles.popoverClearBtn} onClick={() => setActorSearch('')}>Reset</button>}
+                            </div>
+                            <input
+                              type="text"
+                              className={styles.popoverInput}
+                              placeholder="Search name or email..."
+                              value={actorSearch}
+                              onChange={(e) => setActorSearch(e.target.value)}
+                              autoFocus
+                            />
+                            {availableActors.length > 0 && (
+                              <>
+                                <div className={styles.popoverDivider} />
+                                <span className={styles.customDateLabel}>Known Actors:</span>
+                                <div className={styles.userListSection}>
+                                  {availableActors.map((a) => (
+                                    <button
+                                      key={a.id || a.name}
+                                      type="button"
+                                      className={`${styles.userItem} ${actorSearch.toLowerCase() === a.name.toLowerCase() ? styles.userItemActive : ''}`}
+                                      onClick={() => { setActorSearch(a.name); setActiveHeaderFilter(null) }}
+                                    >
+                                      <div className={styles.userAvatarSmall}>
+                                        {a.name.charAt(0).toUpperCase()}
+                                      </div>
+                                      <span>{a.name}</span>
+                                    </button>
+                                  ))}
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        )}
+                      </th>
+                    ),
+                    render: (log) => <ActorCell name={log.actorName} />,
+                  },
+                  {
+                    key: 'auth',
+                    label: 'SIGN-IN METHOD',
+                    priority: 'low',
+                    header: (
+                      <th className={styles.thFilterable}>
+                        <button
+                          type="button"
+                          className={`${styles.thFilterBtn} ${authMethodFilter ? styles.thFilterBtnActive : ''}`}
+                          onClick={() => setActiveHeaderFilter((c) => (c === 'authMethod' ? null : 'authMethod'))}
+                        >
+                          <span>SIGN-IN METHOD</span>
+                          <Icon.ChevronDown width={12} height={12} className={`${styles.filterIcon} ${activeHeaderFilter === 'authMethod' ? styles.filterIconActive : ''}`} />
+                          {authMethodFilter && <span className={styles.filterDot} />}
+                        </button>
+                        {activeHeaderFilter === 'authMethod' && (
+                          <div className={styles.filterPopover}>
+                            <div className={styles.popoverHeader}>
+                              <span className={styles.popoverTitle}>Filter Sign-in Method</span>
+                              {authMethodFilter && <button type="button" className={styles.popoverClearBtn} onClick={() => setAuthMethodFilter('')}>Reset</button>}
+                            </div>
+                            <div className={styles.popoverList}>
+                              <button
+                                type="button"
+                                className={`${styles.popoverItem} ${!authMethodFilter ? styles.popoverItemActive : ''}`}
+                                onClick={() => { setAuthMethodFilter(''); setActiveHeaderFilter(null) }}
+                              >
+                                <span>All Methods</span>
+                              </button>
+                              {availableAuthMethods.map((m) => (
                                 <button
-                                  key={os}
+                                  key={m}
                                   type="button"
-                                  className={`${styles.popoverItem} ${deviceSearch.toLowerCase() === os.toLowerCase() ? styles.popoverItemActive : ''}`}
-                                  onClick={() => { setDeviceSearch(os); setActiveHeaderFilter(null) }}
+                                  className={`${styles.popoverItem} ${authMethodFilter.toLowerCase() === m.toLowerCase() ? styles.popoverItemActive : ''}`}
+                                  onClick={() => { setAuthMethodFilter(m); setActiveHeaderFilter(null) }}
                                 >
-                                  <span>{os}</span>
+                                  <span>{m}</span>
                                 </button>
                               ))}
-                            </>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </th>
-
-                {/* RESULT */}
-                <th className={styles.thFilterable}>
-                  <button
-                    type="button"
-                    className={`${styles.thFilterBtn} ${resultFilter ? styles.thFilterBtnActive : ''}`}
-                    onClick={() => setActiveHeaderFilter((c) => (c === 'result' ? null : 'result'))}
-                  >
-                    <span>RESULT</span>
-                    <Icon.ChevronDown width={12} height={12} className={`${styles.filterIcon} ${activeHeaderFilter === 'result' ? styles.filterIconActive : ''}`} />
-                    {resultFilter && <span className={styles.filterDot} />}
-                  </button>
-                  {activeHeaderFilter === 'result' && (
-                    <div className={`${styles.filterPopover} ${styles.popoverRight}`}>
-                      <div className={styles.popoverHeader}>
-                        <span className={styles.popoverTitle}>Filter Result</span>
-                        {resultFilter && <button type="button" className={styles.popoverClearBtn} onClick={() => setResultFilter('')}>Reset</button>}
-                      </div>
-                      <div className={styles.popoverList}>
-                        <button
-                          type="button"
-                          className={`${styles.popoverItem} ${!resultFilter ? styles.popoverItemActive : ''}`}
-                          onClick={() => { setResultFilter(''); setActiveHeaderFilter(null) }}
-                        >
-                          <span>All Results</span>
-                        </button>
-                        <button
-                          type="button"
-                          className={`${styles.popoverItem} ${resultFilter === 'Success' ? styles.popoverItemActive : ''}`}
-                          onClick={() => { setResultFilter('Success'); setActiveHeaderFilter(null) }}
-                        >
-                          <Badge tone="success" dot>Success</Badge>
-                        </button>
-                        <button
-                          type="button"
-                          className={`${styles.popoverItem} ${resultFilter === 'Failure' ? styles.popoverItemActive : ''}`}
-                          onClick={() => { setResultFilter('Failure'); setActiveHeaderFilter(null) }}
-                        >
-                          <Badge tone="danger" dot>Failure</Badge>
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </th>
-
-                <th>DETAILS</th>
-              </tr>
-            ) : (
-              <tr>
-                {/* TIME */}
-                <th className={styles.thFilterable}>
-                  <button
-                    type="button"
-                    className={`${styles.thFilterBtn} ${dateRange !== 'all' ? styles.thFilterBtnActive : ''}`}
-                    onClick={() => setActiveHeaderFilter((c) => (c === 'time' ? null : 'time'))}
-                  >
-                    <span>TIME</span>
-                    <Icon.ChevronDown width={12} height={12} className={`${styles.filterIcon} ${activeHeaderFilter === 'time' ? styles.filterIconActive : ''}`} />
-                    {dateRange !== 'all' && <span className={styles.filterDot} />}
-                  </button>
-                  {activeHeaderFilter === 'time' && (
-                    <div className={styles.filterPopover}>
-                      <div className={styles.popoverHeader}>
-                        <span className={styles.popoverTitle}>Filter Time</span>
-                        {dateRange !== 'all' && (
-                          <button
-                            type="button"
-                            className={styles.popoverClearBtn}
-                            onClick={() => { setDateRange('all'); setCustomFrom(''); setCustomTo(''); setCustomDraftFrom(''); setCustomDraftTo('') }}
-                          >
-                            Reset
-                          </button>
-                        )}
-                      </div>
-                      <div className={styles.popoverList}>
-                        {DATE_RANGES.map((r) => (
-                          <button
-                            key={r.key}
-                            type="button"
-                            className={`${styles.popoverItem} ${dateRange === r.key ? styles.popoverItemActive : ''}`}
-                            onClick={() => { setDateRange(r.key); setActiveHeaderFilter(null) }}
-                          >
-                            <span>{r.label}</span>
-                          </button>
-                        ))}
-                      </div>
-                      <div className={styles.popoverDivider} />
-                      <div className={styles.customDateSection}>
-                        <span className={styles.customDateLabel}>Custom Range</span>
-                        <div className={styles.customDateRow}>
-                          <input
-                            type="date"
-                            className={styles.dateInput}
-                            value={customDraftFrom || customFrom}
-                            onChange={(e) => setCustomDraftFrom(e.target.value)}
-                          />
-                          <span className={styles.alp1}>to</span>
-                          <input
-                            type="date"
-                            className={styles.dateInput}
-                            value={customDraftTo || customTo}
-                            onChange={(e) => setCustomDraftTo(e.target.value)}
-                          />
-                        </div>
-                        <button
-                          type="button"
-                          className={styles.applyDateBtn}
-                          onClick={() => {
-                            setCustomFrom(customDraftFrom)
-                            setCustomTo(customDraftTo)
-                            setDateRange('custom')
-                            setActiveHeaderFilter(null)
-                          }}
-                        >
-                          Apply Custom Range
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </th>
-
-                {/* SERVICE */}
-                <th className={styles.thFilterable}>
-                  <button
-                    type="button"
-                    className={`${styles.thFilterBtn} ${service ? styles.thFilterBtnActive : ''}`}
-                    onClick={() => setActiveHeaderFilter((c) => (c === 'service' ? null : 'service'))}
-                  >
-                    <span>SERVICE</span>
-                    <Icon.ChevronDown width={12} height={12} className={`${styles.filterIcon} ${activeHeaderFilter === 'service' ? styles.filterIconActive : ''}`} />
-                    {service && <span className={styles.filterDot} />}
-                  </button>
-                  {activeHeaderFilter === 'service' && (
-                    <div className={styles.filterPopover}>
-                      <div className={styles.popoverHeader}>
-                        <span className={styles.popoverTitle}>Filter Service</span>
-                        {service && <button type="button" className={styles.popoverClearBtn} onClick={() => { setService(''); setServiceSearch('') }}>Reset</button>}
-                      </div>
-                      <input
-                        type="text"
-                        className={styles.popoverInput}
-                        placeholder="Type to search service..."
-                        value={serviceSearch}
-                        onChange={(e) => setServiceSearch(e.target.value)}
-                        autoFocus
-                      />
-                      <div className={styles.popoverList}>
-                        <button
-                          type="button"
-                          className={`${styles.popoverItem} ${!service ? styles.popoverItemActive : ''}`}
-                          onClick={() => { setService(''); setActiveHeaderFilter(null) }}
-                        >
-                          <span>All Services</span>
-                        </button>
-                        {availableServices.map((s) => (
-                          <button
-                            key={s}
-                            type="button"
-                            className={`${styles.popoverItem} ${service.toLowerCase() === s.toLowerCase() ? styles.popoverItemActive : ''}`}
-                            onClick={() => { setService(s); setActiveHeaderFilter(null) }}
-                          >
-                            <Badge tone={serviceTone(s)}>{s}</Badge>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </th>
-
-                {/* ACTOR */}
-                <th className={styles.thFilterable}>
-                  <button
-                    type="button"
-                    className={`${styles.thFilterBtn} ${actorSearch ? styles.thFilterBtnActive : ''}`}
-                    onClick={() => setActiveHeaderFilter((c) => (c === 'actor' ? null : 'actor'))}
-                  >
-                    <span>PERFORMED BY</span>
-                    <Icon.ChevronDown width={12} height={12} className={`${styles.filterIcon} ${activeHeaderFilter === 'actor' ? styles.filterIconActive : ''}`} />
-                    {actorSearch && <span className={styles.filterDot} />}
-                  </button>
-                  {activeHeaderFilter === 'actor' && (
-                    <div className={styles.filterPopover}>
-                      <div className={styles.popoverHeader}>
-                        <span className={styles.popoverTitle}>Filter Performed By</span>
-                        {actorSearch && <button type="button" className={styles.popoverClearBtn} onClick={() => setActorSearch('')}>Reset</button>}
-                      </div>
-                      <input
-                        type="text"
-                        className={styles.popoverInput}
-                        placeholder="Search by name..."
-                        value={actorSearch}
-                        onChange={(e) => setActorSearch(e.target.value)}
-                        autoFocus
-                      />
-                      {availableActors.length > 0 && (
-                        <>
-                          <div className={styles.popoverDivider} />
-                          <span className={styles.customDateLabel}>Known Actors:</span>
-                          <div className={styles.userListSection}>
-                            {availableActors.map((a) => (
-                              <button
-                                key={a.id || a.name}
-                                type="button"
-                                className={`${styles.userItem} ${actorSearch.toLowerCase() === a.name.toLowerCase() ? styles.userItemActive : ''}`}
-                                onClick={() => { setActorSearch(a.name); setActiveHeaderFilter(null) }}
-                              >
-                                <div className={styles.userAvatarSmall}>
-                                  {a.name.charAt(0).toUpperCase()}
-                                </div>
-                                <span>{a.name}</span>
-                              </button>
-                            ))}
+                            </div>
                           </div>
-                        </>
-                      )}
-                    </div>
-                  )}
-                </th>
-
-                {/* ACTION */}
-                <th className={styles.thFilterable}>
-                  <button
-                    type="button"
-                    className={`${styles.thFilterBtn} ${actionFilter ? styles.thFilterBtnActive : ''}`}
-                    onClick={() => setActiveHeaderFilter((c) => (c === 'action' ? null : 'action'))}
-                  >
-                    <span>ACTION</span>
-                    <Icon.ChevronDown width={12} height={12} className={`${styles.filterIcon} ${activeHeaderFilter === 'action' ? styles.filterIconActive : ''}`} />
-                    {actionFilter && <span className={styles.filterDot} />}
-                  </button>
-                  {activeHeaderFilter === 'action' && (
-                    <div className={styles.filterPopover}>
-                      <div className={styles.popoverHeader}>
-                        <span className={styles.popoverTitle}>Filter Action</span>
-                        {actionFilter && <button type="button" className={styles.popoverClearBtn} onClick={() => { setActionFilter(''); setActionSearch('') }}>Reset</button>}
-                      </div>
-                      <input
-                        type="text"
-                        className={styles.popoverInput}
-                        placeholder="Search action..."
-                        value={actionSearch}
-                        onChange={(e) => setActionSearch(e.target.value)}
-                        autoFocus
-                      />
-                      <div className={styles.popoverList}>
+                        )}
+                      </th>
+                    ),
+                    render: (log) => <span className={styles.authPill}>{log.authMethod ?? 'Local'}</span>,
+                  },
+                  {
+                    key: 'ip',
+                    label: 'IP ADDRESS',
+                    priority: 'low',
+                    header: (
+                      <th className={styles.thFilterable}>
                         <button
                           type="button"
-                          className={`${styles.popoverItem} ${!actionFilter ? styles.popoverItemActive : ''}`}
-                          onClick={() => { setActionFilter(''); setActiveHeaderFilter(null) }}
+                          className={`${styles.thFilterBtn} ${ipSearch ? styles.thFilterBtnActive : ''}`}
+                          onClick={() => setActiveHeaderFilter((c) => (c === 'ip' ? null : 'ip'))}
                         >
-                          <span>All Actions</span>
+                          <span>IP ADDRESS</span>
+                          <Icon.ChevronDown width={12} height={12} className={`${styles.filterIcon} ${activeHeaderFilter === 'ip' ? styles.filterIconActive : ''}`} />
+                          {ipSearch && <span className={styles.filterDot} />}
                         </button>
-                        {availableActions.map((a) => (
-                          <button
-                            key={a.raw}
-                            type="button"
-                            className={`${styles.popoverItem} ${actionFilter === a.raw ? styles.popoverItemActive : ''}`}
-                            onClick={() => { setActionFilter(a.raw); setActiveHeaderFilter(null) }}
-                          >
-                            <span className={styles.actionCell}>{a.label}</span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </th>
-
-                {/* ENTITY */}
-                <th className={styles.thFilterable}>
-                  <button
-                    type="button"
-                    className={`${styles.thFilterBtn} ${entitySearch ? styles.thFilterBtnActive : ''}`}
-                    onClick={() => setActiveHeaderFilter((c) => (c === 'entity' ? null : 'entity'))}
-                  >
-                    <span>RECORD</span>
-                    <Icon.ChevronDown width={12} height={12} className={`${styles.filterIcon} ${activeHeaderFilter === 'entity' ? styles.filterIconActive : ''}`} />
-                    {entitySearch && <span className={styles.filterDot} />}
-                  </button>
-                  {activeHeaderFilter === 'entity' && (
-                    <div className={`${styles.filterPopover} ${styles.popoverRight}`}>
-                      <div className={styles.popoverHeader}>
-                        <span className={styles.popoverTitle}>Search Entity</span>
-                        {entitySearch && <button type="button" className={styles.popoverClearBtn} onClick={() => setEntitySearch('')}>Reset</button>}
-                      </div>
-                      <input
-                        type="text"
-                        className={styles.popoverInput}
-                        placeholder="Filter by entity type or label..."
-                        value={entitySearch}
-                        onChange={(e) => setEntitySearch(e.target.value)}
-                        autoFocus
-                      />
-                    </div>
-                  )}
-                </th>
-
-                <th>DETAILS</th>
-              </tr>
-            )}
-          </thead>
-          <tbody>
-            {logs === null ? (
-              Array.from({ length: pageSize > 15 ? 10 : pageSize }).map((_, i) => (
-                <tr key={i} className={styles.skeletonTableRow}>
-                  {isLoginTab ? (
-                    <>
-                      <td><SkeletonBlock width={130} height={16} radius="4px" /></td>
-                      <td>
-                        <div className={styles.actorCell}>
-                          <SkeletonBlock width={28} height={28} radius="8px" />
-                          <SkeletonBlock width={110} height={16} radius="4px" />
-                        </div>
-                      </td>
-                      <td><SkeletonBlock width={60} height={22} radius="999px" /></td>
-                      <td><SkeletonBlock width={95} height={22} radius="6px" /></td>
-                      <td>
-                        <div className={styles.devicePillGroup}>
-                          <SkeletonBlock width={75} height={22} radius="6px" />
-                          <SkeletonBlock width={60} height={22} radius="6px" />
-                        </div>
-                      </td>
-                      <td><SkeletonBlock width={70} height={22} radius="999px" /></td>
-                      <td><SkeletonBlock width={52} height={26} radius="7px" /></td>
-                    </>
-                  ) : (
-                    <>
-                      <td><SkeletonBlock width={130} height={16} radius="4px" /></td>
-                      <td><SkeletonBlock width={90} height={22} radius="999px" /></td>
-                      <td>
-                        <div className={styles.actorCell}>
-                          <SkeletonBlock width={28} height={28} radius="8px" />
-                          <SkeletonBlock width={100} height={16} radius="4px" />
-                        </div>
-                      </td>
-                      <td><SkeletonBlock width={120} height={22} radius="6px" /></td>
-                      <td>
-                        <div className={styles.entityWrap}>
-                          <SkeletonBlock width={70} height={16} radius="4px" />
-                          <SkeletonBlock width={45} height={16} radius="4px" />
-                        </div>
-                      </td>
-                      <td><SkeletonBlock width={52} height={26} radius="7px" /></td>
-                    </>
-                  )}
-                </tr>
-              ))
-            ) : logs.length === 0 ? (
-              <DataTable.Empty colSpan={isLoginTab ? 7 : 6}>
-                No audit records found matching the selected filters.
-              </DataTable.Empty>
-            ) : (
-              logs.map((log) => {
-                const initial = (log.actorName || log.actorUserId || 'S').charAt(0).toUpperCase()
-
-                return isLoginTab ? (
-                  <tr key={log.id}>
-                    <td className={styles.timeCell}>{formatTimestamp(log.occurredAt)}</td>
-                    <td>
-                      <ActorCell name={log.actorName} />
-                    </td>
-                    <td>
-                      <span className={styles.authPill}>{log.authMethod ?? 'Local'}</span>
-                    </td>
-                    <td>
-                      {log.sourceIp ? (
+                        {activeHeaderFilter === 'ip' && (
+                          <div className={styles.filterPopover}>
+                            <div className={styles.popoverHeader}>
+                              <span className={styles.popoverTitle}>Filter IP Address</span>
+                              {ipSearch && <button type="button" className={styles.popoverClearBtn} onClick={() => setIpSearch('')}>Reset</button>}
+                            </div>
+                            <input
+                              type="text"
+                              className={styles.popoverInput}
+                              placeholder="Search IP address..."
+                              value={ipSearch}
+                              onChange={(e) => setIpSearch(e.target.value)}
+                              autoFocus
+                            />
+                            {availableIps.length > 0 && (
+                              <>
+                                <div className={styles.popoverDivider} />
+                                <span className={styles.customDateLabel}>Known IPs:</span>
+                                <div className={styles.popoverList}>
+                                  {availableIps.map((ip) => (
+                                    <button
+                                      key={ip}
+                                      type="button"
+                                      className={`${styles.popoverItem} ${ipSearch === ip ? styles.popoverItemActive : ''}`}
+                                      onClick={() => { setIpSearch(ip); setActiveHeaderFilter(null) }}
+                                    >
+                                      <span>{ip}</span>
+                                    </button>
+                                  ))}
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        )}
+                      </th>
+                    ),
+                    render: (log) =>
+                      log.sourceIp ? (
                         <span className={styles.ipBadge}>
                           <span className={styles.ipDot} aria-hidden="true" />
                           {formatIpv4(log.sourceIp)}
                         </span>
                       ) : (
-                        <span className={styles.mutedText}>—</span>
-                      )}
-                    </td>
-                    <td
-                      className={`${styles.deviceCell} ${log.userAgent ? styles.deviceCellClickable : ''}`}
-                      onClick={() => setViewingLog(log)}
-                      title="Click to view full details"
-                    >
-                      {(() => {
-                        const parsed = parseUserAgent(log.userAgent)
-                        if (!parsed) return <span className={styles.mutedText}>{log.userAgent ?? '—'}</span>
-                        return (
-                          <div className={styles.devicePillGroup}>
-                            <span className={styles.browserPill}>{parsed.browser}</span>
-                            <span className={styles.osPill}>{parsed.os}</span>
+                        <span className={styles.mutedText}>{EMPTY_VALUE}</span>
+                      ),
+                  },
+                  {
+                    key: 'device',
+                    label: 'BROWSER / DEVICE',
+                    priority: 'low',
+                    header: (
+                      <th className={styles.thFilterable}>
+                        <button
+                          type="button"
+                          className={`${styles.thFilterBtn} ${deviceSearch ? styles.thFilterBtnActive : ''}`}
+                          onClick={() => setActiveHeaderFilter((c) => (c === 'device' ? null : 'device'))}
+                        >
+                          <span>BROWSER / DEVICE</span>
+                          <Icon.ChevronDown width={12} height={12} className={`${styles.filterIcon} ${activeHeaderFilter === 'device' ? styles.filterIconActive : ''}`} />
+                          {deviceSearch && <span className={styles.filterDot} />}
+                        </button>
+                        {activeHeaderFilter === 'device' && (
+                          <div className={`${styles.filterPopover} ${styles.popoverRight}`}>
+                            <div className={styles.popoverHeader}>
+                              <span className={styles.popoverTitle}>Filter Browser / Device</span>
+                              {deviceSearch && <button type="button" className={styles.popoverClearBtn} onClick={() => setDeviceSearch('')}>Reset</button>}
+                            </div>
+                            <input
+                              type="text"
+                              className={styles.popoverInput}
+                              placeholder="Search browser or OS..."
+                              value={deviceSearch}
+                              onChange={(e) => setDeviceSearch(e.target.value)}
+                              autoFocus
+                            />
+                            {(availableDevices.browsers.length > 0 || availableDevices.oses.length > 0) && (
+                              <div className={styles.popoverList}>
+                                {availableDevices.browsers.length > 0 && (
+                                  <>
+                                    <div className={styles.popoverDivider} />
+                                    <span className={styles.customDateLabel}>Browsers:</span>
+                                    {availableDevices.browsers.map((b) => (
+                                      <button
+                                        key={b}
+                                        type="button"
+                                        className={`${styles.popoverItem} ${deviceSearch.toLowerCase() === b.toLowerCase() ? styles.popoverItemActive : ''}`}
+                                        onClick={() => { setDeviceSearch(b); setActiveHeaderFilter(null) }}
+                                      >
+                                        <span>{b}</span>
+                                      </button>
+                                    ))}
+                                  </>
+                                )}
+                                {availableDevices.oses.length > 0 && (
+                                  <>
+                                    <div className={styles.popoverDivider} />
+                                    <span className={styles.customDateLabel}>Operating Systems:</span>
+                                    {availableDevices.oses.map((os) => (
+                                      <button
+                                        key={os}
+                                        type="button"
+                                        className={`${styles.popoverItem} ${deviceSearch.toLowerCase() === os.toLowerCase() ? styles.popoverItemActive : ''}`}
+                                        onClick={() => { setDeviceSearch(os); setActiveHeaderFilter(null) }}
+                                      >
+                                        <span>{os}</span>
+                                      </button>
+                                    ))}
+                                  </>
+                                )}
+                              </div>
+                            )}
                           </div>
-                        )
-                      })()}
-                    </td>
-                    <td>
+                        )}
+                      </th>
+                    ),
+                    render: (log) => {
+                      const parsed = parseUserAgent(log.userAgent)
+                      return (
+                        <span
+                          className={`${styles.deviceCell} ${log.userAgent ? styles.deviceCellClickable : ''}`}
+                          onClick={() => setViewingLog(log)}
+                          title="Click to view full details"
+                        >
+                          {parsed ? (
+                            <span className={styles.devicePillGroup}>
+                              <span className={styles.browserPill}>{parsed.browser}</span>
+                              <span className={styles.osPill}>{parsed.os}</span>
+                            </span>
+                          ) : (
+                            <span className={styles.mutedText}>{log.userAgent ?? EMPTY_VALUE}</span>
+                          )}
+                        </span>
+                      )
+                    },
+                  },
+                  {
+                    key: 'result',
+                    label: 'OUTCOME',
+                    priority: 'always',
+                    header: (
+                      <th className={styles.thFilterable}>
+                        <button
+                          type="button"
+                          className={`${styles.thFilterBtn} ${resultFilter ? styles.thFilterBtnActive : ''}`}
+                          onClick={() => setActiveHeaderFilter((c) => (c === 'result' ? null : 'result'))}
+                        >
+                          <span>OUTCOME</span>
+                          <Icon.ChevronDown width={12} height={12} className={`${styles.filterIcon} ${activeHeaderFilter === 'result' ? styles.filterIconActive : ''}`} />
+                          {resultFilter && <span className={styles.filterDot} />}
+                        </button>
+                        {activeHeaderFilter === 'result' && (
+                          <div className={`${styles.filterPopover} ${styles.popoverRight}`}>
+                            <div className={styles.popoverHeader}>
+                              <span className={styles.popoverTitle}>Filter Outcome</span>
+                              {resultFilter && <button type="button" className={styles.popoverClearBtn} onClick={() => setResultFilter('')}>Reset</button>}
+                            </div>
+                            <div className={styles.popoverList}>
+                              <button
+                                type="button"
+                                className={`${styles.popoverItem} ${!resultFilter ? styles.popoverItemActive : ''}`}
+                                onClick={() => { setResultFilter(''); setActiveHeaderFilter(null) }}
+                              >
+                                <span>All Results</span>
+                              </button>
+                              <button
+                                type="button"
+                                className={`${styles.popoverItem} ${resultFilter === 'Success' ? styles.popoverItemActive : ''}`}
+                                onClick={() => { setResultFilter('Success'); setActiveHeaderFilter(null) }}
+                              >
+                                <Badge tone="success" dot>Success</Badge>
+                              </button>
+                              <button
+                                type="button"
+                                className={`${styles.popoverItem} ${resultFilter === 'Failure' ? styles.popoverItemActive : ''}`}
+                                onClick={() => { setResultFilter('Failure'); setActiveHeaderFilter(null) }}
+                              >
+                                <Badge tone="danger" dot>Failure</Badge>
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </th>
+                    ),
+                    render: (log) => (
                       <Badge tone={log.result === 'Success' ? 'success' : 'danger'} dot>
                         {log.result}
                       </Badge>
-                    </td>
-                    <td>
-                      <RowAction onClick={() => setViewingLog(log)} title="View full details" />
-                    </td>
-                  </tr>
-                ) : (
-                  <tr key={log.id}>
-                    <td className={styles.timeCell}>{formatTimestamp(log.occurredAt)}</td>
-                    <td>
-                      <Badge tone={serviceTone(log.serviceName)}>{log.serviceName}</Badge>
-                    </td>
-                    <td>
+                    ),
+                  },
+                  {
+                    key: 'details',
+                    label: 'DETAILS',
+                    priority: 'always',
+                    align: 'right',
+                    render: (log) => <RowAction onClick={() => setViewingLog(log)} title="View full details" />,
+                  },
+                  ]
+                : [
+                  {
+                    key: 'time',
+                    label: 'TIME',
+                    priority: 'always',
+                    header: (
+                      <th className={styles.thFilterable}>
+                        <button
+                          type="button"
+                          className={`${styles.thFilterBtn} ${dateRange !== 'all' ? styles.thFilterBtnActive : ''}`}
+                          onClick={() => setActiveHeaderFilter((c) => (c === 'time' ? null : 'time'))}
+                        >
+                          <span>TIME</span>
+                          <Icon.ChevronDown width={12} height={12} className={`${styles.filterIcon} ${activeHeaderFilter === 'time' ? styles.filterIconActive : ''}`} />
+                          {dateRange !== 'all' && <span className={styles.filterDot} />}
+                        </button>
+                        {activeHeaderFilter === 'time' && (
+                          <div className={styles.filterPopover}>
+                            <div className={styles.popoverHeader}>
+                              <span className={styles.popoverTitle}>Filter Time</span>
+                              {dateRange !== 'all' && (
+                                <button
+                                  type="button"
+                                  className={styles.popoverClearBtn}
+                                  onClick={() => { setDateRange('all'); setCustomFrom(''); setCustomTo(''); setCustomDraftFrom(''); setCustomDraftTo('') }}
+                                >
+                                  Reset
+                                </button>
+                              )}
+                            </div>
+                            <div className={styles.popoverList}>
+                              {DATE_RANGES.map((r) => (
+                                <button
+                                  key={r.key}
+                                  type="button"
+                                  className={`${styles.popoverItem} ${dateRange === r.key ? styles.popoverItemActive : ''}`}
+                                  onClick={() => { setDateRange(r.key); setActiveHeaderFilter(null) }}
+                                >
+                                  <span>{r.label}</span>
+                                </button>
+                              ))}
+                            </div>
+                            <div className={styles.popoverDivider} />
+                            <div className={styles.customDateSection}>
+                              <span className={styles.customDateLabel}>Custom Range</span>
+                              <div className={styles.customDateRow}>
+                                <input
+                                  type="date"
+                                  className={styles.dateInput}
+                                  value={customDraftFrom || customFrom}
+                                  onChange={(e) => setCustomDraftFrom(e.target.value)}
+                                />
+                                <span className={styles.alp1}>to</span>
+                                <input
+                                  type="date"
+                                  className={styles.dateInput}
+                                  value={customDraftTo || customTo}
+                                  onChange={(e) => setCustomDraftTo(e.target.value)}
+                                />
+                              </div>
+                              <button
+                                type="button"
+                                className={styles.applyDateBtn}
+                                onClick={() => {
+                                  setCustomFrom(customDraftFrom)
+                                  setCustomTo(customDraftTo)
+                                  setDateRange('custom')
+                                  setActiveHeaderFilter(null)
+                                }}
+                              >
+                                Apply Custom Range
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </th>
+                    ),
+                    render: (log) => <span className={styles.timeCell}>{formatTimestamp(log.occurredAt)}</span>,
+                  },
+                  {
+                    key: 'service',
+                    label: 'APPLICATION',
+                    priority: 'high',
+                    header: (
+                      <th className={styles.thFilterable}>
+                        <button
+                          type="button"
+                          className={`${styles.thFilterBtn} ${service ? styles.thFilterBtnActive : ''}`}
+                          onClick={() => setActiveHeaderFilter((c) => (c === 'service' ? null : 'service'))}
+                        >
+                          <span>APPLICATION</span>
+                          <Icon.ChevronDown width={12} height={12} className={`${styles.filterIcon} ${activeHeaderFilter === 'service' ? styles.filterIconActive : ''}`} />
+                          {service && <span className={styles.filterDot} />}
+                        </button>
+                        {activeHeaderFilter === 'service' && (
+                          <div className={styles.filterPopover}>
+                            <div className={styles.popoverHeader}>
+                              <span className={styles.popoverTitle}>Filter Application</span>
+                              {service && <button type="button" className={styles.popoverClearBtn} onClick={() => { setService(''); setServiceSearch('') }}>Reset</button>}
+                            </div>
+                            <input
+                              type="text"
+                              className={styles.popoverInput}
+                              placeholder="Type to search service..."
+                              value={serviceSearch}
+                              onChange={(e) => setServiceSearch(e.target.value)}
+                              autoFocus
+                            />
+                            <div className={styles.popoverList}>
+                              <button
+                                type="button"
+                                className={`${styles.popoverItem} ${!service ? styles.popoverItemActive : ''}`}
+                                onClick={() => { setService(''); setActiveHeaderFilter(null) }}
+                              >
+                                <span>All Services</span>
+                              </button>
+                              {availableServices.map((s) => (
+                                <button
+                                  key={s}
+                                  type="button"
+                                  className={`${styles.popoverItem} ${service.toLowerCase() === s.toLowerCase() ? styles.popoverItemActive : ''}`}
+                                  onClick={() => { setService(s); setActiveHeaderFilter(null) }}
+                                >
+                                  <Badge tone={serviceTone(s)}>{s}</Badge>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </th>
+                    ),
+                    render: (log) => <Badge tone={serviceTone(log.serviceName)}>{log.serviceName}</Badge>,
+                  },
+                  {
+                    key: 'actor',
+                    label: 'PERFORMED BY',
+                    priority: 'always',
+                    header: (
+                      <th className={styles.thFilterable}>
+                        <button
+                          type="button"
+                          className={`${styles.thFilterBtn} ${actorSearch ? styles.thFilterBtnActive : ''}`}
+                          onClick={() => setActiveHeaderFilter((c) => (c === 'actor' ? null : 'actor'))}
+                        >
+                          <span>PERFORMED BY</span>
+                          <Icon.ChevronDown width={12} height={12} className={`${styles.filterIcon} ${activeHeaderFilter === 'actor' ? styles.filterIconActive : ''}`} />
+                          {actorSearch && <span className={styles.filterDot} />}
+                        </button>
+                        {activeHeaderFilter === 'actor' && (
+                          <div className={styles.filterPopover}>
+                            <div className={styles.popoverHeader}>
+                              <span className={styles.popoverTitle}>Filter Performed By</span>
+                              {actorSearch && <button type="button" className={styles.popoverClearBtn} onClick={() => setActorSearch('')}>Reset</button>}
+                            </div>
+                            <input
+                              type="text"
+                              className={styles.popoverInput}
+                              placeholder="Search by name..."
+                              value={actorSearch}
+                              onChange={(e) => setActorSearch(e.target.value)}
+                              autoFocus
+                            />
+                            {availableActors.length > 0 && (
+                              <>
+                                <div className={styles.popoverDivider} />
+                                <span className={styles.customDateLabel}>Known Actors:</span>
+                                <div className={styles.userListSection}>
+                                  {availableActors.map((a) => (
+                                    <button
+                                      key={a.id || a.name}
+                                      type="button"
+                                      className={`${styles.userItem} ${actorSearch.toLowerCase() === a.name.toLowerCase() ? styles.userItemActive : ''}`}
+                                      onClick={() => { setActorSearch(a.name); setActiveHeaderFilter(null) }}
+                                    >
+                                      <div className={styles.userAvatarSmall}>
+                                        {a.name.charAt(0).toUpperCase()}
+                                      </div>
+                                      <span>{a.name}</span>
+                                    </button>
+                                  ))}
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        )}
+                      </th>
+                    ),
+                    render: (log) => (
                       <div className={styles.actorCell}>
-                        <span className={styles.actorAvatar}>{initial}</span>
+                        <span className={styles.actorAvatar}>
+                          {(log.actorName || log.actorUserId || 'S').charAt(0).toUpperCase()}
+                        </span>
                         <span className={styles.actorName}>
                           {log.actorName ?? <span className={styles.mutedText}>System</span>}
                         </span>
                       </div>
-                    </td>
-                    <td>
-                      <span className={styles.actionCell} title={log.action}>{formatActionLabel(log.action)}</span>
-                    </td>
-                    <td>
-                      {log.entityType ? (
+                    ),
+                  },
+                  {
+                    key: 'action',
+                    label: 'WHAT HAPPENED',
+                    priority: 'always',
+                    header: (
+                      <th className={styles.thFilterable}>
+                        <button
+                          type="button"
+                          className={`${styles.thFilterBtn} ${actionFilter ? styles.thFilterBtnActive : ''}`}
+                          onClick={() => setActiveHeaderFilter((c) => (c === 'action' ? null : 'action'))}
+                        >
+                          <span>WHAT HAPPENED</span>
+                          <Icon.ChevronDown width={12} height={12} className={`${styles.filterIcon} ${activeHeaderFilter === 'action' ? styles.filterIconActive : ''}`} />
+                          {actionFilter && <span className={styles.filterDot} />}
+                        </button>
+                        {activeHeaderFilter === 'action' && (
+                          <div className={styles.filterPopover}>
+                            <div className={styles.popoverHeader}>
+                              <span className={styles.popoverTitle}>Filter What Happened</span>
+                              {actionFilter && <button type="button" className={styles.popoverClearBtn} onClick={() => { setActionFilter(''); setActionSearch('') }}>Reset</button>}
+                            </div>
+                            <input
+                              type="text"
+                              className={styles.popoverInput}
+                              placeholder="Search action..."
+                              value={actionSearch}
+                              onChange={(e) => setActionSearch(e.target.value)}
+                              autoFocus
+                            />
+                            <div className={styles.popoverList}>
+                              <button
+                                type="button"
+                                className={`${styles.popoverItem} ${!actionFilter ? styles.popoverItemActive : ''}`}
+                                onClick={() => { setActionFilter(''); setActiveHeaderFilter(null) }}
+                              >
+                                <span>All Actions</span>
+                              </button>
+                              {availableActions.map((a) => (
+                                <button
+                                  key={a.raw}
+                                  type="button"
+                                  className={`${styles.popoverItem} ${actionFilter === a.raw ? styles.popoverItemActive : ''}`}
+                                  onClick={() => { setActionFilter(a.raw); setActiveHeaderFilter(null) }}
+                                >
+                                  <span className={styles.actionCell}>{a.label}</span>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </th>
+                    ),
+                    render: (log) => (
+                      <span className={styles.actionCell} title={log.action}>
+                        {formatActionLabel(log.action)}
+                      </span>
+                    ),
+                  },
+                  {
+                    key: 'entity',
+                    clamp: true,
+                    label: 'RECORD',
+                    priority: 'low',
+                    header: (
+                      <th className={styles.thFilterable}>
+                        <button
+                          type="button"
+                          className={`${styles.thFilterBtn} ${entitySearch ? styles.thFilterBtnActive : ''}`}
+                          onClick={() => setActiveHeaderFilter((c) => (c === 'entity' ? null : 'entity'))}
+                        >
+                          <span>RECORD</span>
+                          <Icon.ChevronDown width={12} height={12} className={`${styles.filterIcon} ${activeHeaderFilter === 'entity' ? styles.filterIconActive : ''}`} />
+                          {entitySearch && <span className={styles.filterDot} />}
+                        </button>
+                        {activeHeaderFilter === 'entity' && (
+                          <div className={`${styles.filterPopover} ${styles.popoverRight}`}>
+                            <div className={styles.popoverHeader}>
+                              <span className={styles.popoverTitle}>Search Entity</span>
+                              {entitySearch && <button type="button" className={styles.popoverClearBtn} onClick={() => setEntitySearch('')}>Reset</button>}
+                            </div>
+                            <input
+                              type="text"
+                              className={styles.popoverInput}
+                              placeholder="Filter by record type or name..."
+                              value={entitySearch}
+                              onChange={(e) => setEntitySearch(e.target.value)}
+                              autoFocus
+                            />
+                          </div>
+                        )}
+                      </th>
+                    ),
+                    render: (log) =>
+                      log.entityType ? (
                         <div className={styles.entityWrap}>
                           <span className={styles.entityType}>{log.entityType}</span>
                           {log.entityLabel && (
@@ -1448,17 +1447,19 @@ export function AuditLogsPage() {
                           )}
                         </div>
                       ) : (
-                        <span className={styles.mutedText}>—</span>
-                      )}
-                    </td>
-                    <td>
-                      <RowAction onClick={() => setViewingLog(log)} title="View full details" />
-                    </td>
-                  </tr>
-                )
-              })
-            )}
-          </tbody>
+                        <span className={styles.mutedText}>{EMPTY_VALUE}</span>
+                      ),
+                  },
+                  {
+                    key: 'details',
+                    label: 'DETAILS',
+                    priority: 'always',
+                    align: 'right',
+                    render: (log) => <RowAction onClick={() => setViewingLog(log)} title="View full details" />,
+                  },
+                  ]
+            }
+          />
       </DataTable>
 
       <Pagination
@@ -1483,8 +1484,8 @@ export function AuditLogsPage() {
                     <Icon.Shield width={20} height={20} />
                   </div>
                   <div>
-                    <h2 className={drawerStyles.title}>Audit Record Details</h2>
-                    <p className={drawerStyles.subtitle}>Full event context, actor, and execution metadata</p>
+                    <h2 className={drawerStyles.title}>Activity Details</h2>
+                    <p className={drawerStyles.subtitle}>What happened, who did it, and when</p>
                   </div>
                 </div>
                 <button
@@ -1505,7 +1506,7 @@ export function AuditLogsPage() {
                       <div className={styles.overviewTimelineCol}>
                         <h3 className={styles.drawerSectionTitle}>
                           <Icon.Grid width={12} height={12} />
-                          Overview
+                          Summary
                         </h3>
                         <dl className={styles.detailList}>
                           <div className={styles.detailRow}>
@@ -1513,7 +1514,7 @@ export function AuditLogsPage() {
                               <Icon.Layers width={15} height={15} />
                             </span>
                             <div className={styles.detailRowBody}>
-                              <dt className={styles.detailRowLabel}>Service</dt>
+                              <dt className={styles.detailRowLabel}>Application</dt>
                               <dd className={styles.detailRowValue}>
                                 <Badge tone={serviceTone(viewingLog.serviceName)}>
                                   {viewingLog.serviceName}
@@ -1527,7 +1528,7 @@ export function AuditLogsPage() {
                               <Icon.Activity width={15} height={15} />
                             </span>
                             <div className={styles.detailRowBody}>
-                              <dt className={styles.detailRowLabel}>Action</dt>
+                              <dt className={styles.detailRowLabel}>What Happened</dt>
                               <dd className={styles.detailRowValue}>
                                 <span className={styles.actionCell}>
                                   {formatActionLabel(viewingLog.action)}
@@ -1551,7 +1552,7 @@ export function AuditLogsPage() {
                               )}
                             </span>
                             <div className={styles.detailRowBody}>
-                              <dt className={styles.detailRowLabel}>Result</dt>
+                              <dt className={styles.detailRowLabel}>Outcome</dt>
                               <dd className={styles.detailRowValue}>
                                 <Badge
                                   tone={viewingLog.result === 'Success' ? 'success' : 'danger'}
@@ -1568,7 +1569,7 @@ export function AuditLogsPage() {
                               <Icon.Clock width={15} height={15} />
                             </span>
                             <div className={styles.detailRowBody}>
-                              <dt className={styles.detailRowLabel}>Timestamp</dt>
+                              <dt className={styles.detailRowLabel}>Date &amp; Time</dt>
                               <dd className={styles.detailRowValue}>
                                 {formatTimestamp(viewingLog.occurredAt)}
                               </dd>
@@ -1580,14 +1581,14 @@ export function AuditLogsPage() {
                       <div className={`${styles.overviewTimelineCol} ${styles.overviewTimelineColDivider}`}>
                         <h3 className={styles.drawerSectionTitle}>
                           <Icon.Clock width={12} height={12} />
-                          Event Timeline
+                          Timeline
                         </h3>
                         <div className={styles.timeline}>
                           <div className={styles.timelineStep}>
                             <span className={styles.timelineDot} />
                             <div className={styles.timelineStepCard}>
                               <span className={styles.timelineLabel}>
-                                Triggered by {viewingLog.actorName ?? 'System'}
+                                {viewingLog.actorName ? `Started by ${viewingLog.actorName}` : 'Activity recorded'}
                               </span>
                               <span className={styles.timelineTime}>
                                 <Icon.Clock width={12} height={12} />
@@ -1607,8 +1608,8 @@ export function AuditLogsPage() {
                             <div className={styles.timelineStepCard}>
                               <span className={styles.timelineLabel}>
                                 {viewingLog.result === 'Success'
-                                  ? 'Event Completed Successfully'
-                                  : 'Event Execution Failed'}
+                                  ? 'Finished successfully'
+                                  : 'Did not complete'}
                               </span>
                               <span className={styles.timelineTime}>
                                 <Icon.ShieldCheck width={12} height={12} />
@@ -1622,7 +1623,7 @@ export function AuditLogsPage() {
                           <div className={styles.failureAlert}>
                             <Icon.AlertTriangle className={styles.failureAlertIcon} width={15} height={15} />
                             <div>
-                              <strong>Failure Reason:</strong> {viewingLog.failureReason}
+                              <strong>Why it failed:</strong> {viewingLog.failureReason}
                             </div>
                           </div>
                         )}
@@ -1630,191 +1631,82 @@ export function AuditLogsPage() {
                     </div>
                   </section>
 
-                  {/* 2. Actor & Authentication Context */}
-                  <section className={styles.drawerSection}>
-                    <h3 className={styles.drawerSectionTitle}>
-                      <Icon.User width={12} height={12} />
-                      Actor &amp; Authentication Context
-                    </h3>
-                    <div className={styles.fieldCardGrid}>
-                      <div className={styles.fieldCard}>
-                        <span className={styles.fieldCardIcon}>
-                          <Icon.User width={15} height={15} />
-                        </span>
-                        <div className={styles.fieldCardBody}>
-                          <span className={styles.fieldCardLabel}>Actor Name</span>
-                          <span className={styles.fieldCardValue}>
-                            {viewingLog.actorName ?? 'System'}
+                  {/*
+                    Every field below is omitted when the record carries no value for it —
+                    DetailField returns null rather than printing "Not recorded", "System / None"
+                    or an em dash, which is what these cards used to do.
+
+                    Two fields were removed outright rather than relabelled: "Actor ID" and
+                    "Entity ID / Key" rendered raw database GUIDs. They mean nothing to the people
+                    who read an audit trail and cannot be acted on; the actor's name and the
+                    record's name carry the same meaning in readable form.
+                  */}
+                  <DetailSection title="Who Did This" icon={<Icon.User width={12} height={12} />}>
+                    <DetailGrid>
+                      <DetailField label="Performed By" icon={<Icon.User width={15} height={15} />}>
+                        {viewingLog.actorName ?? 'System'}
+                      </DetailField>
+
+                      <DetailField label="Sign-in Method" icon={<Icon.Shield width={15} height={15} />}>
+                        {viewingLog.authMethod ? (
+                          <span className={styles.authPill}>{viewingLog.authMethod}</span>
+                        ) : null}
+                      </DetailField>
+
+                      <DetailField label="IP Address" icon={<Icon.Globe width={15} height={15} />}>
+                        {viewingLog.sourceIp ? (
+                          <span className={styles.ipBadge}>
+                            <span className={styles.ipDot} />
+                            {formatIpv4(viewingLog.sourceIp)}
                           </span>
-                        </div>
-                      </div>
+                        ) : null}
+                      </DetailField>
+                    </DetailGrid>
+                  </DetailSection>
 
-                      <div className={styles.fieldCard}>
-                        <span className={styles.fieldCardIcon}>
-                          <Icon.Key width={15} height={15} />
-                        </span>
-                        <div className={styles.fieldCardBody}>
-                          <span className={styles.fieldCardLabel}>Actor ID</span>
-                          <span className={`${styles.fieldCardValue} ${styles.monoText}`}>
-                            {viewingLog.actorUserId ? (
-                              viewingLog.actorUserId.length > 22
-                                ? `${viewingLog.actorUserId.slice(0, 10)}…${viewingLog.actorUserId.slice(-8)}`
-                                : viewingLog.actorUserId
-                            ) : (
-                              'System / None'
-                            )}
-                          </span>
-                        </div>
-                      </div>
+                  {(() => {
+                    const parsed = parseUserAgent(viewingLog.userAgent)
+                    return (
+                      <DetailSection
+                        title="Device Used"
+                        icon={<Icon.Globe width={12} height={12} />}
+                        hidden={!parsed}
+                      >
+                        <DetailGrid>
+                          <DetailField label="Browser" icon={<Icon.Globe width={15} height={15} />}>
+                            {parsed ? <span className={styles.browserPill}>{parsed.browser}</span> : null}
+                          </DetailField>
 
-                      <div className={styles.fieldCard}>
-                        <span className={styles.fieldCardIcon}>
-                          <Icon.Shield width={15} height={15} />
-                        </span>
-                        <div className={styles.fieldCardBody}>
-                          <span className={styles.fieldCardLabel}>Auth Method</span>
-                          <span className={styles.fieldCardValue}>
-                            {viewingLog.authMethod ? (
-                              <span className={styles.authPill}>{viewingLog.authMethod}</span>
-                            ) : (
-                              <span className={styles.mutedText}>Not recorded</span>
-                            )}
-                          </span>
-                        </div>
-                      </div>
+                          <DetailField label="Operating System" icon={<Icon.Box width={15} height={15} />}>
+                            {parsed ? <span className={styles.osPill}>{parsed.os}</span> : null}
+                          </DetailField>
+                        </DetailGrid>
+                      </DetailSection>
+                    )
+                  })()}
 
-                      <div className={styles.fieldCard}>
-                        <span className={styles.fieldCardIcon}>
-                          <Icon.Globe width={15} height={15} />
-                        </span>
-                        <div className={styles.fieldCardBody}>
-                          <span className={styles.fieldCardLabel}>Client IP (IPv4)</span>
-                          <span className={styles.fieldCardValue}>
-                            <span className={styles.ipBadge}>
-                              <span className={styles.ipDot} />
-                              {formatIpv4(viewingLog.sourceIp)}
-                            </span>
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </section>
+                  <DetailSection
+                    title="Affected Record"
+                    icon={<Icon.Box width={12} height={12} />}
+                    hidden={!viewingLog.entityType && !viewingLog.entityLabel}
+                  >
+                    <DetailGrid>
+                      <DetailField label="Record Type" icon={<Icon.Layers width={15} height={15} />}>
+                        {viewingLog.entityType ? (
+                          <Badge tone="neutral">{viewingLog.entityType}</Badge>
+                        ) : null}
+                      </DetailField>
 
-                  {/* 3. Device & Environment Context */}
-                  <section className={styles.drawerSection}>
-                    <h3 className={styles.drawerSectionTitle}>
-                      <Icon.Globe width={12} height={12} />
-                      Device &amp; Environment Context
-                    </h3>
-                    {(() => {
-                      const parsed = parseUserAgent(viewingLog.userAgent)
-                      return (
-                        <div className={styles.alp2}>
-                          <div className={styles.fieldCardGrid}>
-                            <div className={styles.fieldCard}>
-                              <span className={styles.fieldCardIcon}>
-                                <Icon.Globe width={15} height={15} />
-                              </span>
-                              <div className={styles.fieldCardBody}>
-                                <span className={styles.fieldCardLabel}>Browser</span>
-                                <span className={styles.fieldCardValue}>
-                                  {parsed ? (
-                                    <span className={styles.browserPill}>{parsed.browser}</span>
-                                  ) : (
-                                    <span className={styles.mutedText}>—</span>
-                                  )}
-                                </span>
-                              </div>
-                            </div>
+                      <DetailField label="Record Name" icon={<Icon.FileText width={15} height={15} />}>
+                        {viewingLog.entityLabel}
+                      </DetailField>
+                    </DetailGrid>
+                  </DetailSection>
 
-                            <div className={styles.fieldCard}>
-                              <span className={styles.fieldCardIcon}>
-                                <Icon.Box width={15} height={15} />
-                              </span>
-                              <div className={styles.fieldCardBody}>
-                                <span className={styles.fieldCardLabel}>Operating System</span>
-                                <span className={styles.fieldCardValue}>
-                                  {parsed ? (
-                                    <span className={styles.osPill}>{parsed.os}</span>
-                                  ) : (
-                                    <span className={styles.mutedText}>—</span>
-                                  )}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-
-                          {viewingLog.userAgent && (
-                            <div>
-                              <div className={styles.alp3}>
-                                Raw User Agent
-                              </div>
-                              <pre className={styles.payloadCodeBox}>{viewingLog.userAgent}</pre>
-                            </div>
-                          )}
-                        </div>
-                      )
-                    })()}
-                  </section>
-
-                  {/* 4. Target Entity (if present) */}
-                  {viewingLog.entityType && (
-                    <section className={styles.drawerSection}>
-                      <h3 className={styles.drawerSectionTitle}>
-                        <Icon.Box width={12} height={12} />
-                        Target Entity
-                      </h3>
-                      <div className={styles.fieldCardGrid}>
-                        <div className={styles.fieldCard}>
-                          <span className={styles.fieldCardIcon}>
-                            <Icon.Layers width={15} height={15} />
-                          </span>
-                          <div className={styles.fieldCardBody}>
-                            <span className={styles.fieldCardLabel}>Entity Type</span>
-                            <span className={styles.fieldCardValue}>
-                              <Badge tone="neutral">{viewingLog.entityType}</Badge>
-                            </span>
-                          </div>
-                        </div>
-
-                        <div className={styles.fieldCard}>
-                          <span className={styles.fieldCardIcon}>
-                            <Icon.FileText width={15} height={15} />
-                          </span>
-                          <div className={styles.fieldCardBody}>
-                            <span className={styles.fieldCardLabel}>Entity Name / Label</span>
-                            <span className={styles.fieldCardValue}>
-                              {viewingLog.entityLabel ?? <span className={styles.mutedText}>Not recorded</span>}
-                            </span>
-                          </div>
-                        </div>
-
-                        {viewingLog.entityId && (
-                          <div className={`${styles.fieldCard} ${styles.alp4}`} >
-                            <span className={styles.fieldCardIcon}>
-                              <Icon.Key width={15} height={15} />
-                            </span>
-                            <div className={styles.fieldCardBody}>
-                              <span className={styles.fieldCardLabel}>Entity ID / Key</span>
-                              <span className={`${styles.fieldCardValue} ${styles.monoText}`}>
-                                {viewingLog.entityId}
-                              </span>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </section>
-                  )}
-
-                  {/* 5. Event Details & Payload (if present) */}
                   {viewingLog.details && (
-                    <section className={styles.drawerSection}>
-                      <h3 className={styles.drawerSectionTitle}>
-                        <Icon.FileText width={12} height={12} />
-                        Event Details &amp; Payload
-                      </h3>
+                    <DetailSection title="Additional Details" icon={<Icon.FileText width={12} height={12} />}>
                       <pre className={styles.payloadCodeBox}>{viewingLog.details}</pre>
-                    </section>
+                    </DetailSection>
                   )}
                 </div>
               </div>

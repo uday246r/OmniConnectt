@@ -9,7 +9,7 @@
   gap: var(--omni-space-1);
   background: var(--omni-color-surface-alt);
   border: 1px solid var(--omni-color-border);
-  border-radius: 7px;
+  border-radius: var(--omni-radius-sm-minus);
   padding: 5px 10px;
   font-size: var(--omni-font-size-xs);
   font-weight: var(--omni-font-weight-semibold);
@@ -45,7 +45,7 @@
 }
 
 .footnote {
-  font-size: 11px;
+  font-size: var(--omni-font-size-xs-minus);
   color: var(--omni-color-text-muted);
   font-weight: var(--omni-font-weight-medium);
   margin-top: -8px;

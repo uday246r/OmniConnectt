@@ -3,10 +3,10 @@ import { useCustomerStore } from '../store/customerStore';
 import { useInteractionStore } from '../store/interactionStore';
 import { useNavigationStore } from '../store/navigationStore';
 import CaseDetailsModal from '../components/CaseDetailsModal';
-import { ArrowLeft, Search, Eye, MessageSquare, RefreshCw, X, ChevronLeft, ChevronRight, Clock, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Search, Eye, MessageSquare, RefreshCw, X, ChevronLeft, ChevronRight, Clock, AlertTriangle } from '@omniremit/ui/icons';
 import type { IndividualProfile, CorporateProfile } from '../types/api';
 import { getFriendlyErrorMessage } from '../utils/errorMessages';
-import { Button, ColumnFilter, DataTable, FilterBar, PageHeader, Pagination, RowAction, RowsPerPage, SearchField, type ActiveFilter } from '@omniremit/ui';
+import { Button, ColumnFilter, DataTable, EMPTY_VALUE, FilterBar, PageHeader, Pagination, ResponsiveRows, RowAction, RowsPerPage, SearchField, type ActiveFilter } from '@omniremit/ui';
 import styles from './AllInteractions.module.css';
 import cc from '../shared/c360Common.module.css';
 
@@ -178,14 +178,7 @@ export default function AllInteractions() {
         </div>
 
         {/* Table Content */}
-        {loading ? (
-          <div className={styles.muted}>
-            <div className={styles.row4}>
-              <RefreshCw size={18} className={`animate-spin ${styles.text}`} />
-              <span>Loading interaction and case logs...</span>
-            </div>
-          </div>
-        ) : interactionsError ? (
+        {interactionsError ? (
           // A genuine fetch failure used to fall straight into the "no logs found" empty state below
           // — indistinguishable from a customer who simply has no interaction history.
           <div className={`error-container ${styles.rule}`}>
@@ -196,7 +189,7 @@ export default function AllInteractions() {
               Retry
               </Button>
           </div>
-        ) : filteredInteractions.length === 0 ? (
+        ) : !loading && filteredInteractions.length === 0 ? (
           <div className={styles.text2}>
             <div className={styles.heading}>💬</div>
             <div className={styles.strong}>
@@ -210,86 +203,122 @@ export default function AllInteractions() {
           </div>
         ) : (
           <DataTable>
-              <thead>
-                <tr>
-                  <th>Case #</th>
-                  <th>Subject & Details</th>
-                  <ColumnFilter
-                    label="Channel / Source"
-                    title="Filter Channel"
-                    value={channelFilter}
-                    onChange={setChannelFilter}
-                    options={channelOptions}
-                    allLabel="All Channels"
-                    searchable={channelOptions.length > 6}
-                    searchPlaceholder="Type to narrow channels…"
-                    emptyHint="No channel here matches that."
-                  />
-                  <ColumnFilter
-                    label="Assigned Officer"
-                    title="Filter Officer"
-                    value={officerFilter}
-                    onChange={setOfficerFilter}
-                    options={officerOptions}
-                    allLabel="Everyone"
-                    searchable={officerOptions.length > 6}
-                    searchPlaceholder="Type a name to narrow…"
-                    emptyHint="No officer here matches that."
-                  />
-                  <th>Created Date</th>
-                  <ColumnFilter
-                    label="Status"
-                    value={statusFilter}
-                    onChange={setStatusFilter}
-                    options={CASE_STATUS_OPTIONS}
-                    allLabel="All Statuses"
-                  />
-                  <th className={styles.rule2}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredInteractions.map((item, idx) => {
-                  const statusInfo = getStatusBadge(item.statusParent);
-
-                  return (
-                    <tr key={item.caseId || idx}>
-                      <td className={cc.monoAccent}>
-                        {/* caseId is the real case identifier — no fabricated "CAS-100N" placeholder */}
-                        {item.caseId || '-'}
-                      </td>
-                      <td>
-                        {/* The schema has no literal "title"/"subject" column — classification is the
-                            closest real field for a one-line summary of what the case is about. */}
-                        <div className={styles.text4}>{item.classification || 'Uncategorized'}</div>
-                        <div className={styles.spacer3}>{item.category || item.main || '-'}</div>
-                      </td>
-                      <td>
+            <ResponsiveRows
+              rows={filteredInteractions}
+              loading={loading}
+              loadingRows={pageSize}
+              rowKey={(item, i) => item.caseId || String(i)}
+              empty="No interactions or cases found."
+              columns={[
+                {
+                  key: 'caseId',
+                  label: 'Case #',
+                  priority: 'always',
+                  /* caseId is the real case identifier — no fabricated "CAS-100N" placeholder */
+                  render: (item) => <span className={cc.monoAccent}>{item.caseId || EMPTY_VALUE}</span>,
+                },
+                {
+                  key: 'subject',
+                  clamp: true,
+                  label: 'Subject & Details',
+                  priority: 'always',
+                  /* The schema has no literal "title"/"subject" column — classification is the
+                     closest real field for a one-line summary of what the case is about. */
+                  render: (item) => (
+                    <>
+                      <div className={styles.text4}>{item.classification || 'Uncategorized'}</div>
+                      <div className={styles.spacer3}>{item.category || item.main || EMPTY_VALUE}</div>
+                    </>
+                  ),
+                },
+                {
+                  key: 'channel',
+                  label: 'Channel / Source',
+                  priority: 'low',
+                  header: (
+                    <ColumnFilter
+                      key="channel"
+                      label="Channel / Source"
+                      title="Filter Channel"
+                      value={channelFilter}
+                      onChange={setChannelFilter}
+                      options={channelOptions}
+                      allLabel="All Channels"
+                      searchable={channelOptions.length > 6}
+                      searchPlaceholder="Type to narrow channels…"
+                      emptyHint="No channel here matches that."
+                    />
+                  ),
+                  render: (item) => <span className={styles.panel2}>{item.sourceName || EMPTY_VALUE}</span>,
+                },
+                {
+                  key: 'officer',
+                  label: 'Assigned Officer',
+                  priority: 'low',
+                  header: (
+                    <ColumnFilter
+                      key="officer"
+                      label="Assigned Officer"
+                      title="Filter Officer"
+                      value={officerFilter}
+                      onChange={setOfficerFilter}
+                      options={officerOptions}
+                      allLabel="Everyone"
+                      searchable={officerOptions.length > 6}
+                      searchPlaceholder="Type a name to narrow…"
+                      emptyHint="No officer here matches that."
+                    />
+                  ),
+                  /* No literal "assigned to" column exists — subRoleName (the routing queue/role the
+                     case sits in) is the closest real field to "who owns this right now". */
+                  render: (item) => <span className={styles.text5}>{item.subRoleName || EMPTY_VALUE}</span>,
+                },
+                {
+                  key: 'created',
+                  label: 'Created Date',
+                  priority: 'high',
+                  render: (item) => <span className={styles.text6}>{item.createdDateParent || EMPTY_VALUE}</span>,
+                },
+                {
+                  key: 'status',
+                  label: 'Status',
+                  priority: 'always',
+                  header: (
+                    <ColumnFilter
+                      key="status"
+                      label="Status"
+                      value={statusFilter}
+                      onChange={setStatusFilter}
+                      options={CASE_STATUS_OPTIONS}
+                      allLabel="All Statuses"
+                    />
+                  ),
+                  render: (item) => {
+                    const info = getStatusBadge(item.statusParent);
+                    return (
+                      <span
+                        className={cc.statusPill}
+                        style={{ '--pill-bg': info.bg, '--pill-text': info.text } as React.CSSProperties}
+                      >
                         <span
-                          className={styles.panel2}
-                        >
-                          {item.sourceName || '-'}
-                        </span>
-                      </td>
-                      {/* No literal "assigned to" column exists — subRoleName (the routing queue/role
-                          the case sits in) is the closest real field to "who owns this right now". */}
-                      <td className={styles.text5}>{item.subRoleName || '-'}</td>
-                      <td className={styles.text6}>{item.createdDateParent || '-'}</td>
-                      <td>
-                        <span
-                          className={cc.statusPill} style={{ '--pill-bg': statusInfo.bg, '--pill-text': statusInfo.text } as React.CSSProperties}
-                        >
-                          <span className={cc.statusDot} style={{ '--pill-dot': statusInfo.dot } as React.CSSProperties} />
-                          {statusInfo.label}
-                        </span>
-                      </td>
-                      <td className={styles.rule2}>
-                        <RowAction onClick={() => openCaseModal(item)} />
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </DataTable>
+                          className={cc.statusDot}
+                          style={{ '--pill-dot': info.dot } as React.CSSProperties}
+                        />
+                        {info.label}
+                      </span>
+                    );
+                  },
+                },
+                {
+                  key: 'actions',
+                  label: 'Actions',
+                  priority: 'always',
+                  align: 'right',
+                  render: (item) => <RowAction onClick={() => openCaseModal(item)} />,
+                },
+              ]}
+            />
+          </DataTable>
         )}
 
         {/* Pagination Toolbar */}

@@ -12,7 +12,7 @@
 .icon {
   width: 56px;
   height: 56px;
-  border-radius: 50%;
+  border-radius: var(--omni-radius-circle);
   display: flex;
   align-items: center;
   justify-content: center;

@@ -88,3 +88,16 @@
   gap: var(--omni-space-6);
   min-height: 180px;
 }
+
+/* Loading shape for a donut card: the chart and its legend, side by side as they render. */
+.chartSkeleton {
+  display: flex;
+  align-items: center;
+  gap: var(--omni-space-6);
+  padding: var(--omni-space-4) 0;
+}
+
+.legendSkeleton {
+  flex: 1;
+  min-width: 0;
+}

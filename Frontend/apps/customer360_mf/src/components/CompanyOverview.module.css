@@ -6,12 +6,12 @@
 .stack {
   display: flex;
   flex-direction: column;
-  gap: 16;
+  gap: 16px;
 }
 
 .row {
   display: flex;
-  gap: 16;
+  gap: 16px;
   flex-wrap: wrap;
 }
 
@@ -19,7 +19,7 @@
   flex: 1 1 300px;
   display: flex;
   flex-direction: column;
-  gap: 12;
+  gap: 12px;
 }
 
 .spread {

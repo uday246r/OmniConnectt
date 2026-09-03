@@ -48,14 +48,14 @@
 .avatar {
   width: var(--omni-skeleton-size, 32px);
   height: var(--omni-skeleton-size, 32px);
-  border-radius: 50%;
+  border-radius: var(--omni-radius-circle);
   flex-shrink: 0;
 }
 
 .text {
   width: var(--omni-skeleton-width, 100%);
   height: 0.82em;
-  border-radius: 4px;
+  border-radius: var(--omni-radius-xs);
 }
 
 .textGroup {
@@ -83,7 +83,7 @@
 .tableCell {
   height: 13px;
   flex: 1;
-  border-radius: 4px;
+  border-radius: var(--omni-radius-xs);
 }
 
 /* The first column carries the primary identifier and is visually wider in every real table. */

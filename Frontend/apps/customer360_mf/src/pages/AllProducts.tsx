@@ -3,10 +3,10 @@ import { useCustomerStore } from '../store/customerStore';
 import { useProductStore } from '../store/productStore';
 import { useNavigationStore } from '../store/navigationStore';
 import ProductDetailsModal from '../components/ProductDetailsModal';
-import { ArrowLeft, Search, Eye, Layers, RefreshCw, X, ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Search, Eye, Layers, RefreshCw, X, ChevronLeft, ChevronRight, AlertTriangle } from '@omniremit/ui/icons';
 import type { CorporateProfile, IndividualProfile } from '../types/api';
 import { getFriendlyErrorMessage } from '../utils/errorMessages';
-import { Button, ColumnFilter, DataTable, FilterBar, PageHeader, Pagination, RowAction, RowsPerPage, SearchField, type ActiveFilter } from '@omniremit/ui';
+import { Button, ColumnFilter, DataTable, EMPTY_VALUE, FilterBar, PageHeader, Pagination, ResponsiveRows, RowAction, RowsPerPage, SearchField, type ActiveFilter } from '@omniremit/ui';
 import styles from './AllProducts.module.css';
 import cc from '../shared/c360Common.module.css';
 
@@ -157,14 +157,7 @@ export default function AllProducts() {
         </div>
 
         {/* Table Content */}
-        {loading ? (
-          <div className={styles.muted}>
-            <div className={styles.row4}>
-              <RefreshCw size={18} className={`animate-spin ${styles.text}`} />
-              <span>Loading customer product accounts...</span>
-            </div>
-          </div>
-        ) : error ? (
+        {error ? (
           // A genuine fetch failure used to fall straight into the "no products found" empty state
           // below — indistinguishable from a customer who simply has zero product accounts. This
           // gives an operator a real, actionable reason instead of a false "nothing here".
@@ -176,7 +169,7 @@ export default function AllProducts() {
               Retry
               </Button>
           </div>
-        ) : filteredProducts.length === 0 ? (
+        ) : !loading && filteredProducts.length === 0 ? (
           <div className={styles.text2}>
             <div className={styles.heading}>💳</div>
             <div className={styles.strong}>
@@ -190,77 +183,107 @@ export default function AllProducts() {
           </div>
         ) : (
           <DataTable>
-              <thead>
-                <tr>
-                  <ColumnFilter
-                    label="Product Category"
-                    value={typeFilter}
-                    onChange={setTypeFilter}
-                    options={PRODUCT_CATEGORY_OPTIONS}
-                    allLabel="All Categories"
-                  />
-                  <th>Product Name</th>
-                  <th>Account Number</th>
-                  {/* Not filterable: CustomerProduct carries no branch field — this column renders
-                      a literal "-" for every row. It needs the product API to return a branch
-                      before a filter here could do anything. */}
-                  <th>Branch</th>
-                  <th>Balance / Limit</th>
-                  <ColumnFilter
-                    label="Status"
-                    value={statusFilter}
-                    onChange={setStatusFilter}
-                    options={PRODUCT_STATUS_OPTIONS}
-                    allLabel="All Statuses"
-                  />
-                  <th className={styles.rule2}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredProducts.map((prod, idx) => (
-                  <tr key={prod.accountNumber || idx}>
-                    <td>
-                      <span
-                        className={styles.strong2}
-                      >
-                        {prod.productCategory || prod.type || 'Banking Product'}
+            <ResponsiveRows
+              rows={filteredProducts}
+              loading={loading}
+              loadingRows={pageSize}
+              rowKey={(prod, i) => prod.accountNumber || String(i)}
+              empty="No products found."
+              columns={[
+                {
+                  key: 'category',
+                  label: 'Product Category',
+                  priority: 'always',
+                  header: (
+                    <ColumnFilter
+                      key="category"
+                      label="Product Category"
+                      value={typeFilter}
+                      onChange={setTypeFilter}
+                      options={PRODUCT_CATEGORY_OPTIONS}
+                      allLabel="All Categories"
+                    />
+                  ),
+                  render: (prod) => (
+                    <span className={styles.strong2}>
+                      {prod.productCategory || prod.type || 'Banking Product'}
+                    </span>
+                  ),
+                },
+                {
+                  key: 'name',
+                  label: 'Product Name',
+                  priority: 'always',
+                  render: (prod) => <span className={styles.text4}>{prod.productName}</span>,
+                },
+                {
+                  key: 'account',
+                  label: 'Account Number',
+                  priority: 'high',
+                  render: (prod) => <span className={cc.monoValue}>{prod.accountNumber}</span>,
+                },
+                {
+                  key: 'branch',
+                  label: 'Branch',
+                  priority: 'low',
+                  /* CustomerProduct carries no branch field at all (that lives on the customer's own
+                     profile, a different entity) — always the empty marker, honestly, rather than a
+                     fabricated value. Not filterable for the same reason. */
+                  render: () => <span className={styles.text5}>{EMPTY_VALUE}</span>,
+                },
+                {
+                  key: 'balance',
+                  label: 'Balance / Limit',
+                  priority: 'low',
+                  render: (prod) => (
+                    <span className={styles.strong3}>
+                      {prod.balances ? `RM ${Number(prod.balances).toLocaleString()}` : EMPTY_VALUE}
+                    </span>
+                  ),
+                },
+                {
+                  key: 'status',
+                  label: 'Status',
+                  priority: 'always',
+                  header: (
+                    <ColumnFilter
+                      key="status"
+                      label="Status"
+                      value={statusFilter}
+                      onChange={setStatusFilter}
+                      options={PRODUCT_STATUS_OPTIONS}
+                      allLabel="All Statuses"
+                    />
+                  ),
+                  /* No single generic status field exists — derivedAccountStatus is the one the
+                     backend explicitly provides as a normalized status across product types. The
+                     fixed green "Active" fallback previously shown regardless of real status has
+                     been removed: it is specifically the wrong direction to fail in for something
+                     this label implies about an account. */
+                  render: (prod) =>
+                    prod.derivedAccountStatus ? (
+                      <span className={styles.pill}>
+                        <span className={styles.avatar} />
+                        {prod.derivedAccountStatus}
                       </span>
-                    </td>
-                    <td className={styles.text4}>{prod.productName}</td>
-                    <td className={cc.monoValue}>
-                      {prod.accountNumber}
-                    </td>
-                    {/* CustomerProduct carries no branch field at all (that's only present on the
-                        customer's own profile, a different entity) — always '-', honestly, not a
-                        fabricated value. */}
-                    <td className={styles.text5}>{'-'}</td>
-                    <td className={styles.strong3}>
-                      {prod.balances ? `RM ${Number(prod.balances).toLocaleString()}` : '-'}
-                    </td>
-                    <td>
-                      {/* No single generic status field exists — derivedAccountStatus is the one the
-                          backend explicitly provides as a normalized status across product types. The
-                          fixed green "Active" fallback previously shown regardless of real status has
-                          been removed: it's not just a wrong label, it's specifically the wrong
-                          direction to fail in for something this label implies about an account. */}
-                      {prod.derivedAccountStatus ? (
-                        <span
-                          className={styles.pill}
-                        >
-                          <span className={styles.avatar} />
-                          {prod.derivedAccountStatus}
-                        </span>
-                      ) : (
-                        <span className={styles.muted2}>-</span>
-                      )}
-                    </td>
-                    <td className={styles.rule2}>
-                      <RowAction onClick={() => openProductModal(prod.accountNumber, prod.type as string)} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </DataTable>
+                    ) : (
+                      <span className={styles.muted2}>{EMPTY_VALUE}</span>
+                    ),
+                },
+                {
+                  key: 'actions',
+                  label: 'Actions',
+                  priority: 'always',
+                  align: 'right',
+                  render: (prod) => (
+                    <RowAction
+                      onClick={() => openProductModal(prod.accountNumber, prod.type as string)}
+                    />
+                  ),
+                },
+              ]}
+            />
+          </DataTable>
         )}
 
         {/* Pagination Toolbar */}

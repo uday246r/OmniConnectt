@@ -1,6 +1,6 @@
 import React from 'react';
 import { useCustomerStore } from '../store/customerStore';
-import { User, Building2, Phone, Mail, Edit3, Layers, Sparkles } from 'lucide-react';
+import { User, Building2, Phone, Mail, Edit3, Layers, Sparkles } from '@omniremit/ui/icons';
 import type { IndividualProfile, CorporateProfile } from '../types/api';
 import styles from './CustomerHeader.module.css';
 import cc from '../shared/c360Common.module.css';

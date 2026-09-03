@@ -1,10 +1,11 @@
 import React, { type ReactNode } from 'react';
 import { useProductStore } from '../store/productStore';
 import { useCustomerStore } from '../store/customerStore';
-import { X, Landmark, FileText, DollarSign, Percent, CreditCard, Coins, TrendingUp, ScrollText, Calendar } from 'lucide-react';
+import { Landmark, FileText, DollarSign, Percent, CreditCard, Coins, TrendingUp, ScrollText, Calendar } from '@omniremit/ui/icons';
 import type { AnyProductFields, ProductDetailType, CorporateProfile } from '../types/api';
 import { StatusBadge } from '../shared/StatusBadge';
 import { formatValue, formatCurrency as formatMoney } from '../shared/formatValue';
+import { Drawer } from '@omniremit/ui';
 
 // ---------------------------------------------------------------------------
 // Product type detection — mirrors the routing logic in productStore.ts
@@ -479,21 +480,14 @@ export default function ProductDetailsModal() {
   };
 
   return (
-    <div className="drawer-overlay" onClick={closeProductModal}>
-      <div className="drawer-content" onClick={(e) => e.stopPropagation()}>
-        {/* Drawer Header */}
-        <div className="drawer-header blue-header">
-          <div className="drawer-title-text">
-            <h3>Product Details</h3>
-            <p>Complete Product Information</p>
-          </div>
-          <button className="drawer-close-btn" onClick={closeProductModal}>
-            <X size={18} />
-          </button>
-        </div>
-
-        {/* Drawer Body */}
-        <div className="drawer-body">
+    <Drawer
+      open={modalOpen}
+      onClose={closeProductModal}
+      title="Product Details"
+      subtitle="Complete Product Information"
+      icon={<Landmark size={20} />}
+    >
+      <div className="drawer-body">
           {loadingDetails ? (
             <div className="loading-overlay">
               <div className="spinner"></div>
@@ -512,8 +506,7 @@ export default function ProductDetailsModal() {
               <span>Could not load product details.</span>
             </div>
           )}
-        </div>
       </div>
-    </div>
+    </Drawer>
   );
 }

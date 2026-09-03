@@ -11,7 +11,7 @@
 .warningMark {
   width: 56px;
   height: 56px;
-  border-radius: 50%;
+  border-radius: var(--omni-radius-circle);
   background: var(--omni-color-danger-50);
   color: var(--omni-color-danger-600);
   display: flex;

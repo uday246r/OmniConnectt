@@ -1,6 +1,5 @@
-import { Modal } from '../../../shared/components/Modal/Modal'
-import { Button } from '../../../shared/components/Button/Button'
 import styles from './IdleWarningModal.module.css'
+import { Button, Modal } from '@omniremit/ui'
 
 export interface IdleWarningModalProps {
   open: boolean

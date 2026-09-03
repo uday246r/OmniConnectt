@@ -28,14 +28,14 @@
 }
 
 .title {
-  font-weight: 600;
-  font-size: 14px;
+  font-weight: var(--omni-font-weight-semibold);
+  font-size: var(--omni-font-size-md);
   color: var(--omni-color-text-primary);
   margin-bottom: 2px;
 }
 
 .message {
-  font-size: 13px;
+  font-size: var(--omni-font-size-sm);
   color: var(--omni-color-text-secondary);
   line-height: 1.4;
 }
@@ -43,7 +43,7 @@
 .detailList {
   margin: 6px 0 0 0;
   padding-left: 16px;
-  font-size: 12.5px;
+  font-size: var(--omni-font-size-sm-minus);
   color: var(--omni-color-danger-600);
 }
 
@@ -57,7 +57,7 @@
   color: var(--omni-color-text-muted);
   cursor: pointer;
   padding: 2px;
-  border-radius: 4px;
+  border-radius: var(--omni-radius-xs);
   margin-left: 8px;
 }
 
@@ -67,7 +67,7 @@
   top: var(--omni-space-6);
   right: var(--omni-space-6);
   z-index: 9999;
-  min-width: 320px;
+  min-width: min(320px, calc(100vw - 24px));
   max-width: 460px;
   background: var(--toast-bg);
   border: 1px solid var(--toast-border);

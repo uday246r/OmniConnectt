@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { useAuthStore } from '../../auth/store/authStore'
-import { Badge, Button, ColumnFilter, DataTable, FilterBar, Icon, PageHeader, Pagination, RowsPerPage, SearchField, readStoredPageSize, type ActiveFilter, type BadgeTone } from '@omniremit/ui'
-import { SkeletonBlock } from '../../../shared/components/Skeleton'
+import { Badge, Button, ColumnFilter, DataTable, EMPTY_VALUE, FilterBar, Icon, PageHeader, Pagination, ResponsiveRows, RowsPerPage, SearchField, readStoredPageSize, type ActiveFilter, type BadgeTone } from '@omniremit/ui'
 import { approvalsApi, type ApprovalRequestListItemDto, type ApprovalStatus, type RevealTempPasswordResponse } from '../api/approvalsApi'
 import { useApprovalRequests } from '../hooks/useApprovalRequests'
 import { ApiError } from '../../../shared/api/httpClient'
@@ -374,103 +373,152 @@ export function MyRequestsPage() {
       {/* Shared chrome. This page had a THIRD variant of the same table — 11px header padding and a
           1px #eaecf0 rule against the 12px / 1.5px #e2e8f0 used by Audit Logs and Approval Center —
           so it now renders from the same source as its sibling pages. */}
-      <DataTable minWidth={780}>
-          <thead>
-            <tr>
-              <th>DATE SUBMITTED</th>
-              <ColumnFilter
-                label="Module"
-                value={moduleFilter}
-                onChange={setModuleFilter}
-                options={moduleOptions}
-                allLabel="All Modules"
-                searchable={moduleOptions.length > 6}
-              />
-              <ColumnFilter
-                label="Action"
-                value={actionFilter}
-                onChange={setActionFilter}
-                options={actionOptions}
-                allLabel="All Actions"
-                searchable={actionOptions.length > 6}
-              />
-              <th>RECORD</th>
-              <ColumnFilter
-                label="Checker"
-                value={checkerFilter}
-                onChange={setCheckerFilter}
-                options={checkerOptions}
-                allLabel="Everyone"
-                searchable={checkerOptions.length > 6}
-              />
-              <ColumnFilter
-                label="Status"
-                value={statusFilter === 'all' ? '' : statusFilter}
-                onChange={(v) => setStatusFilter((v || 'all') as ApprovalStatus | 'all')}
-                options={FILTERS.filter((f) => f.key !== 'all').map((f) => ({ value: f.key, label: f.label }))}
-                allLabel="All Statuses"
-              />
-              <th>PASSWORD</th>
-              <th>REJECTION REASON</th>
-            </tr>
-          </thead>
-          <tbody>
-            {visibleItems === null ? (
-              Array.from({ length: pageSize }).map((_, i) => (
-                <tr key={i}><td colSpan={8}><SkeletonBlock height={20} radius="4px" /></td></tr>
-              ))
-            ) : visibleItems.length === 0 ? (
-              <DataTable.Empty colSpan={8}>
-                {statusFilter === 'all' ? "You haven't submitted any requests yet." : `No ${statusFilter.toLowerCase()} requests.`}
-              </DataTable.Empty>
-            ) : (
-              visibleItems.map((r) => {
+      <DataTable>
+        <ResponsiveRows
+          rows={visibleItems ?? []}
+          rowKey={(r) => String(r.id)}
+          loading={visibleItems === null}
+          loadingRows={pageSize}
+          empty={
+            statusFilter === 'all'
+              ? "You haven't submitted any requests yet."
+              : `No ${statusFilter.toLowerCase()} requests.`
+          }
+          columns={[
+            {
+              key: 'requestedAt',
+              label: 'DATE SUBMITTED',
+              priority: 'always',
+              render: (r) => <span className={styles.timeCell}>{formatDateOnly(r.requestedAt)}</span>,
+            },
+            {
+              key: 'module',
+              label: 'Module',
+              priority: 'high',
+              header: (
+                <ColumnFilter
+                  key="module"
+                  label="Module"
+                  value={moduleFilter}
+                  onChange={setModuleFilter}
+                  options={moduleOptions}
+                  allLabel="All Modules"
+                  searchable={moduleOptions.length > 6}
+                />
+              ),
+              render: (r) => <Badge tone="info">{formatModuleName(r.module)}</Badge>,
+            },
+            {
+              key: 'action',
+              label: 'Action',
+              priority: 'always',
+              header: (
+                <ColumnFilter
+                  key="action"
+                  label="Action"
+                  value={actionFilter}
+                  onChange={setActionFilter}
+                  options={actionOptions}
+                  allLabel="All Actions"
+                  searchable={actionOptions.length > 6}
+                />
+              ),
+              render: (r) => {
                 const ActionIcon = ACTION_ICONS[r.action] ?? Icon.Edit
                 return (
-                  <tr key={r.id}>
-                    <td className={styles.timeCell}>{formatDateOnly(r.requestedAt)}</td>
-                    <td><Badge tone="info">{formatModuleName(r.module)}</Badge></td>
-                    <td>
-                      <span className={`${styles.actionCell} ${styles[`action_${r.action}`] ?? ''}`}>
-                        <ActionIcon width={12} height={12} />
-                        <span>{ACTION_LABELS[r.action] ?? r.action}</span>
-                      </span>
-                    </td>
-                    <td>{r.entityLabel ? <span className={styles.entityLabel}>{r.entityLabel}</span> : <span className={styles.mutedText}>—</span>}</td>
-                    <td>
-                      {r.checkerName ? (
-                        <div className={styles.actorCell}>
-                          <span className={styles.checkerAvatar}>{r.checkerName.charAt(0).toUpperCase()}</span>
-                          <span className={styles.actorName}>{r.checkerName}</span>
-                        </div>
-                      ) : (
-                        <span className={styles.unassignedChip}>Unassigned</span>
-                      )}
-                    </td>
-                    <td><Badge tone={STATUS_TONES[r.status]} dot>{r.status}</Badge></td>
-                    <td>
-                      {r.hasTempPassword && !collectedIds.has(r.id) ? (
-                        <button
-                          type="button"
-                          className={styles.revealBtn}
-                          disabled={revealing === r.id}
-                          onClick={() => handleReveal(r.id)}
-                        >
-                          <Icon.Key width={13} height={13} />
-                          <span>{revealing === r.id ? 'Retrieving…' : 'Get password'}</span>
-                        </button>
-                      ) : (
-                        <span className={styles.mutedText}>—</span>
-                      )}
-                    </td>
-                    <td className={styles.reasonCell}>
-                      {r.rejectionReason ?? <span className={styles.mutedText}>—</span>}
-                    </td>
-                  </tr>
+                  <span className={`${styles.actionCell} ${styles[`action_${r.action}`] ?? ''}`}>
+                    <ActionIcon width={12} height={12} />
+                    <span>{ACTION_LABELS[r.action] ?? r.action}</span>
+                  </span>
                 )
-              })
-            )}
-          </tbody>
+              },
+            },
+            {
+              key: 'record',
+              label: 'RECORD',
+              priority: 'high',
+              render: (r) =>
+                r.entityLabel ? (
+                  <span className={styles.entityLabel}>{r.entityLabel}</span>
+                ) : (
+                  <span className={styles.mutedText}>{EMPTY_VALUE}</span>
+                ),
+            },
+            {
+              key: 'checker',
+              label: 'Checker',
+              priority: 'low',
+              header: (
+                <ColumnFilter
+                  key="checker"
+                  label="Checker"
+                  value={checkerFilter}
+                  onChange={setCheckerFilter}
+                  options={checkerOptions}
+                  allLabel="Everyone"
+                  searchable={checkerOptions.length > 6}
+                />
+              ),
+              render: (r) =>
+                r.checkerName ? (
+                  <div className={styles.actorCell}>
+                    <span className={styles.checkerAvatar}>
+                      {r.checkerName.charAt(0).toUpperCase()}
+                    </span>
+                    <span className={styles.actorName}>{r.checkerName}</span>
+                  </div>
+                ) : (
+                  <span className={styles.unassignedChip}>Unassigned</span>
+                ),
+            },
+            {
+              key: 'status',
+              label: 'Status',
+              priority: 'always',
+              header: (
+                <ColumnFilter
+                  key="status"
+                  label="Status"
+                  value={statusFilter === 'all' ? '' : statusFilter}
+                  onChange={(v) => setStatusFilter((v || 'all') as ApprovalStatus | 'all')}
+                  options={FILTERS.filter((f) => f.key !== 'all').map((f) => ({ value: f.key, label: f.label }))}
+                  allLabel="All Statuses"
+                />
+              ),
+              render: (r) => <Badge tone={STATUS_TONES[r.status]} dot>{r.status}</Badge>,
+            },
+            {
+              key: 'password',
+              label: 'PASSWORD',
+              priority: 'low',
+              render: (r) =>
+                r.hasTempPassword && !collectedIds.has(r.id) ? (
+                  <button
+                    type="button"
+                    className={styles.revealBtn}
+                    disabled={revealing === r.id}
+                    onClick={() => handleReveal(r.id)}
+                  >
+                    <Icon.Key width={13} height={13} />
+                    <span>{revealing === r.id ? 'Retrieving…' : 'Get password'}</span>
+                  </button>
+                ) : (
+                  <span className={styles.mutedText}>{EMPTY_VALUE}</span>
+                ),
+            },
+            {
+              key: 'rejectionReason',
+              clamp: true,
+              label: 'REJECTION REASON',
+              priority: 'low',
+              render: (r) => (
+                <span className={styles.reasonCell}>
+                  {r.rejectionReason ?? <span className={styles.mutedText}>{EMPTY_VALUE}</span>}
+                </span>
+              ),
+            },
+          ]}
+        />
       </DataTable>
 
       <Pagination

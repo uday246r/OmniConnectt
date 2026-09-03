@@ -21,7 +21,7 @@
 .domainHint {
   margin: 10px 0 0 0;
   text-align: center;
-  font-size: 11.5px;
+  font-size: var(--omni-font-size-xs-plus);
   line-height: 1.45;
   color: var(--omni-color-text-muted);
 }
@@ -34,7 +34,7 @@
   background: var(--omni-color-warning-bg);
   border: 1px solid var(--omni-color-warning-200);
   color: var(--omni-color-warning-text);
-  font-size: 12px;
+  font-size: var(--omni-font-size-xs);
   line-height: 1.45;
   text-align: center;
 }

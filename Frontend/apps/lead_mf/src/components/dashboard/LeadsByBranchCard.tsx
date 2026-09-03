@@ -2,6 +2,7 @@ import React from 'react';
 import card from '../../shared/dashboardCard.module.css';
 import styles from './LeadsByBranchCard.module.css';
 import { useLeadStore } from '../../store/useLeadStore';
+import { SkeletonText } from '@omniremit/ui';
 
 const BRANCH_COLORS = [
   '#4f46e5', '#3b82f6', '#10b981', '#f59e0b', '#ec4899', '#0d9488',
@@ -37,9 +38,8 @@ export const LeadsByBranchCard: React.FC = () => {
         className={styles.list}
       >
         {isLoadingDashboard ? (
-          <div className={styles.listState}>
-            Loading branch data...
-          </div>
+          /* One shimmer bar per branch row, at the row height the real list uses. */
+          <SkeletonText lines={5} />
         ) : sortedBranches.length === 0 ? (
           <div className={styles.listState}>
             No branch data available.

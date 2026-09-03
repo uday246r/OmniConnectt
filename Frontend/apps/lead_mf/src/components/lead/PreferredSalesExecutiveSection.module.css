@@ -12,7 +12,7 @@
 }
 
 .label {
-  font-weight: 500;
+  font-weight: var(--omni-font-weight-medium);
   color: #1e293b;
 }
 

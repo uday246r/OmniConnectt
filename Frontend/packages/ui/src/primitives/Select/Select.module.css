@@ -23,7 +23,7 @@
   appearance: none;
   -webkit-appearance: none;
   border: 1.5px solid var(--omni-color-border);
-  border-radius: 8px;
+  border-radius: var(--omni-radius-md);
   background: var(--omni-color-surface);
   color: var(--omni-color-text-primary);
   font-family: inherit;
@@ -47,18 +47,18 @@
 .sm {
   height: 32px;
   padding: 0 28px 0 10px;
-  font-size: 12px;
+  font-size: var(--omni-font-size-xs);
 }
 .md {
   height: 36px;
   padding: 0 30px 0 12px;
-  font-size: 13px;
+  font-size: var(--omni-font-size-sm);
 }
 .lg {
   height: 42px;
   padding: 0 32px 0 14px;
-  font-size: 14px;
-  border-radius: 10px;
+  font-size: var(--omni-font-size-md);
+  border-radius: var(--omni-radius-lg-minus);
 }
 
 .chevron {

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Settings, Save, AlertCircle, CheckCircle2, Eye, EyeOff, RefreshCw } from 'lucide-react';
-import { Button, Checkbox, DataTable, PageHeader, Select, Tabs } from '@omniremit/ui';
+import { Settings, Save, AlertCircle, CheckCircle2, Eye, EyeOff, RefreshCw } from '@omniremit/ui/icons';
+import { Button, Checkbox, DataTable, PageHeader, Select, TableSkeleton, Tabs } from '@omniremit/ui';
 import styles from './FieldSettingsPage.module.css';
 import shell from '../shared/leadPage.module.css';
 import { apiClient, isApprovalPending } from '../api/apiClient';
@@ -145,10 +145,16 @@ export const FieldSettingsPage: React.FC = () => {
       )}
 
       {loading ? (
-        <div className={styles.loading}>
-          <RefreshCw size={18} className={`animate-spin ${styles.loadingSpinner}`} />
-          <div className={styles.loadingText}>Loading field settings…</div>
-        </div>
+        <DataTable bare minWidth={820}>
+            <thead>
+              <tr>
+                {Array.from({ length: 9 }, (_, i) => (
+                  <th key={i}>&nbsp;</th>
+                ))}
+              </tr>
+            </thead>
+            <TableSkeleton rows={8} columns={9} />
+          </DataTable>
       ) : (
         sections.map((section) => (
           <div

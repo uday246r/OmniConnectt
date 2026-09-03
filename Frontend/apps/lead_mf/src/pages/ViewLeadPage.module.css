@@ -38,10 +38,10 @@
 .avatar {
   width: 34px;
   height: 34px;
-  border-radius: 50%;
+  border-radius: var(--omni-radius-circle);
   background: var(--lead-avatar-bg);
   color: var(--lead-avatar-text);
-  font-size: 11.5px;
+  font-size: var(--omni-font-size-xs-plus);
   font-weight: var(--omni-font-weight-bold);
   display: flex;
   align-items: center;
@@ -97,7 +97,7 @@
   color: var(--omni-color-text-primary);
   font-weight: var(--omni-font-weight-medium);
   font-size: var(--omni-font-size-sm);
-  font-family: 'SF Mono', 'Fira Code', ui-monospace, monospace;
+  font-family: var(--omni-font-mono);
 }
 
 /*
@@ -170,7 +170,7 @@
 /* Matches the host's `.timeCell`: 12px, medium, tightened. */
 .dateCell {
   color: var(--omni-color-text-secondary);
-  font-size: 12px;
+  font-size: var(--omni-font-size-xs);
   font-weight: var(--omni-font-weight-medium);
   letter-spacing: -0.01em;
   white-space: nowrap;

@@ -14,7 +14,6 @@ import { permissionsApi, type PermissionFeatureDto } from '../../shared/api/perm
 import { useSettingsDrawerStore } from '../../shared/stores/settingsDrawerStore'
 import { useClickOutside } from '../../shared/hooks/useClickOutside'
 import { Icon } from '../../shared/components/Icon/Icon'
-import { Switch } from '../../shared/components/Switch/Switch'
 import { SkeletonBlock } from '../../shared/components/Skeleton'
 import { resolveIcon } from '../../shared/components/Icon/resolveIcon'
 import { toast } from '../../shared/stores/toastStore'
@@ -35,6 +34,7 @@ import {
 } from '../../shared/permissions/catalog'
 import styles from './UserFormLayer.module.css'
 import { TOPICS, invalidate } from '../../shared/stores/invalidationStore'
+import { Switch } from '@omniremit/ui'
 
 export interface CountryPhoneConfig {
   code: string

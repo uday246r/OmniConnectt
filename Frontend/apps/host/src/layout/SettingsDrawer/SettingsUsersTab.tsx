@@ -9,13 +9,11 @@ import { useSettingsDrawerStore } from '../../shared/stores/settingsDrawerStore'
 import { useDebouncedValue } from '../../shared/hooks/useDebouncedValue'
 import { Icon } from '../../shared/components/Icon/Icon'
 import { SkeletonUserCard } from '../../shared/components/Skeleton'
-import { Pagination } from '../../shared/components/Pagination/Pagination'
-import { Modal } from '../../shared/components/Modal/Modal'
-import { Button } from '../../shared/components/Button/Button'
 import { ApiError } from '../../shared/api/httpClient'
 import { toast } from '../../shared/stores/toastStore'
 import styles from './SettingsUsersTab.module.css'
 import { TOPICS, invalidate, useDataRevision } from '../../shared/stores/invalidationStore'
+import { Button, EmptyState, Modal, Pagination } from '@omniremit/ui'
 
 const PAGE_SIZE = 10
 
@@ -331,9 +329,7 @@ export function SettingsUsersTab() {
             )
           })
         ) : (
-          <div className={styles.emptyState}>
-            <p>No users found matching the selected filters.</p>
-          </div>
+          <EmptyState compact title="No users found matching the selected filters." />
         )}
       </div>
 

@@ -11,6 +11,7 @@ import {
 import card from '../../shared/dashboardCard.module.css';
 import styles from './LeadsOverTimeCard.module.css';
 import { useLeadStore } from '../../store/useLeadStore';
+import { SkeletonBlock } from '@omniremit/ui';
 
 const GRANULARITY_LABELS: Record<string, string> = {
   daily: 'Daily',
@@ -59,11 +60,8 @@ export const LeadsOverTimeCard: React.FC = () => {
       {/* Chart */}
       <div className={styles.chartArea}>
         {isLoadingDashboard ? (
-          <div
-            className={styles.chartState}
-          >
-            Loading trend data...
-          </div>
+          /* Shaped like the plot area it replaces, so the card keeps its height. */
+          <SkeletonBlock width="100%" height={220} radius="8px" />
         ) : leadsOverTime.length === 0 ? (
           <div
             className={styles.chartState}

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Building2, Phone, DollarSign, Eye, EyeOff } from 'lucide-react';
+import { Building2, Phone, DollarSign, Eye, EyeOff } from '@omniremit/ui/icons';
 import type { CorporateProfile, ContactDetail } from '../types/api';
 import { maskPhone, maskTIN } from '../utils/masking';
 import { api } from '../services/api';

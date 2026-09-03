@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home } from 'lucide-react';
+import { Home } from '@omniremit/ui/icons';
 import { useLeadStore } from '../../../store/useLeadStore';
 import { SearchableDropdown } from '../../common/SearchableDropdown';
 import { isFieldVisible, isFieldRequired, isFieldEditable, getFieldLabel } from '../../../config/fieldControlRegistry';

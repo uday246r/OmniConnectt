@@ -122,9 +122,16 @@
   --omni-space-8: 48px;
 
   /* ---- Radius scale ---- */
+  --omni-radius-xs: 4px;
+  --omni-radius-xs-plus: 5px;
+  --omni-radius-sm-minus: 7px;
   --omni-radius-sm: 6px;
   --omni-radius-md: 8px;
+  --omni-radius-md-plus: 9px;
+  --omni-radius-lg-minus: 10px;
   --omni-radius-lg: 12px;
+  --omni-radius-lg-plus: 14px;
+  --omni-radius-circle: 50%;
   --omni-radius-xl: 16px;
   --omni-radius-pill: 999px;
 
@@ -135,11 +142,31 @@
 
   /* ---- Typography ---- */
   --omni-font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  /* One monospace stack. Three different ones were in use — host, lead and customer360 each had
+     their own — so identifiers and codes rendered differently in each app. */
+  --omni-font-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+  /*
+   * Dense steps between 9.5px and 22px. These mirror packages/ui/src/tokens/tokens.css exactly —
+   * the host defines its own copy of the scale, so a token added there is UNDEFINED here until it
+   * is added here too, and `var()` on an undefined custom property silently drops the declaration.
+   * That is how avatars and status dots briefly rendered as squares: `border-radius:
+   * var(--omni-radius-circle)` resolved to nothing.
+   */
+  --omni-font-size-3xs: 9.5px;
+  --omni-font-size-2xs: 10px;
+  --omni-font-size-2xs-plus: 10.5px;
+  --omni-font-size-xs-minus: 11px;
+  --omni-font-size-xs-plus: 11.5px;
   --omni-font-size-xs: 12px;
+  --omni-font-size-sm-minus: 12.5px;
   --omni-font-size-sm: 13px;
+  --omni-font-size-sm-plus: 13.5px;
   --omni-font-size-md: 14px;
+  --omni-font-size-md-plus: 15px;
   --omni-font-size-lg: 16px;
+  --omni-font-size-lg-plus: 18px;
   --omni-font-size-xl: 20px;
+  --omni-font-size-xl-plus: 22px;
   --omni-font-size-2xl: 28px;
   --omni-font-weight-regular: 400;
   --omni-font-weight-medium: 500;

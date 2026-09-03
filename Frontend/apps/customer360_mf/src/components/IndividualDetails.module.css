@@ -6,5 +6,5 @@
 .stack {
   display: flex;
   flex-direction: column;
-  gap: 12;
+  gap: 12px;
 }

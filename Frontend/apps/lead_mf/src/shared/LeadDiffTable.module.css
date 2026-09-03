@@ -26,8 +26,8 @@
 /* The value cells are monospaced so a changed character is visible at a glance — the whole point of
    showing the two side by side. */
 .valueCell {
-  font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace;
-  font-size: 11.5px;
+  font-family: var(--omni-font-mono);
+  font-size: var(--omni-font-size-xs-plus);
   width: 37.5%;
 }
 

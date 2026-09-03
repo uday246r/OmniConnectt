@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { Settings, Eye, EyeOff, Save, RefreshCw, GripVertical, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Settings, Eye, EyeOff, Save, RefreshCw, GripVertical, AlertCircle, CheckCircle2 } from '@omniremit/ui/icons';
 import { api } from '../services/api';
 import { isApprovalPending } from '../types/api';
 import type { FieldConfig, FieldConfigProfileType, MaskingRule } from '../types/api';
-import { Button, Checkbox, DataTable, PageHeader, Select } from '@omniremit/ui';
+import { Button, Checkbox, DataTable, PageHeader, Select, TableSkeleton } from '@omniremit/ui';
 import styles from './FieldSettings.module.css';
 import cc from '../shared/c360Common.module.css';
 
@@ -150,10 +150,16 @@ export default function FieldSettings() {
       </div>
 
       {loading ? (
-        <div className={`loading-overlay ${styles.box}`}>
-          <div className={`spinner ${styles.text}`}></div>
-          <p>Loading field settings…</p>
-        </div>
+        <DataTable minWidth={880}>
+            <thead>
+              <tr>
+                {Array.from({ length: 9 }, (_, i) => (
+                  <th key={i}>&nbsp;</th>
+                ))}
+              </tr>
+            </thead>
+            <TableSkeleton rows={8} columns={9} />
+          </DataTable>
       ) : (
         sections.map(({ section, fields: sectionFields }) => (
           <section className={styles.section} key={section}>

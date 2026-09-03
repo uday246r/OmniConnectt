@@ -1,6 +1,7 @@
 import React from 'react';
 import { useInteractionStore } from '../store/interactionStore';
-import { X, FileText, User, ShieldAlert } from 'lucide-react';
+import { FileText, User, ShieldAlert } from '@omniremit/ui/icons';
+import { Drawer } from '@omniremit/ui';
 import { formatValue } from '../shared/formatValue';
 
 export default function CaseDetailsModal() {
@@ -10,21 +11,14 @@ export default function CaseDetailsModal() {
 
   // "-" is a display-only fallback for a missing value — never a sample/demo value.
   return (
-    <div className="drawer-overlay" onClick={closeCaseModal}>
-      <div className="drawer-content" onClick={(e) => e.stopPropagation()}>
-        {/* Drawer Header */}
-        <div className="drawer-header blue-header">
-          <div className="drawer-title-text">
-            <h3>Case Details</h3>
-            <p>Complete Case Information</p>
-          </div>
-          <button className="drawer-close-btn" onClick={closeCaseModal}>
-            <X size={18} />
-          </button>
-        </div>
-
-        {/* Drawer Body */}
-        <div className="drawer-body">
+    <Drawer
+      open={modalOpen}
+      onClose={closeCaseModal}
+      title="Case Details"
+      subtitle="Complete Case Information"
+      icon={<FileText size={20} />}
+    >
+      <div className="drawer-body">
           {/* Section 1: Case Overview */}
           <div className="drawer-section">
             <div className="drawer-section-title">
@@ -90,8 +84,7 @@ export default function CaseDetailsModal() {
               </div>
             </div>
           </div>
-        </div>
       </div>
-    </div>
+    </Drawer>
   );
 }

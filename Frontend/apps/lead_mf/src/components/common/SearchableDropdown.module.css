@@ -35,7 +35,7 @@
   padding: 12px;
   text-align: center;
   color: var(--omni-color-text-secondary);
-  font-size: 13px;
+  font-size: var(--omni-font-size-sm);
 }
 
 .optionMeta {
@@ -92,7 +92,7 @@
  */
 .option {
   padding: var(--omni-space-2) 14px;
-  font-size: 13.5px;
+  font-size: var(--omni-font-size-sm-plus);
   cursor: pointer;
   display: flex;
   align-items: center;

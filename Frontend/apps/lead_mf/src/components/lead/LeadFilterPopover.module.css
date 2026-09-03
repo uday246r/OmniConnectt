@@ -26,7 +26,9 @@
   border-radius: var(--omni-radius-xl);
   box-shadow: 0 12px 32px -4px rgba(15, 23, 42, 0.18), 0 4px 12px rgba(0, 0, 0, 0.06);
   border: 1px solid var(--omni-color-border);
-  width: 520px;
+  /* Never wider than the viewport. At a fixed 520px this popover overflowed any screen under
+     ~560px, and the file had no media query to rescue it. `min()` needs no breakpoint. */
+  width: min(520px, calc(100vw - 24px));
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -70,7 +72,7 @@
   background: transparent;
   color: var(--text-secondary);
   font-weight: var(--omni-font-weight-medium);
-  font-size: 13.5px;
+  font-size: var(--omni-font-size-sm-plus);
   font-family: inherit;
   cursor: pointer;
   text-align: left;
@@ -108,7 +110,7 @@
 .tabDot {
   width: 7px;
   height: 7px;
-  border-radius: 50%;
+  border-radius: var(--omni-radius-circle);
   background: var(--omni-color-primary-600);
   flex-shrink: 0;
 }
@@ -216,7 +218,7 @@
 }
 
 .fieldLabel {
-  font-size: 12.5px;
+  font-size: var(--omni-font-size-sm-minus);
   color: var(--omni-color-text-secondary);
   font-weight: var(--omni-font-weight-medium);
 }
@@ -226,7 +228,7 @@
   padding: 9px var(--omni-space-3);
   border-radius: var(--omni-radius-md);
   border: 1px solid var(--omni-color-border-strong);
-  font-size: 13.5px;
+  font-size: var(--omni-font-size-sm-plus);
   font-family: inherit;
   color: var(--omni-color-text-primary);
   outline: none;
@@ -260,7 +262,7 @@
 
 .activeBarLabel {
   flex-shrink: 0;
-  font-size: 10.5px;
+  font-size: var(--omni-font-size-2xs-plus);
   font-weight: var(--omni-font-weight-bold);
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -284,7 +286,7 @@
   border-radius: var(--omni-radius-pill);
   background: var(--omni-color-primary-50);
   border: 1px solid #bfdbfe; /* not in scale — matches the host's active-filter border */
-  font-size: 11.5px;
+  font-size: var(--omni-font-size-xs-plus);
   line-height: 18px;
 }
 
@@ -309,7 +311,7 @@
   flex-shrink: 0;
   padding: 0;
   border: none;
-  border-radius: 50%;
+  border-radius: var(--omni-radius-circle);
   background: transparent;
   color: var(--omni-color-primary-700);
   cursor: pointer;

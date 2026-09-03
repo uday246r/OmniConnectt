@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Button, Drawer } from '@omniremit/ui';
+import { Button, Card, Drawer, getInitials } from '@omniremit/ui';
 import drawerLayout from '../../shared/drawerLayout.module.css';
 import styles from './LeadDetailsDrawer.module.css';
 import {
@@ -27,7 +27,7 @@ import {
   Shield,
   Hash,
   Sparkles,
-} from 'lucide-react';
+} from '@omniremit/ui/icons';
 import { useLeadStore } from '../../store/useLeadStore';
 import { isFieldVisible, getFieldLabel, type LeadFieldConfig } from '../../config/fieldControlRegistry';
 import { applyMaskingRule, hasRevealableValue } from '../../utils/fieldMasking';
@@ -68,15 +68,6 @@ const formatConsent = (val?: string | null): string => {
   if (v === 'DO_NOT_CONSENT') return 'Did not consent to marketing & promotional activities';
   return val;
 };
-
-const getInitials = (name: string): string => {
-  const parts = (name || '').split(' ').filter((p) => !['bin', 'binti', 'a/l', 'a/p'].includes(p.toLowerCase()));
-  if (parts.length >= 2) {
-    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-  }
-  return parts[0]?.substring(0, 2).toUpperCase() || '??';
-};
-
 export const LeadDetailsDrawer: React.FC = () => {
   const { selectedLead, isDetailsDrawerOpen, closeDetailsDrawer, fieldConfig } = useLeadStore();
   const [revealed, setRevealed] = useState<Record<string, boolean>>({});
@@ -143,7 +134,7 @@ export const LeadDetailsDrawer: React.FC = () => {
     iconTone = 'primary',
     fullWidth = false,
     copyable = false,
-    valueStyle,
+    mono = false,
   }: {
     apiField: string;
     label: string;
@@ -152,7 +143,8 @@ export const LeadDetailsDrawer: React.FC = () => {
     iconTone?: 'primary' | 'neutral' | 'purple' | 'success' | 'amber';
     fullWidth?: boolean;
     copyable?: boolean;
-    valueStyle?: React.CSSProperties;
+    /** Render the value in the platform monospace face (identifiers, account numbers). */
+    mono?: boolean;
   }) {
     if (!isFieldVisible(fieldConfig, apiField)) return null;
 
@@ -185,8 +177,7 @@ export const LeadDetailsDrawer: React.FC = () => {
         <div className="lead-field-body">
           <span className="lead-field-label">{getFieldLabel(fieldConfig, apiField, label)}</span>
           <div
-            className={`lead-field-value ${styles.valueRow}`}
-            style={valueStyle}
+            className={`lead-field-value ${styles.valueRow} ${mono ? styles.monoValue : ''}`}
           >
             <span className={styles.wrapAnywhere}>{displayValue}</span>
             <div className={styles.inlineChip}>
@@ -351,7 +342,7 @@ export const LeadDetailsDrawer: React.FC = () => {
                 icon={Key}
                 iconTone="purple"
                 copyable
-                valueStyle={{ fontFamily: "'SF Mono', 'Fira Code', monospace" }}
+                mono
               />
               <FieldCard
                 apiField="phoneNumber"
@@ -401,7 +392,7 @@ export const LeadDetailsDrawer: React.FC = () => {
                 icon={Building}
                 iconTone="primary"
               />
-              <div className="lead-field-card">
+              <Card size="sm" row>
                 <span className="lead-field-icon lead-field-icon-purple">
                   <Calendar size={15} />
                 </span>
@@ -409,7 +400,7 @@ export const LeadDetailsDrawer: React.FC = () => {
                   <span className="lead-field-label">Submission Date</span>
                   <span className="lead-field-value">{selectedLead.createdDate || '—'}</span>
                 </div>
-              </div>
+              </Card>
             </div>
           </section>
 
@@ -421,7 +412,7 @@ export const LeadDetailsDrawer: React.FC = () => {
                 Product Specific Details
               </h3>
               <div className="lead-field-grid-2">
-                <div className="lead-field-card">
+                <Card size="sm" row>
                   <span className="lead-field-icon">
                     <Package size={15} />
                   </span>
@@ -431,7 +422,7 @@ export const LeadDetailsDrawer: React.FC = () => {
                       {formatVal(selectedLead.product)}
                     </span>
                   </div>
-                </div>
+                </Card>
 
                 {isHomeFinancing && (
                   <>

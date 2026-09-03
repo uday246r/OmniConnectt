@@ -6,7 +6,7 @@ import { HomeFinancingFields } from './ProductSpecificFields/HomeFinancingFields
 import { MicrofinanceFields } from './ProductSpecificFields/MicrofinanceFields';
 import { DeclarationConsentSection } from './DeclarationConsentSection';
 import { useLeadStore } from '../../store/useLeadStore';
-import { Loader2, CheckCircle2 } from 'lucide-react';
+import { Loader2, CheckCircle2 } from '@omniremit/ui/icons';
 import styles from './LeadFormContainer.module.css';
 import { Button } from '@omniremit/ui';
 

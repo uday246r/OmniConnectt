@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Trash2, ArrowLeft } from 'lucide-react';
+import { Trash2, ArrowLeft } from '@omniremit/ui/icons';
 import { Button, Drawer } from '@omniremit/ui';
 import { useLeadStore } from '../../store/useLeadStore';
 import drawerLayout from '../../shared/drawerLayout.module.css';

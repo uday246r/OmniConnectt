@@ -58,35 +58,35 @@
   border-radius: var(--omni-radius-pill);
   background: var(--pill-bg);
   color: var(--pill-text);
-  font-size: 11.5px;
+  font-size: var(--omni-font-size-xs-plus);
   font-weight: var(--omni-font-weight-semibold);
 }
 
 .statusDot {
   width: 5px;
   height: 5px;
-  border-radius: 50%;
+  border-radius: var(--omni-radius-circle);
   background: var(--pill-dot);
   flex-shrink: 0;
 }
 
 /* Monospaced identifier (account number, reference, IP). */
 .monoValue {
-  font-family: 'SF Mono', 'Fira Code', ui-monospace, monospace;
+  font-family: var(--omni-font-mono);
   color: var(--omni-color-text-primary);
   font-weight: var(--omni-font-weight-medium);
 }
 
 .monoAccent {
-  font-family: 'SF Mono', 'Fira Code', ui-monospace, monospace;
+  font-family: var(--omni-font-mono);
   font-weight: var(--omni-font-weight-semibold);
   color: var(--omni-color-primary-600);
 }
 
 .monoMeta {
-  font-size: 11.5px;
+  font-size: var(--omni-font-size-xs-plus);
   color: var(--omni-color-text-secondary);
-  font-family: 'SF Mono', 'Fira Code', ui-monospace, monospace;
+  font-family: var(--omni-font-mono);
 }
 
 /*

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Layers, UserPlus, Sparkles } from 'lucide-react';
+import { Layers, UserPlus, Sparkles } from '@omniremit/ui/icons';
 import { Button, PageHeader } from '@omniremit/ui';
 import { TimeRangeFilterDropdown } from './TimeRangeFilterDropdown';
 import { useLeadStore } from '../../store/useLeadStore';

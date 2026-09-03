@@ -8,7 +8,6 @@ import { PendingApprovalDialog } from '../../features/approvals/components/Pendi
 import { remoteAppsApi, type RemoteAppDto } from '../../features/settings-applications/api/remoteAppsApi'
 import { useSettingsDrawerStore } from '../../shared/stores/settingsDrawerStore'
 import { Icon } from '../../shared/components/Icon/Icon'
-import { Switch } from '../../shared/components/Switch/Switch'
 import { SkeletonBlock } from '../../shared/components/Skeleton'
 import { resolveIcon } from '../../shared/components/Icon/resolveIcon'
 import { groupsFromCatalog, columnsForRows } from '../../shared/permissions/catalog'
@@ -16,6 +15,7 @@ import { toast } from '../../shared/stores/toastStore'
 import { LIMITS, required, maxLength, firstError, isValid, type FieldErrors } from '../../shared/validation/rules'
 import styles from './RoleFormLayer.module.css'
 import { TOPICS, invalidate } from '../../shared/stores/invalidationStore'
+import { Switch } from '@omniremit/ui'
 
 interface RoleFormLayerProps {
   roleId?: string

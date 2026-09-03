@@ -16,9 +16,6 @@ importers:
       '@omniremit/ui':
         specifier: workspace:*
         version: link:../../packages/ui
-      lucide-react:
-        specifier: ^1.31.0
-        version: 1.32.0(react@19.2.8)
       react:
         specifier: ^19.2.8
         version: 19.2.8
@@ -117,14 +114,11 @@ importers:
       '@omniremit/ui':
         specifier: workspace:*
         version: link:../../packages/ui
-      lucide-react:
-        specifier: ^1.16.0
-        version: 1.32.0(react@19.2.8)
       react:
-        specifier: ^19.0.0
+        specifier: ^19.2.8
         version: 19.2.8
       react-dom:
-        specifier: ^19.0.0
+        specifier: ^19.2.8
         version: 19.2.8(react@19.2.8)
       recharts:
         specifier: ^3.10.1
@@ -140,10 +134,10 @@ importers:
         specifier: ^22.10.0
         version: 22.20.1
       '@types/react':
-        specifier: ^19.0.0
+        specifier: ^19.2.18
         version: 19.2.18
       '@types/react-dom':
-        specifier: ^19.0.0
+        specifier: ^19.2.4
         version: 19.2.4(@types/react@19.2.18)
       '@vitejs/plugin-react':
         specifier: ^4.3.4
@@ -165,6 +159,9 @@ importers:
 
   packages/ui:
     dependencies:
+      lucide-react:
+        specifier: ^1.31.0
+        version: 1.32.0(react@19.2.8)
       react:
         specifier: ^19.2.0
         version: 19.2.8

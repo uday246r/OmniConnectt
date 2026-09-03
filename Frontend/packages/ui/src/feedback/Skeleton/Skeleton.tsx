@@ -102,3 +102,50 @@ export function SkeletonTable({ rows = 5, columns = 4, className }: SkeletonTabl
     </div>
   )
 }
+
+export interface TableSkeletonProps {
+  /** Number of placeholder rows. Match the table's page size so nothing shifts when data lands. */
+  rows?: number
+  /** Number of columns, or per-column widths (`'40%'`, `120`) for a closer shape match. */
+  columns: number | Array<string | number>
+  /** Set when the table renders a leading expander column, so the skeleton reserves it too. */
+  leadingExpander?: boolean
+}
+
+/**
+ * Loading rows for a real `<table>`.
+ *
+ * Renders `<tr>/<td>` INSIDE the caller's `<DataTable>`, so the header, column widths, row height,
+ * padding and borders are the table's own — the placeholder occupies exactly the space the data
+ * will. `SkeletonTable` above draws a standalone grid of divs, which is right for a card but cannot
+ * line up with a table it is not part of.
+ *
+ * This exists because the remotes replaced their tables with a centred spinner and the words
+ * "Loading…" while loading: the page collapsed to one line, then snapped back to full height when
+ * data arrived. The host never did that — it has always drawn shape-matched skeletons — which is
+ * why loading felt worse in the remotes.
+ */
+export function TableSkeleton({ rows = 5, columns, leadingExpander }: TableSkeletonProps) {
+  const widths = typeof columns === 'number' ? Array.from({ length: columns }, () => undefined) : columns
+
+  return (
+    <tbody aria-busy="true">
+      {Array.from({ length: rows }, (_, r) => (
+        <tr key={r}>
+          {leadingExpander && (
+            <td>
+              <SkeletonBlock width={16} height={16} radius="4px" />
+            </td>
+          )}
+          {widths.map((w, c) => (
+            <td key={c}>
+              {/* First column carries the row's identity, so it reads a little wider — the same
+                  weighting SkeletonTable uses for its lead cell. */}
+              <SkeletonBlock width={w ?? (c === 0 ? '70%' : '55%')} height={14} radius="4px" />
+            </td>
+          ))}
+        </tr>
+      ))}
+    </tbody>
+  )
+}

@@ -11,6 +11,7 @@ import { useSettingsDrawerStore, type SettingsTab } from './shared/stores/settin
 import { RouteFallback } from './shared/components/RouteFallback/RouteFallback'
 import { LoginPage } from './pages/LoginPage/LoginPage'
 import { AppShellSkeleton } from './shared/components/AppShellSkeleton/AppShellSkeleton'
+import { PageSkeleton } from './shared/components/PageSkeleton/PageSkeleton'
 import { lazyWithPreload, preloadWhenIdle } from './shared/utils/lazyWithPreload'
 
 /**
@@ -258,13 +259,15 @@ function AuthenticatedShell() {
  * <Suspense><Outlet /></Suspense>, and page <Route>s are nested inside a
  * <Route element={<AuthenticatedPagesLayout />}> so RR6 sees only valid Route children.
  *
- * The AppShellSkeleton fallback matches the shape shown by RequireAuth during hydration
- * (sidebar + topbar + stat-card grid), so there is no visible layout jump if a page
- * chunk hasn't resolved by the time hydration finishes.
+ * The fallback is PageSkeleton, NOT AppShellSkeleton. This boundary sits inside AuthenticatedShell,
+ * so the real Sidebar and Topbar are already mounted by the time a page chunk is loading — using the
+ * shell skeleton here painted a second, fake sidebar and navbar inside the content area, on top of
+ * the real ones. PageSkeleton draws only what the page itself owns: banner, stat cards, toolbar,
+ * table.
  */
 function AuthenticatedPagesLayout() {
   return (
-    <Suspense fallback={<AppShellSkeleton />}>
+    <Suspense fallback={<PageSkeleton />}>
       <Outlet />
     </Suspense>
   )
@@ -327,10 +330,10 @@ function AppRoutes() {
           the correct solution: this Route renders AuthenticatedPagesLayout (which renders
           <Suspense><Outlet /></Suspense>), and all page routes are nested inside it.
 
-          The fallback is AppShellSkeleton — the same shaped skeleton (sidebar + topbar +
-          stat-card grid) shown by RequireAuth during hydration. If a page chunk isn't ready
-          when RequireAuth finishes, the user sees the same visual continuously rather than
-          the bare RouteFallback straight-line boxes that were appearing before.
+          The fallback is PageSkeleton, which draws only the page's own content (banner, stat
+          cards, toolbar, table). It must NOT be AppShellSkeleton: this boundary renders inside
+          AuthenticatedShell, so the real Sidebar and Topbar are already on screen and the shell
+          skeleton painted a duplicate fake sidebar and navbar inside the content area.
         */}
         <Route element={<AuthenticatedPagesLayout />}>
           <Route index element={<DashboardPage />} />

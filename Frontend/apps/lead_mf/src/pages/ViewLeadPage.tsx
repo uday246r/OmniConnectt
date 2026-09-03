@@ -11,8 +11,8 @@ import {
   ChevronRight,
   FolderKanban,
   X,
-} from 'lucide-react';
-import { Button, ColumnFilter, DataTable, EmptyState, FilterBar, PageHeader, Pagination, RowsPerPage, SearchField, type ActiveFilter } from '@omniremit/ui';
+} from '@omniremit/ui/icons';
+import { Button, ColumnFilter, DataTable, EmptyState, FilterBar, PageHeader, Pagination, ResponsiveRows, RowsPerPage, SearchField, getInitials, type ActiveFilter } from '@omniremit/ui';
 import { useLeadStore } from '../store/useLeadStore';
 import styles from './ViewLeadPage.module.css';
 import shell from '../shared/leadPage.module.css';
@@ -45,15 +45,6 @@ const AVATAR_COLORS = [
   { bg: '#fdf2f8', text: '#be185d', border: '#fbcfe8' },
   { bg: '#f0fdfa', text: '#0f766e', border: '#99f6e4' },
 ];
-
-const getInitials = (name: string): string => {
-  if (!name) return '??';
-  const parts = name.trim().split(/\s+/).filter((p) => !['bin', 'binti', 'a/l', 'a/p'].includes(p.toLowerCase()));
-  if (parts.length >= 2) {
-    return (parts[0][0] + parts[1][0]).toUpperCase();
-  }
-  return name.slice(0, 2).toUpperCase();
-};
 
 /* Column key -> the name shown on its filter chip. */
 const TOOLBAR_FILTER_LABELS: { field: string; label: string }[] = [
@@ -233,14 +224,7 @@ export const ViewLeadPage: React.FC = () => {
         </div>
 
         {/* Table Content */}
-        {isLoadingLeads ? (
-          <div className={shell.loadingRow}>
-            <div className={shell.loadingInner}>
-              <RefreshCw size={18} className={`animate-spin ${shell.loadingSpinner}`} />
-              <span>Loading lead records from database...</span>
-            </div>
-          </div>
-        ) : leads.length === 0 ? (
+        {!isLoadingLeads && leads.length === 0 ? (
           <EmptyState
             icon={<FolderKanban size={32} />}
             title="No leads found"
@@ -251,192 +235,218 @@ export const ViewLeadPage: React.FC = () => {
             }
           />
         ) : (
-          <DataTable bare minWidth={780}>
-              <thead>
-                <tr>
-                  <ColumnFilter
-                    label="Customer Details"
-                    title="Filter Name"
-                    value={columnValue('name')}
-                    onChange={(v) => setColumnFilter('name', v)}
-                    options={[]}
-                    allLabel={undefined}
-                    freeText
-                    searchPlaceholder="Type a customer name…"
-                    emptyHint="Press Enter to filter by name."
-                  />
-                  <ColumnFilter
-                    label="IC Number"
-                    title="Filter IC Number"
-                    value={columnValue('icNumber')}
-                    onChange={(v) => setColumnFilter('icNumber', v)}
-                    options={[]}
-                    allLabel={undefined}
-                    freeText
-                    searchPlaceholder="Type an IC number…"
-                    emptyHint="Press Enter to filter by IC number."
-                  />
-                  <ColumnFilter
-                    label="Contact"
-                    title="Filter Phone"
-                    value={columnValue('phone')}
-                    onChange={(v) => setColumnFilter('phone', v)}
-                    options={[]}
-                    allLabel={undefined}
-                    freeText
-                    searchPlaceholder="Type a phone number…"
-                    emptyHint="Press Enter to filter by phone."
-                  />
-                  <ColumnFilter
-                    label="Product"
-                    value={columnValue('product')}
-                    onChange={(v) => setColumnFilter('product', v)}
-                    options={toOptions(products)}
-                    allLabel="All Products"
-                    searchable={products.length > 10}
-                  />
-                  <ColumnFilter
-                    label="Branch"
-                    value={columnValue('branch')}
-                    onChange={(v) => setColumnFilter('branch', v)}
-                    options={toOptions(branches)}
-                    allLabel="All Branches"
-                    searchable={branches.length > 10}
-                  />
-                  <ColumnFilter
-                    label="Created Date"
-                    title="Created On or After"
-                    value={columnValue('createdFrom')}
-                    onChange={(v) => setColumnFilter('createdFrom', v)}
-                    options={[]}
-                    allLabel={undefined}
-                    freeText
-                    searchPlaceholder="YYYY-MM-DD"
-                    emptyHint="Enter a date, then press Enter."
-                  />
-                  <th className={styles.thRight}>
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {leads.map((lead, idx) => {
-                  const initials = getInitials(lead.name);
-                  const avatarColor = AVATAR_COLORS[idx % AVATAR_COLORS.length];
-
-                  return (
-                    <tr key={lead.id} id={`lead-row-${lead.id}`}>
-                      {/* Customer — avatar + name only, no ID badge */}
-                      <td>
-                        <div className={styles.customerCell}>
-                          {/* Avatar palette is chosen per row from AVATAR_COLORS, so the three
-                              colours arrive as CSS custom properties; the declarations that use
-                              them live in ViewLeadPage.module.css. */}
-                          <div
-                            className={styles.avatar}
-                            style={
-                              {
-                                '--lead-avatar-bg': avatarColor.bg,
-                                '--lead-avatar-text': avatarColor.text,
-                                '--lead-avatar-border': avatarColor.border,
-                              } as React.CSSProperties
-                            }
-                          >
-                            {initials}
-                          </div>
-                          {/* Only the customer name — ID removed per user request */}
-                          <span className={styles.customerName}>{lead.name}</span>
+          <DataTable bare>
+            <ResponsiveRows
+              rows={leads}
+              rowKey={(lead) => String(lead.id)}
+              rowId={(lead) => `lead-row-${lead.id}`}
+              loading={isLoadingLeads}
+              loadingRows={pageSize}
+              columns={[
+                {
+                  key: 'name',
+                  label: 'Customer Details',
+                  priority: 'always',
+                  header: (
+                    <ColumnFilter
+                      key="name"
+                      label="Customer Details"
+                      title="Filter Name"
+                      value={columnValue('name')}
+                      onChange={(v) => setColumnFilter('name', v)}
+                      options={[]}
+                      allLabel={undefined}
+                      freeText
+                      searchPlaceholder="Type a customer name…"
+                      emptyHint="Press Enter to filter by name."
+                    />
+                  ),
+                  render: (lead, idx) => {
+                    const avatarColor = AVATAR_COLORS[idx % AVATAR_COLORS.length];
+                    return (
+                      <div className={styles.customerCell}>
+                        {/* Avatar palette is chosen per row from AVATAR_COLORS, so the three
+                            colours arrive as CSS custom properties; the declarations that use
+                            them live in ViewLeadPage.module.css. */}
+                        <div
+                          className={styles.avatar}
+                          style={
+                            {
+                              '--lead-avatar-bg': avatarColor.bg,
+                              '--lead-avatar-text': avatarColor.text,
+                              '--lead-avatar-border': avatarColor.border,
+                            } as React.CSSProperties
+                          }
+                        >
+                          {getInitials(lead.name)}
                         </div>
-                      </td>
+                        <span className={styles.customerName}>{lead.name}</span>
+                      </div>
+                    );
+                  },
+                },
+                {
+                  key: 'icNumber',
+                  label: 'IC Number',
+                  priority: 'high',
+                  header: (
+                    <ColumnFilter
+                      key="icNumber"
+                      label="IC Number"
+                      title="Filter IC Number"
+                      value={columnValue('icNumber')}
+                      onChange={(v) => setColumnFilter('icNumber', v)}
+                      options={[]}
+                      allLabel={undefined}
+                      freeText
+                      searchPlaceholder="Type an IC number…"
+                      emptyHint="Press Enter to filter by IC number."
+                    />
+                  ),
+                  /* Masked per Field Settings when the field is marked Sensitive. */
+                  render: (lead) =>
+                    isFieldVisible(commonFieldConfig, 'icNumber') ? (
+                      <div className={styles.monoValue}>
+                        {renderMaskedCell(commonFieldConfig, 'icNumber', lead.icNumber)}
+                      </div>
+                    ) : null,
+                },
+                {
+                  key: 'phone',
+                  label: 'Contact',
+                  priority: 'high',
+                  header: (
+                    <ColumnFilter
+                      key="phone"
+                      label="Contact"
+                      title="Filter Phone"
+                      value={columnValue('phone')}
+                      onChange={(v) => setColumnFilter('phone', v)}
+                      options={[]}
+                      allLabel={undefined}
+                      freeText
+                      searchPlaceholder="Type a phone number…"
+                      emptyHint="Press Enter to filter by phone."
+                    />
+                  ),
+                  render: (lead) =>
+                    isFieldVisible(commonFieldConfig, 'phoneNumber') ? (
+                      <div className={styles.strongValue}>{formatPhone(lead.phone)}</div>
+                    ) : null,
+                },
+                {
+                  key: 'product',
+                  label: 'Product',
+                  priority: 'low',
+                  header: (
+                    <ColumnFilter
+                      key="product"
+                      label="Product"
+                      value={columnValue('product')}
+                      onChange={(v) => setColumnFilter('product', v)}
+                      options={toOptions(products)}
+                      allLabel="All Products"
+                      searchable={products.length > 10}
+                    />
+                  ),
+                  render: (lead) => <div className={styles.productValue}>{lead.product}</div>,
+                },
+                {
+                  key: 'branch',
+                  label: 'Branch',
+                  priority: 'low',
+                  header: (
+                    <ColumnFilter
+                      key="branch"
+                      label="Branch"
+                      value={columnValue('branch')}
+                      onChange={(v) => setColumnFilter('branch', v)}
+                      options={toOptions(branches)}
+                      allLabel="All Branches"
+                      searchable={branches.length > 10}
+                    />
+                  ),
+                  render: (lead) =>
+                    isFieldVisible(commonFieldConfig, 'branch') ? (
+                      <div className={styles.strongValue}>{lead.branch || 'Not Assigned'}</div>
+                    ) : null,
+                },
+                {
+                  key: 'createdDate',
+                  label: 'Created Date',
+                  priority: 'low',
+                  header: (
+                    <ColumnFilter
+                      key="createdFrom"
+                      label="Created Date"
+                      title="Created On or After"
+                      value={columnValue('createdFrom')}
+                      onChange={(v) => setColumnFilter('createdFrom', v)}
+                      options={[]}
+                      allLabel={undefined}
+                      freeText
+                      searchPlaceholder="YYYY-MM-DD"
+                      emptyHint="Enter a date, then press Enter."
+                    />
+                  ),
+                  render: (lead) => <span className={styles.dateCell}>{lead.createdDate}</span>,
+                },
+                {
+                  key: 'actions',
+                  label: 'Actions',
+                  priority: 'always',
+                  align: 'right',
+                  render: (lead) => (
+                    <div className={styles.actions}>
+                      {/* View — text + icon */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openDetailsDrawer(lead);
+                        }}
+                        id={`view-lead-${lead.id}`}
+                        title="View Lead Details"
+                        className={`${styles.rowAction} ${styles.actionView}`}
+                      >
+                        <Eye size={13} />
+                        <span>View</span>
+                      </button>
 
-                      {/* IC Number — masked per Field Settings when the field is marked Sensitive */}
-                      <td>
-                        {isFieldVisible(commonFieldConfig, 'icNumber') && (
-                          <div className={styles.monoValue}>
-                            {renderMaskedCell(commonFieldConfig, 'icNumber', lead.icNumber)}
-                          </div>
-                        )}
-                      </td>
+                      {canEditLead() && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openEditWorkflow(lead);
+                          }}
+                          id={`edit-lead-${lead.id}`}
+                          title="Edit Lead"
+                          className={`${styles.rowAction} ${styles.actionEdit}`}
+                        >
+                          <Edit3 size={14} />
+                        </button>
+                      )}
 
-                      {/* Contact */}
-                      <td>
-                        {isFieldVisible(commonFieldConfig, 'phoneNumber') && (
-                          <div className={styles.strongValue}>{formatPhone(lead.phone)}</div>
-                        )}
-                      </td>
-
-                      {/* Product */}
-                      <td>
-                        <div className={styles.productValue}>{lead.product}</div>
-                      </td>
-
-                      {/* Branch */}
-                      <td>
-                        {isFieldVisible(commonFieldConfig, 'branch') && (
-                          <div className={styles.strongValue}>{lead.branch || 'Not Assigned'}</div>
-                        )}
-                      </td>
-
-                      {/* Created Date */}
-                      <td className={styles.dateCell}>
-                        {lead.createdDate}
-                      </td>
-
-                      {/* Action Buttons */}
-                      <td className={styles.actionsCellTd}>
-                        <div className={styles.actions}>
-                          {/* View — text + icon */}
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              openDetailsDrawer(lead);
-                            }}
-                            id={`view-lead-${lead.id}`}
-                            title="View Lead Details"
-                            className={`${styles.rowAction} ${styles.actionView}`}
-                          >
-                            <Eye size={13} />
-                            <span>View</span>
-                          </button>
-
-                          {/* Edit */}
-                          {canEditLead() && (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                openEditWorkflow(lead);
-                              }}
-                              id={`edit-lead-${lead.id}`}
-                              title="Edit Lead"
-                              className={`${styles.rowAction} ${styles.actionEdit}`}
-                            >
-                              <Edit3 size={14} />
-                            </button>
-                          )}
-
-                          {/* Delete */}
-                          {canDeleteLead() && (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                openDeleteWorkflow(lead);
-                              }}
-                              id={`delete-lead-${lead.id}`}
-                              title="Delete Lead"
-                              className={`${styles.rowAction} ${styles.actionDelete}`}
-                            >
-                              <Trash2 size={14} />
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
+                      {canDeleteLead() && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openDeleteWorkflow(lead);
+                          }}
+                          id={`delete-lead-${lead.id}`}
+                          title="Delete Lead"
+                          className={`${styles.rowAction} ${styles.actionDelete}`}
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      )}
+                    </div>
+                  ),
+                },
+              ]}
+            />
           </DataTable>
         )}
 

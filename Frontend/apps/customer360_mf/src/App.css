@@ -1,7 +1,7 @@
 .counter {
-  font-size: 16px;
+  font-size: var(--omni-font-size-lg);
   padding: 5px 10px;
-  border-radius: 5px;
+  border-radius: var(--omni-radius-xs-plus);
   color: var(--accent);
   background: var(--accent-bg);
   border: 2px solid transparent;
@@ -117,8 +117,8 @@
 
   a {
     color: var(--text-h);
-    font-size: 16px;
-    border-radius: 6px;
+    font-size: var(--omni-font-size-lg);
+    border-radius: var(--omni-radius-sm);
     background: var(--social-bg);
     display: flex;
     padding: 6px 12px;

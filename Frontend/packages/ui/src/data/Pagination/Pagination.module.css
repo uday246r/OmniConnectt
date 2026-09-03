@@ -17,7 +17,7 @@
 
 .summary {
   margin: 0;
-  font-size: 12.5px;
+  font-size: var(--omni-font-size-sm-minus);
   color: var(--omni-color-text-secondary);
 }
 
@@ -40,7 +40,7 @@
 }
 
 .pageSizeLabel {
-  font-size: 12.5px;
+  font-size: var(--omni-font-size-sm-minus);
   color: var(--omni-color-text-secondary);
   white-space: nowrap;
 }
@@ -61,9 +61,9 @@
   gap: 6px;
   background: var(--omni-color-surface);
   border: 1.5px solid var(--omni-color-border);
-  border-radius: 10px;
+  border-radius: var(--omni-radius-lg-minus);
   padding: 7px 14px;
-  font-size: 12.5px;
+  font-size: var(--omni-font-size-sm-minus);
   font-weight: var(--omni-font-weight-semibold);
   color: var(--omni-color-text-secondary);
   cursor: pointer;
@@ -75,7 +75,7 @@
 
 .pageBtn:hover:not(:disabled) {
   background: var(--omni-color-primary-50);
-  border-color: #93c5fd; /* not in scale — the host's exact hover border */
+  border-color: var(--omni-color-primary-300); /* not in scale — the host's exact hover border */
   color: var(--omni-color-primary-600);
   box-shadow: 0 2px 8px rgba(37, 99, 235, 0.15);
 }
@@ -99,7 +99,7 @@
 }
 
 .indicator {
-  font-size: 12.5px;
+  font-size: var(--omni-font-size-sm-minus);
   color: var(--omni-color-text-secondary);
   min-width: 92px;
   text-align: center;

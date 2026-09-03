@@ -15,13 +15,13 @@
   padding: 10px 16px;
   background: var(--omni-color-surface);
   border: 1.5px solid #e8edf5; /* not in scale — the host's exact hairline */
-  border-radius: 12px;
-  font-size: 12px;
+  border-radius: var(--omni-radius-lg);
+  font-size: var(--omni-font-size-xs);
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
 }
 
 .label {
-  font-size: 11px;
+  font-size: var(--omni-font-size-xs-minus);
   font-weight: var(--omni-font-weight-bold);
   color: var(--omni-color-text-secondary);
   text-transform: uppercase;
@@ -35,9 +35,9 @@
   max-width: 280px;
   background: var(--omni-color-primary-50);
   border: 1px solid #bfdbfe;
-  border-radius: 8px;
+  border-radius: var(--omni-radius-md);
   padding: 4px 10px;
-  font-size: 11.5px;
+  font-size: var(--omni-font-size-xs-plus);
   font-weight: var(--omni-font-weight-semibold);
   color: var(--omni-color-primary-600);
   box-shadow: 0 1px 2px rgba(37, 99, 235, 0.05);
@@ -53,30 +53,30 @@
   background: none;
   border: none;
   padding: 0;
-  color: #60a5fa;
+  color: var(--omni-color-primary-400);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 50%;
+  border-radius: var(--omni-radius-circle);
   flex-shrink: 0;
   transition: color 120ms ease, background 120ms ease;
 }
 
 .chipRemove:hover {
   color: var(--omni-color-primary-700);
-  background: #bfdbfe;
+  background: var(--omni-color-primary-200);
 }
 
 .clearAll {
   background: none;
   border: none;
   color: var(--omni-color-danger-600);
-  font-size: 11.5px;
+  font-size: var(--omni-font-size-xs-plus);
   font-weight: var(--omni-font-weight-bold);
   cursor: pointer;
   padding: 4px 9px;
-  border-radius: 6px;
+  border-radius: var(--omni-radius-sm);
   font-family: inherit;
   margin-left: auto;
   transition: background 120ms ease;

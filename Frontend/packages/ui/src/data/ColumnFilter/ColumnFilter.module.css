@@ -20,8 +20,8 @@
   padding: 12px 16px;
   background: none;
   border: none;
-  font-size: 11px;
-  font-weight: 700;
+  font-size: var(--omni-font-size-xs-minus);
+  font-weight: var(--omni-font-weight-bold);
   color: var(--omni-color-text-secondary);
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -33,7 +33,7 @@
 }
 
 .trigger:hover {
-  color: #1e40af;
+  color: var(--omni-color-info-text);
   background: rgba(37, 99, 235, 0.06);
 }
 
@@ -60,7 +60,7 @@
 .dot {
   width: 6px;
   height: 6px;
-  border-radius: 50%;
+  border-radius: var(--omni-radius-circle);
   background: var(--omni-color-primary-600);
   box-shadow: 0 0 6px rgba(37, 99, 235, 0.6);
   flex-shrink: 0;
@@ -76,7 +76,7 @@
   max-width: 320px;
   background: var(--omni-color-surface);
   border: 1.5px solid var(--omni-color-border);
-  border-radius: 14px;
+  border-radius: var(--omni-radius-lg-plus);
   box-shadow: 0 16px 40px rgba(15, 23, 42, 0.14), 0 2px 8px rgba(15, 23, 42, 0.04);
   padding: 14px;
   display: flex;
@@ -108,20 +108,20 @@
 }
 
 .title {
-  font-size: 12.5px;
-  font-weight: 700;
+  font-size: var(--omni-font-size-sm-minus);
+  font-weight: var(--omni-font-weight-bold);
   color: var(--omni-color-text-primary);
 }
 
 .clearBtn {
-  font-size: 11px;
-  font-weight: 600;
+  font-size: var(--omni-font-size-xs-minus);
+  font-weight: var(--omni-font-weight-semibold);
   color: var(--omni-color-danger-600);
   background: none;
   border: none;
   cursor: pointer;
   padding: 2px 7px;
-  border-radius: 5px;
+  border-radius: var(--omni-radius-xs-plus);
   font-family: inherit;
   transition: background 120ms ease;
 }
@@ -141,9 +141,9 @@
   align-items: center;
   gap: 8px;
   padding: 7px 10px;
-  border-radius: 8px;
-  font-size: 12px;
-  font-weight: 500;
+  border-radius: var(--omni-radius-md);
+  font-size: var(--omni-font-size-xs);
+  font-weight: var(--omni-font-weight-medium);
   color: #334155;
   cursor: pointer;
   transition: all 120ms ease;
@@ -162,7 +162,7 @@
 .itemActive {
   background: var(--omni-color-primary-50);
   color: var(--omni-color-primary-600);
-  font-weight: 700;
+  font-weight: var(--omni-font-weight-bold);
 }
 
 .input {
@@ -170,8 +170,8 @@
   padding: 7px 11px;
   background: var(--omni-color-surface-alt);
   border: 1.5px solid var(--omni-color-border);
-  border-radius: 8px;
-  font-size: 12px;
+  border-radius: var(--omni-radius-md);
+  font-size: var(--omni-font-size-xs);
   color: var(--omni-color-text-primary);
   outline: none;
   font-family: inherit;
@@ -186,7 +186,7 @@
 
 .emptyHint {
   padding: 10px;
-  font-size: 12px;
+  font-size: var(--omni-font-size-xs);
   color: var(--omni-color-text-muted);
   text-align: center;
 }

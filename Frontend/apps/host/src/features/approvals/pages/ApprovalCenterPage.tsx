@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useAuthStore } from '../../auth/store/authStore'
-import { Badge, DataTable, PageHeader, Pagination, RowAction, RowsPerPage, readStoredPageSize, type BadgeTone } from '@omniremit/ui'
+import { Badge, DataTable, EMPTY_VALUE, PageHeader, Pagination, ResponsiveRows, RowAction, RowsPerPage, readStoredPageSize, type BadgeTone } from '@omniremit/ui'
 import { SkeletonBlock } from '../../../shared/components/Skeleton'
 import { ApiError } from '../../../shared/api/httpClient'
 import { useDebouncedValue } from '../../../shared/hooks/useDebouncedValue'
@@ -1063,530 +1063,548 @@ export function ApprovalCenterPage() {
       {/* Table — shared chrome. This page's own `.tableContainer`/`.logTable` were a byte-for-byte
           copy of the Audit Logs pair (only min-width differed), which is exactly the duplication
           @omniremit/ui's DataTable exists to remove. */}
-      <DataTable minWidth={760} reserveHeight>
-          <thead>
-            <tr>
-              {/* REQUESTED */}
-              <th className={styles.thFilterable}>
-                <button
-                  type="button"
-                  className={`${styles.thFilterBtn} ${dateRange !== 'all' ? styles.thFilterBtnActive : ''}`}
-                  onClick={() => setActiveHeaderFilter((c) => (c === 'requested' ? null : 'requested'))}
-                >
-                  <span>REQUESTED</span>
-                  <Icon.ChevronDown width={12} height={12} className={`${styles.filterIcon} ${activeHeaderFilter === 'requested' ? styles.filterIconActive : ''}`} />
-                  {dateRange !== 'all' && <span className={styles.filterDot} />}
-                </button>
-                {activeHeaderFilter === 'requested' && (
-                  <div className={styles.filterPopover}>
-                    <div className={styles.popoverHeader}>
-                      <span className={styles.popoverTitle}>Requested Date</span>
-                      {dateRange !== 'all' && (
-                        <button type="button" className={styles.popoverClearBtn} onClick={() => { setDateRange('all'); setCustomFrom(''); setCustomTo(''); setCustomDraftFrom(''); setCustomDraftTo('') }}>
-                          Reset
-                        </button>
-                      )}
-                    </div>
-                    <div className={styles.popoverList}>
-                      {DATE_RANGES.map((r) => (
-                        <button
-                          key={r.key}
-                          type="button"
-                          className={`${styles.popoverItem} ${dateRange === r.key ? styles.popoverItemActive : ''}`}
-                          onClick={() => { setDateRange(r.key); setActiveHeaderFilter(null) }}
-                        >
-                          <span>{r.label}</span>
-                        </button>
-                      ))}
-                    </div>
-                    <div className={styles.popoverDivider} />
-                    <div className={styles.customDateSection}>
-                      <span className={styles.customDateLabel}>Custom Range</span>
-                      <div className={styles.customDateRow}>
-                        <input
-                          type="date"
-                          className={styles.dateInput}
-                          value={customDraftFrom || customFrom}
-                          onChange={(e) => setCustomDraftFrom(e.target.value)}
-                        />
-                        <span className={styles.rangeSeparator}>to</span>
-                        <input
-                          type="date"
-                          className={styles.dateInput}
-                          value={customDraftTo || customTo}
-                          onChange={(e) => setCustomDraftTo(e.target.value)}
-                        />
-                      </div>
+      <DataTable reserveHeight>
+          <ResponsiveRows
+            rows={items ?? []}
+            rowKey={(r) => String(r.id)}
+            loading={items === null}
+            loadingRows={pageSize}
+            empty="No approval requests found matching the selected filters."
+            columns={[
+                {
+                  key: 'requested',
+                  label: 'REQUESTED',
+                  priority: 'always',
+                  header: (
+                    <th className={styles.thFilterable}>
                       <button
                         type="button"
-                        className={styles.applyDateBtn}
-                        onClick={() => {
-                          setCustomFrom(customDraftFrom)
-                          setCustomTo(customDraftTo)
-                          setDateRange('custom')
-                          setActiveHeaderFilter(null)
-                        }}
+                        className={`${styles.thFilterBtn} ${dateRange !== 'all' ? styles.thFilterBtnActive : ''}`}
+                        onClick={() => setActiveHeaderFilter((c) => (c === 'requested' ? null : 'requested'))}
                       >
-                        Apply Custom Range
+                        <span>REQUESTED</span>
+                        <Icon.ChevronDown width={12} height={12} className={`${styles.filterIcon} ${activeHeaderFilter === 'requested' ? styles.filterIconActive : ''}`} />
+                        {dateRange !== 'all' && <span className={styles.filterDot} />}
                       </button>
-                    </div>
-                  </div>
-                )}
-              </th>
-
-              {/* MODULE */}
-              <th className={styles.thFilterable}>
-                <button
-                  type="button"
-                  className={`${styles.thFilterBtn} ${module ? styles.thFilterBtnActive : ''}`}
-                  onClick={() => setActiveHeaderFilter((c) => (c === 'module' ? null : 'module'))}
-                >
-                  <span>MODULE</span>
-                  <Icon.ChevronDown width={12} height={12} className={`${styles.filterIcon} ${activeHeaderFilter === 'module' ? styles.filterIconActive : ''}`} />
-                  {module && <span className={styles.filterDot} />}
-                </button>
-                {activeHeaderFilter === 'module' && (
-                  <div className={styles.filterPopover}>
-                    <div className={styles.popoverHeader}>
-                      <span className={styles.popoverTitle}>Filter Module</span>
-                      {module && <button type="button" className={styles.popoverClearBtn} onClick={() => { setModule(''); setModuleSearch('') }}>Reset</button>}
-                    </div>
-                    <input
-                      type="text"
-                      className={styles.popoverInput}
-                      placeholder="Type to search module..."
-                      value={moduleSearch}
-                      onChange={(e) => setModuleSearch(e.target.value)}
-                      autoFocus
-                    />
-                    <div className={styles.popoverList}>
-                      <button
-                        type="button"
-                        className={`${styles.popoverItem} ${!module ? styles.popoverItemActive : ''}`}
-                        onClick={() => { setModule(''); setActiveHeaderFilter(null) }}
-                      >
-                        <span>All Modules</span>
-                      </button>
-                      {availableModules.length === 0 ? (
-                        <div className={styles.emptyHint}>No modules matching "{moduleSearch}"</div>
-                      ) : (
-                        availableModules.map((m) => (
-                          <button
-                            key={m.key}
-                            type="button"
-                            className={`${styles.popoverItem} ${module === m.key ? styles.popoverItemActive : ''}`}
-                            onClick={() => { setModule(m.key); setActiveHeaderFilter(null) }}
-                          >
-                            <span>{m.label}</span>
-                          </button>
-                        ))
-                      )}
-                    </div>
-                  </div>
-                )}
-              </th>
-
-              {/* ACTION */}
-              <th className={styles.thFilterable}>
-                <button
-                  type="button"
-                  className={`${styles.thFilterBtn} ${actionFilter ? styles.thFilterBtnActive : ''}`}
-                  onClick={() => setActiveHeaderFilter((c) => (c === 'action' ? null : 'action'))}
-                >
-                  <span>ACTION</span>
-                  <Icon.ChevronDown width={12} height={12} className={`${styles.filterIcon} ${activeHeaderFilter === 'action' ? styles.filterIconActive : ''}`} />
-                  {actionFilter && <span className={styles.filterDot} />}
-                </button>
-                {activeHeaderFilter === 'action' && (
-                  <div className={styles.filterPopover}>
-                    <div className={styles.popoverHeader}>
-                      <span className={styles.popoverTitle}>Filter Action</span>
-                      {actionFilter && <button type="button" className={styles.popoverClearBtn} onClick={() => setActionFilter('')}>Reset</button>}
-                    </div>
-                    <div className={styles.popoverList}>
-                      <button
-                        type="button"
-                        className={`${styles.popoverItem} ${!actionFilter ? styles.popoverItemActive : ''}`}
-                        onClick={() => { setActionFilter(''); setActiveHeaderFilter(null) }}
-                      >
-                        <span>All Actions</span>
-                      </button>
-                      {Object.keys(ACTION_LABELS).map((act) => {
-                        const ActIcon = ACTION_ICONS[act] ?? Icon.Edit
-                        return (
-                          <button
-                            key={act}
-                            type="button"
-                            className={`${styles.popoverItem} ${actionFilter === act ? styles.popoverItemActive : ''}`}
-                            onClick={() => { setActionFilter(act); setActiveHeaderFilter(null) }}
-                          >
-                            <span className={`${styles.actionCell} ${styles[`action_${act}`] ?? ''}`}>
-                              <ActIcon width={13} height={13} />
-                              <span>{ACTION_LABELS[act]}</span>
-                            </span>
-                          </button>
-                        )
-                      })}
-                    </div>
-                  </div>
-                )}
-              </th>
-
-              {/* ENTITY */}
-              <th className={styles.thFilterable}>
-                <button
-                  type="button"
-                  className={`${styles.thFilterBtn} ${entitySearch ? styles.thFilterBtnActive : ''}`}
-                  onClick={() => setActiveHeaderFilter((c) => (c === 'entity' ? null : 'entity'))}
-                >
-                  <span>RECORD</span>
-                  <Icon.ChevronDown width={12} height={12} className={`${styles.filterIcon} ${activeHeaderFilter === 'entity' ? styles.filterIconActive : ''}`} />
-                  {entitySearch && <span className={styles.filterDot} />}
-                </button>
-                {activeHeaderFilter === 'entity' && (
-                  <div className={styles.filterPopover}>
-                    <div className={styles.popoverHeader}>
-                      <span className={styles.popoverTitle}>Search Entity</span>
-                      {entitySearch && <button type="button" className={styles.popoverClearBtn} onClick={() => setEntitySearch('')}>Reset</button>}
-                    </div>
-                    <input
-                      type="text"
-                      className={styles.popoverInput}
-                      placeholder="Filter by entity name/ID..."
-                      value={entitySearch}
-                      onChange={(e) => setEntitySearch(e.target.value)}
-                      autoFocus
-                    />
-                  </div>
-                )}
-              </th>
-
-              {/* MAKER */}
-              <th className={styles.thFilterable}>
-                <button
-                  type="button"
-                  className={`${styles.thFilterBtn} ${makerSearch ? styles.thFilterBtnActive : ''}`}
-                  onClick={() => setActiveHeaderFilter((c) => (c === 'maker' ? null : 'maker'))}
-                >
-                  <span>MAKER</span>
-                  <Icon.ChevronDown width={12} height={12} className={`${styles.filterIcon} ${activeHeaderFilter === 'maker' ? styles.filterIconActive : ''}`} />
-                  {makerSearch && <span className={styles.filterDot} />}
-                </button>
-                {activeHeaderFilter === 'maker' && (
-                  <div className={styles.filterPopover}>
-                    <div className={styles.popoverHeader}>
-                      <span className={styles.popoverTitle}>Filter Maker</span>
-                      {makerSearch && <button type="button" className={styles.popoverClearBtn} onClick={() => setMakerSearch('')}>Reset</button>}
-                    </div>
-                    <input
-                      type="text"
-                      className={styles.popoverInput}
-                      placeholder="Search maker name..."
-                      value={makerSearch}
-                      onChange={(e) => setMakerSearch(e.target.value)}
-                      autoFocus
-                    />
-                    {availableMakers.length > 0 && (
-                      <>
-                        <div className={styles.popoverDivider} />
-                        <span className={styles.customDateLabel}>Known Makers:</span>
-                        <div className={styles.userListSection}>
-                          {availableMakers.map((m) => (
+                      {activeHeaderFilter === 'requested' && (
+                        <div className={styles.filterPopover}>
+                          <div className={styles.popoverHeader}>
+                            <span className={styles.popoverTitle}>Requested Date</span>
+                            {dateRange !== 'all' && (
+                              <button type="button" className={styles.popoverClearBtn} onClick={() => { setDateRange('all'); setCustomFrom(''); setCustomTo(''); setCustomDraftFrom(''); setCustomDraftTo('') }}>
+                                Reset
+                              </button>
+                            )}
+                          </div>
+                          <div className={styles.popoverList}>
+                            {DATE_RANGES.map((r) => (
+                              <button
+                                key={r.key}
+                                type="button"
+                                className={`${styles.popoverItem} ${dateRange === r.key ? styles.popoverItemActive : ''}`}
+                                onClick={() => { setDateRange(r.key); setActiveHeaderFilter(null) }}
+                              >
+                                <span>{r.label}</span>
+                              </button>
+                            ))}
+                          </div>
+                          <div className={styles.popoverDivider} />
+                          <div className={styles.customDateSection}>
+                            <span className={styles.customDateLabel}>Custom Range</span>
+                            <div className={styles.customDateRow}>
+                              <input
+                                type="date"
+                                className={styles.dateInput}
+                                value={customDraftFrom || customFrom}
+                                onChange={(e) => setCustomDraftFrom(e.target.value)}
+                              />
+                              <span className={styles.rangeSeparator}>to</span>
+                              <input
+                                type="date"
+                                className={styles.dateInput}
+                                value={customDraftTo || customTo}
+                                onChange={(e) => setCustomDraftTo(e.target.value)}
+                              />
+                            </div>
                             <button
-                              key={m.id || m.name}
                               type="button"
-                              className={`${styles.userItem} ${makerSearch.toLowerCase() === m.name.toLowerCase() ? styles.userItemActive : ''}`}
-                              onClick={() => { setMakerSearch(m.name); setActiveHeaderFilter(null) }}
+                              className={styles.applyDateBtn}
+                              onClick={() => {
+                                setCustomFrom(customDraftFrom)
+                                setCustomTo(customDraftTo)
+                                setDateRange('custom')
+                                setActiveHeaderFilter(null)
+                              }}
                             >
-                              <div className={styles.userAvatarSmall}>
-                                {m.name.charAt(0).toUpperCase()}
-                              </div>
-                              <span>{m.name}</span>
+                              Apply Custom Range
                             </button>
-                          ))}
+                          </div>
                         </div>
-                      </>
-                    )}
-                  </div>
-                )}
-              </th>
-
-              {/* CHECKER */}
-              <th className={styles.thFilterable}>
-                <button
-                  type="button"
-                  className={`${styles.thFilterBtn} ${assignedToMeOnly || checkerSearch ? styles.thFilterBtnActive : ''}`}
-                  onClick={() => setActiveHeaderFilter((c) => (c === 'checker' ? null : 'checker'))}
-                >
-                  <span>CHECKER</span>
-                  <Icon.ChevronDown width={12} height={12} className={`${styles.filterIcon} ${activeHeaderFilter === 'checker' ? styles.filterIconActive : ''}`} />
-                  {(assignedToMeOnly || checkerSearch) && <span className={styles.filterDot} />}
-                </button>
-                {activeHeaderFilter === 'checker' && (
-                  <div className={`${styles.filterPopover} ${styles.popoverRight}`}>
-                    <div className={styles.popoverHeader}>
-                      <span className={styles.popoverTitle}>Filter Checker</span>
-                      {(assignedToMeOnly || checkerSearch) && (
-                        <button
-                          type="button"
-                          className={styles.popoverClearBtn}
-                          onClick={() => { setAssignedToMeOnly(false); setCheckerSearch('') }}
-                        >
-                          Reset
-                        </button>
                       )}
-                    </div>
-                    <label className={styles.popoverCheckboxLabel}>
-                      <input
-                        type="checkbox"
-                        checked={assignedToMeOnly}
-                        onChange={(e) => setAssignedToMeOnly(e.target.checked)}
-                      />
-                      <span>Assigned to me</span>
-                    </label>
-                    <input
-                      type="text"
-                      className={styles.popoverInput}
-                      placeholder="Search checker name..."
-                      value={checkerSearch}
-                      onChange={(e) => setCheckerSearch(e.target.value)}
-                    />
-                    {availableCheckers.length > 0 && (
-                      <>
-                        <div className={styles.popoverDivider} />
-                        <span className={styles.customDateLabel}>Known Checkers:</span>
-                        <div className={styles.userListSection}>
-                          {availableCheckers.map((c) => (
+                    </th>
+                  ),
+                  render: (r) => <span className={styles.timeCell}>{formatDateOnly(r.requestedAt)}</span>,
+                },
+                {
+                  key: 'module',
+                  label: 'MODULE',
+                  priority: 'high',
+                  header: (
+                    <th className={styles.thFilterable}>
+                      <button
+                        type="button"
+                        className={`${styles.thFilterBtn} ${module ? styles.thFilterBtnActive : ''}`}
+                        onClick={() => setActiveHeaderFilter((c) => (c === 'module' ? null : 'module'))}
+                      >
+                        <span>MODULE</span>
+                        <Icon.ChevronDown width={12} height={12} className={`${styles.filterIcon} ${activeHeaderFilter === 'module' ? styles.filterIconActive : ''}`} />
+                        {module && <span className={styles.filterDot} />}
+                      </button>
+                      {activeHeaderFilter === 'module' && (
+                        <div className={styles.filterPopover}>
+                          <div className={styles.popoverHeader}>
+                            <span className={styles.popoverTitle}>Filter Module</span>
+                            {module && <button type="button" className={styles.popoverClearBtn} onClick={() => { setModule(''); setModuleSearch('') }}>Reset</button>}
+                          </div>
+                          <input
+                            type="text"
+                            className={styles.popoverInput}
+                            placeholder="Type to search module..."
+                            value={moduleSearch}
+                            onChange={(e) => setModuleSearch(e.target.value)}
+                            autoFocus
+                          />
+                          <div className={styles.popoverList}>
                             <button
-                              key={c.id || c.name}
                               type="button"
-                              className={`${styles.userItem} ${checkerSearch.toLowerCase() === c.name.toLowerCase() ? styles.userItemActive : ''}`}
-                              onClick={() => { setCheckerSearch(c.name); setActiveHeaderFilter(null) }}
+                              className={`${styles.popoverItem} ${!module ? styles.popoverItemActive : ''}`}
+                              onClick={() => { setModule(''); setActiveHeaderFilter(null) }}
                             >
-                              <div className={`${styles.userAvatarSmall} ${styles.checkerAvatarSmall}`}>
-                                {c.name.charAt(0).toUpperCase()}
-                              </div>
-                              <span>{c.name}</span>
+                              <span>All Modules</span>
                             </button>
-                          ))}
+                            {availableModules.length === 0 ? (
+                              <div className={styles.emptyHint}>No modules matching "{moduleSearch}"</div>
+                            ) : (
+                              availableModules.map((m) => (
+                                <button
+                                  key={m.key}
+                                  type="button"
+                                  className={`${styles.popoverItem} ${module === m.key ? styles.popoverItemActive : ''}`}
+                                  onClick={() => { setModule(m.key); setActiveHeaderFilter(null) }}
+                                >
+                                  <span>{m.label}</span>
+                                </button>
+                              ))
+                            )}
+                          </div>
                         </div>
-                      </>
-                    )}
-                  </div>
-                )}
-              </th>
-
-              {/* STATUS */}
-              <th className={styles.thFilterable}>
-                <button
-                  type="button"
-                  className={`${styles.thFilterBtn} ${statusFilter || activeTab !== TAB_IDS.all ? styles.thFilterBtnActive : ''}`}
-                  onClick={() => setActiveHeaderFilter((c) => (c === 'status' ? null : 'status'))}
-                >
-                  <span>STATUS</span>
-                  <Icon.ChevronDown width={12} height={12} className={`${styles.filterIcon} ${activeHeaderFilter === 'status' ? styles.filterIconActive : ''}`} />
-                  {(statusFilter || activeTab !== TAB_IDS.all) && <span className={styles.filterDot} />}
-                </button>
-                {activeHeaderFilter === 'status' && (
-                  <div className={`${styles.filterPopover} ${styles.popoverRight}`}>
-                    <div className={styles.popoverHeader}>
-                      <span className={styles.popoverTitle}>Filter Status</span>
-                      {(statusFilter || activeTab !== TAB_IDS.all) && (
-                        <button
-                          type="button"
-                          className={styles.popoverClearBtn}
-                          onClick={() => { setStatusFilter(''); setActiveTab(TAB_IDS.all) }}
-                        >
-                          Reset
-                        </button>
                       )}
-                    </div>
-                    <div className={styles.popoverList}>
+                    </th>
+                  ),
+                  render: (r) => <Badge tone="info">{formatModuleName(r.module, moduleLabelsByKey)}</Badge>,
+                },
+                {
+                  key: 'action',
+                  label: 'ACTION',
+                  priority: 'always',
+                  header: (
+                    <th className={styles.thFilterable}>
                       <button
                         type="button"
-                        className={`${styles.popoverItem} ${!statusFilter && activeTab === TAB_IDS.all ? styles.popoverItemActive : ''}`}
-                        onClick={() => { setStatusFilter(''); setActiveTab(TAB_IDS.all); setActiveHeaderFilter(null) }}
+                        className={`${styles.thFilterBtn} ${actionFilter ? styles.thFilterBtnActive : ''}`}
+                        onClick={() => setActiveHeaderFilter((c) => (c === 'action' ? null : 'action'))}
                       >
-                        <span>All Statuses</span>
+                        <span>ACTION</span>
+                        <Icon.ChevronDown width={12} height={12} className={`${styles.filterIcon} ${activeHeaderFilter === 'action' ? styles.filterIconActive : ''}`} />
+                        {actionFilter && <span className={styles.filterDot} />}
                       </button>
-                      <button
-                        type="button"
-                        className={`${styles.popoverItem} ${statusFilter === 'Pending' || (activeTab === TAB_IDS.pending && !statusFilter) ? styles.popoverItemActive : ''}`}
-                        onClick={() => { setStatusFilter('Pending'); setActiveHeaderFilter(null) }}
-                      >
-                        <Badge tone="warning" dot>Pending</Badge>
-                      </button>
-                      <button
-                        type="button"
-                        className={`${styles.popoverItem} ${statusFilter === 'Approved' ? styles.popoverItemActive : ''}`}
-                        onClick={() => { setStatusFilter('Approved'); setActiveHeaderFilter(null) }}
-                      >
-                        <Badge tone="success" dot>Approved</Badge>
-                      </button>
-                      <button
-                        type="button"
-                        className={`${styles.popoverItem} ${statusFilter === 'Rejected' ? styles.popoverItemActive : ''}`}
-                        onClick={() => { setStatusFilter('Rejected'); setActiveHeaderFilter(null) }}
-                      >
-                        <Badge tone="danger" dot>Rejected</Badge>
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </th>
-
-              {/* DECIDED */}
-              <th className={styles.thFilterable}>
-                <button
-                  type="button"
-                  className={`${styles.thFilterBtn} ${decidedRange !== 'all' ? styles.thFilterBtnActive : ''}`}
-                  onClick={() => setActiveHeaderFilter((c) => (c === 'decided' ? null : 'decided'))}
-                >
-                  <span>DECIDED</span>
-                  <Icon.ChevronDown width={12} height={12} className={`${styles.filterIcon} ${activeHeaderFilter === 'decided' ? styles.filterIconActive : ''}`} />
-                  {decidedRange !== 'all' && <span className={styles.filterDot} />}
-                </button>
-                {activeHeaderFilter === 'decided' && (
-                  <div className={`${styles.filterPopover} ${styles.popoverRight}`}>
-                    <div className={styles.popoverHeader}>
-                      <span className={styles.popoverTitle}>Decided Date</span>
-                      {decidedRange !== 'all' && (
-                        <button type="button" className={styles.popoverClearBtn} onClick={() => { setDecidedRange('all'); setDecidedCustomFrom(''); setDecidedCustomTo(''); setDecidedDraftFrom(''); setDecidedDraftTo('') }}>
-                          Reset
-                        </button>
+                      {activeHeaderFilter === 'action' && (
+                        <div className={styles.filterPopover}>
+                          <div className={styles.popoverHeader}>
+                            <span className={styles.popoverTitle}>Filter Action</span>
+                            {actionFilter && <button type="button" className={styles.popoverClearBtn} onClick={() => setActionFilter('')}>Reset</button>}
+                          </div>
+                          <div className={styles.popoverList}>
+                            <button
+                              type="button"
+                              className={`${styles.popoverItem} ${!actionFilter ? styles.popoverItemActive : ''}`}
+                              onClick={() => { setActionFilter(''); setActiveHeaderFilter(null) }}
+                            >
+                              <span>All Actions</span>
+                            </button>
+                            {Object.keys(ACTION_LABELS).map((act) => {
+                              const ActIcon = ACTION_ICONS[act] ?? Icon.Edit
+                              return (
+                                <button
+                                  key={act}
+                                  type="button"
+                                  className={`${styles.popoverItem} ${actionFilter === act ? styles.popoverItemActive : ''}`}
+                                  onClick={() => { setActionFilter(act); setActiveHeaderFilter(null) }}
+                                >
+                                  <span className={`${styles.actionCell} ${styles[`action_${act}`] ?? ''}`}>
+                                    <ActIcon width={13} height={13} />
+                                    <span>{ACTION_LABELS[act]}</span>
+                                  </span>
+                                </button>
+                              )
+                            })}
+                          </div>
+                        </div>
                       )}
-                    </div>
-                    <div className={styles.popoverList}>
-                      {DATE_RANGES.map((r) => (
-                        <button
-                          key={r.key}
-                          type="button"
-                          className={`${styles.popoverItem} ${decidedRange === r.key ? styles.popoverItemActive : ''}`}
-                          onClick={() => { setDecidedRange(r.key); setActiveHeaderFilter(null) }}
-                        >
-                          <span>{r.label}</span>
-                        </button>
-                      ))}
-                    </div>
-                    <div className={styles.popoverDivider} />
-                    <div className={styles.customDateSection}>
-                      <span className={styles.customDateLabel}>Custom Range</span>
-                      <div className={styles.customDateRow}>
-                        <input
-                          type="date"
-                          className={styles.dateInput}
-                          value={decidedDraftFrom || decidedCustomFrom}
-                          onChange={(e) => setDecidedDraftFrom(e.target.value)}
-                        />
-                        <span className={styles.rangeSeparator}>to</span>
-                        <input
-                          type="date"
-                          className={styles.dateInput}
-                          value={decidedDraftTo || decidedCustomTo}
-                          onChange={(e) => setDecidedDraftTo(e.target.value)}
-                        />
-                      </div>
-                      <button
-                        type="button"
-                        className={styles.applyDateBtn}
-                        onClick={() => {
-                          setDecidedCustomFrom(decidedDraftFrom)
-                          setDecidedCustomTo(decidedDraftTo)
-                          setDecidedRange('custom')
-                          setActiveHeaderFilter(null)
-                        }}
-                      >
-                        Apply Custom Range
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </th>
-
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {items === null ? (
-              // Shaped per-column, matching AuditLogsPage's own skeleton rows — a single bar spanning
-              // the whole row read as noticeably less finished next to that page's per-cell shapes.
-              Array.from({ length: pageSize }).map((_, i) => (
-                <tr key={i}>
-                  <td><SkeletonBlock width={85} height={15} radius="4px" /></td>
-                  <td><SkeletonBlock width={100} height={20} radius="999px" /></td>
-                  <td><SkeletonBlock width={75} height={20} radius="6px" /></td>
-                  <td><SkeletonBlock width={95} height={15} radius="4px" /></td>
-                  <td>
-                    <div className={styles.actorCell}>
-                      <SkeletonBlock width={28} height={28} radius="8px" />
-                      <SkeletonBlock width={80} height={15} radius="4px" />
-                    </div>
-                  </td>
-                  <td>
-                    <div className={styles.actorCell}>
-                      <SkeletonBlock width={28} height={28} radius="8px" />
-                      <SkeletonBlock width={80} height={15} radius="4px" />
-                    </div>
-                  </td>
-                  <td><SkeletonBlock width={70} height={20} radius="999px" /></td>
-                  <td><SkeletonBlock width={85} height={15} radius="4px" /></td>
-                  <td><SkeletonBlock width={56} height={26} radius="7px" /></td>
-                </tr>
-              ))
-            ) : items.length === 0 ? (
-              <DataTable.Empty colSpan={9}>No approval requests found matching the selected filters.</DataTable.Empty>
-            ) : (
-              items.map((r) => {
-                const ActionIcon = ACTION_ICONS[r.action] ?? Icon.Edit
-                return (
-                  <tr key={r.id}>
-                    <td className={styles.timeCell}>{formatDateOnly(r.requestedAt)}</td>
-                    <td><Badge tone="info">{formatModuleName(r.module, moduleLabelsByKey)}</Badge></td>
-                    <td>
+                    </th>
+                  ),
+                  render: (r) => {
+                    const ActionIcon = ACTION_ICONS[r.action] ?? Icon.Edit
+                    return (
                       <span className={`${styles.actionCell} ${styles[`action_${r.action}`] ?? ''}`}>
                         <ActionIcon width={12} height={12} />
                         <span>{ACTION_LABELS[r.action] ?? r.action}</span>
                       </span>
-                    </td>
-                    <td>
-                      {r.entityLabel ? (
-                        <span className={styles.entityLabel}>{r.entityLabel}</span>
-                      ) : (
-                        <span className={styles.mutedText}>—</span>
-                      )}
-                    </td>
-                    <td>
-                      {r.makerName ? (
-                        <div className={styles.actorCell}>
-                          <span className={styles.actorAvatar}>{r.makerName.charAt(0).toUpperCase()}</span>
-                          <span className={styles.actorName}>{r.makerName}</span>
+                    )
+                  },
+                },
+                {
+                  key: 'entity',
+                  label: 'ENTITY',
+                  priority: 'high',
+                  header: (
+                    <th className={styles.thFilterable}>
+                      <button
+                        type="button"
+                        className={`${styles.thFilterBtn} ${entitySearch ? styles.thFilterBtnActive : ''}`}
+                        onClick={() => setActiveHeaderFilter((c) => (c === 'entity' ? null : 'entity'))}
+                      >
+                        <span>RECORD</span>
+                        <Icon.ChevronDown width={12} height={12} className={`${styles.filterIcon} ${activeHeaderFilter === 'entity' ? styles.filterIconActive : ''}`} />
+                        {entitySearch && <span className={styles.filterDot} />}
+                      </button>
+                      {activeHeaderFilter === 'entity' && (
+                        <div className={styles.filterPopover}>
+                          <div className={styles.popoverHeader}>
+                            <span className={styles.popoverTitle}>Search Entity</span>
+                            {entitySearch && <button type="button" className={styles.popoverClearBtn} onClick={() => setEntitySearch('')}>Reset</button>}
+                          </div>
+                          <input
+                            type="text"
+                            className={styles.popoverInput}
+                            placeholder="Filter by entity name/ID..."
+                            value={entitySearch}
+                            onChange={(e) => setEntitySearch(e.target.value)}
+                            autoFocus
+                          />
                         </div>
-                      ) : (
-                        <span className={styles.mutedText}>Unknown</span>
                       )}
-                    </td>
-                    <td>
-                      {r.checkerName ? (
-                        <div className={styles.actorCell}>
-                          <span className={`${styles.actorAvatar} ${styles.checkerAvatar}`}>{r.checkerName.charAt(0).toUpperCase()}</span>
-                          <span className={styles.actorName}>{r.checkerName}</span>
+                    </th>
+                  ),
+                  render: (r) =>
+                    r.entityLabel ? (
+                      <span className={styles.entityLabel}>{r.entityLabel}</span>
+                    ) : (
+                      <span className={styles.mutedText}>{EMPTY_VALUE}</span>
+                    ),
+                },
+                {
+                  key: 'maker',
+                  label: 'MAKER',
+                  priority: 'low',
+                  header: (
+                    <th className={styles.thFilterable}>
+                      <button
+                        type="button"
+                        className={`${styles.thFilterBtn} ${makerSearch ? styles.thFilterBtnActive : ''}`}
+                        onClick={() => setActiveHeaderFilter((c) => (c === 'maker' ? null : 'maker'))}
+                      >
+                        <span>MAKER</span>
+                        <Icon.ChevronDown width={12} height={12} className={`${styles.filterIcon} ${activeHeaderFilter === 'maker' ? styles.filterIconActive : ''}`} />
+                        {makerSearch && <span className={styles.filterDot} />}
+                      </button>
+                      {activeHeaderFilter === 'maker' && (
+                        <div className={styles.filterPopover}>
+                          <div className={styles.popoverHeader}>
+                            <span className={styles.popoverTitle}>Filter Maker</span>
+                            {makerSearch && <button type="button" className={styles.popoverClearBtn} onClick={() => setMakerSearch('')}>Reset</button>}
+                          </div>
+                          <input
+                            type="text"
+                            className={styles.popoverInput}
+                            placeholder="Search maker name..."
+                            value={makerSearch}
+                            onChange={(e) => setMakerSearch(e.target.value)}
+                            autoFocus
+                          />
+                          {availableMakers.length > 0 && (
+                            <>
+                              <div className={styles.popoverDivider} />
+                              <span className={styles.customDateLabel}>Known Makers:</span>
+                              <div className={styles.userListSection}>
+                                {availableMakers.map((m) => (
+                                  <button
+                                    key={m.id || m.name}
+                                    type="button"
+                                    className={`${styles.userItem} ${makerSearch.toLowerCase() === m.name.toLowerCase() ? styles.userItemActive : ''}`}
+                                    onClick={() => { setMakerSearch(m.name); setActiveHeaderFilter(null) }}
+                                  >
+                                    <div className={styles.userAvatarSmall}>
+                                      {m.name.charAt(0).toUpperCase()}
+                                    </div>
+                                    <span>{m.name}</span>
+                                  </button>
+                                ))}
+                              </div>
+                            </>
+                          )}
                         </div>
-                      ) : (
-                        <span className={styles.unassignedChip}>Unassigned</span>
                       )}
-                    </td>
-                    <td><Badge tone={STATUS_TONES[r.status]} dot>{r.status}</Badge></td>
-                    <td className={styles.timeCell}>
-                      {r.decidedAt ? formatDateOnly(r.decidedAt) : <span className={styles.mutedText}>—</span>}
-                    </td>
-                    <td>
-                      <RowAction onClick={() => handleRowClick(r)} trailing={<Icon.ChevronRight width={12} height={12} />} />
-                    </td>
-                  </tr>
-                )
-              })
-            )}
-          </tbody>
+                    </th>
+                  ),
+                  render: (r) =>
+                    r.makerName ? (
+                      <div className={styles.actorCell}>
+                        <span className={styles.actorAvatar}>{r.makerName.charAt(0).toUpperCase()}</span>
+                        <span className={styles.actorName}>{r.makerName}</span>
+                      </div>
+                    ) : (
+                      <span className={styles.mutedText}>Unknown</span>
+                    ),
+                },
+                {
+                  key: 'checker',
+                  label: 'CHECKER',
+                  priority: 'low',
+                  header: (
+                    <th className={styles.thFilterable}>
+                      <button
+                        type="button"
+                        className={`${styles.thFilterBtn} ${assignedToMeOnly || checkerSearch ? styles.thFilterBtnActive : ''}`}
+                        onClick={() => setActiveHeaderFilter((c) => (c === 'checker' ? null : 'checker'))}
+                      >
+                        <span>CHECKER</span>
+                        <Icon.ChevronDown width={12} height={12} className={`${styles.filterIcon} ${activeHeaderFilter === 'checker' ? styles.filterIconActive : ''}`} />
+                        {(assignedToMeOnly || checkerSearch) && <span className={styles.filterDot} />}
+                      </button>
+                      {activeHeaderFilter === 'checker' && (
+                        <div className={`${styles.filterPopover} ${styles.popoverRight}`}>
+                          <div className={styles.popoverHeader}>
+                            <span className={styles.popoverTitle}>Filter Checker</span>
+                            {(assignedToMeOnly || checkerSearch) && (
+                              <button
+                                type="button"
+                                className={styles.popoverClearBtn}
+                                onClick={() => { setAssignedToMeOnly(false); setCheckerSearch('') }}
+                              >
+                                Reset
+                              </button>
+                            )}
+                          </div>
+                          <label className={styles.popoverCheckboxLabel}>
+                            <input
+                              type="checkbox"
+                              checked={assignedToMeOnly}
+                              onChange={(e) => setAssignedToMeOnly(e.target.checked)}
+                            />
+                            <span>Assigned to me</span>
+                          </label>
+                          <input
+                            type="text"
+                            className={styles.popoverInput}
+                            placeholder="Search checker name..."
+                            value={checkerSearch}
+                            onChange={(e) => setCheckerSearch(e.target.value)}
+                          />
+                          {availableCheckers.length > 0 && (
+                            <>
+                              <div className={styles.popoverDivider} />
+                              <span className={styles.customDateLabel}>Known Checkers:</span>
+                              <div className={styles.userListSection}>
+                                {availableCheckers.map((c) => (
+                                  <button
+                                    key={c.id || c.name}
+                                    type="button"
+                                    className={`${styles.userItem} ${checkerSearch.toLowerCase() === c.name.toLowerCase() ? styles.userItemActive : ''}`}
+                                    onClick={() => { setCheckerSearch(c.name); setActiveHeaderFilter(null) }}
+                                  >
+                                    <div className={`${styles.userAvatarSmall} ${styles.checkerAvatarSmall}`}>
+                                      {c.name.charAt(0).toUpperCase()}
+                                    </div>
+                                    <span>{c.name}</span>
+                                  </button>
+                                ))}
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      )}
+                    </th>
+                  ),
+                  render: (r) =>
+                    r.checkerName ? (
+                      <div className={styles.actorCell}>
+                        <span className={`${styles.actorAvatar} ${styles.checkerAvatar}`}>
+                          {r.checkerName.charAt(0).toUpperCase()}
+                        </span>
+                        <span className={styles.actorName}>{r.checkerName}</span>
+                      </div>
+                    ) : (
+                      <span className={styles.unassignedChip}>Unassigned</span>
+                    ),
+                },
+                {
+                  key: 'status',
+                  label: 'STATUS',
+                  priority: 'always',
+                  header: (
+                    <th className={styles.thFilterable}>
+                      <button
+                        type="button"
+                        className={`${styles.thFilterBtn} ${statusFilter || activeTab !== TAB_IDS.all ? styles.thFilterBtnActive : ''}`}
+                        onClick={() => setActiveHeaderFilter((c) => (c === 'status' ? null : 'status'))}
+                      >
+                        <span>STATUS</span>
+                        <Icon.ChevronDown width={12} height={12} className={`${styles.filterIcon} ${activeHeaderFilter === 'status' ? styles.filterIconActive : ''}`} />
+                        {(statusFilter || activeTab !== TAB_IDS.all) && <span className={styles.filterDot} />}
+                      </button>
+                      {activeHeaderFilter === 'status' && (
+                        <div className={`${styles.filterPopover} ${styles.popoverRight}`}>
+                          <div className={styles.popoverHeader}>
+                            <span className={styles.popoverTitle}>Filter Status</span>
+                            {(statusFilter || activeTab !== TAB_IDS.all) && (
+                              <button
+                                type="button"
+                                className={styles.popoverClearBtn}
+                                onClick={() => { setStatusFilter(''); setActiveTab(TAB_IDS.all) }}
+                              >
+                                Reset
+                              </button>
+                            )}
+                          </div>
+                          <div className={styles.popoverList}>
+                            <button
+                              type="button"
+                              className={`${styles.popoverItem} ${!statusFilter && activeTab === TAB_IDS.all ? styles.popoverItemActive : ''}`}
+                              onClick={() => { setStatusFilter(''); setActiveTab(TAB_IDS.all); setActiveHeaderFilter(null) }}
+                            >
+                              <span>All Statuses</span>
+                            </button>
+                            <button
+                              type="button"
+                              className={`${styles.popoverItem} ${statusFilter === 'Pending' || (activeTab === TAB_IDS.pending && !statusFilter) ? styles.popoverItemActive : ''}`}
+                              onClick={() => { setStatusFilter('Pending'); setActiveHeaderFilter(null) }}
+                            >
+                              <Badge tone="warning" dot>Pending</Badge>
+                            </button>
+                            <button
+                              type="button"
+                              className={`${styles.popoverItem} ${statusFilter === 'Approved' ? styles.popoverItemActive : ''}`}
+                              onClick={() => { setStatusFilter('Approved'); setActiveHeaderFilter(null) }}
+                            >
+                              <Badge tone="success" dot>Approved</Badge>
+                            </button>
+                            <button
+                              type="button"
+                              className={`${styles.popoverItem} ${statusFilter === 'Rejected' ? styles.popoverItemActive : ''}`}
+                              onClick={() => { setStatusFilter('Rejected'); setActiveHeaderFilter(null) }}
+                            >
+                              <Badge tone="danger" dot>Rejected</Badge>
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </th>
+                  ),
+                  render: (r) => <Badge tone={STATUS_TONES[r.status]} dot>{r.status}</Badge>,
+                },
+                {
+                  key: 'decided',
+                  label: 'DECIDED',
+                  priority: 'low',
+                  header: (
+                    <th className={styles.thFilterable}>
+                      <button
+                        type="button"
+                        className={`${styles.thFilterBtn} ${decidedRange !== 'all' ? styles.thFilterBtnActive : ''}`}
+                        onClick={() => setActiveHeaderFilter((c) => (c === 'decided' ? null : 'decided'))}
+                      >
+                        <span>DECIDED</span>
+                        <Icon.ChevronDown width={12} height={12} className={`${styles.filterIcon} ${activeHeaderFilter === 'decided' ? styles.filterIconActive : ''}`} />
+                        {decidedRange !== 'all' && <span className={styles.filterDot} />}
+                      </button>
+                      {activeHeaderFilter === 'decided' && (
+                        <div className={`${styles.filterPopover} ${styles.popoverRight}`}>
+                          <div className={styles.popoverHeader}>
+                            <span className={styles.popoverTitle}>Decided Date</span>
+                            {decidedRange !== 'all' && (
+                              <button type="button" className={styles.popoverClearBtn} onClick={() => { setDecidedRange('all'); setDecidedCustomFrom(''); setDecidedCustomTo(''); setDecidedDraftFrom(''); setDecidedDraftTo('') }}>
+                                Reset
+                              </button>
+                            )}
+                          </div>
+                          <div className={styles.popoverList}>
+                            {DATE_RANGES.map((r) => (
+                              <button
+                                key={r.key}
+                                type="button"
+                                className={`${styles.popoverItem} ${decidedRange === r.key ? styles.popoverItemActive : ''}`}
+                                onClick={() => { setDecidedRange(r.key); setActiveHeaderFilter(null) }}
+                              >
+                                <span>{r.label}</span>
+                              </button>
+                            ))}
+                          </div>
+                          <div className={styles.popoverDivider} />
+                          <div className={styles.customDateSection}>
+                            <span className={styles.customDateLabel}>Custom Range</span>
+                            <div className={styles.customDateRow}>
+                              <input
+                                type="date"
+                                className={styles.dateInput}
+                                value={decidedDraftFrom || decidedCustomFrom}
+                                onChange={(e) => setDecidedDraftFrom(e.target.value)}
+                              />
+                              <span className={styles.rangeSeparator}>to</span>
+                              <input
+                                type="date"
+                                className={styles.dateInput}
+                                value={decidedDraftTo || decidedCustomTo}
+                                onChange={(e) => setDecidedDraftTo(e.target.value)}
+                              />
+                            </div>
+                            <button
+                              type="button"
+                              className={styles.applyDateBtn}
+                              onClick={() => {
+                                setDecidedCustomFrom(decidedDraftFrom)
+                                setDecidedCustomTo(decidedDraftTo)
+                                setDecidedRange('custom')
+                                setActiveHeaderFilter(null)
+                              }}
+                            >
+                              Apply Custom Range
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </th>
+                  ),
+                  render: (r) => (
+                    <span className={styles.timeCell}>
+                      {r.decidedAt ? formatDateOnly(r.decidedAt) : <span className={styles.mutedText}>{EMPTY_VALUE}</span>}
+                    </span>
+                  ),
+                },
+                {
+                  key: 'actions',
+                  label: 'Actions',
+                  priority: 'always',
+                  align: 'right',
+                  render: (r) => (
+                    <RowAction
+                      onClick={() => handleRowClick(r)}
+                      trailing={<Icon.ChevronRight width={12} height={12} />}
+                    />
+                  ),
+                },
+            ]}
+          />
       </DataTable>
 
       <Pagination

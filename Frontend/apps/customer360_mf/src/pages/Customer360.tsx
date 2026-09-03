@@ -12,7 +12,7 @@ import CaseDetailsModal from '../components/CaseDetailsModal';
 import ProductDetailsModal from '../components/ProductDetailsModal';
 import DynamicProfileSection, { groupBySection } from '../components/DynamicProfileSection';
 import { useFieldReveal } from '../hooks/useFieldReveal';
-import { Eye, EyeOff, ChevronRight, ChevronDown, SlidersHorizontal, Building2, Layers, User, Briefcase, Globe, Shield, FileText, Calendar, DollarSign, MapPin, Mail, Phone, TrendingUp, Search, RotateCcw, AlertCircle, Loader2 } from 'lucide-react';
+import { Eye, EyeOff, ChevronRight, ChevronDown, SlidersHorizontal, Building2, Layers, User, Briefcase, Globe, Shield, FileText, Calendar, DollarSign, MapPin, Mail, Phone, TrendingUp, Search, RotateCcw, AlertCircle, Loader2 } from '@omniremit/ui/icons';
 import { useNavigationStore } from '../store/navigationStore';
 import type {
   IndividualProfile,
@@ -25,7 +25,7 @@ import type {
 
 import { DEFAULT_INDIVIDUAL_FIELD_CONFIGS, DEFAULT_CORPORATE_FIELD_CONFIGS } from '../constants/defaultFieldConfigs';
 import styles from './Customer360.module.css';
-import { Button, PageHeader } from '@omniremit/ui';
+import { Button, DataTable, EMPTY_VALUE, PageHeader, ResponsiveRows, getInitials } from '@omniremit/ui';
 import { StatusBadge } from '../shared/StatusBadge';
 import { formatValue, formatCurrency as formatMoney } from '../shared/formatValue';
 
@@ -736,16 +736,6 @@ export default function Customer360() {
     (safeIntPageNumber - 1) * intPageSize,
     safeIntPageNumber * intPageSize
   );
-
-  const getInitials = (name: string | null | undefined): string => {
-    if (!name) return '-';
-    const parts = name.split(' ').filter(Boolean);
-    if (parts.length >= 2) {
-      return (parts[0][0] + parts[1][0]).toUpperCase();
-    }
-    return parts[0][0].toUpperCase();
-  };
-
   // formatValue/formatCurrency live in src/shared — formatValue alone had been copied
   // verbatim into four components. Currency follows the corporate profile's country.
   const formatCurrency = (val: unknown) =>
@@ -1282,43 +1272,78 @@ export default function Customer360() {
                     </div>
                   )}
 
-                  {loadingInteractions ? (
-                    <div className={styles.rule5}>Loading interactions...</div>
-                  ) : interactionsError ? (
+                  {interactionsError ? (
                     <div className="error-container">
                       <p>{getFriendlyErrorMessage({ message: interactionsError ?? undefined, status: interactionsErrorStatus ?? undefined })}</p>
                       <Button onClick={() => loadInteractions(individualProfile.nationalId as string)} className={styles.spacer9}>
                         Retry
                       </Button>
                     </div>
-                  ) : intData.filtered.length === 0 ? (
+                  ) : !loadingInteractions && intData.filtered.length === 0 ? (
                     <div className="empty-state">No interactions found.</div>
                   ) : (
-                    <div className="table-responsive-wrapper">
-                    <table className="data-table">
-                      <thead>
-                        <tr>
-                          <th>Case ID</th>
-                          <th>Category</th>
-                          <th>Status</th>
-                          <th>Source</th>
-                          <th>Classification</th>
-                          <th>Complaint Date</th>
-                          <th>Action</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {paginatedInteractions.map((item) => (
-                          <tr key={item.caseId}>
-                            <td className="account-num-text">{formatValue(item.caseId)}</td>
-                            <td>{formatValue(item.category)}</td>
-                            <td>
-                              <StatusBadge status={formatValue(getLegacyInteractionField(item, 'status') || item.statusParent)} />
-                            </td>
-                            <td>{formatValue(getLegacyInteractionField(item, 'source') || item.sourceName)}</td>
-                            <td>{formatValue(item.classification || item.subCategory1)}</td>
-                            <td>{formatValue((item.dateComplaint || item.dateCase || '').split(' ')[0] || item.positionDate)}</td>
-                            <td>
+                    <DataTable bare>
+                      <ResponsiveRows
+                        rows={paginatedInteractions}
+                        loading={loadingInteractions}
+                        loadingRows={5}
+                        rowKey={(item) => String(item.caseId)}
+                        columns={[
+                          {
+                            key: 'caseId',
+                            label: 'Case ID',
+                            priority: 'always',
+                            render: (item) => (
+                              <span className="account-num-text">{formatValue(item.caseId)}</span>
+                            ),
+                          },
+                          {
+                            key: 'category',
+                            label: 'Category',
+                            priority: 'high',
+                            render: (item) => formatValue(item.category),
+                          },
+                          {
+                            key: 'status',
+                            label: 'Status',
+                            priority: 'always',
+                            render: (item) => (
+                              <StatusBadge
+                                status={formatValue(
+                                  getLegacyInteractionField(item, 'status') || item.statusParent
+                                )}
+                              />
+                            ),
+                          },
+                          {
+                            key: 'source',
+                            label: 'Source',
+                            priority: 'low',
+                            render: (item) =>
+                              formatValue(getLegacyInteractionField(item, 'source') || item.sourceName),
+                          },
+                          {
+                            key: 'classification',
+                            label: 'Classification',
+                            priority: 'low',
+                            render: (item) => formatValue(item.classification || item.subCategory1),
+                          },
+                          {
+                            key: 'complaintDate',
+                            label: 'Complaint Date',
+                            priority: 'low',
+                            render: (item) =>
+                              formatValue(
+                                (item.dateComplaint || item.dateCase || '').split(' ')[0] ||
+                                  item.positionDate
+                              ),
+                          },
+                          {
+                            key: 'action',
+                            label: 'Action',
+                            priority: 'always',
+                            align: 'right',
+                            render: (item) => (
                               <span
                                 className={`action-link ${styles.row8}`}
                                 onClick={() => openCaseModal(item)}
@@ -1326,12 +1351,11 @@ export default function Customer360() {
                                 <Eye size={13} />
                                 View
                               </span>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                    </div>
+                            ),
+                          },
+                        ]}
+                      />
+                    </DataTable>
                   )}
 
                   {/* Pagination */}
@@ -1492,64 +1516,127 @@ export default function Customer360() {
                         </div>
                       )}
 
-                      {loadingProducts ? (
-                        <div className={styles.rule5}>Loading products...</div>
-                      ) : productsError ? (
+                      {productsError ? (
                         <div className="error-container">
                           <p>{getFriendlyErrorMessage({ message: productsError ?? undefined, status: productsErrorStatus ?? undefined })}</p>
                           <Button onClick={() => loadProducts(individualProfile.nationalId as string, pageNumber, pageSize)} className={styles.spacer9}>
                             Retry
                           </Button>
                         </div>
-                      ) : indData.filtered.length === 0 ? (
+                      ) : !loadingProducts && indData.filtered.length === 0 ? (
                         <div className="empty-state">No products found.</div>
                       ) : (
-                        <div className={`table-responsive-wrapper ${styles.rule6}`}>
-                        <table className={`data-table ${styles.box7}`}>
-                          <thead className={styles.rule7}>
-                            <tr>
-                              <th>Product Name</th>
-                              <th>Type</th>
-                              <th>Account Number</th>
-                              <th>Tenure</th>
-                              <th>Account Status</th>
-                              <th>Balance</th>
-                              <th>Outstanding</th>
-                              <th>Maturity Date</th>
-                              <th>Timeline & Summary</th>
-                              <th>Campaign Code</th>
-                              <th>Action</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {indData.filtered.map((item) => (
-                              <tr key={item.accountNumber || getLegacyProductField(item, 'accountNo')}>
-                                <td className={styles.strong4}>{formatValue(item.productName)}</td>
-                                <td>{formatValue(item.type || item.productCategory)}</td>
-                                <td className="account-num-text">{formatValue(item.accountNumber || getLegacyProductField(item, 'accountNo'))}</td>
-                                <td>{formatValue(item.tenure)}</td>
-                                <td>
-                                  <StatusBadge status={formatValue(item.derivedAccountStatus || item.financingStatus)} />
-                                </td>
-                                <td>{formatCurrency(item.balances || getLegacyProductField(item, 'placementAmount'))}</td>
-                                <td>{formatCurrency(item.outstanding)}</td>
-                                <td>{formatValue(item.maturityDate)}</td>
-                                <td>{formatValue(getLegacyProductField(item, 'timelineSummary') || getLegacyProductField(item, 'timelineAndSummary'))}</td>
-                                <td>{formatValue(item.campaignCode)}</td>
-                                <td>
+                        <DataTable bare>
+                          <ResponsiveRows
+                            rows={indData.filtered}
+                            loading={loadingProducts}
+                            loadingRows={5}
+                            rowKey={(item) =>
+                              String(item.accountNumber || getLegacyProductField(item, 'accountNo'))
+                            }
+                            columns={[
+                              {
+                                key: 'productName',
+                                label: 'Product Name',
+                                priority: 'always',
+                                render: (item) => (
+                                  <span className={styles.strong4}>{formatValue(item.productName)}</span>
+                                ),
+                              },
+                              {
+                                key: 'type',
+                                label: 'Type',
+                                priority: 'low',
+                                render: (item) => formatValue(item.type || item.productCategory),
+                              },
+                              {
+                                key: 'accountNumber',
+                                label: 'Account Number',
+                                priority: 'high',
+                                render: (item) => (
+                                  <span className="account-num-text">
+                                    {formatValue(item.accountNumber || getLegacyProductField(item, 'accountNo'))}
+                                  </span>
+                                ),
+                              },
+                              {
+                                key: 'tenure',
+                                label: 'Tenure',
+                                priority: 'low',
+                                render: (item) => formatValue(item.tenure),
+                              },
+                              {
+                                key: 'accountStatus',
+                                label: 'Account Status',
+                                priority: 'always',
+                                render: (item) => (
+                                  <StatusBadge
+                                    status={formatValue(item.derivedAccountStatus || item.financingStatus)}
+                                  />
+                                ),
+                              },
+                              {
+                                key: 'balance',
+                                label: 'Balance',
+                                priority: 'high',
+                                render: (item) =>
+                                  formatCurrency(
+                                    item.balances || getLegacyProductField(item, 'placementAmount')
+                                  ),
+                              },
+                              {
+                                key: 'outstanding',
+                                label: 'Outstanding',
+                                priority: 'low',
+                                render: (item) => formatCurrency(item.outstanding),
+                              },
+                              {
+                                key: 'maturityDate',
+                                label: 'Maturity Date',
+                                priority: 'low',
+                                render: (item) => formatValue(item.maturityDate),
+                              },
+                              {
+                                key: 'timeline',
+                                clamp: true,
+                                label: 'Timeline & Summary',
+                                priority: 'low',
+                                render: (item) =>
+                                  formatValue(
+                                    getLegacyProductField(item, 'timelineSummary') ||
+                                      getLegacyProductField(item, 'timelineAndSummary')
+                                  ),
+                              },
+                              {
+                                key: 'campaignCode',
+                                label: 'Campaign Code',
+                                priority: 'low',
+                                render: (item) => formatValue(item.campaignCode),
+                              },
+                              {
+                                key: 'action',
+                                label: 'Action',
+                                priority: 'always',
+                                align: 'right',
+                                render: (item) => (
                                   <span
                                     className={`action-link ${styles.row8}`}
-                                    onClick={() => openProductModal((item.accountNumber || getLegacyProductField(item, 'accountNo')) as string, (item.type || item.productCategory) as string)}
+                                    onClick={() =>
+                                      openProductModal(
+                                        (item.accountNumber ||
+                                          getLegacyProductField(item, 'accountNo')) as string,
+                                        (item.type || item.productCategory) as string
+                                      )
+                                    }
                                   >
                                     <Eye size={13} />
                                     View
                                   </span>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                        </div>
+                                ),
+                              },
+                            ]}
+                          />
+                        </DataTable>
                       )}
 
                       {/* Pagination */}
@@ -1585,68 +1672,90 @@ export default function Customer360() {
                   )}
 
                   {productsTab === 'interested' && (
-                    <div className="table-responsive-wrapper">
-                      <table className={`data-table ${styles.box7}`}>
-                        <thead>
-                          <tr>
-                            <th>Product Name</th>
-                            <th>Product Category</th>
-                            <th>Engagement Count</th>
-                            <th>Eligibility Score</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {profile.interestedProductName || profile.interestedProductCategory ? (
-                            <tr>
-                              <td className={styles.strong4}>{formatValue(profile.interestedProductName)}</td>
-                              <td>{formatValue(profile.interestedProductCategory)}</td>
-                              <td>{formatValue(profile.engagementCount)}</td>
-                              <td>{formatValue(profile.eligibilityScore)}</td>
-                            </tr>
-                          ) : (
-                            <tr>
-                              <td colSpan={4} className={styles.text2}>
-                                No interested products found.
-                              </td>
-                            </tr>
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
+                    <DataTable bare>
+                      <ResponsiveRows
+                        rows={
+                          profile.interestedProductName || profile.interestedProductCategory
+                            ? [profile]
+                            : []
+                        }
+                        rowKey={() => 'interested-product'}
+                        empty="No interested products found."
+                        columns={[
+                          {
+                            key: 'name',
+                            label: 'Product Name',
+                            priority: 'always',
+                            render: (row) => (
+                              <span className={styles.strong4}>
+                                {formatValue(row.interestedProductName)}
+                              </span>
+                            ),
+                          },
+                          {
+                            key: 'category',
+                            label: 'Product Category',
+                            priority: 'always',
+                            render: (row) => formatValue(row.interestedProductCategory),
+                          },
+                          {
+                            key: 'engagement',
+                            label: 'Engagement Count',
+                            priority: 'low',
+                            render: (row) => formatValue(row.engagementCount),
+                          },
+                          {
+                            key: 'eligibility',
+                            label: 'Eligibility Score',
+                            priority: 'low',
+                            render: (row) => formatValue(row.eligibilityScore),
+                          },
+                        ]}
+                      />
+                    </DataTable>
                   )}
                 </div>
               )}
 
               {/* RM DETAILS TAB */}
               {activeTab === 'rm_details' && (
-                <div className="table-responsive-wrapper">
-                  <table className={`data-table ${styles.box7}`}>
-                    <thead>
-                      <tr>
-                        <th>Relationship Manager</th>
-                        <th>Manager ID</th>
-                        <th>Branch Code</th>
-                        <th>Manager Contact</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {profile.rmName || profile.rmId ? (
-                        <tr>
-                          <td className={styles.strong4}>{formatValue(profile.rmName)}</td>
-                          <td className="account-num-text">{formatValue(profile.rmId)}</td>
-                          <td>{formatValue(profile.rmBranchCode)}</td>
-                          <td>{formatValue(profile.rmContactNo)}</td>
-                        </tr>
-                      ) : (
-                        <tr>
-                          <td colSpan={4} className={styles.text2}>
-                            No Relationship Manager details found.
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
+                <DataTable bare>
+                  <ResponsiveRows
+                    rows={profile.rmName || profile.rmId ? [profile] : []}
+                    rowKey={() => 'relationship-manager'}
+                    empty="No Relationship Manager details found."
+                    columns={[
+                      {
+                        key: 'rmName',
+                        label: 'Relationship Manager',
+                        priority: 'always',
+                        render: (row) => (
+                          <span className={styles.strong4}>{formatValue(row.rmName)}</span>
+                        ),
+                      },
+                      {
+                        key: 'rmId',
+                        label: 'Manager ID',
+                        priority: 'high',
+                        render: (row) => (
+                          <span className="account-num-text">{formatValue(row.rmId)}</span>
+                        ),
+                      },
+                      {
+                        key: 'rmBranchCode',
+                        label: 'Branch Code',
+                        priority: 'low',
+                        render: (row) => formatValue(row.rmBranchCode),
+                      },
+                      {
+                        key: 'rmContactNo',
+                        label: 'Manager Contact',
+                        priority: 'low',
+                        render: (row) => formatValue(row.rmContactNo),
+                      },
+                    ]}
+                  />
+                </DataTable>
               )}
             </div>
           </div>
@@ -1914,62 +2023,104 @@ export default function Customer360() {
                         </div>
                       )}
 
-                      {loadingProducts ? (
-                        <div className={styles.rule5}>Loading products...</div>
-                      ) : productsError ? (
+                      {productsError ? (
                         <div className="error-container">
                           <p>{getFriendlyErrorMessage({ message: productsError ?? undefined, status: productsErrorStatus ?? undefined })}</p>
                           <Button onClick={() => loadProducts(corporateProfile.brn as string, pageNumber, pageSize)} className={styles.spacer9}>
                             Retry
                           </Button>
                         </div>
-                      ) : corpData.filtered.length === 0 ? (
+                      ) : !loadingProducts && corpData.filtered.length === 0 ? (
                         <div className="empty-state">No products found.</div>
                       ) : (
                         <div>
-                          <div className={`table-responsive-wrapper ${styles.rule6}`}>
-                          <table className={`data-table ${styles.rule7}`}>
-                            <thead>
-                              <tr>
-                                <th>Category</th>
-                                <th>Sub Category</th>
-                                <th>Product Name</th>
-                                <th>Account Number</th>
-                                <th>Account Status</th>
-                                <th>Balance</th>
-                                <th>Outstanding</th>
-                                <th>Last Contact Date</th>
-                                <th>Action</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {corpData.filtered.map((item) => (
-                                <tr key={item.accountNumber}>
-                                  <td>
-                                    <span className={`${styles.typeChip}${item.type === 'Deposit' ? ` ${styles.typeChipDeposit}` : ''}`}>
+                          <DataTable bare>
+                            <ResponsiveRows
+                              rows={corpData.filtered}
+                              loading={loadingProducts}
+                              loadingRows={5}
+                              rowKey={(item) => String(item.accountNumber)}
+                              columns={[
+                                {
+                                  key: 'category',
+                                  label: 'Category',
+                                  priority: 'always',
+                                  render: (item) => (
+                                    <span
+                                      className={`${styles.typeChip}${item.type === 'Deposit' ? ` ${styles.typeChipDeposit}` : ''}`}
+                                    >
                                       {item.type}
                                     </span>
-                                  </td>
-                                  <td>{item.productCategory}</td>
-                                  <td className={styles.rule8}>{item.productName}</td>
-                                  <td className="account-num-text">{item.accountNumber}</td>
-                                  <td>
-                                    <StatusBadge status={item.derivedAccountStatus || item.financingStatus || '-'} />
-                                  </td>
-                                  <td>{item.balances || '-'}</td>
-                                  <td>{item.outstanding || '-'}</td>
-                                  <td>{item.lastContactDate || '-'}</td>
-                                  <td>
-                                    <span className={`action-link ${styles.row11}`} onClick={() => openProductModal(item.accountNumber, item.type as string)}>
+                                  ),
+                                },
+                                {
+                                  key: 'subCategory',
+                                  label: 'Sub Category',
+                                  priority: 'low',
+                                  render: (item) => item.productCategory,
+                                },
+                                {
+                                  key: 'productName',
+                                  label: 'Product Name',
+                                  priority: 'always',
+                                  render: (item) => (
+                                    <span className={styles.rule8}>{item.productName}</span>
+                                  ),
+                                },
+                                {
+                                  key: 'accountNumber',
+                                  label: 'Account Number',
+                                  priority: 'high',
+                                  render: (item) => (
+                                    <span className="account-num-text">{item.accountNumber}</span>
+                                  ),
+                                },
+                                {
+                                  key: 'accountStatus',
+                                  label: 'Account Status',
+                                  priority: 'always',
+                                  render: (item) => (
+                                    <StatusBadge
+                                      status={item.derivedAccountStatus || item.financingStatus || EMPTY_VALUE}
+                                    />
+                                  ),
+                                },
+                                {
+                                  key: 'balance',
+                                  label: 'Balance',
+                                  priority: 'high',
+                                  render: (item) => item.balances || EMPTY_VALUE,
+                                },
+                                {
+                                  key: 'outstanding',
+                                  label: 'Outstanding',
+                                  priority: 'low',
+                                  render: (item) => item.outstanding || EMPTY_VALUE,
+                                },
+                                {
+                                  key: 'lastContactDate',
+                                  label: 'Last Contact Date',
+                                  priority: 'low',
+                                  render: (item) => item.lastContactDate || EMPTY_VALUE,
+                                },
+                                {
+                                  key: 'action',
+                                  label: 'Action',
+                                  priority: 'always',
+                                  align: 'right',
+                                  render: (item) => (
+                                    <span
+                                      className={`action-link ${styles.row11}`}
+                                      onClick={() => openProductModal(item.accountNumber, item.type as string)}
+                                    >
                                       <Eye size={13} />
                                       View
                                     </span>
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                          </div>
+                                  ),
+                                },
+                              ]}
+                            />
+                          </DataTable>
 
                           {/* Pagination */}
                           {totalPages > 1 && (
@@ -2009,54 +2160,98 @@ export default function Customer360() {
                         <FileText size={16} />
                         Authorized Signatories
                       </h4>
-                      <div className="table-responsive-wrapper">
-                      <table className="data-table">
-                        <thead>
-                          <tr>
-                            <th>Signatory Name</th>
-                            <th>Date of Birth</th>
-                            <th>ID Number</th>
-                            <th>Phone Number</th>
-                            <th>Position</th>
-                          </tr>
-                        </thead>
-                         <tbody>
-                           <tr>
-                             <td className={styles.rule8}>{corporateProfile.signatoryName || '-'}</td>
-                             <td>{corporateProfile.signatoryDateOfBirth || '-'}</td>
-                             <td>
-                               <div className={styles.spread2}>
-                                 <span>{revealed['sigId'] ? (corporateProfile.signatoryIdNumber || '-') : maskNRIC(corporateProfile.signatoryIdNumber)}</span>
-                                 {corporateProfile.signatoryIdNumber && corporateProfile.signatoryIdNumber.trim() !== '' && corporateProfile.signatoryIdNumber.toLowerCase() !== 'null' && (
-                                   <button
-                                     onClick={() => handleToggleReveal('sigId', 'Signatory ID Number', corporateProfile.signatoryIdNumber!)}
-                                     className={styles.row12}
-                                     title={revealed['sigId'] ? 'Hide details' : 'Reveal details'}
-                                   >
-                                     {revealed['sigId'] ? <EyeOff size={14} /> : <Eye size={14} />}
-                                   </button>
-                                 )}
-                               </div>
-                             </td>
-                             <td>
-                               <div className={styles.spread2}>
-                                 <span>{revealed['sigPhone'] ? (corporateProfile.signatoryPhoneNumber || '-') : maskPhone(corporateProfile.signatoryPhoneNumber)}</span>
-                                 {corporateProfile.signatoryPhoneNumber && corporateProfile.signatoryPhoneNumber.trim() !== '' && corporateProfile.signatoryPhoneNumber.toLowerCase() !== 'null' && (
-                                   <button
-                                     onClick={() => handleToggleReveal('sigPhone', 'Signatory Phone Number', corporateProfile.signatoryPhoneNumber!)}
-                                     className={styles.row12}
-                                     title={revealed['sigPhone'] ? 'Hide details' : 'Reveal details'}
-                                   >
-                                     {revealed['sigPhone'] ? <EyeOff size={14} /> : <Eye size={14} />}
-                                   </button>
-                                 )}
-                               </div>
-                             </td>
-                             <td>{corporateProfile.signatoryPosition || '-'}</td>
-                           </tr>
-                         </tbody>
-                      </table>
-                      </div>
+                      <DataTable bare>
+                        <ResponsiveRows
+                          rows={[corporateProfile]}
+                          rowKey={() => 'signatory'}
+                          columns={[
+                            {
+                              key: 'name',
+                              label: 'Signatory Name',
+                              priority: 'always',
+                              render: (row) => (
+                                <span className={styles.rule8}>
+                                  {row.signatoryName || EMPTY_VALUE}
+                                </span>
+                              ),
+                            },
+                            {
+                              key: 'dob',
+                              label: 'Date of Birth',
+                              priority: 'low',
+                              render: (row) => row.signatoryDateOfBirth || EMPTY_VALUE,
+                            },
+                            {
+                              key: 'id',
+                              label: 'ID Number',
+                              priority: 'always',
+                              render: (row) => (
+                                <div className={styles.spread2}>
+                                  <span>
+                                    {revealed['sigId']
+                                      ? row.signatoryIdNumber || EMPTY_VALUE
+                                      : maskNRIC(row.signatoryIdNumber)}
+                                  </span>
+                                  {row.signatoryIdNumber &&
+                                    row.signatoryIdNumber.trim() !== '' &&
+                                    row.signatoryIdNumber.toLowerCase() !== 'null' && (
+                                      <button
+                                        onClick={() =>
+                                          handleToggleReveal(
+                                            'sigId',
+                                            'Signatory ID Number',
+                                            row.signatoryIdNumber!
+                                          )
+                                        }
+                                        className={styles.row12}
+                                        title={revealed['sigId'] ? 'Hide details' : 'Reveal details'}
+                                      >
+                                        {revealed['sigId'] ? <EyeOff size={14} /> : <Eye size={14} />}
+                                      </button>
+                                    )}
+                                </div>
+                              ),
+                            },
+                            {
+                              key: 'phone',
+                              label: 'Phone Number',
+                              priority: 'high',
+                              render: (row) => (
+                                <div className={styles.spread2}>
+                                  <span>
+                                    {revealed['sigPhone']
+                                      ? row.signatoryPhoneNumber || EMPTY_VALUE
+                                      : maskPhone(row.signatoryPhoneNumber)}
+                                  </span>
+                                  {row.signatoryPhoneNumber &&
+                                    row.signatoryPhoneNumber.trim() !== '' &&
+                                    row.signatoryPhoneNumber.toLowerCase() !== 'null' && (
+                                      <button
+                                        onClick={() =>
+                                          handleToggleReveal(
+                                            'sigPhone',
+                                            'Signatory Phone Number',
+                                            row.signatoryPhoneNumber!
+                                          )
+                                        }
+                                        className={styles.row12}
+                                        title={revealed['sigPhone'] ? 'Hide details' : 'Reveal details'}
+                                      >
+                                        {revealed['sigPhone'] ? <EyeOff size={14} /> : <Eye size={14} />}
+                                      </button>
+                                    )}
+                                </div>
+                              ),
+                            },
+                            {
+                              key: 'position',
+                              label: 'Position',
+                              priority: 'low',
+                              render: (row) => row.signatoryPosition || EMPTY_VALUE,
+                            },
+                          ]}
+                        />
+                      </DataTable>
                     </div>
                   )}
                 </div>
@@ -2069,26 +2264,42 @@ export default function Customer360() {
                     <TrendingUp size={14} />
                     Interested Products
                   </h4>
-                  <div className="table-responsive-wrapper">
-                  <table className="data-table">
-                    <thead>
-                      <tr>
-                        <th>Product Name</th>
-                        <th>Product Category</th>
-                        <th>Engagement Count</th>
-                        <th>Eligibility Score</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr>
-                        <td className={styles.rule8}>{formatValue(profile.interestedProductName || profile.interestedProduct)}</td>
-                        <td>{formatValue(profile.interestedProductCategory)}</td>
-                        <td>{formatValue(profile.engagementCount)}</td>
-                        <td>{formatValue(profile.eligibilityScore)}</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                  </div>
+                  <DataTable bare>
+                    <ResponsiveRows
+                      rows={[profile]}
+                      rowKey={() => 'interested-product-corporate'}
+                      columns={[
+                        {
+                          key: 'name',
+                          label: 'Product Name',
+                          priority: 'always',
+                          render: (row) => (
+                            <span className={styles.rule8}>
+                              {formatValue(row.interestedProductName || row.interestedProduct)}
+                            </span>
+                          ),
+                        },
+                        {
+                          key: 'category',
+                          label: 'Product Category',
+                          priority: 'always',
+                          render: (row) => formatValue(row.interestedProductCategory),
+                        },
+                        {
+                          key: 'engagement',
+                          label: 'Engagement Count',
+                          priority: 'low',
+                          render: (row) => formatValue(row.engagementCount),
+                        },
+                        {
+                          key: 'eligibility',
+                          label: 'Eligibility Score',
+                          priority: 'low',
+                          render: (row) => formatValue(row.eligibilityScore),
+                        },
+                      ]}
+                    />
+                  </DataTable>
                 </div>
               )}
             </div>

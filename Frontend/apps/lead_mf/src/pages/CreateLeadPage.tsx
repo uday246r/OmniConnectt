@@ -1,5 +1,5 @@
 import React from 'react';
-import { FileText } from 'lucide-react';
+import { FileText } from '@omniremit/ui/icons';
 import { PageHeader } from '@omniremit/ui';
 import { LeadFormContainer } from '../components/lead/LeadFormContainer';
 import shell from '../shared/leadPage.module.css';

@@ -2,7 +2,7 @@ import React from 'react';
 import {
   User, MapPin, Phone, Mail, Calendar, Globe, Shield, BookOpen, DollarSign, AlertTriangle,
   Hash, CreditCard, Building2, CheckSquare, TrendingUp, FileText, Briefcase, Eye, EyeOff,
-} from 'lucide-react';
+} from '@omniremit/ui/icons';
 import SectionContainer from './SectionContainer';
 import type { ContactDetail, CustomerProfile, FieldConfig } from '../types/api';
 import { applyMaskingRule, formatFieldValue, hasRevealableValue } from '../utils/fieldMasking';

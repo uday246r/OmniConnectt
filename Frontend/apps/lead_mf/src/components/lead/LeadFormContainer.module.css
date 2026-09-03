@@ -15,9 +15,9 @@
   padding: 32px 24px;
   text-align: center;
   color: var(--omni-color-text-secondary);
-  font-size: 13.5px;
+  font-size: var(--omni-font-size-sm-plus);
   background: var(--omni-color-surface-alt);
-  border-radius: 12px;
+  border-radius: var(--omni-radius-lg);
   border: 1.5px dashed #e2e8f0;
   line-height: 1.6;
 }
@@ -28,7 +28,7 @@
 }
 
 .emptyText {
-  font-weight: 600;
+  font-weight: var(--omni-font-weight-semibold);
   color: var(--omni-color-text-primary);
   margin-bottom: 4px;
 }

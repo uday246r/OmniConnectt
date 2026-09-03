@@ -3,7 +3,7 @@
  */
 
 .changeHint {
-  font-size: 13px;
+  font-size: var(--omni-font-size-sm);
   color: var(--omni-color-primary-600);
   margin-top: 2px;
 }

@@ -13,11 +13,18 @@ export function SkeletonDonutChart() {
   return (
     <div className={styles.donutSkelContainer} aria-hidden="true">
       <div className={styles.donutSkelRingWrap}>
-        <svg width="148" height="148" viewBox="0 0 150 150">
+        {/* 140x140 / r=54 / strokeWidth=18 mirrors the real donut in DashboardPage exactly. */}
+        <svg width="140" height="140" viewBox="0 0 150 150">
           <circle cx="75" cy="75" r="54" fill="transparent" stroke="#eaecf0" strokeWidth="18" />
         </svg>
+        {/*
+          The centre holds a 24px total and a small uppercase "Total" beneath it, so the placeholder
+          is two stacked blocks. It was a single full-width bar, which read as a line struck through
+          the ring rather than as a number.
+        */}
         <div className={styles.donutSkelCenter}>
-          <div className={`${[styles.shimmer, styles.text].join(' ')} ${styles.sdc1}`}  />
+          <div className={`${[styles.shimmer, styles.text].join(' ')} ${styles.sdcNum}`} />
+          <div className={`${[styles.shimmer, styles.text].join(' ')} ${styles.sdcLabel}`} />
         </div>
       </div>
 

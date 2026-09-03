@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle } from '@omniremit/ui/icons';
 import { Button, Drawer } from '@omniremit/ui';
 import form from '../../shared/formField.module.css';
 import { useLeadStore } from '../../store/useLeadStore';

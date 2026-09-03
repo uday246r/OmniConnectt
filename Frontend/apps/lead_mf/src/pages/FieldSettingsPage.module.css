@@ -12,16 +12,16 @@
   gap: var(--omni-space-1);
   background: #f1f5f9;
   padding: var(--omni-space-1);
-  border-radius: 10px;
+  border-radius: var(--omni-radius-lg-minus);
   width: fit-content;
   flex-wrap: wrap;
 }
 
 .productTab {
   padding: var(--omni-space-2) var(--omni-space-4);
-  border-radius: 7px;
+  border-radius: var(--omni-radius-sm-minus);
   border: none;
-  font-size: 12.5px;
+  font-size: var(--omni-font-size-sm-minus);
   font-weight: var(--omni-font-weight-semibold);
   font-family: inherit;
   cursor: pointer;
@@ -48,7 +48,7 @@
   align-items: center;
   gap: var(--omni-space-2);
   padding: 10px var(--omni-space-4);
-  border-radius: 10px;
+  border-radius: var(--omni-radius-lg-minus);
   font-size: var(--omni-font-size-sm);
   font-weight: var(--omni-font-weight-semibold);
 }
@@ -76,7 +76,7 @@
   padding: 60px 0;
   text-align: center;
   color: var(--omni-color-text-muted);
-  font-size: 13.5px;
+  font-size: var(--omni-font-size-sm-plus);
 }
 
 .loadingSpinner {
@@ -102,7 +102,7 @@
   padding: 12px var(--omni-space-5);
   border-bottom: 1px solid #eaecf0;
   background: linear-gradient(180deg, var(--omni-color-surface-alt) 0%, #f1f5f9 100%);
-  font-size: 11px;
+  font-size: var(--omni-font-size-xs-minus);
   font-weight: var(--omni-font-weight-bold);
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -128,7 +128,7 @@
 
 .selectInput {
   padding: 6px var(--omni-space-2);
-  border-radius: 7px;
+  border-radius: var(--omni-radius-sm-minus);
   border: 1px solid var(--omni-color-border-strong);
   font-size: var(--omni-font-size-sm);
   font-family: inherit;
@@ -149,10 +149,10 @@
 .numberInput {
   box-sizing: border-box;
   border: 1.5px solid var(--omni-color-border);
-  border-radius: 8px;
+  border-radius: var(--omni-radius-md);
   background: var(--omni-color-surface);
   color: var(--omni-color-text-primary);
-  font-size: 13px;
+  font-size: var(--omni-font-size-sm);
   font-family: inherit;
   outline: none;
   transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
@@ -194,7 +194,7 @@
   width: 30px;
   height: 30px;
   border: 1.5px solid transparent;
-  border-radius: 8px;
+  border-radius: var(--omni-radius-md);
   background: var(--omni-color-surface-alt);
   color: var(--omni-color-text-muted);
   cursor: pointer;
@@ -208,7 +208,7 @@
 
 .visibilityToggleOn {
   background: var(--omni-color-primary-50);
-  border-color: #bfdbfe;
+  border-color: var(--omni-color-primary-200);
   color: var(--omni-color-primary-600);
 }
 

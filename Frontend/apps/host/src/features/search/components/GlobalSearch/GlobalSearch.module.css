@@ -48,11 +48,11 @@
 }
 
 .shortcut {
-  font-size: 11px;
+  font-size: var(--omni-font-size-xs-minus);
   color: var(--omni-color-text-muted);
   background: var(--omni-color-surface);
   border: 1px solid var(--omni-color-border);
-  border-radius: 4px;
+  border-radius: var(--omni-radius-xs);
   padding: 1px 5px;
   flex-shrink: 0;
 }

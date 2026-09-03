@@ -10,22 +10,12 @@ import { ApiError } from '../../shared/api/httpClient'
 import { toast } from '../../shared/stores/toastStore'
 import styles from './CheckerAssignmentFormLayer.module.css'
 import { TOPICS, invalidate } from '../../shared/stores/invalidationStore'
+import { getInitials } from '@omniremit/ui'
 
 interface CheckerAssignmentFormLayerProps {
   /** Pre-selected module, when opened via a specific module card's "Add Checker" button. */
   module?: string
 }
-
-function getInitials(name?: string, email?: string): string {
-  if (name && name.trim()) {
-    const parts = name.trim().split(/\s+/)
-    if (parts.length >= 2) return `${parts[0][0]}${parts[1][0]}`.toUpperCase()
-    return name.substring(0, 2).toUpperCase()
-  }
-  if (email) return email.substring(0, 2).toUpperCase()
-  return 'U'
-}
-
 /**
  * Assigns one checker to one module. Deliberately a single simple form, not a wizard — there's only
  * two fields — but follows the same header/popLayer/invalidate shape every other form layer here

@@ -12,7 +12,7 @@ import {
   Flag,
   Search,
   X,
-} from 'lucide-react';
+} from '@omniremit/ui/icons';
 import { useLeadStore } from '../../store/useLeadStore';
 import { FilterCriterion } from '../../types/lead';
 

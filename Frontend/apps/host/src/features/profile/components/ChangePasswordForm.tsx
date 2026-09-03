@@ -1,10 +1,9 @@
 import { useState, type FormEvent } from 'react'
 import { useAuthStore } from '../../auth/store/authStore'
 import { authServiceClient } from '../../../shared/api/authServiceClient'
-import { Button } from '../../../shared/components/Button/Button'
-import { Input } from '../../../shared/components/Input/Input'
 import { Icon } from '../../../shared/components/Icon/Icon'
 import styles from './ChangePasswordForm.module.css'
+import { Button, Input } from '@omniremit/ui'
 
 export interface ChangePasswordFormProps {
   /** Called after the server confirms the change. The two callers do different things with it:

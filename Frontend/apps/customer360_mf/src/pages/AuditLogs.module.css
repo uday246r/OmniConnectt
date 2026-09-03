@@ -12,8 +12,8 @@
 .row {
   width: 50px;
   height: 50px;
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.18);
+  border-radius: var(--omni-radius-lg-plus);
+  background: var(--omni-color-on-header-surface);
   border: 1.5px solid rgba(255, 255, 255, 0.3);
   display: flex;
   align-items: center;
@@ -52,12 +52,12 @@
   gap: 6px;
   height: 38px;
   padding: 0 14px;
-  border-radius: 10px;
+  border-radius: var(--omni-radius-lg-minus);
   border: 1px solid #eaecf0;
   background: var(--omni-color-surface);
   color: #334155;
-  font-size: 13px;
-  font-weight: 600;
+  font-size: var(--omni-font-size-sm);
+  font-weight: var(--omni-font-weight-semibold);
   cursor: pointer;
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
   font-family: inherit;
@@ -65,13 +65,13 @@
 
 .row4 {
   padding: 16px 20px;
-  background: #fef2f2;
+  background: var(--omni-color-danger-50);
   border-bottom: 1px solid #fecaca;
-  color: #b91c1c;
+  color: var(--omni-color-danger-700);
   display: flex;
   align-items: center;
   gap: 10px;
-  font-size: 13px;
+  font-size: var(--omni-font-size-sm);
 }
 
 .rule2 {
@@ -91,8 +91,8 @@
 
 .rule3 {
   margin: 0;
-  font-size: 13.5px;
-  font-weight: 500;
+  font-size: var(--omni-font-size-sm-plus);
+  font-weight: var(--omni-font-weight-medium);
 }
 
 .text3 {
@@ -109,14 +109,14 @@
 
 .text4 {
   margin: 0 0 4px;
-  font-size: 15px;
+  font-size: var(--omni-font-size-md-plus);
   color: var(--omni-color-text-primary);
-  font-weight: 600;
+  font-weight: var(--omni-font-weight-semibold);
 }
 
 .text5 {
   margin: 0;
-  font-size: 13px;
+  font-size: var(--omni-font-size-sm);
   color: var(--omni-color-text-secondary);
 }
 
@@ -131,11 +131,11 @@
 .text6 {
   white-space: nowrap;
   color: var(--omni-color-text-primary);
-  font-weight: 500;
+  font-weight: var(--omni-font-weight-medium);
 }
 
 .text7 {
-  font-weight: 600;
+  font-weight: var(--omni-font-weight-semibold);
   color: var(--omni-color-text-primary);
 }
 
@@ -149,5 +149,5 @@
 }
 
 .rule7 {
-  font-weight: 600;
+  font-weight: var(--omni-font-weight-semibold);
 }

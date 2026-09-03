@@ -139,7 +139,7 @@
   padding: 60px 0;
   text-align: center;
   color: var(--omni-color-text-muted);
-  font-size: 13.5px;
+  font-size: var(--omni-font-size-sm-plus);
 }
 .loadingInner {
   display: inline-flex;
@@ -181,7 +181,7 @@
   border-radius: var(--omni-radius-md);
   border: 1.5px solid var(--omni-color-border);
   background: var(--omni-color-surface);
-  font-size: 12.5px;
+  font-size: var(--omni-font-size-sm-minus);
   font-family: inherit;
   color: var(--omni-color-text-primary);
   cursor: pointer;

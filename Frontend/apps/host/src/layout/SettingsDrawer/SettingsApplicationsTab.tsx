@@ -7,13 +7,11 @@ import { useDebouncedValue } from '../../shared/hooks/useDebouncedValue'
 import { useModuleRegistryStore } from '../../shared/stores/moduleRegistryStore'
 import { Icon } from '../../shared/components/Icon/Icon'
 import { SkeletonAppCard } from '../../shared/components/Skeleton'
-import { Pagination } from '../../shared/components/Pagination/Pagination'
-import { Modal } from '../../shared/components/Modal/Modal'
-import { Button } from '../../shared/components/Button/Button'
 import { ApiError } from '../../shared/api/httpClient'
 import { toast } from '../../shared/stores/toastStore'
 import styles from './SettingsApplicationsTab.module.css'
 import { TOPICS, invalidate, useDataRevision } from '../../shared/stores/invalidationStore'
+import { Button, EmptyState, Modal, Pagination } from '@omniremit/ui'
 
 const PAGE_SIZE = 10
 
@@ -356,9 +354,7 @@ export function SettingsApplicationsTab() {
             )
           })
         ) : (
-          <div className={styles.emptyState}>
-            <p>No applications registered yet.</p>
-          </div>
+          <EmptyState compact title="No applications registered yet." />
         )}
       </div>
 

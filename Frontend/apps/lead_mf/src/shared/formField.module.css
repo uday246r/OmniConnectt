@@ -71,14 +71,14 @@
 }
 
 .sectionHeading {
-  font-size: 18px;
+  font-size: var(--omni-font-size-lg-plus);
   font-weight: var(--omni-font-weight-bold);
   color: var(--omni-color-text-primary);
   margin-bottom: 6px;
 }
 
 .sectionText {
-  font-size: 13.5px;
+  font-size: var(--omni-font-size-sm-plus);
   color: var(--omni-color-text-secondary);
 }
 
@@ -87,7 +87,7 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: var(--omni-space-3);
-  font-size: 13.5px;
+  font-size: var(--omni-font-size-sm-plus);
 }
 
 .detailLabel {

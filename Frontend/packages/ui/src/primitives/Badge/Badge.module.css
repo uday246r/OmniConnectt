@@ -8,12 +8,19 @@
   font-weight: var(--omni-font-weight-semibold);
   white-space: nowrap;
   border: 1px solid transparent;
+  /*
+   * Capped. `nowrap` with no max-width meant one long status or module name set the width of the
+   * whole column it sat in — the badge could not shrink, so the table grew instead.
+   */
+  max-width: var(--omni-badge-max, 180px);
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .dot {
   width: 6px;
   height: 6px;
-  border-radius: 50%;
+  border-radius: var(--omni-radius-circle);
   background: currentColor;
   flex-shrink: 0;
 }

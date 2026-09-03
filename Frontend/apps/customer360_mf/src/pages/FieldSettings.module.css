@@ -12,8 +12,8 @@
 .row {
   width: 50px;
   height: 50px;
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.18);
+  border-radius: var(--omni-radius-lg-plus);
+  background: var(--omni-color-on-header-surface);
   border: 1.5px solid rgba(255, 255, 255, 0.3);
   display: flex;
   align-items: center;
@@ -28,17 +28,17 @@
   align-items: center;
   gap: 6px;
   color: #16a34a;
-  font-size: 13px;
-  font-weight: 600;
+  font-size: var(--omni-font-size-sm);
+  font-weight: var(--omni-font-weight-semibold);
 }
 
 .row3 {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  color: #b45309;
-  font-size: 13px;
-  font-weight: 600;
+  color: var(--omni-color-warning-700);
+  font-size: var(--omni-font-size-sm);
+  font-weight: var(--omni-font-weight-semibold);
 }
 
 .row4 {
@@ -46,8 +46,8 @@
   align-items: center;
   gap: 6px;
   color: var(--omni-color-danger-600);
-  font-size: 13px;
-  font-weight: 600;
+  font-size: var(--omni-font-size-sm);
+  font-weight: var(--omni-font-weight-semibold);
 }
 
 .box {
@@ -55,7 +55,7 @@
 }
 
 .text {
-  font-weight: 600;
+  font-weight: var(--omni-font-weight-semibold);
   color: #374151;
 }
 
@@ -154,7 +154,7 @@
 /* Same uppercase micro-heading lead_mf's Field Settings uses, so the two screens read alike. */
 .sectionTitle {
   margin: 0;
-  font-size: 11px;
+  font-size: var(--omni-font-size-xs-minus);
   font-weight: var(--omni-font-weight-bold);
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -178,10 +178,10 @@
   padding: 0 8px;
   text-align: center;
   border: 1.5px solid var(--omni-color-border);
-  border-radius: 8px;
+  border-radius: var(--omni-radius-md);
   background: var(--omni-color-surface);
   color: var(--omni-color-text-primary);
-  font-size: 13px;
+  font-size: var(--omni-font-size-sm);
   font-family: inherit;
   outline: none;
   transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
@@ -211,7 +211,7 @@
   width: 30px;
   height: 30px;
   border: 1.5px solid transparent;
-  border-radius: 8px;
+  border-radius: var(--omni-radius-md);
   background: var(--omni-color-surface-alt);
   color: var(--omni-color-text-muted);
   cursor: pointer;
@@ -225,7 +225,7 @@
 
 .visibilityToggleOn {
   background: var(--omni-color-primary-50);
-  border-color: #bfdbfe;
+  border-color: var(--omni-color-primary-200);
   color: var(--omni-color-primary-600);
 }
 
@@ -241,10 +241,10 @@
   height: 32px;
   padding: 0 10px;
   border: 1.5px solid var(--omni-color-border);
-  border-radius: 8px;
+  border-radius: var(--omni-radius-md);
   background: var(--omni-color-surface);
   color: var(--omni-color-text-primary);
-  font-size: 13px;
+  font-size: var(--omni-font-size-sm);
   font-family: inherit;
   outline: none;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;

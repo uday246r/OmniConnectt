@@ -37,7 +37,7 @@ export const LeadDiffTable: React.FC<LeadDiffTableProps> = ({
 }) => {
   return (
     <div className={styles.frame}>
-      <DataTable bare>
+      <DataTable bare minWidth={420}>
         <thead>
           <tr>
             <th>Field</th>

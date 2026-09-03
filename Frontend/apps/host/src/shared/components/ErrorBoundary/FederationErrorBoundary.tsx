@@ -1,5 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react'
-import { Button } from '../Button/Button'
+import { Button } from '@omniremit/ui'
 import styles from './FederationErrorBoundary.module.css'
 
 /** Delays between automatic retries, in ms. After the last one, only a manual retry remains. */

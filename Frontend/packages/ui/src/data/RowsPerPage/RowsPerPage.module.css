@@ -13,7 +13,7 @@
 }
 
 .label {
-  font-size: 11.5px;
+  font-size: var(--omni-font-size-xs-plus);
   font-weight: var(--omni-font-weight-bold);
   color: var(--omni-color-text-secondary);
   letter-spacing: 0.05em;
@@ -35,8 +35,8 @@
   box-sizing: border-box;
   padding: 6px 9px;
   border: 1.5px solid #93c5fd;
-  border-radius: 8px;
-  font-size: 12px;
+  border-radius: var(--omni-radius-md);
+  font-size: var(--omni-font-size-xs);
   font-weight: var(--omni-font-weight-semibold);
   font-family: inherit;
   color: var(--omni-color-text-primary);

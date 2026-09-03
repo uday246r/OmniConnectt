@@ -1,5 +1,5 @@
 import React from 'react';
-import { ScrollText } from 'lucide-react';
+import { ScrollText } from '@omniremit/ui/icons';
 import { useLeadStore } from '../../store/useLeadStore';
 import { isFieldVisible, isFieldRequired, isFieldEditable, getFieldLabel } from '../../config/fieldControlRegistry';
 import styles from './DeclarationConsentSection.module.css';

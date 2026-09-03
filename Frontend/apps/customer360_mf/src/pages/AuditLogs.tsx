@@ -16,19 +16,18 @@ import {
   Layers,
   Activity,
   Key,
-  Globe,
   Box,
   Copy,
   Check,
   LayoutGrid,
-} from 'lucide-react';
+} from '@omniremit/ui/icons';
 import { api, ApiError } from '../services/api';
 import type { AuditLog } from '../types/api';
 import { getFriendlyErrorMessage } from '../utils/errorMessages';
 import styles from './AuditLogs.module.css';
 import cc from '../shared/c360Common.module.css';
-import { ActorCell, Badge, Button, ColumnFilter, DataTable, EMPTY_VALUE, FilterBar, PageHeader, Pagination, RowAction, RowsPerPage, SearchField, formatAuditTimestamp, readStoredPageSize, type ActiveFilter, type BadgeTone } from '@omniremit/ui';
-import { resolveActor, shortId } from '../shared/resolveActor';
+import { ActorCell, Badge, Button, ColumnFilter, DataTable, DetailField, DetailGrid, DetailSection, DetailSections, Drawer, EMPTY_VALUE, FilterBar, PageHeader, Pagination, ResponsiveRows, RowAction, RowsPerPage, SearchField, formatAuditTimestamp, readStoredPageSize, type ActiveFilter, type BadgeTone } from '@omniremit/ui';
+import { resolveActor } from '../shared/resolveActor';
 
 /* Action -> platform badge tone. Was four hardcoded {bg,text,border,dot} palettes handed to the
    pill through inline custom properties; the tones carry the same colours from the token set. */
@@ -64,6 +63,25 @@ const ACTION_FILTER_OPTIONS = [
   { value: 'UPDATE', label: 'Profile Update' },
   { value: 'EXPORT', label: 'Data Export' },
 ];
+
+/*
+ * The raw action code (VIEW, LOOKUP, PROFILE.UPDATE) is what the API stores; ACTION_FILTER_OPTIONS
+ * already carries the plain-English name for each. Using it here means the table, the filter chips
+ * and the details drawer all say the same human-readable thing instead of shouting a code.
+ */
+const formatActionLabel = (action?: string | null): string => {
+  if (!action) return 'Activity';
+  const known = ACTION_FILTER_OPTIONS.find((o) => o.value === action.toUpperCase());
+  if (known) return known.label;
+  const segment = action.includes('.') ? action.slice(action.lastIndexOf('.') + 1) : action;
+  return segment
+    .replace(/_/g, ' ')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(' ');
+};
 
 export default function AuditLogs() {
   const [logs, setLogs] = useState<AuditLog[]>([]);
@@ -225,8 +243,13 @@ export default function AuditLogs() {
 
   const isSuccess = (selectedLog?.status || '').toUpperCase() === 'SUCCESS' || !selectedLog?.status;
   const resolvedActor = resolveActor(selectedLog?.user);
-  const actorName = resolvedActor.name ?? (resolvedActor.id ? `Officer ${shortId(resolvedActor.id)}` : 'System Officer');
-  const actorInitial = getActorInitial(actorName);
+  /*
+   * Stays null when the name cannot be resolved, so the Performed By field is omitted
+   * entirely. It previously rendered a truncated database GUID as though it were a name
+   * ("Officer 1a2b3c"), or the invented title 'System Officer'.
+   */
+  const actorName = resolvedActor.name;
+  const actorInitial = actorName ? getActorInitial(actorName) : '';
 
   return (
     <div className={styles.stack}>
@@ -316,13 +339,15 @@ export default function AuditLogs() {
           </div>
         )}
 
-        {/* Table / Empty State */}
-        {loading && logs.length === 0 ? (
-          <div className={styles.text}>
-            <RefreshCw size={24} className={`animate-spin ${styles.text2}`} />
-            <p className={styles.rule3}>Loading Customer 360° audit logs...</p>
-          </div>
-        ) : logs.length === 0 ? (
+        {/*
+          * Table / Empty State.
+          *
+          * The table uses priority columns + a row expander: as the window narrows, What Happened
+          * and Customer Reference drop out first and each row grows a chevron revealing them
+          * underneath, rather than the table scrolling sideways with half its columns off screen.
+          * `minWidth` is deliberately gone — the point is that it no longer needs a scroller.
+          */}
+        {logs.length === 0 && !loading ? (
           <div className={styles.text3}>
             <ShieldCheck size={36} className={styles.muted} />
             <h3 className={styles.text4}>No audit logs found</h3>
@@ -332,115 +357,148 @@ export default function AuditLogs() {
           </div>
         ) : (
           <DataTable>
-              <thead>
-                <tr>
-                  <th>Date &amp; Time</th>
-                  <ColumnFilter
-                    label="Performed By"
-                    title="Filter Performed By"
-                    value={actorFilter}
-                    onChange={setActorFilter}
-                    options={actorOptions}
-                    allLabel="Everyone"
-                    searchable={actorOptions.length > 6}
-                    searchPlaceholder="Type a name to narrow…"
-                    emptyHint="Nobody in this log matches that."
-                  />
-                  <ColumnFilter
-                    label="Action"
-                    value={actionFilter}
-                    onChange={setActionFilter}
-                    options={ACTION_FILTER_OPTIONS}
-                    allLabel="All Actions"
-                  />
-                  <ColumnFilter
-                    label="Customer Reference"
-                    title="Filter Customer"
-                    value={customerFilter}
-                    onChange={setCustomerFilter}
-                    options={customerOptions}
-                    allLabel="All Customers"
-                    searchable={customerOptions.length > 6}
-                    searchPlaceholder="Type to narrow customers…"
-                    emptyHint="No customer in this log matches that."
-                  />
-                  <th>What Happened</th>
-                  <ColumnFilter
-                    label="Status"
-                    value={statusFilter}
-                    onChange={setStatusFilter}
-                    options={STATUS_FILTER_OPTIONS}
-                    allLabel="All Statuses"
-                  />
-                  <th className={styles.rule4}>Details</th>
-                </tr>
-              </thead>
-              <tbody>
-                {visibleLogs.map((log, idx) => {
-                  // Per ROW. This previously read the component-level `isSuccess`, which is derived
-                  // from `selectedLog` — the drawer's record — so every row in the table rendered
-                  // the status of whichever log happened to be selected.
-                  const rowSuccess = isSuccessStatus(log.status);
-
-                  return (
-                    <tr
-                      key={idx}
-                      className={styles.rule5}
-                    >
-                      <td className={styles.text6}>
-                        {formatAuditTimestamp(log.timestamp)}
-                      </td>
-                      <td>
-                        {(() => {
-                          const actor = resolveActor(log.user);
-                          return (
-                            <ActorCell
-                              name={actor.name ?? (actor.id ? null : 'System')}
-                              fallback={actor.id ? shortId(actor.id) : undefined}
-                            />
-                          );
-                        })()}
-                      </td>
-                      <td>
-                        <Badge tone={actionTone(log.action)} dot>
-                          {(log.action || 'VIEW').toUpperCase()}
-                        </Badge>
-                      </td>
-                      {/* Customer reference. When there is no name — a failed lookup, a
-                          system-scope event — the identifier IS the reference, so it becomes the
-                          primary line instead of rendering a bare "-" above it. */}
-                      <td>
-                        {log.customerName ? (
-                          <>
-                            <div className={styles.text7}>{log.customerName}</div>
-                            {log.customerId && <div className={cc.monoMeta}>{log.customerId}</div>}
-                          </>
-                        ) : log.customerId ? (
-                          <div className={cc.monoMeta}>{log.customerId}</div>
-                        ) : (
-                          <span className={cc.mutedText}>{EMPTY_VALUE}</span>
-                        )}
-                      </td>
-                      <td className={styles.text8}>{log.description || '-'}</td>
-                      <td>
-                        <Badge tone={rowSuccess ? 'success' : 'danger'} dot>
-                          {log.status || 'Success'}
-                        </Badge>
-                      </td>
-                      <td className={styles.rule4}>
-                        <RowAction
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedLog(log);
-                            setDetailsOpen(true);
-                          }}
-                        />
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </DataTable>
+            <ResponsiveRows
+              loading={loading && logs.length === 0}
+              loadingRows={pageSize}
+              rows={visibleLogs}
+              rowKey={(log, i) => String(log.id ?? i)}
+              empty="No audit records found matching the selected filters."
+              columns={[
+                {
+                  key: 'timestamp',
+                  label: 'Date & Time',
+                  priority: 'always',
+                  render: (log) => (
+                    <span className={styles.text6}>{formatAuditTimestamp(log.timestamp)}</span>
+                  ),
+                },
+                {
+                  key: 'actor',
+                  label: 'Performed By',
+                  priority: 'always',
+                  header: (
+                    <ColumnFilter
+                      key="actor"
+                      label="Performed By"
+                      title="Filter Performed By"
+                      value={actorFilter}
+                      onChange={setActorFilter}
+                      options={actorOptions}
+                      allLabel="Everyone"
+                      searchable={actorOptions.length > 6}
+                      searchPlaceholder="Type a name to narrow…"
+                      emptyHint="Nobody in this log matches that."
+                    />
+                  ),
+                  render: (log) => {
+                    const actor = resolveActor(log.user);
+                    return (
+                      /*
+                       * No raw identifier here. The fallback used to be shortId(actor.id) — a
+                       * truncated database GUID, meaningless to the people who read this log. When
+                       * the name cannot be resolved, saying so plainly is more useful.
+                       */
+                      <ActorCell
+                        name={actor.name ?? (actor.id ? null : 'System')}
+                        fallback="Unknown user"
+                      />
+                    );
+                  },
+                },
+                {
+                  key: 'action',
+                  label: 'What Happened',
+                  priority: 'always',
+                  header: (
+                    <ColumnFilter
+                      key="action"
+                      label="What Happened"
+                      value={actionFilter}
+                      onChange={setActionFilter}
+                      options={ACTION_FILTER_OPTIONS}
+                      allLabel="All Actions"
+                    />
+                  ),
+                  render: (log) => (
+                    <Badge tone={actionTone(log.action)} dot>
+                      {formatActionLabel(log.action)}
+                    </Badge>
+                  ),
+                },
+                {
+                  key: 'customer',
+                  label: 'Customer',
+                  priority: 'low',
+                  header: (
+                    <ColumnFilter
+                      key="customer"
+                      label="Customer"
+                      title="Filter Customer"
+                      value={customerFilter}
+                      onChange={setCustomerFilter}
+                      options={customerOptions}
+                      allLabel="All Customers"
+                      searchable={customerOptions.length > 6}
+                      searchPlaceholder="Type to narrow customers…"
+                      emptyHint="No customer in this log matches that."
+                    />
+                  ),
+                  render: (log) =>
+                    log.customerName ? (
+                      <>
+                        <div className={styles.text7}>{log.customerName}</div>
+                        {log.customerId && <div className={cc.monoMeta}>{log.customerId}</div>}
+                      </>
+                    ) : log.customerId ? (
+                      <div className={cc.monoMeta}>{log.customerId}</div>
+                    ) : (
+                      <span className={cc.mutedText}>{EMPTY_VALUE}</span>
+                    ),
+                },
+                {
+                  key: 'description',
+                  label: 'Description',
+                  priority: 'low',
+                  render: (log) => <span className={styles.text8}>{log.description || EMPTY_VALUE}</span>,
+                },
+                {
+                  key: 'status',
+                  label: 'Outcome',
+                  priority: 'high',
+                  header: (
+                    <ColumnFilter
+                      key="status"
+                      label="Outcome"
+                      value={statusFilter}
+                      onChange={setStatusFilter}
+                      options={STATUS_FILTER_OPTIONS}
+                      allLabel="All Outcomes"
+                    />
+                  ),
+                  render: (log) => (
+                    <Badge tone={isSuccessStatus(log.status) ? 'success' : 'danger'} dot>
+                      {log.status || 'Success'}
+                    </Badge>
+                  ),
+                },
+                {
+                  key: 'details',
+                  label: 'Details',
+                  priority: 'always',
+                  align: 'right',
+                  render: (log) => (
+                    <RowAction
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedLog(log);
+                        setDetailsOpen(true);
+                      }}
+                    />
+                  ),
+                },
+              ]}
+            />
+          </DataTable>
         )}
       </div>
 
@@ -455,75 +513,60 @@ export default function AuditLogs() {
 
       {/* Details Drawer — Host & Lead Standard Structured Inspect Drawer */}
       {detailsOpen && selectedLog && (
-        <div
-          className={`drawer-overlay ${styles.rule6}`}
-          onClick={() => setDetailsOpen(false)}
+        <Drawer
+          open={detailsOpen}
+          onClose={() => setDetailsOpen(false)}
+          title="Activity Details"
+          subtitle="What happened, who did it, and when"
+          icon={<Shield size={22} />}
+          footer={
+            <Button type="button" variant="secondary" onClick={() => setDetailsOpen(false)}>
+              Close Details
+            </Button>
+          }
         >
-          <div className="audit-details-drawer" onClick={(e) => e.stopPropagation()}>
-            {/* Radiant Gradient Header */}
-            <div className="audit-drawer-header">
-              <div className="audit-header-left">
-                <div className="audit-header-icon-box">
-                  <Shield size={22} />
-                </div>
-                <div className="audit-header-text">
-                  <h2 className="audit-header-title">Audit Record Details</h2>
-                  <p className="audit-header-subtitle">Full event context, actor, and execution metadata</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                className="audit-header-close-btn"
-                onClick={() => setDetailsOpen(false)}
-                aria-label="Close details drawer"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            {/* Scrollable Body */}
-            <div className="audit-drawer-body">
-              {/* 1. Overview & Event Timeline (Two-Column Layout) */}
+            <DetailSections>
+              {/* Summary + timeline, side by side */}
               <section className="audit-drawer-section">
                 <div className="audit-overview-timeline-grid">
-                  {/* Left Column: Overview */}
                   <div className="audit-overview-col">
                     <h3 className="audit-drawer-section-title">
                       <LayoutGrid size={12} />
-                      Overview
+                      Summary
                     </h3>
                     <dl className="audit-detail-list">
-                      {/* Service */}
+                      {/*
+                        Not read from the record, and not a fabrication either: every row on this
+                        page is the Customer 360 audit trail, so naming the application states a
+                        fact about where the event came from. It keeps the Summary block structurally
+                        identical to the host and lead drawers, which both lead with it.
+                      */}
                       <div className="audit-detail-row">
                         <span className="audit-detail-icon">
                           <Layers size={15} />
                         </span>
                         <div className="audit-detail-row-body">
-                          <dt className="audit-detail-row-label">Service</dt>
+                          <dt className="audit-detail-row-label">Application</dt>
                           <dd className="audit-detail-row-value">
-                            <Badge tone="primary">
-                              Customer360Service
-                              </Badge>
+                            <Badge tone="primary">Customer 360</Badge>
                           </dd>
                         </div>
                       </div>
 
-                      {/* Action */}
                       <div className="audit-detail-row">
                         <span className="audit-detail-icon audit-detail-icon-neutral">
                           <Activity size={15} />
                         </span>
                         <div className="audit-detail-row-body">
-                          <dt className="audit-detail-row-label">Action</dt>
+                          <dt className="audit-detail-row-label">What Happened</dt>
                           <dd className="audit-detail-row-value">
                             <span className="audit-action-badge">
-                              {selectedLog.action || 'PROFILE.VIEW'}
+                              {formatActionLabel(selectedLog.action)}
                             </span>
                           </dd>
                         </div>
                       </div>
 
-                      {/* Result */}
                       <div className="audit-detail-row">
                         <span
                           className={`audit-detail-icon ${
@@ -533,22 +576,21 @@ export default function AuditLogs() {
                           {isSuccess ? <CheckCircle2 size={15} /> : <AlertTriangle size={15} />}
                         </span>
                         <div className="audit-detail-row-body">
-                          <dt className="audit-detail-row-label">Result</dt>
+                          <dt className="audit-detail-row-label">Outcome</dt>
                           <dd className="audit-detail-row-value">
                             <Badge tone={isSuccess ? 'success' : 'danger'} dot>
-                              {isSuccess ? 'Success' : selectedLog.status || 'Failed'}
+                              {isSuccess ? 'Successful' : selectedLog.status || 'Failed'}
                             </Badge>
                           </dd>
                         </div>
                       </div>
 
-                      {/* Timestamp */}
                       <div className="audit-detail-row">
                         <span className="audit-detail-icon audit-detail-icon-purple">
                           <Clock size={15} />
                         </span>
                         <div className="audit-detail-row-body">
-                          <dt className="audit-detail-row-label">Timestamp</dt>
+                          <dt className="audit-detail-row-label">Date &amp; Time</dt>
                           <dd className="audit-detail-row-value">
                             {formatAuditTimestamp(selectedLog.timestamp)}
                           </dd>
@@ -557,18 +599,17 @@ export default function AuditLogs() {
                     </dl>
                   </div>
 
-                  {/* Right Column: Event Timeline */}
                   <div className="audit-overview-col audit-overview-col-divider">
                     <h3 className="audit-drawer-section-title">
                       <Clock size={12} />
-                      Event Timeline
+                      Timeline
                     </h3>
                     <div className="audit-timeline">
                       <div className="audit-timeline-step">
                         <span className="audit-timeline-dot" />
                         <div className="audit-timeline-step-card">
                           <span className="audit-timeline-label">
-                            Triggered by {actorName}
+                            {actorName ? `Started by ${actorName}` : 'Activity recorded'}
                           </span>
                           <span className="audit-timeline-time">
                             <Clock size={12} />
@@ -585,11 +626,11 @@ export default function AuditLogs() {
                         />
                         <div className="audit-timeline-step-card">
                           <span className="audit-timeline-label">
-                            {isSuccess ? 'Event Completed Successfully' : 'Event Execution Failed'}
+                            {isSuccess ? 'Finished successfully' : 'Did not complete'}
                           </span>
                           <span className="audit-timeline-time">
                             <ShieldCheck size={12} />
-                            Customer 360 CRM
+                            Customer 360
                           </span>
                         </div>
                       </div>
@@ -598,133 +639,60 @@ export default function AuditLogs() {
                 </div>
               </section>
 
-              {/* 2. Actor & Authentication Context */}
-              <section className="audit-drawer-section">
-                <h3 className="audit-drawer-section-title">
-                  <User size={12} />
-                  Actor &amp; Authentication Context
-                </h3>
-                <div className="audit-field-card-grid">
-                  <div className="audit-field-card">
-                    <span className="audit-field-card-icon">
-                      <User size={15} />
-                    </span>
-                    <div className="audit-field-card-body">
-                      <span className="audit-field-card-label">Actor / Officer Name</span>
-                      <div className="audit-field-card-value">
-                        <div className="audit-user-chip">
-                          <span className="audit-user-avatar">{actorInitial}</span>
-                          <span>{actorName}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="audit-field-card">
-                    <span className="audit-field-card-icon">
-                      <Shield size={15} />
-                    </span>
-                    <div className="audit-field-card-body">
-                      <span className="audit-field-card-label">Access Channel</span>
-                      <span className="audit-field-card-value">
-                        <Badge tone="primary">
-                          CRM Core Access
-                          </Badge>
+              {/*
+                Every field below disappears when the backend sends nothing for it — DetailField
+                returns null rather than printing a placeholder. This section previously showed an
+                "Access Channel" badge reading "CRM Core Access" and a "Client IP" of "127.0.0.1",
+                both hardcoded in the markup rather than returned by the API: invented values in an
+                audit trail, which is the one place they must never appear. Gone until the endpoint
+                actually supplies them.
+              */}
+              <DetailSection title="Who Did This" icon={<User size={12} />} hidden={!actorName}>
+                <DetailGrid>
+                  <DetailField label="Performed By" icon={<User size={15} />}>
+                    {actorName ? (
+                      <span className="audit-user-chip">
+                        <span className="audit-user-avatar">{actorInitial}</span>
+                        <span>{actorName}</span>
                       </span>
-                    </div>
-                  </div>
+                    ) : null}
+                  </DetailField>
+                </DetailGrid>
+              </DetailSection>
 
-                  <div className="audit-field-card">
-                    <span className="audit-field-card-icon">
-                      <Globe size={15} />
-                    </span>
-                    <div className="audit-field-card-body">
-                      <span className="audit-field-card-label">Client IP (IPv4)</span>
-                      <span className="audit-field-card-value">
-                        <span className="audit-ip-badge">
-                          <span className="audit-ip-dot" />
-                          127.0.0.1
-                        </span>
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </section>
+              <DetailSection
+                title="Customer & Record"
+                icon={<Box size={12} />}
+                hidden={
+                  !selectedLog.customerName &&
+                  !selectedLog.customerType &&
+                  !selectedLog.field &&
+                  !selectedLog.description
+                }
+              >
+                <DetailGrid>
+                  <DetailField label="Customer" icon={<User size={15} />}>
+                    {selectedLog.customerName}
+                  </DetailField>
 
-              {/* 3. Target Customer & Entity Context */}
-              <section className="audit-drawer-section">
-                <h3 className="audit-drawer-section-title">
-                  <Box size={12} />
-                  Target Customer &amp; Entity Context
-                </h3>
-                <div className="audit-field-card-grid">
-                  <div className="audit-field-card">
-                    <span className="audit-field-card-icon">
-                      <User size={15} />
-                    </span>
-                    <div className="audit-field-card-body">
-                      <span className="audit-field-card-label">Customer Name</span>
-                      <span className={`audit-field-card-value ${styles.rule7}`}>
-                        {selectedLog.customerName || 'General / System Scope'}
-                      </span>
-                    </div>
-                  </div>
+                  <DetailField label="Customer Type" icon={<Layers size={15} />}>
+                    {selectedLog.customerType ? (
+                      <Badge tone="primary">{selectedLog.customerType}</Badge>
+                    ) : null}
+                  </DetailField>
 
-                  <div className="audit-field-card">
-                    <span className="audit-field-card-icon">
-                      <Layers size={15} />
-                    </span>
-                    <div className="audit-field-card-body">
-                      <span className="audit-field-card-label">Customer Type</span>
-                      <span className="audit-field-card-value">
-                        <Badge tone="primary">
-                          {selectedLog.customerType || 'Individual Profile'}
-                          </Badge>
-                      </span>
-                    </div>
-                  </div>
+                  <DetailField label="Field Changed" icon={<Target size={15} />}>
+                    {selectedLog.field}
+                  </DetailField>
 
-                  <div className="audit-field-card">
-                    <span className="audit-field-card-icon">
-                      <Target size={15} />
-                    </span>
-                    <div className="audit-field-card-body">
-                      <span className="audit-field-card-label">Target Field / Attribute</span>
-                      <span className="audit-field-card-value">
-                        {selectedLog.field || 'Full Profile View'}
-                      </span>
-                    </div>
-                  </div>
+                  <DetailField label="Description" icon={<FileText size={15} />} full>
+                    {selectedLog.description}
+                  </DetailField>
+                </DetailGrid>
+              </DetailSection>
+            </DetailSections>
 
-                  <div className="audit-field-card audit-field-card-full">
-                    <span className="audit-field-card-icon">
-                      <FileText size={15} />
-                    </span>
-                    <div className="audit-field-card-body">
-                      <span className="audit-field-card-label">Event Description</span>
-                      <span className="audit-field-card-value">
-                        {selectedLog.description || 'No description provided.'}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </section>
-
-            </div>
-
-            {/*
-              Sticky Footer — the raw JSON payload dump, the "Copy JSON"/"Copy ID" controls and the
-              truncated record GUID were removed: this drawer is read by business users reviewing
-              who did what, and internal identifiers are noise they cannot act on. Everything
-              meaningful is already presented as labelled fields above.
-            */}
-            <div className="audit-drawer-footer">
-              <Button type="button" variant="secondary" onClick={() => setDetailsOpen(false)}>
-                Close Details
-              </Button>
-            </div>
-          </div>
-        </div>
+        </Drawer>
       )}
     </div>
   );

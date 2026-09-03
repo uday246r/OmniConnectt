@@ -5,7 +5,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 9px;
+  border-radius: var(--omni-radius-md-plus);
   background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
   flex-shrink: 0;
   box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);

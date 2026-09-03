@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { Save, ArrowLeft, CheckCircle2 } from 'lucide-react';
+import { Save, ArrowLeft, CheckCircle2 } from '@omniremit/ui/icons';
 import { Button, Drawer, EmptyState } from '@omniremit/ui';
 import { LeadDiffTable } from '../../shared/LeadDiffTable';
 import { useLeadStore } from '../../store/useLeadStore';

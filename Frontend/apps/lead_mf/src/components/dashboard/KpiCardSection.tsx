@@ -1,5 +1,5 @@
 import React from 'react';
-import { Users, UserPlus, Hourglass, CheckCircle2, TrendingUp } from 'lucide-react';
+import { Users, UserPlus, Hourglass, CheckCircle2, TrendingUp } from '@omniremit/ui/icons';
 import { useLeadStore } from '../../store/useLeadStore';
 import styles from './KpiCardSection.module.css';
 

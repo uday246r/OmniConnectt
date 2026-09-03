@@ -33,7 +33,7 @@
 }
 
 .donutLabel {
-  font-size: 11px;
+  font-size: var(--omni-font-size-xs-minus);
   color: var(--omni-color-text-muted);
   font-weight: var(--omni-font-weight-semibold);
   margin-top: 3px;
@@ -68,13 +68,13 @@
 .legendSwatch {
   width: 8px;
   height: 8px;
-  border-radius: 50%;
+  border-radius: var(--omni-radius-circle);
   background-color: var(--legend-color);
   flex-shrink: 0;
 }
 
 .legendName {
-  font-size: 12.5px;
+  font-size: var(--omni-font-size-sm-minus);
   font-weight: var(--omni-font-weight-medium);
   color: #334155;
   overflow: hidden;

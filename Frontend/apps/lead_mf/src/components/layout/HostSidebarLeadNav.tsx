@@ -6,7 +6,7 @@ import {
   Users,
   ShieldCheck,
   Settings,
-} from 'lucide-react';
+} from '@omniremit/ui/icons';
 import { useLeadStore } from '../../store/useLeadStore';
 import {
   canViewDashboard,
