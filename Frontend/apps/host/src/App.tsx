@@ -60,6 +60,7 @@ const FEATURE_KEYS = {
   auditLogs: 'host.system.audit-logs',
   approvals: 'host.system.approvals',
   checkerAssignment: 'host.system.checker-assignment',
+  licensing: 'host.settings.licensing',
 } as const
 
 /**
@@ -454,6 +455,7 @@ function AppRoutes() {
                 ['roles', FEATURE_KEYS.roles, 'Create'],
                 ['applications', FEATURE_KEYS.applications, 'Register'],
                 ['checker-assignment', FEATURE_KEYS.checkerAssignment, 'Manage'],
+                ['licensing', FEATURE_KEYS.licensing, 'Manage'],
               ] as const
             ).map(([tab, featureKey, createCapability]) => (
               <Route key={tab} path={tab}>
