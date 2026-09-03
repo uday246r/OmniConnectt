@@ -83,6 +83,10 @@ public static class AuthDbSeeder
         await SeedSuperAdminUserAsync(db, roles, logger, ct);
         await SeedNavigationAsync(db, logger, ct);
         await LegacyFeatureCleanup.RunAsync(db, logger, ct);
+
+        // Diagnostic only — logs grants the claims builder will no longer mint. Runs last, so it sees
+        // the catalog exactly as the rest of startup left it.
+        await StaleGrantReport.RunAsync(db, logger, ct);
     }
 
     /// <summary>

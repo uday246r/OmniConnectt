@@ -156,8 +156,17 @@ public class AuthDbContext(DbContextOptions<AuthDbContext> options) : DbContext(
         modelBuilder.Entity<PermissionFeatureCapability>(entity =>
         {
             entity.HasIndex(c => new { c.FeatureId, c.Key }).IsUnique();
-            entity.Property(c => c.Key).HasMaxLength(50);
-            entity.Property(c => c.DisplayName).HasMaxLength(100);
+
+            // Widened from 50: dotted keys such as "chart.leads-over-time" are longer than the bare
+            // verbs ("Create", "View") this column was sized for.
+            entity.Property(c => c.Key).HasMaxLength(150);
+            entity.Property(c => c.DisplayName).HasMaxLength(200);
+            entity.Property(c => c.Description).HasMaxLength(500);
+            entity.Property(c => c.GroupKey).HasMaxLength(100);
+
+            // Stored as a string, like every other enum here, so inserting a new type in the middle
+            // of the enum can never silently re-map existing rows.
+            entity.Property(c => c.Type).HasConversion<string>().HasMaxLength(20);
 
             entity.HasOne(c => c.Feature)
                 .WithMany(f => f.Capabilities)

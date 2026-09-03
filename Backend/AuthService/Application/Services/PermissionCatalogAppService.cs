@@ -43,9 +43,8 @@ public class PermissionCatalogAppService(AuthDbContext db, IMemoryCache cache)
     }
 
     /// <summary>
-    /// Upserts a RemoteApp feature, its sub-modules (as child features), and fully replaces every
-    /// capability set involved. Idempotent — the same full-replace pattern used for RolePermissions
-    /// on role save.
+    /// Upserts a RemoteApp feature, its sub-modules (as child features), and reconciles every
+    /// capability set involved — declared capabilities upserted, undeclared ones deactivated. Idempotent.
     /// </summary>
     public async Task UpsertRemoteAppFeatureAsync(
         string key,
@@ -212,22 +211,99 @@ public class PermissionCatalogAppService(AuthDbContext db, IMemoryCache cache)
             existing.IsActive = true;
             existing.ParentFeatureId = parentId;
             existing.UpdatedAt = now;
-            db.PermissionFeatureCapabilities.RemoveRange(existing.Capabilities);
         }
 
-        foreach (var capability in capabilities)
-        {
-            db.PermissionFeatureCapabilities.Add(new PermissionFeatureCapability
-            {
-                Id = Guid.NewGuid(),
-                FeatureId = existing.Id,
-                Key = capability.Key,
-                DisplayName = capability.DisplayName,
-                SortOrder = capability.SortOrder,
-            });
-        }
+        ReconcileCapabilities(existing, capabilities);
 
         return existing;
+    }
+
+    /// <summary>
+    /// Brings one feature's capability rows in line with what the remote just declared: declared ones
+    /// are upserted and active, undeclared ones are deactivated.
+    /// </summary>
+    /// <remarks>
+    /// This used to be <c>RemoveRange(existing.Capabilities)</c> followed by a blind re-add, which had
+    /// two consequences. Every capability row was destroyed and recreated with a fresh Id on every
+    /// single sync — so nothing could ever reference a capability by Id. And when a remote stopped
+    /// declaring a capability, the row vanished while the RolePermission and UserPermissionOverride
+    /// rows naming it did not, leaving grants for something that no longer existed; those grants then
+    /// kept minting into tokens, because the claims builder had no capability row to check against.
+    /// <para>
+    /// Deactivating instead keeps the grant visible for audit and keeps the Id stable, while the
+    /// claims builder's <c>IsActive</c> join is what actually stops the stale grant being minted.
+    /// </para>
+    /// </remarks>
+    private void ReconcileCapabilities(PermissionFeature feature, IReadOnlyList<UpsertCapabilityRequest> declared)
+    {
+        // A snapshot, because the loop below adds rows and the navigation collection is fixed up by
+        // the change tracker as it goes.
+        var stored = feature.Capabilities.ToList();
+        var byKey = stored.ToDictionary(c => c.Key, StringComparer.OrdinalIgnoreCase);
+        var declaredKeys = declared.Select(d => d.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var incoming in declared)
+        {
+            var type = ParseType(incoming.Type);
+            var groupKey = incoming.GroupKey ?? DeriveGroupKey(incoming.Key);
+
+            if (byKey.TryGetValue(incoming.Key, out var row))
+            {
+                row.DisplayName = incoming.DisplayName;
+                row.SortOrder = incoming.SortOrder;
+                row.Description = incoming.Description;
+                row.Type = type;
+                row.GroupKey = groupKey;
+
+                // A capability that comes back after being withdrawn becomes grantable again, and any
+                // grant that survived the gap starts working again — which is the behaviour that makes
+                // deactivate-instead-of-delete safe for a remote that is merely offline mid-deploy.
+                row.IsActive = true;
+                continue;
+            }
+
+            var added = new PermissionFeatureCapability
+            {
+                Id = Guid.NewGuid(),
+                FeatureId = feature.Id,
+                Key = incoming.Key,
+                DisplayName = incoming.DisplayName,
+                Description = incoming.Description,
+                Type = type,
+                GroupKey = groupKey,
+                SortOrder = incoming.SortOrder,
+                IsActive = true,
+            };
+            // Added through the DbSet, never through feature.Capabilities: a row reached only by
+            // navigation fixup has its client-generated key mistaken for an existing row and is
+            // issued as an UPDATE instead of an INSERT. The nav-item sync carries the same note.
+            db.PermissionFeatureCapabilities.Add(added);
+
+            // Only the local dictionary is updated — the change tracker will fix up the navigation
+            // collection itself, and adding to it here as well would leave the same instance in it
+            // twice, which the catalog read would then emit as a duplicate capability.
+            byKey[incoming.Key] = added;
+        }
+
+        foreach (var row in stored.Where(c => c.IsActive && !declaredKeys.Contains(c.Key)))
+        {
+            row.IsActive = false;
+        }
+    }
+
+    private static CapabilityType ParseType(string? value) =>
+        Enum.TryParse<CapabilityType>(value, ignoreCase: true, out var parsed)
+            ? parsed
+            // An unrecognised type from a newer remote degrades to Api rather than failing the sync,
+            // matching how the rest of the discovery ladder handles a shape it does not know. Api is
+            // the safe direction: it is enforced by a filter, so it can only ever be stricter.
+            : CapabilityType.Api;
+
+    /// <summary>"kpi.total-leads" groups under "kpi"; "View" has no prefix and no group.</summary>
+    private static string? DeriveGroupKey(string capabilityKey)
+    {
+        var dot = capabilityKey.IndexOf('.');
+        return dot > 0 ? capabilityKey[..dot] : null;
     }
 
     public async Task DeactivateRemoteAppFeatureAsync(string key, CancellationToken ct = default)
@@ -289,7 +365,13 @@ public class PermissionCatalogAppService(AuthDbContext db, IMemoryCache cache)
 
     private static PermissionFeatureDto ToDto(PermissionFeature f, IReadOnlyList<PermissionFeature>? children = null) => new(
         f.Id, f.Key, f.DisplayName, f.Source.ToString(), f.SortOrder,
-        f.Capabilities.OrderBy(c => c.SortOrder).Select(c => new CapabilityDto(c.Key, c.DisplayName)).ToList(),
+        f.Capabilities
+            // Deactivated capabilities stay in the table for audit but must never be offered in the
+            // editors — granting one would create exactly the stale grant this change exists to end.
+            .Where(c => c.IsActive)
+            .OrderBy(c => c.SortOrder).ThenBy(c => c.Key, StringComparer.Ordinal)
+            .Select(c => new CapabilityDto(c.Key, c.DisplayName, c.Description, c.Type.ToString(), c.GroupKey))
+            .ToList(),
         (children ?? [])
             .OrderBy(c => c.SortOrder).ThenBy(c => c.DisplayName)
             .Select(c => ToDto(c))
