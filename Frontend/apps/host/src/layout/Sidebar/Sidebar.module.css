@@ -211,3 +211,12 @@
   flex: 1;
   min-width: 0;
 }
+
+/*
+ * A group header is the whole row, so it stretches like the link it replaced and pushes its chevron
+ * to the far edge. The shared .navItem class supplies the rest of the appearance.
+ */
+.groupHeader {
+  width: 100%;
+  justify-content: flex-start;
+}

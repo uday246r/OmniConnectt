@@ -67,21 +67,89 @@ function NavRow({ node, health }: { node: NavNodeDto; health: SidebarProps['heal
   const isOpen = expanded.has(node.key)
   const NodeIcon = resolveIcon(node.iconKey)
 
+  /*
+   * A row with children is a GROUP HEADER, not a link — the whole row toggles it, and the chevron is
+   * an indicator inside that one control rather than a second control beside it.
+   *
+   * Previously the row was a link and only the little chevron toggled, so clicking the app name
+   * opened the group but clicking it again could not close it: the click navigated instead, and
+   * landing back on a child route immediately re-expanded the group. Making the row itself the
+   * toggle is the standard accordion behaviour and removes that dead end.
+   *
+   * It also removes an accessibility problem. The chevron used to be a button sitting next to an
+   * anchor covering the same row, so the group had two tab stops that looked like one thing. Now
+   * there is one control, and `aria-expanded` on it says what it does.
+   *
+   * The children are the navigation targets. An app is still reachable directly at /apps/{key} by
+   * URL, which redirects to its first visible page.
+   */
+  if (hasChildren) {
+    return (
+      <>
+        <div className={styles.rowWrap}>
+          <button
+            type="button"
+            className={classNames(
+              navItemStyles.navItem,
+              styles.groupHeader,
+              node.state !== 'visible' && navItemStyles.navItemLocked,
+            )}
+            aria-expanded={isOpen}
+            title={node.maintenanceMessage ?? undefined}
+            onClick={() => toggleExpanded(node.key)}
+          >
+            <span className={navItemStyles.navIcon} aria-hidden="true">
+              <NodeIcon width={17} height={17} />
+            </span>
+            <span className={navItemStyles.navLabel}>{node.label}</span>
+            {unreachableBadge(node, health)}
+            <StateBadge node={node} />
+            <span
+              className={classNames(navItemStyles.navChevron, isOpen && navItemStyles.navChevronOpen)}
+              aria-hidden="true"
+            >
+              <Icon.ChevronRight width={14} height={14} />
+            </span>
+          </button>
+        </div>
+
+        {isOpen && (
+          <div className={navItemStyles.navChildren}>
+            {node.children.map((child) => {
+              const ChildIcon = resolveIcon(child.iconKey)
+              return (
+                <NavLink
+                  key={child.key}
+                  to={child.routePath}
+                  className={({ isActive }) =>
+                    classNames(
+                      navItemClass({ isActive }),
+                      navItemStyles.navChildItem,
+                      child.state !== 'visible' && navItemStyles.navItemLocked,
+                    )
+                  }
+                  title={child.maintenanceMessage ?? undefined}
+                >
+                  <span className={navItemStyles.navIcon} aria-hidden="true">
+                    <ChildIcon width={15} height={15} />
+                  </span>
+                  <span className={navItemStyles.navLabel}>{child.label}</span>
+                  <StateBadge node={child} />
+                </NavLink>
+              )
+            })}
+          </div>
+        )}
+      </>
+    )
+  }
+
   return (
     <>
       <div className={styles.rowWrap}>
         <NavLink
           to={node.routePath}
-          /*
-           * `end` for any row that has children, not just the dashboard.
-           *
-           * Without it a NavLink to /apps/lead also matches /apps/lead/view-lead, so both the parent
-           * and the child were marked aria-current="page" at once. Only one row can be the current
-           * page, and announcing two leaves a screen-reader user unable to tell which. The parent
-           * still reads as containing the active page because it is expanded and its child is
-           * highlighted.
-           */
-          end={node.routePath === '/' || hasChildren}
+          end={node.routePath === '/'}
           className={({ isActive }) =>
             classNames(navItemClass({ isActive }), node.state !== 'visible' && navItemStyles.navItemLocked)
           }
@@ -94,53 +162,7 @@ function NavRow({ node, health }: { node: NavNodeDto; health: SidebarProps['heal
           {unreachableBadge(node, health)}
           <StateBadge node={node} />
         </NavLink>
-
-        {/*
-          A real button, outside the link rather than appended inside it. Keeping it a sibling is what
-          makes "expand" and "navigate" two distinct, independently keyboard-reachable actions —
-          nesting an interactive control inside an anchor is invalid, and was the reason the old code
-          had to intercept clicks and re-dispatch them.
-        */}
-        {hasChildren && (
-          <button
-            type="button"
-            className={classNames(navItemStyles.navChevron, isOpen && navItemStyles.navChevronOpen)}
-            aria-expanded={isOpen}
-            aria-label={`${isOpen ? 'Collapse' : 'Expand'} ${node.label}`}
-            onClick={() => toggleExpanded(node.key)}
-          >
-            <Icon.ChevronRight width={14} height={14} />
-          </button>
-        )}
       </div>
-
-      {hasChildren && isOpen && (
-        <div className={navItemStyles.navChildren}>
-          {node.children.map((child) => {
-            const ChildIcon = resolveIcon(child.iconKey)
-            return (
-              <NavLink
-                key={child.key}
-                to={child.routePath}
-                className={({ isActive }) =>
-                  classNames(
-                    navItemClass({ isActive }),
-                    navItemStyles.navChildItem,
-                    child.state !== 'visible' && navItemStyles.navItemLocked,
-                  )
-                }
-                title={child.maintenanceMessage ?? undefined}
-              >
-                <span className={navItemStyles.navIcon} aria-hidden="true">
-                  <ChildIcon width={15} height={15} />
-                </span>
-                <span className={navItemStyles.navLabel}>{child.label}</span>
-                <StateBadge node={child} />
-              </NavLink>
-            )
-          })}
-        </div>
-      )}
     </>
   )
 }

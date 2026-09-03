@@ -75,7 +75,7 @@ describe('rendering the server tree', () => {
     // View Leads and Create Lead are the same remote.lead.lead feature. This is the pair a
     // one-row-per-module design silently dropped.
     renderSidebar(sections())
-    await userEvent.click(screen.getByRole('button', { name: /expand lead management/i }))
+    await userEvent.click(screen.getByRole('button', { name: /lead management/i }))
 
     expect(screen.getByRole('link', { name: /view leads/i })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /create lead/i })).toBeInTheDocument()
@@ -88,11 +88,11 @@ describe('rendering the server tree', () => {
   })
 })
 
-describe('the chevron, owned by the host', () => {
-  it('is absent when a row has no children', () => {
+describe('the group header, owned by the host', () => {
+  it('is a plain link, not a toggle, when a row has no children', () => {
     renderSidebar(sections([node({ key: 'host.dashboard', label: 'Dashboard', routePath: '/' })]))
 
-    expect(screen.queryByRole('button', { name: /expand/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /dashboard/i })).not.toBeInTheDocument()
   })
 
   it('starts collapsed, so children are not in the document', () => {
@@ -103,25 +103,34 @@ describe('the chevron, owned by the host', () => {
 
   it('expands and collapses, and reports its state to assistive tech', async () => {
     renderSidebar(sections())
-    const chevron = screen.getByRole('button', { name: /expand lead management/i })
+    const chevron = screen.getByRole('button', { name: /lead management/i })
 
     expect(chevron).toHaveAttribute('aria-expanded', 'false')
 
     await userEvent.click(chevron)
-    expect(screen.getByRole('button', { name: /collapse lead management/i })).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByRole('button', { name: /lead management/i })).toHaveAttribute('aria-expanded', 'true')
     expect(screen.getByRole('link', { name: /view leads/i })).toBeInTheDocument()
 
-    await userEvent.click(screen.getByRole('button', { name: /collapse lead management/i }))
+    await userEvent.click(screen.getByRole('button', { name: /lead management/i }))
     expect(screen.queryByRole('link', { name: /view leads/i })).not.toBeInTheDocument()
   })
 
-  it('is a separate control from the link, so expanding does not navigate', async () => {
-    // The old implementation appended the chevron INSIDE the anchor and had to intercept and
-    // re-dispatch clicks. Keeping them siblings is what makes both independently reachable.
+  it('collapses again on a second click anywhere on the row, and never navigates', async () => {
+    // The bug this replaces: the row was a link and only the small chevron toggled, so clicking the
+    // app name opened the group but clicking it again navigated instead of closing — and landing
+    // back on a child route re-expanded it, so the name could never close what it had opened.
     renderSidebar(sections())
-    const chevron = screen.getByRole('button', { name: /expand lead management/i })
+    const row = screen.getByRole('button', { name: /lead management/i })
 
-    expect(chevron.closest('a')).toBeNull()
+    // A button, not an anchor: there is no href to follow, so a click cannot navigate away.
+    expect(row.tagName).toBe('BUTTON')
+    expect(row.closest('a')).toBeNull()
+
+    await userEvent.click(row)
+    expect(screen.getByRole('link', { name: /view leads/i })).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: /lead management/i }))
+    expect(screen.queryByRole('link', { name: /view leads/i })).not.toBeInTheDocument()
   })
 
   it('expands the group containing the current route on load', () => {
@@ -133,7 +142,7 @@ describe('the chevron, owned by the host', () => {
 
   it('persists which groups were open, so a reload restores them', async () => {
     const { unmount } = renderSidebar(sections())
-    await userEvent.click(screen.getByRole('button', { name: /expand lead management/i }))
+    await userEvent.click(screen.getByRole('button', { name: /lead management/i }))
     unmount()
 
     // The store rehydrates from localStorage on creation, so asserting on what was written is what
@@ -183,7 +192,8 @@ describe('maintenance state', () => {
   it('marks a row under maintenance with its message', () => {
     renderSidebar(sections([{ ...LEAD, state: 'maintenance', maintenanceMessage: 'Back at 09:00.' }]))
 
-    expect(screen.getByRole('link', { name: /lead management/i })).toHaveAttribute('title', 'Back at 09:00.')
+    // A row with children is a group-header button, not a link.
+    expect(screen.getByRole('button', { name: /lead management/i })).toHaveAttribute('title', 'Back at 09:00.')
   })
 
   it('badges an unreachable app from the health overlay, not the tree', () => {
@@ -194,7 +204,7 @@ describe('maintenance state', () => {
       </MemoryRouter>,
     )
 
-    const row = screen.getByRole('link', { name: /lead management/i })
+    const row = screen.getByRole('button', { name: /lead management/i })
     expect(within(row).getByTitle('App server not responding')).toBeInTheDocument()
   })
 })
