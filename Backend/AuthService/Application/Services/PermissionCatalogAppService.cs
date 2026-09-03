@@ -3,6 +3,7 @@ using AuthService.Domain.Entities;
 using AuthService.Domain.Enums;
 using AuthService.Infrastructure;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace AuthService.Application.Services;
 
@@ -12,7 +13,7 @@ namespace AuthService.Application.Services;
 /// — and their own dynamically-declared capabilities — in sync. See
 /// Controllers/InternalController.cs for the API-key-gated HTTP surface over this.
 /// </summary>
-public class PermissionCatalogAppService(AuthDbContext db)
+public class PermissionCatalogAppService(AuthDbContext db, IMemoryCache cache)
 {
     public async Task<IReadOnlyList<PermissionFeatureDto>> GetCatalogAsync(bool activeOnly, CancellationToken ct = default)
     {
@@ -52,18 +53,27 @@ public class PermissionCatalogAppService(AuthDbContext db)
         int sortOrder,
         IReadOnlyList<UpsertCapabilityRequest> capabilities,
         IReadOnlyList<UpsertModuleRequest>? modules = null,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        string? iconKey = null,
+        string? manifestUrl = null,
+        string? containerName = null,
+        string? status = null,
+        string? maintenanceMessage = null)
     {
         var now = DateTimeOffset.UtcNow;
         var parent = await UpsertFeatureRowAsync(key, displayName, sortOrder, capabilities, parentId: null, now, ct);
+
+        await UpsertNavMetadataAsync(parent.Id, iconKey, manifestUrl, containerName, status, maintenanceMessage, now, ct);
 
         var incomingModules = modules ?? [];
         var childKeys = incomingModules.Select(m => $"{key}.{m.Key}").ToHashSet(StringComparer.Ordinal);
 
         foreach (var module in incomingModules)
         {
-            await UpsertFeatureRowAsync(
+            var child = await UpsertFeatureRowAsync(
                 $"{key}.{module.Key}", module.DisplayName, module.SortOrder, module.Capabilities, parent.Id, now, ct);
+
+            await ReplaceNavItemsAsync(child.Id, module.Nav, ct);
         }
 
         // A sub-module the remote no longer declares is DEACTIVATED, never deleted — deleting it
@@ -81,6 +91,90 @@ public class PermissionCatalogAppService(AuthDbContext db)
         }
 
         await db.SaveChangesAsync(ct);
+
+        // A resynced remote's new pages should appear in the sidebar on the next request, not after
+        // the catalog cache happens to expire.
+        cache.Remove(NavigationAppService.CatalogCacheKey);
+    }
+
+    /// <summary>
+    /// Fully replaces a feature's sidebar rows — but only when the caller actually supplied some.
+    /// <para>
+    /// A null <paramref name="nav"/> means the Module Registry had nothing to say: an older remote
+    /// that predates navigation, or one that was unreachable when the sync ran. Clearing rows in that
+    /// case would empty a working sidebar every time a remote hiccuped. An empty list is different —
+    /// it is a positive statement that this module has no rows, and it clears them.
+    /// </para>
+    /// </summary>
+    private async Task ReplaceNavItemsAsync(Guid featureId, IReadOnlyList<UpsertNavItemRequest>? nav, CancellationToken ct)
+    {
+        if (nav is null)
+        {
+            return;
+        }
+
+        var existing = await db.FeatureNavItems.Where(n => n.FeatureId == featureId).ToListAsync(ct);
+        db.FeatureNavItems.RemoveRange(existing);
+
+        // AddRange on the DbSet, not through a navigation collection: rows reached only by fixup get
+        // their client-generated key treated as an existing row and issued as an UPDATE instead of an
+        // INSERT. The same trap is documented on the capability sync.
+        db.FeatureNavItems.AddRange(nav.Select(n => new FeatureNavItem
+        {
+            Id = Guid.NewGuid(),
+            FeatureId = featureId,
+            NavKey = n.Key,
+            Label = n.Label,
+            IconKey = n.IconKey,
+            RouteSegment = n.RouteSegment,
+            SortOrder = n.SortOrder,
+            RequiredCapability = n.RequiredCapability,
+        }));
+    }
+
+    /// <summary>
+    /// Creates or updates the replicated render metadata for a remote-app feature. No-ops when the
+    /// caller supplied no manifest URL — that is a host feature, or an older Module Registry that
+    /// does not send render metadata, and neither should clear what is already stored.
+    /// </summary>
+    private async Task UpsertNavMetadataAsync(
+        Guid featureId,
+        string? iconKey,
+        string? manifestUrl,
+        string? containerName,
+        string? status,
+        string? maintenanceMessage,
+        DateTimeOffset now,
+        CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(manifestUrl))
+        {
+            return;
+        }
+
+        var existing = await db.RemoteAppNavMetadata.FirstOrDefaultAsync(m => m.FeatureId == featureId, ct);
+
+        if (existing is null)
+        {
+            db.RemoteAppNavMetadata.Add(new RemoteAppNavMetadata
+            {
+                FeatureId = featureId,
+                IconKey = iconKey,
+                ManifestUrl = manifestUrl,
+                ContainerName = containerName,
+                Status = status ?? "Active",
+                MaintenanceMessage = maintenanceMessage,
+                UpdatedAt = now,
+            });
+            return;
+        }
+
+        existing.IconKey = iconKey;
+        existing.ManifestUrl = manifestUrl;
+        existing.ContainerName = containerName;
+        existing.Status = status ?? "Active";
+        existing.MaintenanceMessage = maintenanceMessage;
+        existing.UpdatedAt = now;
     }
 
     /// <summary>Creates or updates one feature row and fully replaces its capabilities. Does not save.</summary>
@@ -164,7 +258,9 @@ public class PermissionCatalogAppService(AuthDbContext db)
             // Named `ct:` — UpsertRemoteAppFeatureAsync gained a `modules` parameter before the
             // cancellation token, so a positional call would silently bind `ct` to `modules`.
             await UpsertRemoteAppFeatureAsync(
-                incoming.Key, incoming.DisplayName, incoming.SortOrder, incoming.Capabilities, incoming.Modules, ct: ct);
+                incoming.Key, incoming.DisplayName, incoming.SortOrder, incoming.Capabilities, incoming.Modules, ct: ct,
+                iconKey: incoming.IconKey, manifestUrl: incoming.ManifestUrl, containerName: incoming.ContainerName,
+                status: incoming.Status, maintenanceMessage: incoming.MaintenanceMessage);
         }
 
         var now = DateTimeOffset.UtcNow;

@@ -104,7 +104,9 @@ builder.Services.AddScoped<SetPasswordInviteService>();
 builder.Services.AddScoped<PermissionCatalogAppService>();
 builder.Services.AddScoped<DashboardAppService>();
 builder.Services.AddScoped<SearchAppService>();
+builder.Services.AddMemoryCache();
 builder.Services.AddScoped<EntitlementAppService>();
+builder.Services.AddScoped<NavigationAppService>();
 // Singleton: it caches the entitlement map across requests, which is the whole point of it.
 builder.Services.AddSingleton<EntitlementSnapshotProvider>();
 

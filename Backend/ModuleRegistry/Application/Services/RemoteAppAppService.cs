@@ -170,12 +170,14 @@ public partial class RemoteAppAppService(
         db.RemoteApps.Add(app);
         await db.SaveChangesAsync(ct);
 
+        IReadOnlyList<RemoteNavItem>? nav = null;
         if (!string.IsNullOrWhiteSpace(sourceUrl))
         {
-            await RefreshCapabilitiesFromSourceAsync(app, sourceUrl, ct);
+            nav = await RefreshCapabilitiesFromSourceAsync(app, sourceUrl, ct);
         }
 
-        await authServiceClient.UpsertAsync(featureKey, displayName, request.SidebarOrder, ToCapabilityTuples(app), ct);
+        await authServiceClient.UpsertAsync(
+            featureKey, displayName, request.SidebarOrder, ToCapabilityTuples(app), ct, nav, ToRenderMetadata(app));
         await authServiceClient.PushAuditLogAsync("remoteapp.created", "RemoteApp", app.Id.ToString(), $"Registered remote app '{displayName}' ({key}).", actingUserId, actorName, displayName, ct);
 
         return MutationResult<RemoteAppDto>.Ok(ToDto(app));
@@ -216,23 +218,30 @@ public partial class RemoteAppAppService(
 
         await db.SaveChangesAsync(ct);
 
+        IReadOnlyList<RemoteNavItem>? nav = null;
         if (!string.IsNullOrWhiteSpace(newSourceUrl))
         {
             // Always re-fetch on save (not just when the URL itself changed) — this is also how an
             // admin picks up a remote app's newly-added capability without waiting for the periodic
             // resync, by simply opening and saving the edit form (or hitting Resync directly).
-            await RefreshCapabilitiesFromSourceAsync(app, newSourceUrl, ct);
+            nav = await RefreshCapabilitiesFromSourceAsync(app, newSourceUrl, ct);
         }
         else if (string.IsNullOrWhiteSpace(newSourceUrl) && app.Capabilities.Count > 0)
         {
             db.RemoteAppCapabilities.RemoveRange(app.Capabilities);
             app.Capabilities.Clear();
             await db.SaveChangesAsync(ct);
+
+            // The source URL was cleared, so the app has no declared navigation any more. Empty, not
+            // null: this is a real answer, and it must clear AuthService's rows rather than leaving a
+            // sidebar pointing at pages nothing declares.
+            nav = [];
         }
 
         if (app.Status != RemoteAppStatus.Disabled)
         {
-            await authServiceClient.UpsertAsync(app.PermissionFeatureKey, app.DisplayName, app.SidebarOrder, ToCapabilityTuples(app), ct);
+            await authServiceClient.UpsertAsync(
+                app.PermissionFeatureKey, app.DisplayName, app.SidebarOrder, ToCapabilityTuples(app), ct, nav, ToRenderMetadata(app));
         }
 
         await authServiceClient.PushAuditLogAsync("remoteapp.updated", "RemoteApp", app.Id.ToString(), $"Updated remote app '{app.DisplayName}' ({app.Key}).", actingUserId, actorName, app.DisplayName, ct);
@@ -279,7 +288,12 @@ public partial class RemoteAppAppService(
         }
         else if (!becomingDisabled && wasDisabled)
         {
-            await authServiceClient.UpsertAsync(app.PermissionFeatureKey, app.DisplayName, app.SidebarOrder, ToCapabilityTuples(app), ct);
+            // Nav is null here: re-enabling an app does not re-fetch its manifest, so AuthService
+            // should restore the rows it already holds rather than have them cleared by a push that
+            // simply had nothing to say about them.
+            await authServiceClient.UpsertAsync(
+                app.PermissionFeatureKey, app.DisplayName, app.SidebarOrder, ToCapabilityTuples(app), ct,
+                nav: null, render: ToRenderMetadata(app));
         }
 
         await authServiceClient.PushAuditLogAsync(
@@ -353,9 +367,21 @@ public partial class RemoteAppAppService(
         // The database writes stay sequential and on one context — EF Core's DbContext is not
         // thread-safe, so only the network I/O above may overlap.
         var staged = new List<(RemoteApp App, List<RemoteAppCapability> Capabilities)>();
+
+        // Nav is not persisted here — it travels straight through to AuthService, which keeps its own
+        // last-known rows when a push omits them. That is why an unreachable remote (fetched == null)
+        // simply contributes no entry: its sidebar survives untouched on the other side, and this
+        // service avoids a table whose only job would be to duplicate that.
+        var navByApp = new Dictionary<Guid, IReadOnlyList<RemoteNavItem>?>();
+
         foreach (var (app, fetched) in fetches)
         {
-            var rows = ApplyFetchedCapabilities(app, fetched);
+            if (fetched?.Nav is not null)
+            {
+                navByApp[app.Id] = fetched.Nav;
+            }
+
+            var rows = ApplyFetchedCapabilities(app, fetched?.Capabilities);
             if (rows is not null)
             {
                 staged.Add((app, rows));
@@ -374,7 +400,13 @@ public partial class RemoteAppAppService(
 
         var active = apps.Where(a => a.Status != RemoteAppStatus.Disabled).ToList();
         var features = active
-            .Select(a => (a.PermissionFeatureKey, a.DisplayName, a.SidebarOrder, ToCapabilityTuples(a)))
+            .Select(a => (
+                a.PermissionFeatureKey,
+                a.DisplayName,
+                a.SidebarOrder,
+                ToCapabilityTuples(a),
+                navByApp.TryGetValue(a.Id, out var nav) ? nav : null,
+                (RemoteAppRenderMetadata?)ToRenderMetadata(a)))
             .ToList();
         await authServiceClient.ResyncAsync(features, ct);
 
@@ -431,17 +463,24 @@ public partial class RemoteAppAppService(
     }
 
     /// <summary>Fetches the remote's declared capabilities and fully replaces the local RemoteAppCapability cache for it. No-ops (keeps last-known set) if the remote is unreachable.</summary>
-    private async Task RefreshCapabilitiesFromSourceAsync(RemoteApp app, string sourceUrl, CancellationToken ct)
+    /// <returns>
+    /// The sidebar rows the remote declared, or null when it declared none or could not be reached.
+    /// Nav is deliberately not cached in this service: it is handed to the caller to forward, and
+    /// AuthService keeps its own last-known rows when a push omits them. Null therefore means "leave
+    /// the existing sidebar alone", which is the right behaviour for an unreachable remote and saves
+    /// a table here whose only job would be to duplicate AuthService's.
+    /// </returns>
+    private async Task<IReadOnlyList<RemoteNavItem>?> RefreshCapabilitiesFromSourceAsync(RemoteApp app, string sourceUrl, CancellationToken ct)
     {
         var fetched = await authServiceClient.FetchRemoteCapabilitiesAsync(sourceUrl, ct);
-        var staged = ApplyFetchedCapabilities(app, fetched);
-        if (staged is null)
+        var staged = ApplyFetchedCapabilities(app, fetched?.Capabilities);
+        if (staged is not null)
         {
-            return;
+            await db.SaveChangesAsync(ct);
+            ResetCapabilityNavigation(app, staged);
         }
 
-        await db.SaveChangesAsync(ct);
-        ResetCapabilityNavigation(app, staged);
+        return fetched?.Nav;
     }
 
     /// <summary>
@@ -498,6 +537,10 @@ public partial class RemoteAppAppService(
             app.Capabilities.Add(capability);
         }
     }
+
+    /// <summary>The presentation fields replicated into AuthDb. Health is excluded on purpose — see RemoteAppRenderMetadata.</summary>
+    private static RemoteAppRenderMetadata ToRenderMetadata(RemoteApp app) => new(
+        app.IconKey, app.ManifestUrl, app.ContainerName, app.Status.ToString(), app.MaintenanceMessage);
 
     private static IReadOnlyList<RemoteCapability> ToCapabilityTuples(RemoteApp app) =>
         app.Capabilities

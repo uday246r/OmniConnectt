@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using ModuleRegistry.Domain;
 using ModuleRegistry.Domain.Entities;
 using ModuleRegistry.Domain.Enums;
 
@@ -56,17 +57,27 @@ public static class ModuleRegistryDbSeeder
 
         try
         {
-            // Sync permissions to AuthService
-            var customerCapabilities = await authServiceClient.FetchRemoteCapabilitiesAsync(customer360.PermissionsSourceUrl, ct) ?? [];
-            await authServiceClient.UpsertAsync(customer360.PermissionFeatureKey, customer360.DisplayName, customer360.SidebarOrder, customerCapabilities, ct);
-
-            var leadCapabilities = await authServiceClient.FetchRemoteCapabilitiesAsync(lead.PermissionsSourceUrl, ct) ?? [];
-            await authServiceClient.UpsertAsync(lead.PermissionFeatureKey, lead.DisplayName, lead.SidebarOrder, leadCapabilities, ct);
-            logger.LogInformation("Synced remote app permissions to AuthService.");
+            await PushAsync(customer360, ct);
+            await PushAsync(lead, ct);
+            logger.LogInformation("Synced remote app permissions and navigation to AuthService.");
         }
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Could not push initial remote app permissions to AuthService during seed.");
+        }
+
+        async Task PushAsync(RemoteApp app, CancellationToken token)
+        {
+            var discovered = await authServiceClient.FetchRemoteCapabilitiesAsync(app.PermissionsSourceUrl!, token);
+            await authServiceClient.UpsertAsync(
+                app.PermissionFeatureKey,
+                app.DisplayName,
+                app.SidebarOrder,
+                discovered?.Capabilities ?? [],
+                token,
+                discovered?.Nav,
+                new RemoteAppRenderMetadata(
+                    app.IconKey, app.ManifestUrl, app.ContainerName, app.Status.ToString(), app.MaintenanceMessage));
         }
     }
 }

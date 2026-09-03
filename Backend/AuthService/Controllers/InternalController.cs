@@ -22,7 +22,9 @@ public class InternalController(PermissionCatalogAppService catalog) : Controlle
     {
         // Named `ct:` — `modules` sits before the cancellation token, so a positional call would bind ct to it.
         await catalog.UpsertRemoteAppFeatureAsync(
-            request.Key, request.DisplayName, request.SortOrder, request.Capabilities, request.Modules, ct: ct);
+            request.Key, request.DisplayName, request.SortOrder, request.Capabilities, request.Modules, ct: ct,
+            iconKey: request.IconKey, manifestUrl: request.ManifestUrl, containerName: request.ContainerName,
+            status: request.Status, maintenanceMessage: request.MaintenanceMessage);
         return NoContent();
     }
 

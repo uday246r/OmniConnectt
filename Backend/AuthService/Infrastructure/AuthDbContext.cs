@@ -17,6 +17,8 @@ public class AuthDbContext(DbContextOptions<AuthDbContext> options) : DbContext(
     public DbSet<CheckerAssignment> CheckerAssignments => Set<CheckerAssignment>();
     public DbSet<SetPasswordInvite> SetPasswordInvites => Set<SetPasswordInvite>();
     public DbSet<ModuleEntitlement> ModuleEntitlements => Set<ModuleEntitlement>();
+    public DbSet<FeatureNavItem> FeatureNavItems => Set<FeatureNavItem>();
+    public DbSet<RemoteAppNavMetadata> RemoteAppNavMetadata => Set<RemoteAppNavMetadata>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -107,6 +109,43 @@ public class AuthDbContext(DbContextOptions<AuthDbContext> options) : DbContext(
             entity.Property(e => e.Visibility).HasConversion<string>().HasMaxLength(20);
             entity.Property(e => e.PlanTier).HasMaxLength(50);
             entity.Property(e => e.LockReason).HasMaxLength(500);
+        });
+
+        modelBuilder.Entity<FeatureNavItem>(entity =>
+        {
+            entity.HasIndex(n => new { n.FeatureId, n.NavKey }).IsUnique();
+
+            // Cascade, unlike RolePermission's Restrict. These rows are replicated presentation data
+            // with no grant history in them — nothing is lost by removing them with their feature,
+            // and leaving orphans would mean a sidebar row pointing at a feature that is gone.
+            entity.HasOne(n => n.Feature)
+                .WithMany()
+                .HasForeignKey(n => n.FeatureId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.Property(n => n.NavKey).HasMaxLength(100);
+            entity.Property(n => n.Label).HasMaxLength(200);
+            entity.Property(n => n.IconKey).HasMaxLength(100);
+            entity.Property(n => n.RouteSegment).HasMaxLength(100);
+            entity.Property(n => n.RequiredCapability).HasMaxLength(50);
+        });
+
+        modelBuilder.Entity<RemoteAppNavMetadata>(entity =>
+        {
+            // Keyed by FeatureId rather than an Id of its own: exactly one metadata row per feature,
+            // enforced by the primary key instead of an index that could be forgotten.
+            entity.HasKey(m => m.FeatureId);
+
+            entity.HasOne(m => m.Feature)
+                .WithMany()
+                .HasForeignKey(m => m.FeatureId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.Property(m => m.IconKey).HasMaxLength(100);
+            entity.Property(m => m.ManifestUrl).HasMaxLength(2048);
+            entity.Property(m => m.ContainerName).HasMaxLength(200);
+            entity.Property(m => m.Status).HasMaxLength(20);
+            entity.Property(m => m.MaintenanceMessage).HasMaxLength(2000);
         });
 
         modelBuilder.Entity<PermissionFeatureCapability>(entity =>

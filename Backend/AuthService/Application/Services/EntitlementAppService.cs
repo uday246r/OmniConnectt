@@ -4,6 +4,7 @@ using AuthService.Domain.Entities;
 using AuthService.Domain.Enums;
 using AuthService.Infrastructure;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace AuthService.Application.Services;
 
@@ -11,7 +12,7 @@ namespace AuthService.Application.Services;
 /// Reads and writes module licensing. Separate from RoleAppService on purpose: this decides what the
 /// deployment has bought, not who inside it may use what.
 /// </summary>
-public class EntitlementAppService(AuthDbContext db, EntitlementSnapshotProvider snapshot)
+public class EntitlementAppService(AuthDbContext db, EntitlementSnapshotProvider snapshot, IMemoryCache cache)
 {
     /// <summary>
     /// The full feature tree with each node's stored and effective entitlement.
@@ -99,7 +100,12 @@ public class EntitlementAppService(AuthDbContext db, EntitlementSnapshotProvider
         row.UpdatedBy = actorUserId;
 
         await db.SaveChangesAsync(ct);
+
+        // Both caches: the entitlement map this node reads, and the navigation catalog built from it.
+        // Other services still converge on their own 30s poll, but the operator who just made the
+        // change sees it immediately rather than wondering whether it saved.
         snapshot.Invalidate();
+        cache.Remove(NavigationAppService.CatalogCacheKey);
 
         var tree = await GetTreeAsync(ct);
         return Find(tree, featureKey);
