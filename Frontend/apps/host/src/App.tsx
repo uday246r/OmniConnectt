@@ -12,6 +12,7 @@ import { useSettingsDrawerStore, type SettingsTab } from './shared/stores/settin
 import { RouteFallback } from './shared/components/RouteFallback/RouteFallback'
 import { LoginPage } from './pages/LoginPage/LoginPage'
 import { PageSkeleton } from './shared/components/PageSkeleton/PageSkeleton'
+import { ForbiddenPage } from './pages/ForbiddenPage/ForbiddenPage'
 import { lazyWithPreload, preloadWhenIdle } from './shared/utils/lazyWithPreload'
 
 /**
@@ -52,6 +53,7 @@ const MyRequestsPage = lazy(() =>
 )
 
 const FEATURE_KEYS = {
+  dashboard: 'host.dashboard',
   users: 'host.settings.users',
   roles: 'host.settings.roles',
   applications: 'host.settings.applications',
@@ -107,6 +109,41 @@ function SettingsRoute({ tab }: { tab: SettingsTab }) {
    * bar keeps saying where you actually are.
    */
   return <DashboardPage />
+}
+
+/**
+ * The dashboard, gated by the same capability that decides whether its sidebar row appears.
+ *
+ * The row was hidden for a user without `host.dashboard:View`, but the route itself was open, so
+ * typing "/" — or simply signing in, which lands there — rendered the page anyway. Nothing leaked,
+ * because every call it makes is permission-checked server-side and the cards just read zero, but a
+ * page of zeroes is its own kind of wrong answer: it reads as "the platform is empty" rather than
+ * "this isn't yours to see".
+ *
+ * Denial redirects rather than showing Forbidden. Since "/" is where sign-in lands, a bare denial
+ * would make the first screen after logging in an error page, for a user whose account is working
+ * exactly as configured. The navigation tree already knows what they CAN reach, so the first row in
+ * it is a far better destination — and it is the server's answer, not a guess made here.
+ */
+function DashboardRoute() {
+  const isAdministrator = useAuthStore((s) => Boolean(s.user?.isAdministrator))
+  const hasCapability = useAuthStore((s) => s.hasCapability)
+  const navStatus = useNavigationStore((s) => s.status)
+  const sections = useNavigationStore((s) => s.sections)
+
+  if (isAdministrator || hasCapability(FEATURE_KEYS.dashboard, 'View')) {
+    return <DashboardPage />
+  }
+
+  // Redirecting off a tree that has not arrived yet would bounce the user somewhere arbitrary.
+  if (navStatus === 'idle' || navStatus === 'loading') {
+    return <RouteFallback />
+  }
+
+  const firstReachable = sections.flatMap((s) => s.items).find((i) => i.routePath !== '/')
+  return firstReachable
+    ? <Navigate to={firstReachable.routePath} replace />
+    : <ForbiddenPage what="the dashboard" />
 }
 
 function LoginRoute() {
@@ -361,7 +398,7 @@ function AppRoutes() {
           skeleton painted a duplicate fake sidebar and navbar inside the content area.
         */}
         <Route element={<AuthenticatedPagesLayout />}>
-          <Route index element={<DashboardPage />} />
+          <Route index element={<DashboardRoute />} />
           <Route path="profile" element={<ProfilePage />} />
           {/*
             Two routes, one component. /apps/lead resolves to the first page the caller can see;
