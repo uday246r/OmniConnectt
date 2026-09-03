@@ -1,0 +1,10 @@
+# Normalise line endings in the repository.
+#
+# Without this, a contributor whose editor writes LF and one whose editor writes
+# CRLF produce commits where git sees every line of a file as changed. That is
+# what turned the shared-UI merge into whole-file conflicts: UserFormLayer.tsx
+# showed 1589 changed lines when the real change was 32.
+#
+# `text=auto` stores every file git detects as text with LF in the repository,
+# while still checking it out with the platform's native endings.
+* text=auto
