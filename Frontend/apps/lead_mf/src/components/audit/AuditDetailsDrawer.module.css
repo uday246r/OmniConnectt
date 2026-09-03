@@ -1,0 +1,19 @@
+/*
+ * Styles extracted from this component's former inline blocks.
+ */
+
+.warnIcon {
+  color: var(--omni-color-warning-600);
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+/*
+ * The audit "action" value (LEAD_UPDATE, LEAD_DELETE, ...) is a machine identifier, so it keeps the
+ * monospace face the old `.audit-action-badge` gave it. Everything else about the badge — shape,
+ * colour, padding — now comes from the shared Badge, which is why this is one declaration instead
+ * of the nine that class used to carry.
+ */
+.actionCode {
+  font-family: var(--omni-font-mono, ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace);
+}

@@ -1,7 +1,8 @@
 import React from 'react';
-import { ScrollText } from 'lucide-react';
+import { ScrollText } from '@omniremit/ui/icons';
 import { useLeadStore } from '../../store/useLeadStore';
 import { isFieldVisible, isFieldRequired, isFieldEditable, getFieldLabel } from '../../config/fieldControlRegistry';
+import styles from './DeclarationConsentSection.module.css';
 
 interface DeclarationConsentSectionProps {
   isEdit?: boolean;
@@ -26,13 +27,13 @@ export const DeclarationConsentSection: React.FC<DeclarationConsentSectionProps>
 
       {/* Radio options for Declaration/Consent */}
       {isFieldVisible(config, 'marketingConsent') && (
-        <div style={{ marginBottom: '20px' }}>
-          <div className="form-label" style={{ marginBottom: '10px' }}>
+        <div className={styles.section}>
+          <div className={`form-label ${styles.sectionLabel}`}>
             {getFieldLabel(config, 'marketingConsent', 'Declaration/Consent')}{' '}
             {isFieldRequired(config, 'marketingConsent') && <span className="required-asterisk">*</span>}
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <div className={styles.optionList}>
             <label className="custom-radio-label">
               <input
                 type="radio"
@@ -69,7 +70,7 @@ export const DeclarationConsentSection: React.FC<DeclarationConsentSectionProps>
           </div>
 
           {errors.marketingConsent && (
-            <div className="field-error-message" style={{ marginTop: '8px' }}>
+            <div className={`field-error-message ${styles.optionRow}`}>
               {errors.marketingConsent}
             </div>
           )}
@@ -78,7 +79,7 @@ export const DeclarationConsentSection: React.FC<DeclarationConsentSectionProps>
 
       {/* Mandatory Privacy Policy Agreement */}
       {isFieldVisible(config, 'agreedToPrivacyPolicy') && (
-        <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid #f1f5f9' }}>
+        <div className={styles.optionHint}>
           <label className="custom-checkbox-label">
             <input
               type="checkbox"
@@ -87,7 +88,7 @@ export const DeclarationConsentSection: React.FC<DeclarationConsentSectionProps>
               disabled={privacyPolicyLocked}
               onChange={(e) => setFieldValue('agreedToPrivacyPolicy', e.target.checked)}
             />
-            <span style={{ fontSize: '12.5px', color: '#475569' }}>
+            <span className={styles.errorText}>
               I have read and agree to Bank Simpanan Nasional&apos;s{' '}
               <a
                 href="#privacy-policy"
@@ -95,7 +96,7 @@ export const DeclarationConsentSection: React.FC<DeclarationConsentSectionProps>
                   e.preventDefault();
                   alert('Bank Simpanan Nasional Privacy Policy: Your data is collected and processed in accordance with the Malaysian Personal Data Protection Act (PDPA) 2010.');
                 }}
-                style={{ color: '#2563eb', textDecoration: 'underline', fontWeight: 600 }}
+                className={styles.noteText}
               >
                 Privacy Policy
               </a>
@@ -106,7 +107,7 @@ export const DeclarationConsentSection: React.FC<DeclarationConsentSectionProps>
           </label>
 
           {errors.agreedToPrivacyPolicy && (
-            <div className="field-error-message" style={{ marginTop: '8px' }}>
+            <div className={`field-error-message ${styles.optionRow}`}>
               {errors.agreedToPrivacyPolicy}
             </div>
           )}

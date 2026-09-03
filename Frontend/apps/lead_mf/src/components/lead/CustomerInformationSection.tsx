@@ -1,8 +1,9 @@
 import React from 'react';
-import { User } from 'lucide-react';
+import { User } from '@omniremit/ui/icons';
 import { useLeadStore } from '../../store/useLeadStore';
 import { SearchableDropdown } from '../common/SearchableDropdown';
 import { isFieldVisible, isFieldRequired, isFieldEditable, getFieldLabel } from '../../config/fieldControlRegistry';
+import styles from './CustomerInformationSection.module.css';
 
 interface CustomerInformationSectionProps {
   isEdit?: boolean;
@@ -67,10 +68,10 @@ export const CustomerInformationSection: React.FC<CustomerInformationSectionProp
               onBlur={() => validateField('icNumber')}
             />
             {errors.icNumber && (
-              <div className="field-error-message" style={{ marginTop: '4px' }}>
+              <div className={`field-error-message ${styles.hintSpacer}`}>
                 <div>{errors.icNumber}</div>
-                <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px', fontWeight: 400 }}>
-                  Format: <span style={{ fontFamily: 'monospace', fontWeight: 600, color: '#334155' }}>YYMMDD-PB-XXXX</span>
+                <div className={styles.hint}>
+                  Format: <span className={styles.monoValue}>YYMMDD-PB-XXXX</span>
                 </div>
               </div>
             )}
@@ -85,7 +86,7 @@ export const CustomerInformationSection: React.FC<CustomerInformationSectionProp
             </label>
             <div className={`phone-input-container ${errors.phoneNumber ? 'has-error' : ''}`}>
               <div className="phone-prefix-box">
-                <span style={{ fontSize: '15px' }}>🇲🇾</span>
+                <span className={styles.largeText}>🇲🇾</span>
                 <span>+60</span>
               </div>
               <input

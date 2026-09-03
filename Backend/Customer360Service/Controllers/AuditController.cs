@@ -121,13 +121,18 @@ namespace backend.Controllers
         /// </summary>
         private string GetAuthenticatedUser()
         {
-            var nameClaim = User.FindFirst(ClaimTypes.Name)?.Value;
+            // Short claim names, not the long-form ClaimTypes.* URIs. Program.cs sets
+            // `options.MapInboundClaims = false`, which stops the JWT handler remapping "name" and
+            // "email" onto their legacy WS-Security URIs — so ClaimTypes.Name never matched anything
+            // and EVERY audit row fell through to the subject id, rendering as
+            // "User 60892301-eded-47ce-be0b-09a5823bc2bc" instead of the person's name.
+            var nameClaim = User.FindFirst(JwtClaimTypes.Name)?.Value;
             if (!string.IsNullOrEmpty(nameClaim) && nameClaim != "omniconnect-app")
             {
                 return nameClaim;
             }
 
-            var emailClaim = User.FindFirst(ClaimTypes.Email)?.Value;
+            var emailClaim = User.FindFirst(JwtClaimTypes.Email)?.Value;
             if (!string.IsNullOrEmpty(emailClaim))
             {
                 return emailClaim;
@@ -135,7 +140,7 @@ namespace backend.Controllers
 
             // The subject id is the last resort that is still genuinely the caller. Naming it as an
             // id rather than a person keeps the row honest about what is actually known.
-            var subClaim = User.FindFirst("sub")?.Value;
+            var subClaim = User.FindFirst(JwtClaimTypes.Subject)?.Value;
             return !string.IsNullOrEmpty(subClaim) ? $"User {subClaim}" : "Unattributed";
         }
     }

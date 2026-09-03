@@ -1,8 +1,7 @@
 import { useNavigate } from 'react-router-dom'
-import { Modal } from '../../../shared/components/Modal/Modal'
-import { Button } from '../../../shared/components/Button/Button'
 import type { PendingApprovalConflict } from '../pendingConflict'
 import styles from './PendingApprovalDialog.module.css'
+import { Button, Modal } from '@omniremit/ui'
 
 function formatWhen(iso: string): string {
   const date = new Date(iso)

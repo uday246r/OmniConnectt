@@ -1,4 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
 
 /* ── Page Grid ──────────────────────────────────────────────── */
 .page {
@@ -107,7 +106,7 @@
 /* Sized to the same ceiling as the app's biggest real heading
    (DashboardPage.module.css .heroTitle, 22px) — not a marketing-page display size. */
 .cardTitle {
-  font-size: 22px;
+  font-size: var(--omni-font-size-xl-plus);
   font-weight: 800;
   color: var(--omni-color-text-primary);
   letter-spacing: -0.03em;
@@ -116,10 +115,10 @@
 }
 
 .cardSubtitle {
-  font-size: 13px;
+  font-size: var(--omni-font-size-sm);
   color: var(--omni-color-text-secondary);
   margin: 0;
-  font-weight: 400;
+  font-weight: var(--omni-font-weight-regular);
   line-height: 1.55;
 }
 
@@ -138,7 +137,7 @@
   margin-bottom: 20px;
 }
 
-.errorIcon { font-size: 14px; }
+.errorIcon { font-size: var(--omni-font-size-md); }
 
 /* ── Form Fields ─────────────────────────────────────────────── */
 .formFields {
@@ -168,7 +167,7 @@
 }
 
 .forgotPasswordLink {
-  font-size: 12.5px;
+  font-size: var(--omni-font-size-sm-minus);
   font-weight: var(--omni-font-weight-semibold);
   color: var(--omni-color-primary-600);
   text-decoration: none;
@@ -212,7 +211,7 @@
   font-family: inherit;
 }
 
-.textInput::placeholder { color: var(--omni-color-text-muted); font-size: 13.5px; }
+.textInput::placeholder { color: var(--omni-color-text-muted); font-size: var(--omni-font-size-sm-plus); }
 
 .textInput:hover:not(:focus):not(:disabled) { border-color: var(--omni-color-border-strong); }
 
@@ -235,7 +234,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 5px;
+  border-radius: var(--omni-radius-xs-plus);
   transition: color var(--omni-transition-fast);
 }
 .eyeToggleBtn:hover { color: var(--omni-color-text-secondary); }
@@ -260,7 +259,7 @@
 .customCheckbox {
   width: 18px;
   height: 18px;
-  border-radius: 5px;
+  border-radius: var(--omni-radius-xs-plus);
   border: 1.5px solid var(--omni-color-border-strong);
   background: var(--omni-color-surface);
   display: flex;
@@ -277,7 +276,7 @@
 }
 
 .checkboxLabel {
-  font-size: 13.5px;
+  font-size: var(--omni-font-size-sm-plus);
   font-weight: var(--omni-font-weight-medium);
   color: var(--omni-color-text-secondary);
 }
@@ -290,7 +289,7 @@
   border: 1px solid transparent;
   background: linear-gradient(135deg, #2f72f5 0%, var(--omni-color-primary-700) 100%);
   color: var(--omni-color-text-on-primary);
-  font-size: 15px;
+  font-size: var(--omni-font-size-md-plus);
   font-weight: var(--omni-font-weight-bold);
   letter-spacing: -0.01em;
   display: flex;
@@ -356,7 +355,7 @@
   gap: 14px;
   margin: 20px 0 16px 0;
   color: var(--omni-color-text-muted);
-  font-size: 11px;
+  font-size: var(--omni-font-size-xs-minus);
   font-weight: var(--omni-font-weight-bold);
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -381,7 +380,7 @@
   background: var(--omni-color-info-bg);
   border: 1px solid var(--omni-color-primary-200);
   color: var(--omni-color-info-text);
-  font-size: 12px;
+  font-size: var(--omni-font-size-xs);
   line-height: 1.45;
   text-align: center;
 }
@@ -401,7 +400,7 @@
 }
 
 .footerLink {
-  font-size: 12px;
+  font-size: var(--omni-font-size-xs);
   color: var(--omni-color-text-muted);
   text-decoration: none;
   font-weight: var(--omni-font-weight-medium);
@@ -410,7 +409,7 @@
 
 .footerLink:hover { color: var(--omni-color-primary-600); }
 
-.footerDot { color: var(--omni-color-border-strong); font-size: 10px; }
+.footerDot { color: var(--omni-color-border-strong); font-size: var(--omni-font-size-2xs); }
 
 /* ── Responsive ─────────────────────────────────────────────── */
 @media (max-width: 1080px) {
@@ -442,8 +441,8 @@
     margin-bottom: 20px;
     padding-bottom: 16px;
   }
-  .cardTitle { font-size: 20px; }
-  .cardSubtitle { font-size: 12.5px; }
+  .cardTitle { font-size: var(--omni-font-size-xl); }
+  .cardSubtitle { font-size: var(--omni-font-size-sm-minus); }
   .formFields { gap: 16px; margin-bottom: 20px; }
   .textInput, .signInButton { height: 46px; }
   .cardFooterLinks { margin-top: 18px; padding-top: 16px; }
@@ -452,7 +451,7 @@
 @media (max-height: 700px) {
   .formCard   { padding: 24px 28px 20px 28px; }
   .cardHeader { margin-bottom: 18px; padding-bottom: 14px; }
-  .cardTitle  { font-size: 22px; }
+  .cardTitle  { font-size: var(--omni-font-size-xl-plus); }
   .formFields { gap: 14px; margin-bottom: 16px; }
   .cardFooterLinks { margin-top: 16px; }
 }

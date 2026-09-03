@@ -1,0 +1,236 @@
+/*
+ * Page shell shared WITHIN lead_mf.
+ *
+ * View Leads and Audit Trail Logs render the same frame: a page column, a white table card, a
+ * search/actions toolbar and a pagination footer. Both had their own copy of every rule. This is
+ * application-level rather than global — the host composes its pages differently, so promoting it to
+ * @omniremit/ui would be inventing a shared abstraction for a single consumer.
+ */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--omni-space-5);
+  max-width: 1340px;
+  width: 100%;
+  padding-bottom: var(--omni-space-7);
+  font-family: var(--omni-font-family);
+  box-sizing: border-box;
+}
+.card {
+  background: var(--omni-color-surface);
+  border-radius: var(--omni-radius-xl);
+  border: 1px solid #eaecf0;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.04);
+  /* Must NOT be hidden — that would clip the DataTable's own horizontal scroll container. */
+  overflow: visible;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  /*
+   * Horizontal inset, so a table inside this card is not flush against its edge — the host's audit
+   * table sits in from the card border and these did not. Vertical padding stays off: the toolbar
+   * and the table manage their own.
+   */
+  padding-left: var(--omni-space-4);
+  padding-right: var(--omni-space-4);
+}
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--omni-space-3);
+  padding: var(--omni-space-4) var(--omni-space-5);
+  border-bottom: 1px solid #eaecf0;
+  background: var(--omni-color-surface);
+}
+.toolbarLeft {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  max-width: 420px;
+}
+.toolbarRight {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.searchForm {
+  position: relative;
+  width: 100%;
+}
+.searchIcon {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--omni-color-text-muted);
+  pointer-events: none;
+}
+.searchInput {
+  height: 40px;
+  padding-left: 38px;
+  padding-right: 14px;
+  font-size: var(--omni-font-size-sm);
+}
+.searchInputClearable {
+  padding-right: 34px;
+}
+.clearSearch {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--omni-color-text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  padding: 2px;
+  border-radius: var(--omni-radius-sm);
+}
+.clearSearch:hover {
+  color: var(--omni-color-text-secondary);
+}
+.filterAnchor {
+  position: relative;
+}
+.toolbarBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  height: 40px;
+  border-radius: var(--omni-radius-lg);
+  border: 1.5px solid var(--omni-color-border);
+  background: var(--omni-color-surface);
+  color: var(--omni-color-text-primary);
+  font-size: var(--omni-font-size-sm);
+  font-weight: var(--omni-font-weight-semibold);
+  font-family: inherit;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  transition: background var(--omni-transition-fast), border-color var(--omni-transition-fast),
+    color var(--omni-transition-fast);
+}
+.toolbarBtn:hover {
+  background: var(--omni-color-surface-alt);
+  border-color: #c8d4e0;
+}
+.filterBtn {
+  padding: 0 var(--omni-space-4);
+}
+.filterBtnActive,
+.filterBtnActive:hover {
+  border-color: var(--omni-color-primary-600);
+  background: var(--omni-color-primary-50);
+  color: var(--omni-color-primary-700);
+}
+.refreshBtn {
+  width: 40px;
+  padding: 0;
+  color: var(--text-secondary);
+}
+.loadingRow {
+  padding: 60px 0;
+  text-align: center;
+  color: var(--omni-color-text-muted);
+  font-size: var(--omni-font-size-sm-plus);
+}
+.loadingInner {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--omni-space-2);
+}
+.loadingSpinner {
+  color: var(--omni-color-primary-600);
+}
+.pagination {
+  padding: 14px var(--omni-space-5);
+  border-top: 1px solid #eaecf0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--omni-space-3);
+  background: var(--omni-color-surface-alt);
+  font-size: var(--omni-font-size-sm);
+  color: var(--omni-color-text-secondary);
+}
+.paginationStrong {
+  color: var(--omni-color-text-primary);
+}
+.paginationControls {
+  display: flex;
+  align-items: center;
+  gap: var(--omni-space-4);
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.paginationGroup {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.pageSizeSelect {
+  padding: 5px 10px;
+  border-radius: var(--omni-radius-md);
+  border: 1.5px solid var(--omni-color-border);
+  background: var(--omni-color-surface);
+  font-size: var(--omni-font-size-sm-minus);
+  font-family: inherit;
+  color: var(--omni-color-text-primary);
+  cursor: pointer;
+  outline: none;
+  font-weight: var(--omni-font-weight-medium);
+}
+.pageIndicator {
+  font-weight: var(--omni-font-weight-semibold);
+  color: var(--omni-color-text-primary);
+  padding: 0 var(--omni-space-1);
+}
+.pageNavBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--omni-radius-md);
+  border: 1.5px solid var(--omni-color-border);
+  background: var(--omni-color-surface);
+  color: var(--omni-color-text-primary);
+  cursor: pointer;
+  transition: background var(--omni-transition-fast), border-color var(--omni-transition-fast);
+}
+.pageNavBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Wider toolbar-left, for a page whose controls include a select alongside the search box. */
+.toolbarLeftWide {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  max-width: 520px;
+  flex-wrap: wrap;
+}
+
+.toolbarSelect {
+  width: 160px;
+  height: 40px;
+  appearance: auto;
+  cursor: pointer;
+  font-size: var(--omni-font-size-sm);
+}
+
+.searchGrow {
+  position: relative;
+  flex: 1;
+  min-width: 220px;
+}

@@ -2,10 +2,11 @@ import React from 'react';
 import {
   User, MapPin, Phone, Mail, Calendar, Globe, Shield, BookOpen, DollarSign, AlertTriangle,
   Hash, CreditCard, Building2, CheckSquare, TrendingUp, FileText, Briefcase, Eye, EyeOff,
-} from 'lucide-react';
+} from '@omniremit/ui/icons';
 import SectionContainer from './SectionContainer';
 import type { ContactDetail, CustomerProfile, FieldConfig } from '../types/api';
 import { applyMaskingRule, formatFieldValue, hasRevealableValue } from '../utils/fieldMasking';
+import styles from './DynamicProfileSection.module.css';
 
 /** Decorative only — which icon a known section heading gets. Not part of the admin-configurable
  * spec (label/visibility/section/order/sensitive/masking), so kept as a small static lookup here
@@ -150,15 +151,14 @@ export default function DynamicProfileSection({
               </div>
               {config.sensitive ? (
                 <div
-                  className="info-value"
-                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: '8px' }}
+                  className={`info-value ${styles.spread}`}
                 >
-                  <span style={{ overflowWrap: 'anywhere' }}>{displayValue}</span>
+                  <span className={styles.rule}>{displayValue}</span>
                   {revealable && (
                     <button
                       type="button"
                       onClick={() => onToggleReveal(config.apiField, config.displayLabel, rawStr)}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', color: '#004EEB', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+                      className={styles.row}
                       title={isRevealed ? 'Hide details' : 'Reveal details'}
                     >
                       {isRevealed ? <EyeOff size={15} /> : <Eye size={15} />}
@@ -166,9 +166,9 @@ export default function DynamicProfileSection({
                   )}
                 </div>
               ) : (
-                <div className="info-value" style={isLink ? { color: '#004EEB', wordBreak: 'break-all' } : undefined}>
+                <div className={`info-value ${styles.text}`} style={isLink ? { color: '#004EEB', wordBreak: 'break-all' } : undefined}>
                   {isLink ? (
-                    <a href={displayValue} target="_blank" rel="noreferrer" style={{ color: '#004EEB', textDecoration: 'none' }}>
+                    <a href={displayValue} target="_blank" rel="noreferrer">
                       {displayValue}
                     </a>
                   ) : (

@@ -1,0 +1,283 @@
+/*
+ * The platform's canonical table chrome.
+ *
+ * Copied value-for-value from the host's de-facto table reference — the `.tableContainer` /
+ * `.logTable` block in apps/host/src/features/system-audit-logs/pages/AuditLogsPage.module.css,
+ * which was byte-identical to the copy in ApprovalCenterPage.module.css apart from `min-width`.
+ * That duplicated pair is what this file replaces.
+ *
+ * NOTE for anyone reaching for `shared/components/Table`: that component was dead code (zero
+ * imports anywhere) AND its styling did not match what the host actually renders — different
+ * padding, no header gradient, uppercase via a different weight. It was a misleading reference and
+ * has been removed. This file is the real one.
+ *
+ * TOKENS: every value with an exact `--omni-*` equivalent uses it. Several deliberately do not,
+ * because the host's real value is not in the token scale and snapping it to the nearest token
+ * would silently restyle the reference design (e.g. header `font-size: 11px` — the scale's smallest
+ * step is `--omni-font-size-xs: 12px`). Those are left raw and flagged inline. Do not "tidy" them
+ * into tokens without changing theme.css first.
+ */
+
+.container {
+  background: var(--omni-color-surface);
+  border: 1.5px solid #e8edf5; /* not in scale: --omni-color-border is #e2e8f0 */
+  border-radius: 18px; /* not in scale: --omni-radius-xl is 16px */
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04); /* not --omni-shadow-sm (0 1px 2px /.06) */
+  overflow-x: auto;
+  /* Momentum scrolling on iOS. AuditLogsPage set this in a max-width:768px media query; it is
+     harmless at any width and belongs with the scroll container itself. */
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Opt-in: the audit/approval tables reserve height so the page does not jump between pages of
+   results. Short tables (a 3-row settings list) must not inherit that. */
+.minHeight {
+  min-height: 420px;
+}
+
+/*
+ * For a table nested inside something that already draws a card — a Field Settings section, a
+ * dashboard panel. Keeps the row rhythm, header treatment and hover that make a table feel like
+ * part of the platform, and drops only the outer chrome, so the two borders do not double up.
+ */
+.bare {
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+}
+
+.table {
+  width: 100%;
+  /* Set by the `minWidth` prop as a custom-property hand-off — the value is runtime data, so it
+     cannot live in a static stylesheet, but the declaration itself still does. Defaults to 0 so an
+     unset prop simply means "no minimum". */
+  min-width: var(--omni-data-table-min-width, 0);
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.table thead {
+  background: linear-gradient(180deg, var(--omni-color-surface-alt) 0%, #f1f5f9 100%);
+  border-bottom: 1.5px solid var(--omni-color-border);
+}
+
+.table th {
+  padding: var(--omni-space-3) var(--omni-space-4);
+  font-size: var(--omni-font-size-xs-minus); /* below the scale's smallest step (xs = 12px) */
+  font-weight: var(--omni-font-weight-bold);
+  color: var(--omni-color-text-secondary);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/*
+ * DEFAULT OVERFLOW POLICY.
+ *
+ * A cell used to have no cap at all: no max-width, no overflow, no wrap rule. Whatever the data
+ * happened to be decided the column's width and the row's height, so one long description turned
+ * every row in the table four lines tall, and one long identifier pushed the columns beside it off
+ * screen. Truncation was opt-in per page, which meant most tables did not have it.
+ *
+ * Two lines, then ellipsis. One line is too strict for a description column; unbounded is what
+ * caused the problem. Callers that need a different treatment override `max-width` or set
+ * `--omni-data-table-cell-lines` on the cell.
+ *
+ * A truncated cell MUST carry a `title` so the full value stays reachable — see ActorCell for the
+ * pattern. The row expander (priority columns) is the fuller answer and is tracked separately.
+ */
+.table td {
+  padding: 13px 18px; /* off-scale by design; matches the host reference exactly */
+  border-bottom: 1px solid #f1f5f9;
+  font-size: var(--omni-font-size-sm);
+  vertical-align: middle;
+  color: #334155; /* between --omni-color-text-primary and -secondary; not a token */
+  max-width: var(--omni-data-table-cell-max, 280px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
+}
+
+/*
+ * The clamp itself. Applied to the cell's own text, not to element children, so a cell containing
+ * a Badge, an ActorCell or a button row is laid out normally and only free text is clamped.
+ */
+.table td {
+  display: table-cell;
+}
+
+/*
+ * Multi-line clamping is OPT-IN, via ResponsiveColumn's `clamp` flag.
+ *
+ * This used to be a blanket rule on `td > :where(span, div, p):only-child`, which was wrong: it
+ * overrode the display of whatever sat alone in a cell. Every Badge, status pill and action chip is
+ * an `inline-flex` element that shrink-wraps its label — forcing it to `-webkit-box` made it a
+ * block-level box, so its background stretched the full width of the column, and `box-orient:
+ * vertical` would have stacked a Badge's dot above its text. Only genuinely long free text wants
+ * clamping, and only the column author knows which columns those are.
+ */
+.cellClamp {
+  display: -webkit-box;
+  -webkit-line-clamp: var(--omni-data-table-cell-lines, 2);
+  line-clamp: var(--omni-data-table-cell-lines, 2);
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.table tbody tr {
+  transition: background 140ms ease;
+}
+
+.table tbody tr:hover {
+  background: var(--omni-color-surface-alt);
+}
+
+.table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* Right-aligned action cluster — was re-declared per feature. */
+.actionsCell {
+  display: flex;
+  gap: var(--omni-space-2);
+  justify-content: flex-end;
+  align-items: center;
+}
+
+.emptyCell {
+  text-align: center;
+  padding: 56px var(--omni-space-6);
+  color: var(--omni-color-text-muted);
+  font-size: var(--omni-font-size-md);
+  font-weight: var(--omni-font-weight-medium);
+}
+
+/* On the narrowest screens the 18px radius reads as disproportionate against the reduced page
+   gutters. Carried over from MyRequestsPage, which was the only table that had this rule. */
+@media (max-width: 480px) {
+  .container {
+    border-radius: var(--omni-radius-lg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .table tbody tr {
+    transition: none;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   PRIORITY COLUMNS + ROW EXPANDER  (see ResponsiveRows.tsx)
+   ══════════════════════════════════════════════════════════════
+   Visual treatment carried over from the host's Audit Logs, which had defined exactly this
+   interaction — chevron, expanded detail row, fade-in — before it was replaced by a separate
+   record viewer, leaving ~140 lines of styling unused. This is that design, made shareable.
+   ══════════════════════════════════════════════════════════════ */
+
+.expanderHead {
+  width: 40px;
+  padding-left: var(--omni-space-3) !important;
+  padding-right: 0 !important;
+}
+
+.expanderCell {
+  width: 40px;
+  padding-left: var(--omni-space-3);
+  padding-right: 0;
+  max-width: none;
+}
+
+.expandChevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: var(--omni-radius-sm);
+  background: transparent;
+  color: var(--omni-color-text-muted);
+  font-size: 17px;
+  line-height: 1;
+  cursor: pointer;
+  transition: transform 200ms ease, color 120ms ease, background 120ms ease;
+}
+
+.expandChevron:hover {
+  background: var(--omni-color-surface-alt);
+  color: var(--omni-color-text-primary);
+}
+
+.expandChevron:focus-visible {
+  outline: 2px solid var(--omni-color-primary-600);
+  outline-offset: 1px;
+}
+
+.expandChevronOpen {
+  transform: rotate(90deg);
+  color: var(--omni-color-primary-600);
+}
+
+/* The row whose detail panel is open — tinted so the pair reads as one unit. */
+.rowExpanded > td {
+  background: var(--omni-color-primary-50);
+  border-bottom-color: transparent;
+}
+
+.expandedRow > td {
+  background: var(--omni-color-primary-50);
+  padding: 0 0 var(--omni-space-4);
+}
+
+.expandedCell {
+  max-width: none !important;
+  overflow: visible !important;
+}
+
+.expandedList {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--omni-space-3) var(--omni-space-5);
+  margin: 0;
+  padding: 0 var(--omni-space-5);
+  animation: expandFadeIn 160ms ease-out;
+}
+
+@keyframes expandFadeIn {
+  from { opacity: 0; transform: translateY(-3px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .expandedList { animation: none; }
+  .expandChevron { transition: color 120ms ease, background 120ms ease; }
+}
+
+.expandedItem {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+/* Same micro-heading the table headers use, so a value reads the same wherever it sits. */
+.expandedLabel {
+  font-size: var(--omni-font-size-2xs-plus);
+  font-weight: var(--omni-font-weight-bold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--omni-color-text-secondary);
+}
+
+.expandedValue {
+  margin: 0;
+  font-size: var(--omni-font-size-sm);
+  color: var(--omni-color-text-primary);
+  overflow-wrap: anywhere;
+}
+
+.thRight {
+  text-align: right;
+}

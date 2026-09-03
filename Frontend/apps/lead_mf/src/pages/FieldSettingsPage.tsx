@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { Settings, Save, AlertCircle, CheckCircle2, Eye, EyeOff, RefreshCw } from 'lucide-react';
+import { Settings, Save, AlertCircle, CheckCircle2, Eye, EyeOff, RefreshCw } from '@omniremit/ui/icons';
+import { Button, Checkbox, DataTable, PageHeader, Select, TableSkeleton, Tabs } from '@omniremit/ui';
+import styles from './FieldSettingsPage.module.css';
+import shell from '../shared/leadPage.module.css';
 import { apiClient, isApprovalPending } from '../api/apiClient';
 import type { LeadFieldConfig } from '../config/fieldControlRegistry';
-import { FieldSettingsSkeleton } from '../components/common/PageSkeletons';
 
 /**
  * Lead Management's own Field Settings admin page — a separate implementation from Customer 360's
@@ -10,6 +12,15 @@ import { FieldSettingsSkeleton } from '../components/common/PageSkeletons';
  * section-grouped table cards, full-array PUT, pending-approval banner without refetching so unsaved
  * edits under the admin's cursor are never discarded).
  */
+export /* The masking vocabulary, shared by the two Field Settings pages' Select controls. */
+const MASKING_RULE_OPTIONS = [
+  { value: 'None', label: 'None' },
+  { value: 'HideFirstShowLast', label: 'Hide First, Show Last' },
+  { value: 'HideLastShowFirst', label: 'Hide Last, Show First' },
+  { value: 'HideMiddleShowFirstAndLast', label: 'Hide Middle, Show Ends' },
+  { value: 'FullMask', label: 'Full Mask' },
+];
+
 export const FieldSettingsPage: React.FC = () => {
   const [products, setProducts] = useState<{ id: string; name: string }[]>([]);
   const [selectedProductId, setSelectedProductId] = useState<string>('');
@@ -83,159 +94,81 @@ export const FieldSettingsPage: React.FC = () => {
 
   return (
     <div
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '20px',
-        maxWidth: '1340px',
-        width: '100%',
-        paddingBottom: '32px',
-        fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
-        boxSizing: 'border-box',
-      }}
+      className={shell.page}
     >
       {/* Hero Banner */}
-      <div
-        className="lead-hero-banner"
-        style={{
-          borderRadius: '18px',
-          padding: '24px 30px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: '20px',
-          flexWrap: 'wrap',
-          position: 'relative',
-          overflow: 'hidden',
-          background: 'linear-gradient(120deg, #1e40af 0%, #2563eb 45%, #3b82f6 100%)',
-          boxShadow: '0 4px 20px rgba(37, 99, 235, 0.25), 0 1px 4px rgba(37, 99, 235, 0.15)',
-          boxSizing: 'border-box',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '18px', minWidth: 0, position: 'relative', zIndex: 1 }}>
-          <div
-            style={{
-              width: '50px',
-              height: '50px',
-              borderRadius: '14px',
-              background: 'rgba(255, 255, 255, 0.18)',
-              border: '1.5px solid rgba(255, 255, 255, 0.3)',
-              backdropFilter: 'blur(8px)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#ffffff',
-              flexShrink: 0,
-              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
-            }}
+      <PageHeader
+        icon={<Settings size={24} />}
+        title="Field Settings"
+        subtitle="Configure label, visibility, requirement, editability, order, and masking per financing product."
+        actions={
+          <Button
+            type="button"
+            variant="onHeader"
+            onClick={handleSave}
+            disabled={saving || loading || fields.length === 0}
+            loading={saving}
+            leadingIcon={<Save size={15} />}
           >
-            <Settings size={24} />
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-            <h1 style={{ fontSize: '20px', fontWeight: 800, color: '#ffffff', margin: 0, letterSpacing: '-0.025em' }}>
-              Field Settings
-            </h1>
-            <p style={{ fontSize: '13px', color: 'rgba(255, 255, 255, 0.85)', margin: 0 }}>
-              Configure label, visibility, requirement, editability, order, and masking per financing product.
-            </p>
-          </div>
-        </div>
-
-        <button
-          type="button"
-          onClick={handleSave}
-          disabled={saving || loading || fields.length === 0}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '7px',
-            height: '40px',
-            padding: '0 18px',
-            borderRadius: '12px',
-            border: '1px solid rgba(255, 255, 255, 0.35)',
-            background: 'rgba(255, 255, 255, 0.95)',
-            color: '#1d4ed8',
-            fontSize: '13.5px',
-            fontWeight: 700,
-            cursor: saving || loading || fields.length === 0 ? 'not-allowed' : 'pointer',
-            opacity: saving || loading || fields.length === 0 ? 0.6 : 1,
-            boxShadow: '0 2px 10px rgba(0, 0, 0, 0.12)',
-            fontFamily: 'inherit',
-            flexShrink: 0,
-          }}
-        >
-          {saving ? <RefreshCw size={15} className="animate-spin" /> : <Save size={15} />}
-          <span>{saving ? 'Saving…' : 'Save Changes'}</span>
-        </button>
-      </div>
+            {saving ? 'Saving…' : 'Save Changes'}
+          </Button>
+        }
+      />
 
       {/* Product Tabs */}
-      <div style={{ display: 'inline-flex', gap: '4px', background: '#f1f5f9', padding: '4px', borderRadius: '10px', width: 'fit-content', flexWrap: 'wrap' }}>
-        {products.map((p) => (
-          <button
-            key={p.id}
-            type="button"
-            onClick={() => setSelectedProductId(p.id)}
-            style={{
-              padding: '8px 16px',
-              borderRadius: '7px',
-              border: 'none',
-              fontSize: '12.5px',
-              fontWeight: 600,
-              cursor: 'pointer',
-              fontFamily: 'inherit',
-              background: selectedProductId === p.id ? '#ffffff' : 'transparent',
-              color: selectedProductId === p.id ? '#2563eb' : '#64748b',
-              boxShadow: selectedProductId === p.id ? '0 1px 3px rgba(15, 23, 42, 0.08)' : 'none',
-            }}
-          >
-            {p.name}
-          </button>
-        ))}
-      </div>
+      {/* Shared Tabs: role="tablist" with roving tabindex and Left/Right/Home/End keys, none of
+          which the hand-rolled button row had. */}
+      <Tabs
+        id="lead-field-settings-product"
+        tabs={products.map((p) => ({ key: p.id, label: p.name }))}
+        activeKey={selectedProductId ?? ''}
+        onChange={setSelectedProductId}
+      />
 
       {savedMessage && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 16px', borderRadius: '10px', background: '#ecfdf5', border: '1px solid #a7f3d0', color: '#047857', fontSize: '13px', fontWeight: 600 }}>
+        <div className={`${styles.banner} ${styles.bannerSuccess}`}>
           <CheckCircle2 size={16} />
           <span>{savedMessage}</span>
         </div>
       )}
       {pendingMessage && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 16px', borderRadius: '10px', background: '#fffbeb', border: '1px solid #fde68a', color: '#92400e', fontSize: '13px', fontWeight: 600 }}>
+        <div className={`${styles.banner} ${styles.bannerPending}`}>
           <AlertCircle size={16} />
           <span>{pendingMessage}</span>
         </div>
       )}
       {error && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 16px', borderRadius: '10px', background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626', fontSize: '13px', fontWeight: 600 }}>
+        <div className={`${styles.banner} ${styles.bannerError}`}>
           <AlertCircle size={16} />
           <span>{error}</span>
         </div>
       )}
 
       {loading ? (
-        <FieldSettingsSkeleton />
+        <DataTable bare minWidth={820}>
+            <thead>
+              <tr>
+                {Array.from({ length: 9 }, (_, i) => (
+                  <th key={i}>&nbsp;</th>
+                ))}
+              </tr>
+            </thead>
+            <TableSkeleton rows={8} columns={9} />
+          </DataTable>
       ) : (
         sections.map((section) => (
           <div
             key={section}
-            style={{
-              background: '#ffffff',
-              borderRadius: '16px',
-              border: '1px solid #eaecf0',
-              boxShadow: '0 1px 4px rgba(15, 23, 42, 0.04)',
-              overflow: 'hidden',
-            }}
+            className={styles.sectionCard}
           >
-            <div style={{ padding: '13px 20px', borderBottom: '1px solid #eaecf0', background: '#f8fafc', fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>
+            <div className={styles.sectionTitle}>
               {section}
             </div>
-            <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-              <table style={{ width: '100%', minWidth: '820px', borderCollapse: 'collapse', fontSize: '13px', textAlign: 'left' }}>
+              <DataTable minWidth={820} bare>
                 <thead>
-                  <tr style={{ background: '#ffffff', borderBottom: '1px solid #eaecf0' }}>
+                  <tr>
                     {['Field', 'Label', 'Order', 'Visible', 'Required', 'Editable', 'Sensitive', 'Masking Rule', 'Visible Chars'].map((h) => (
-                      <th key={h} style={{ padding: '10px 16px', fontWeight: 700, fontSize: '10.5px', textTransform: 'uppercase', letterSpacing: '0.04em', color: '#64748b', whiteSpace: 'nowrap' }}>
+                      <th key={h}>
                         {h}
                       </th>
                     ))}
@@ -245,55 +178,52 @@ export const FieldSettingsPage: React.FC = () => {
                   {fields
                     .filter((f) => f.section === section)
                     .map((f) => (
-                      <tr key={f.id} style={{ borderBottom: '1px solid #f1f5f9', opacity: f.visible ? 1 : 0.55 }}>
-                        <td style={{ padding: '10px 16px' }}>
-                          <code style={{ fontSize: '12px', color: '#64748b' }}>{f.apiField}</code>
+                      <tr key={f.id} className={f.visible ? undefined : styles.rowHidden}>
+                        <td className={styles.cell}>
+                          <code className={styles.apiField}>{f.apiField}</code>
                         </td>
-                        <td style={{ padding: '10px 16px' }}>
+                        <td className={styles.cell}>
                           <input
                             type="text"
                             value={f.displayLabel}
                             onChange={(e) => updateField(f.id, { displayLabel: e.target.value })}
-                            style={{ width: '180px', padding: '6px 10px', borderRadius: '7px', border: '1px solid #cbd5e1', fontSize: '13px', fontFamily: 'inherit' }}
+                            className={styles.labelInput}
                           />
                         </td>
-                        <td style={{ padding: '10px 16px' }}>
+                        <td className={styles.cell}>
                           <input
                             type="number"
                             value={f.displayOrder}
                             onChange={(e) => updateField(f.id, { displayOrder: Number(e.target.value) })}
-                            style={{ width: '64px', padding: '6px 8px', borderRadius: '7px', border: '1px solid #cbd5e1', fontSize: '13px', fontFamily: 'inherit' }}
+                            className={styles.orderInput}
                           />
                         </td>
-                        <td style={{ padding: '10px 16px' }}>
+                        <td className={styles.cell}>
                           <button
                             type="button"
                             onClick={() => updateField(f.id, { visible: !f.visible })}
-                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: f.visible ? '#2563eb' : '#94a3b8', display: 'flex' }}
+                            className={`${styles.visibilityToggle}${f.visible ? ` ${styles.visibilityToggleOn}` : ''}`}
                             aria-label={f.visible ? 'Hide field' : 'Show field'}
                           >
                             {f.visible ? <Eye size={16} /> : <EyeOff size={16} />}
                           </button>
                         </td>
-                        <td style={{ padding: '10px 16px' }}>
-                          <input
-                            type="checkbox"
+                        <td className={styles.cell}>
+                          <Checkbox
                             checked={f.required}
                             onChange={(e) => updateField(f.id, { required: e.target.checked })}
-                            style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                            wrapperClassName={styles.checkboxCell}
                           />
                         </td>
-                        <td style={{ padding: '10px 16px' }}>
-                          <input
-                            type="checkbox"
+                        <td className={styles.cell}>
+                          <Checkbox
                             checked={f.editable}
                             onChange={(e) => updateField(f.id, { editable: e.target.checked })}
-                            style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                            wrapperClassName={styles.checkboxCell}
                           />
                         </td>
-                        <td style={{ padding: '10px 16px' }}>
-                          <input
-                            type="checkbox"
+                        <td className={styles.cell}>
+                          <Checkbox
                             checked={f.sensitive}
                             onChange={(e) =>
                               updateField(f.id, {
@@ -301,46 +231,32 @@ export const FieldSettingsPage: React.FC = () => {
                                 maskingRule: e.target.checked ? (f.maskingRule === 'None' ? 'HideFirstShowLast' : f.maskingRule) : 'None',
                               })
                             }
-                            style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                            wrapperClassName={styles.checkboxCell}
                           />
                         </td>
-                        <td style={{ padding: '10px 16px' }}>
-                          <select
+                        <td className={styles.cell}>
+                          <Select
+                            size="sm"
                             value={f.maskingRule}
                             disabled={!f.sensitive}
                             onChange={(e) => updateField(f.id, { maskingRule: e.target.value as LeadFieldConfig['maskingRule'] })}
-                            style={{ padding: '6px 8px', borderRadius: '7px', border: '1px solid #cbd5e1', fontSize: '12.5px', fontFamily: 'inherit', opacity: f.sensitive ? 1 : 0.5 }}
-                          >
-                            <option value="None">None</option>
-                            <option value="HideFirstShowLast">Hide First, Show Last</option>
-                            <option value="HideLastShowFirst">Hide Last, Show First</option>
-                            <option value="HideMiddleShowFirstAndLast">Hide Middle, Show Ends</option>
-                            <option value="FullMask">Full Mask</option>
-                          </select>
+                            options={MASKING_RULE_OPTIONS}
+                          />
                         </td>
-                        <td style={{ padding: '10px 16px' }}>
+                        <td className={styles.cell}>
                           <input
                             type="number"
                             min={0}
                             value={f.visibleCharCount}
                             disabled={!f.sensitive || f.maskingRule === 'None' || f.maskingRule === 'FullMask'}
                             onChange={(e) => updateField(f.id, { visibleCharCount: Number(e.target.value) })}
-                            style={{
-                              width: '56px',
-                              padding: '6px 8px',
-                              borderRadius: '7px',
-                              border: '1px solid #cbd5e1',
-                              fontSize: '13px',
-                              fontFamily: 'inherit',
-                              opacity: !f.sensitive || f.maskingRule === 'None' || f.maskingRule === 'FullMask' ? 0.5 : 1,
-                            }}
+                            className={styles.numberInput}
                           />
                         </td>
                       </tr>
                     ))}
                 </tbody>
-              </table>
-            </div>
+              </DataTable>
           </div>
         ))
       )}

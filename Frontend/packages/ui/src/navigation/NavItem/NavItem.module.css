@@ -1,0 +1,109 @@
+/*
+ * The sidebar navigation row.
+ *
+ * Copied verbatim from the host's `Sidebar.module.css` `.navItem`, which is the design reference.
+ * Both remotes portal their own sub-navigation INTO that same sidebar, so their rows sit directly
+ * beneath the host's — which made the drift very visible once you looked:
+ *
+ *              host .navItem        remote .navBtn
+ *   padding    8px 10px             7px 10px
+ *   gap        9px                  var(--omni-space-2)  (8px)
+ *   font-size  13.5px               var(--omni-font-size-sm)
+ *   radius     8px                  var(--omni-radius-md)
+ *
+ * Every row in one sidebar now measures the same, whichever app put it there. The host keeps its
+ * NavLink markup and imports these classes through `navItemStyles`; the remotes render <NavItem>.
+ */
+.navItem {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 10px;
+  border-radius: var(--omni-radius-md);
+  color: var(--omni-color-text-secondary);
+  font-size: var(--omni-font-size-sm-plus);
+  font-weight: var(--omni-font-weight-medium);
+  text-decoration: none;
+  transition: background 120ms ease, color 120ms ease;
+  letter-spacing: -0.01em;
+  margin-bottom: 1px;
+  /* Needed only by the remotes, whose rows are <button>s rather than <a>s. Inert on an anchor. */
+  width: 100%;
+  border: none;
+  background: transparent;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+.navItem:hover {
+  background: var(--omni-color-surface-alt);
+  color: var(--omni-color-text-primary);
+}
+
+/* Active — blue filled */
+.navItemActive,
+.navItemActive:hover {
+  background: var(--omni-color-primary-50);
+  color: var(--omni-color-primary-700);
+  font-weight: var(--omni-font-weight-semibold);
+}
+
+.navItemActive .navIcon { color: var(--omni-color-primary-600); }
+
+.navIcon {
+  width: 17px;
+  height: 17px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--omni-color-text-muted);
+  transition: color 120ms ease;
+}
+
+.navItem:hover .navIcon { color: var(--omni-color-text-secondary); }
+
+.navLabel {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.navItem:focus-visible {
+  outline: 2px solid var(--omni-color-primary-600);
+  outline-offset: -2px;
+}
+
+/*
+ * Icon-rail mode — 769px to 1100px, matching the host sidebar's own rule.
+ *
+ * Lives here rather than in the host because BOTH the host's rows and the sub-navigation rows the
+ * remotes portal into the same sidebar render this component. Hiding the label from the host's
+ * stylesheet could never reach the remotes' rows: CSS Modules hash per package, so a host selector
+ * cannot target a class the shared package generated.
+ *
+ * The label is hidden, not removed, so it stays in the accessibility tree and the row remains
+ * announced correctly.
+ */
+@media (min-width: 769px) and (max-width: 1100px) {
+  .navItem {
+    justify-content: center;
+    padding-left: 8px;
+    padding-right: 8px;
+    gap: 0;
+  }
+
+  .navLabel {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}

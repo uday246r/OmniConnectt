@@ -1,0 +1,199 @@
+/*
+ * Dashboard time-range filter.
+ *
+ * Like LeadFilterPopover, the panel is portaled to document.body — here to escape the hero banner's
+ * `overflow: hidden` — so it lands outside `#lead-mf-scope`. A CSS Module still applies, because
+ * modules are excluded from the prefixer and their class names are hashed unique.
+ */
+
+.root {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--omni-space-2);
+  padding: var(--omni-space-2) 14px;
+  background: var(--omni-color-surface);
+  border: 1.5px solid var(--omni-color-primary-500);
+  border-radius: var(--omni-radius-lg-minus);
+  font-size: var(--omni-font-size-sm-plus);
+  font-weight: var(--omni-font-weight-semibold);
+  font-family: inherit;
+  color: var(--omni-color-text-primary);
+  box-shadow: 0 2px 6px rgba(59, 130, 246, 0.12);
+  cursor: pointer;
+  transition: background var(--omni-transition-fast), border-color var(--omni-transition-fast);
+}
+
+.trigger:hover {
+  background: var(--omni-color-primary-50);
+}
+
+.triggerIcon {
+  color: var(--omni-color-primary-600);
+}
+
+.chevron {
+  color: var(--omni-color-text-secondary);
+  transition: transform 0.2s ease;
+}
+
+.chevronOpen {
+  transform: rotate(180deg);
+}
+
+.resetBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: var(--omni-space-2) 14px;
+  background: var(--omni-color-surface);
+  border: 1px solid var(--omni-color-border-strong);
+  border-radius: var(--omni-radius-lg-minus);
+  font-size: var(--omni-font-size-sm);
+  font-weight: var(--omni-font-weight-semibold);
+  font-family: inherit;
+  color: var(--omni-color-primary-600);
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  transition: background var(--omni-transition-fast), border-color var(--omni-transition-fast);
+}
+
+.resetBtn:hover {
+  background: var(--omni-color-primary-50);
+  border-color: var(--omni-color-primary-200);
+}
+
+/* ── Portaled panel ──────────────────────────────────────────── */
+.panel {
+  position: fixed;
+  top: var(--range-top, 0);
+  right: var(--range-right, 0);
+  z-index: 1200;
+  background: var(--omni-color-surface);
+  border-radius: var(--omni-radius-xl);
+  box-shadow: 0 12px 32px -4px rgba(15, 23, 42, 0.15), 0 4px 12px rgba(0, 0, 0, 0.06);
+  border: 1px solid var(--omni-color-border);
+  display: flex;
+  width: min(460px, calc(100vw - 24px));
+  overflow: hidden;
+  padding: var(--omni-space-3);
+  gap: var(--omni-space-4);
+}
+
+.presets {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.preset {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--omni-space-2) var(--omni-space-3);
+  border-radius: var(--omni-radius-md);
+  border: none;
+  background: transparent;
+  color: #334155;
+  font-weight: var(--omni-font-weight-medium);
+  font-size: var(--omni-font-size-sm);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--omni-transition-fast);
+}
+
+.preset:hover {
+  background: var(--omni-color-surface-alt);
+}
+
+.presetActive,
+.presetActive:hover {
+  background: var(--omni-color-primary-50);
+  color: var(--omni-color-primary-600);
+  font-weight: var(--omni-font-weight-semibold);
+}
+
+.custom {
+  width: 210px;
+  border-left: 1px solid #f1f5f9;
+  padding-left: var(--omni-space-4);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.customTitle {
+  font-size: var(--omni-font-size-sm-plus);
+  font-weight: var(--omni-font-weight-bold);
+  color: var(--omni-color-text-primary);
+  margin-bottom: 14px;
+}
+
+.customField {
+  margin-bottom: var(--omni-space-3);
+}
+
+.customFieldLast {
+  margin-bottom: var(--omni-space-4);
+}
+
+.customLabel {
+  display: block;
+  font-size: var(--omni-font-size-xs);
+  color: var(--omni-color-text-secondary);
+  margin-bottom: var(--omni-space-1);
+  font-weight: var(--omni-font-weight-medium);
+}
+
+.dateInput {
+  width: 100%;
+  padding: 7px 10px;
+  border-radius: var(--omni-radius-md);
+  border: 1px solid var(--omni-color-border-strong);
+  font-size: var(--omni-font-size-sm-minus);
+  font-family: inherit;
+  color: var(--omni-color-text-primary);
+  font-weight: var(--omni-font-weight-medium);
+  outline: none;
+  box-sizing: border-box;
+  background-color: var(--omni-color-surface-alt);
+}
+
+.dateInput:focus {
+  border-color: var(--omni-color-primary-600);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.applyBtn {
+  width: 100%;
+  padding: 9px var(--omni-space-4);
+  background: var(--omni-color-primary-600);
+  border: none;
+  border-radius: var(--omni-radius-md);
+  color: var(--omni-color-text-on-primary);
+  font-size: var(--omni-font-size-sm);
+  font-weight: var(--omni-font-weight-semibold);
+  font-family: inherit;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.25);
+  transition: background-color var(--omni-transition-fast);
+}
+
+.applyBtn:hover:not(:disabled) {
+  background: var(--omni-color-primary-700);
+}
+
+/* `disabled` replaces the inline background/cursor ternaries on both dates being set. */
+.applyBtn:disabled {
+  background: var(--omni-color-text-muted);
+  cursor: not-allowed;
+  box-shadow: none;
+}

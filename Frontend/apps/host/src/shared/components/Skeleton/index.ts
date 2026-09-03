@@ -1,15 +1,29 @@
 /*
- * The four primitives now live in @omniremit/ui so the remotes use the same ones rather than their
- * own copies — re-exported here so every existing host import keeps working unchanged.
+ * The host's skeleton barrel.
  *
- * The card-level skeletons below stay local on purpose: each is an exact shape match for a specific
- * host card, which is what makes them worth having (no layout shift when the real content arrives),
- * and that shape is not something a remote would ever want.
+ * The four PRIMITIVES now come straight from @omniremit/ui — they were byte-compatible duplicates
+ * of the shared ones, and a shimmer that differs between the host and a remote is exactly the kind
+ * of drift the shared package exists to prevent. Every existing
+ * `from '…/shared/components/Skeleton'` import keeps working unchanged.
+ *
+ * The CARD-LEVEL skeletons below stay local on purpose: each one is shape-matched to a specific
+ * host card so the page does not shift when real content arrives. They describe host layouts, so
+ * they are not shareable and do not belong in the platform package.
  */
-export { SkeletonBlock, SkeletonText, SkeletonAvatar, SkeletonTable } from '@omniremit/ui/skeleton'
-export type { SkeletonBlockProps } from '@omniremit/ui/skeleton'
+export {
+  SkeletonBlock,
+  SkeletonText,
+  SkeletonAvatar,
+  SkeletonTable,
+} from '@omniremit/ui'
+export type {
+  SkeletonBlockProps,
+  SkeletonTextProps,
+  SkeletonAvatarProps,
+  SkeletonTableProps,
+} from '@omniremit/ui'
 
-// Card-level skeletons — exact shape matches for zero CLS
+// Card-level skeletons — exact shape matches for zero CLS. Host-specific.
 export { SkeletonUserCard } from './SkeletonUserCard'
 export { SkeletonRoleCard } from './SkeletonRoleCard'
 export { SkeletonAppCard } from './SkeletonAppCard'

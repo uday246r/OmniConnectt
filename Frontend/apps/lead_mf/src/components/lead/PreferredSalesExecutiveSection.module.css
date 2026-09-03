@@ -1,0 +1,22 @@
+/*
+ * Styles extracted from this component's former inline blocks.
+ */
+
+.section {
+  margin-top: 20px;
+  margin-bottom: 20px;
+}
+
+.field {
+  margin-bottom: 14px;
+}
+
+.label {
+  font-weight: var(--omni-font-weight-medium);
+  color: #1e293b;
+}
+
+.nested {
+  margin-top: 12px;
+  padding-left: 28px;
+}

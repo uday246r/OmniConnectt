@@ -2,8 +2,8 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
-using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using backend.Infrastructure;
 
 #nullable disable
@@ -18,63 +18,63 @@ namespace backend.Migrations
 #pragma warning disable 612, 618
             modelBuilder
                 .HasAnnotation("ProductVersion", "10.0.0")
-                .HasAnnotation("Relational:MaxIdentifierLength", 63);
+                .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
-            NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
+            SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
             modelBuilder.Entity("backend.Models.AuditLog", b =>
                 {
                     b.Property<string>("Id")
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)")
+                        .HasColumnType("nvarchar(64)")
                         .HasJsonPropertyName("id");
 
                     b.Property<string>("Action")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
+                        .HasColumnType("nvarchar(100)")
                         .HasJsonPropertyName("action");
 
                     b.Property<string>("CustomerId")
                         .HasMaxLength(150)
-                        .HasColumnType("character varying(150)")
+                        .HasColumnType("nvarchar(150)")
                         .HasJsonPropertyName("customerId");
 
                     b.Property<string>("CustomerName")
                         .HasMaxLength(300)
-                        .HasColumnType("character varying(300)")
+                        .HasColumnType("nvarchar(300)")
                         .HasJsonPropertyName("customerName");
 
                     b.Property<string>("CustomerType")
                         .HasMaxLength(50)
-                        .HasColumnType("character varying(50)")
+                        .HasColumnType("nvarchar(50)")
                         .HasJsonPropertyName("customerType");
 
                     b.Property<string>("Description")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("nvarchar(max)")
                         .HasJsonPropertyName("description");
 
                     b.Property<string>("Field")
                         .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
+                        .HasColumnType("nvarchar(200)")
                         .HasJsonPropertyName("field");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
+                        .HasColumnType("nvarchar(20)")
                         .HasJsonPropertyName("status");
 
                     b.Property<string>("Timestamp")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("nvarchar(450)")
                         .HasJsonPropertyName("timestamp");
 
                     b.Property<string>("User")
                         .IsRequired()
                         .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
+                        .HasColumnType("nvarchar(200)")
                         .HasJsonPropertyName("user");
 
                     b.HasKey("Id");
@@ -90,52 +90,52 @@ namespace backend.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("ApiField")
                         .IsRequired()
                         .HasMaxLength(150)
-                        .HasColumnType("character varying(150)")
+                        .HasColumnType("nvarchar(150)")
                         .HasJsonPropertyName("apiField");
 
                     b.Property<string>("DisplayLabel")
                         .IsRequired()
                         .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
+                        .HasColumnType("nvarchar(200)")
                         .HasJsonPropertyName("displayLabel");
 
                     b.Property<int>("DisplayOrder")
-                        .HasColumnType("integer")
+                        .HasColumnType("int")
                         .HasJsonPropertyName("displayOrder");
 
                     b.Property<string>("MaskingRule")
                         .IsRequired()
                         .HasMaxLength(40)
-                        .HasColumnType("character varying(40)")
+                        .HasColumnType("nvarchar(40)")
                         .HasJsonPropertyName("maskingRule");
 
                     b.Property<string>("ProfileType")
                         .IsRequired()
                         .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
+                        .HasColumnType("nvarchar(20)")
                         .HasJsonPropertyName("profileType");
 
                     b.Property<string>("Section")
                         .IsRequired()
                         .HasMaxLength(150)
-                        .HasColumnType("character varying(150)")
+                        .HasColumnType("nvarchar(150)")
                         .HasJsonPropertyName("section");
 
                     b.Property<bool>("Sensitive")
-                        .HasColumnType("boolean")
+                        .HasColumnType("bit")
                         .HasJsonPropertyName("sensitive");
 
                     b.Property<bool>("Visible")
-                        .HasColumnType("boolean")
+                        .HasColumnType("bit")
                         .HasJsonPropertyName("visible");
 
                     b.Property<int>("VisibleCharCount")
-                        .HasColumnType("integer")
+                        .HasColumnType("int")
                         .HasJsonPropertyName("visibleCharCount");
 
                     b.HasKey("Id");

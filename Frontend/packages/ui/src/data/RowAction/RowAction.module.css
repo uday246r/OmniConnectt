@@ -1,0 +1,43 @@
+/* Copied from the host's `.viewDetailBtn` (ApprovalCenterPage + AuditLogsPage), which is the
+   design reference. The remotes' `.inspectBtn` copies rested on a tinted primary background
+   instead of this neutral surface, so a row action looked like a primary control in a remote and
+   a quiet secondary one in the host. */
+.rowAction {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--omni-color-surface);
+  border: 1.5px solid var(--omni-color-border);
+  border-radius: var(--omni-radius-md);
+  padding: 5px 12px;
+  font-size: var(--omni-font-size-xs-plus);
+  font-weight: var(--omni-font-weight-semibold);
+  color: var(--omni-color-text-secondary);
+  cursor: pointer;
+  transition: all 0.16s ease;
+  font-family: inherit;
+  white-space: nowrap;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.rowAction:hover:not(:disabled) {
+  background: var(--omni-color-primary-50);
+  border-color: var(--omni-color-primary-300); /* not in scale — the host's exact hover border */
+  color: var(--omni-color-primary-600);
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.15);
+  transform: translateY(-0.5px);
+}
+
+.rowAction:focus-visible {
+  outline: 2px solid var(--omni-color-primary-600);
+  outline-offset: 2px;
+}
+
+.rowAction:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rowAction:hover:not(:disabled) { transform: none; }
+}

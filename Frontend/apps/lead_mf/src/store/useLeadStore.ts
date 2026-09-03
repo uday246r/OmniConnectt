@@ -11,6 +11,7 @@ import {
   DashboardFilterParams,
 } from '../api/apiClient';
 import { isFieldRequired, type LeadFieldConfig } from '../config/fieldControlRegistry';
+import { readStoredPageSize } from '@omniremit/ui';
 
 /** LeadFormData's field names match the backend's apiField catalog 1:1 with exactly one exception —
  * the form calls it `preferredBranch`, the catalog calls it `branch`. Central so both validateField
@@ -121,6 +122,12 @@ interface LeadStoreState {
   addFilterRule: () => void;
   removeFilterRule: (id: string) => void;
   updateFilterRule: (id: string, field: string, value: string) => void;
+  /**
+   * Set (or clear) the filter for one field and refetch — what a per-column table filter needs.
+   * The existing rule-list actions are id-based and assume the multi-rule popover UI; a column
+   * header only ever knows its own field.
+   */
+  setColumnFilter: (field: string, value: string) => void;
   applyFilters: () => void;
   clearAllFilters: () => void;
 
@@ -211,6 +218,8 @@ interface LeadStoreState {
   openAuditDetails: (log: AuditRecord) => void;
   closeAuditDetails: () => void;
   setAuditPage: (page: number) => void;
+  /** Rows per page for the audit table. The page size was fixed at 10 with no way to change it. */
+  setAuditPageSize: (size: number) => void;
   setAuditSearchQuery: (query: string) => void;
   setAuditActionFilter: (action: string) => void;
 }
@@ -659,7 +668,7 @@ export const useLeadStore = create<LeadStoreState>((set, get) => ({
   totalRecords: 0,
   totalPages: 1,
   currentPage: 1,
-  pageSize: 10,
+  pageSize: readStoredPageSize('lead.directory', 10),
   isLoadingLeads: false,
   searchQuery: '',
   selectedProductFilter: '',
@@ -688,6 +697,24 @@ export const useLeadStore = create<LeadStoreState>((set, get) => ({
         r.id === id ? { ...r, field, value } : r
       ),
     }));
+  },
+
+  setColumnFilter: (field, value) => {
+    set((state) => {
+      const existing = state.filterRules.find((r) => r.field === field);
+      let filterRules;
+      if (existing) {
+        filterRules = state.filterRules.map((r) => (r.field === field ? { ...r, value } : r));
+      } else if (value) {
+        filterRules = [...state.filterRules, { id: `col-${field}`, field, value }];
+      } else {
+        filterRules = state.filterRules;
+      }
+      // Keep at least one (empty) rule so the existing multi-rule popover still has a row to render.
+      if (filterRules.length === 0) filterRules = [{ id: '1', field: 'product', value: '' }];
+      return { filterRules, currentPage: 1 };
+    });
+    get().fetchLeads();
   },
 
   applyFilters: () => {
@@ -1276,7 +1303,7 @@ export const useLeadStore = create<LeadStoreState>((set, get) => ({
   auditLogs: [],
   totalAuditRecords: 0,
   auditPage: 1,
-  auditPageSize: 10,
+  auditPageSize: readStoredPageSize('lead.audit', 10),
   auditSearchQuery: '',
   auditActionFilter: '',
   isLoadingAuditLogs: false,
@@ -1310,6 +1337,11 @@ export const useLeadStore = create<LeadStoreState>((set, get) => ({
 
   setAuditPage: (page) => {
     set({ auditPage: page });
+    get().fetchAuditLogs();
+  },
+
+  setAuditPageSize: (size) => {
+    set({ auditPageSize: size, auditPage: 1 });
     get().fetchAuditLogs();
   },
 

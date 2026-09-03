@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { api, ApiError } from '../services/api';
 import { useCustomerStore } from './customerStore';
 import type { CustomerProduct, ProductDetail } from '../types/api';
+import { readStoredPageSize } from '@omniremit/ui';
 
 // ---------------------------------------------------------------------------
 // Stale-response guard for loadProducts, mirroring customerStore's
@@ -65,7 +66,7 @@ export const useProductStore = create<ProductStoreState>((set, get) => ({
 
   // Pagination
   pageNumber: 1,
-  pageSize: 5,
+  pageSize: readStoredPageSize('c360.products', 5),
   totalCount: 0,
   totalPages: 1,
 

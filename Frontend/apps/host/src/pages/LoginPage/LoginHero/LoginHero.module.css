@@ -1,4 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
 
 /* ── Hero Container ─────────────────────────────────────────── */
 /* The exact gradient used everywhere else in the app for a "hero" surface —
@@ -56,7 +55,7 @@
   left: 4%;
   width: 560px;
   height: 560px;
-  border-radius: 50%;
+  border-radius: var(--omni-radius-circle);
   background: radial-gradient(circle, rgba(255,255,255,0.16) 0%, rgba(255,255,255,0.05) 42%, transparent 70%);
   filter: blur(60px);
   pointer-events: none;
@@ -84,7 +83,7 @@
   right: -60px;
   width: 260px;
   height: 260px;
-  border-radius: 50%;
+  border-radius: var(--omni-radius-circle);
   background: rgba(255,255,255,0.06);
   pointer-events: none;
   z-index: 1;
@@ -115,7 +114,7 @@
   color: #fff;
 }
 
-.brandTitle span { color: #bfdbfe; }
+.brandTitle span { color: var(--omni-color-primary-200); }
 
 /* ── Headline Section ───────────────────────────────────────── */
 .headlineSection {
@@ -128,12 +127,12 @@
   align-items: center;
   gap: 6px;
   padding: 5px 12px 5px 10px;
-  border-radius: 999px;
+  border-radius: var(--omni-radius-pill);
   background: rgba(255,255,255,0.12);
   border: 1px solid rgba(255,255,255,0.24);
-  color: #dbeafe;
-  font-size: 11px;
-  font-weight: 700;
+  color: var(--omni-color-info-bg);
+  font-size: var(--omni-font-size-xs-minus);
+  font-weight: var(--omni-font-weight-bold);
   letter-spacing: 0.02em;
   margin-bottom: 16px;
 }
@@ -152,15 +151,15 @@
 }
 
 .gradientHeading {
-  color: #93c5fd;
+  color: var(--omni-color-primary-300);
 }
 
 .subHeading {
-  font-size: 14px;
+  font-size: var(--omni-font-size-md);
   line-height: 1.6;
   color: rgba(255,255,255,0.72);
   margin: 0;
-  font-weight: 400;
+  font-weight: var(--omni-font-weight-regular);
   max-width: 420px;
 }
 
@@ -221,7 +220,7 @@
   padding: 8px 13px 8px 9px;
   background: rgba(255,255,255,0.14);
   border: 1px solid rgba(255,255,255,0.26);
-  border-radius: 12px;
+  border-radius: var(--omni-radius-lg);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   box-shadow:
@@ -243,7 +242,7 @@
 .cardIconBox {
   width: 32px;
   height: 32px;
-  border-radius: 8px;
+  border-radius: var(--omni-radius-md);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -254,8 +253,8 @@
 }
 
 .cardLabel {
-  font-size: 11px;
-  font-weight: 700;
+  font-size: var(--omni-font-size-xs-minus);
+  font-weight: var(--omni-font-weight-bold);
   color: #fff;
   line-height: 1.28;
   white-space: nowrap;
@@ -270,7 +269,7 @@
   position: relative;
   width: 8px;
   height: 8px;
-  border-radius: 50%;
+  border-radius: var(--omni-radius-circle);
   background: radial-gradient(circle at 35% 32%, #4ade80 0%, #16a34a 55%, #15803d 100%);
   margin-left: 2px;
   flex-shrink: 0;
@@ -281,7 +280,7 @@
   content: '';
   position: absolute;
   inset: -4px;
-  border-radius: 50%;
+  border-radius: var(--omni-radius-circle);
   border: 1.5px solid rgba(34, 197, 94, 0.85);
   animation: statusPing 2.4s cubic-bezier(0, 0, 0.2, 1) infinite;
 }
@@ -307,7 +306,7 @@
   padding: 13px 16px;
   background: rgba(255,255,255,0.12);
   border: 1px solid rgba(255,255,255,0.22);
-  border-radius: 14px;
+  border-radius: var(--omni-radius-lg-plus);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
   flex-shrink: 0;
@@ -327,7 +326,7 @@
 .featureIconWrap {
   width: 32px;
   height: 32px;
-  border-radius: 8px;
+  border-radius: var(--omni-radius-md);
   background: rgba(255,255,255,0.16);
   border: 1px solid rgba(255,255,255,0.26);
   display: flex;
@@ -344,17 +343,17 @@
 }
 
 .featureTitle {
-  font-size: 11.5px;
-  font-weight: 700;
+  font-size: var(--omni-font-size-xs-plus);
+  font-weight: var(--omni-font-weight-bold);
   color: #fff;
   letter-spacing: -0.01em;
   white-space: nowrap;
 }
 
 .featureSub {
-  font-size: 9.5px;
+  font-size: var(--omni-font-size-3xs);
   color: rgba(255,255,255,0.62);
-  font-weight: 400;
+  font-weight: var(--omni-font-weight-regular);
   white-space: nowrap;
   margin-top: 1px;
 }
@@ -362,9 +361,9 @@
 /* ── Footer ─────────────────────────────────────────────────── */
 .heroFooter {
   margin-top: 16px;
-  font-size: 11.5px;
+  font-size: var(--omni-font-size-xs-plus);
   color: rgba(255,255,255,0.55);
-  font-weight: 500;
+  font-weight: var(--omni-font-weight-medium);
   flex-shrink: 0;
 }
 
@@ -382,4 +381,15 @@
   .mainHeading    { font-size: 34px; }
   .featureStrip   { grid-template-columns: repeat(2,1fr); }
   .featureItem    { border-right: none; padding: 4px 6px; }
+}
+
+/* Decorative overlay drawn above the hero art; never intercepts pointer events. */
+.overlayLayer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 2;
+  overflow: visible;
 }

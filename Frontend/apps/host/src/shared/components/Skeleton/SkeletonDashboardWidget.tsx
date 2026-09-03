@@ -8,14 +8,14 @@ export function SkeletonDashboardWidget() {
   return (
     <div className={styles.dashWidgetSkel} aria-hidden="true">
       {/* App icon */}
-      <div className={[styles.shimmer, styles.square].join(' ')} style={{ width: 36, height: 36 }} />
+      <div className={`${[styles.shimmer, styles.square].join(' ')} ${styles.sdw1}`}  />
       {/* Name + key */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 5, flex: 1 }}>
-        <div className={[styles.shimmer, styles.text].join(' ')} style={{ width: '55%' }} />
-        <div className={[styles.shimmer, styles.text].join(' ')} style={{ width: '40%' }} />
+      <div className={styles.sdw2}>
+        <div className={`${[styles.shimmer, styles.text].join(' ')} ${styles.sdw3}`}  />
+        <div className={`${[styles.shimmer, styles.text].join(' ')} ${styles.sdw4}`}  />
       </div>
       {/* Status pill */}
-      <div className={[styles.shimmer, styles.pill].join(' ')} style={{ width: 58, height: 20, flexShrink: 0 }} />
+      <div className={`${[styles.shimmer, styles.pill].join(' ')} ${styles.sdw5}`}  />
     </div>
   )
 }

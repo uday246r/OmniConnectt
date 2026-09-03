@@ -13,7 +13,7 @@ public class AuthDbContextFactory : IDesignTimeDbContextFactory<AuthDbContext>
     public AuthDbContext CreateDbContext(string[] args)
     {
         var optionsBuilder = new DbContextOptionsBuilder<AuthDbContext>();
-        optionsBuilder.UseNpgsql("Host=localhost;Database=omniremit_auth_designtime;Username=design;Password=design");
+        optionsBuilder.UseSqlServer("Server=localhost;Database=omniremit_auth_designtime;Trusted_Connection=True;TrustServerCertificate=True;");
         return new AuthDbContext(optionsBuilder.Options);
     }
 }

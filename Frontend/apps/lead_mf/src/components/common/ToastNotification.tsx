@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
-import { X, CheckCircle2, AlertTriangle, AlertCircle, Info } from 'lucide-react';
+import { X, CheckCircle2, AlertTriangle, AlertCircle, Info } from '@omniremit/ui/icons';
 import { useLeadStore } from '../../store/useLeadStore';
+import styles from './ToastNotification.module.css';
 
 export const ToastNotification: React.FC = () => {
   const { toast, hideToast } = useLeadStore();
@@ -19,13 +20,13 @@ export const ToastNotification: React.FC = () => {
   const getIcon = () => {
     switch (toast.type) {
       case 'success':
-        return <CheckCircle2 size={20} style={{ color: '#16a34a', flexShrink: 0 }} />;
+        return <CheckCircle2 size={20} className={styles.iconSuccess} />;
       case 'warning':
-        return <AlertTriangle size={20} style={{ color: '#d97706', flexShrink: 0 }} />;
+        return <AlertTriangle size={20} className={styles.iconWarning} />;
       case 'error':
-        return <AlertCircle size={20} style={{ color: '#dc2626', flexShrink: 0 }} />;
+        return <AlertCircle size={20} className={styles.iconError} />;
       default:
-        return <Info size={20} style={{ color: '#2563eb', flexShrink: 0 }} />;
+        return <Info size={20} className={styles.iconInfo} />;
     }
   };
 
@@ -57,39 +58,24 @@ export const ToastNotification: React.FC = () => {
 
   return (
     <div
-      style={{
-        position: 'fixed',
-        top: '24px',
-        right: '24px',
-        zIndex: 9999,
-        minWidth: '320px',
-        maxWidth: '460px',
-        background: getBgColor(),
-        border: `1px solid ${getBorderColor()}`,
-        borderRadius: '8px',
-        padding: '14px 18px',
-        boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.05)',
-        animation: 'slideInRight 0.25s ease-out',
-        display: 'flex',
-        alignItems: 'flex-start',
-        gap: '12px',
-      }}
+      className={styles.toastRoot}
+      style={{ '--toast-bg': getBgColor(), '--toast-border': getBorderColor() } as React.CSSProperties}
     >
       {getIcon()}
 
-      <div style={{ flex: 1 }}>
-        <div style={{ fontWeight: 600, fontSize: '14px', color: '#0f172a', marginBottom: '2px' }}>
+      <div className={styles.body}>
+        <div className={styles.title}>
           {toast.title}
         </div>
         {toast.message && (
-          <div style={{ fontSize: '13px', color: '#475569', lineHeight: '1.4' }}>
+          <div className={styles.message}>
             {toast.message}
           </div>
         )}
         {toast.errorsList && toast.errorsList.length > 0 && (
-          <ul style={{ margin: '6px 0 0 0', paddingLeft: '16px', fontSize: '12.5px', color: '#dc2626' }}>
+          <ul className={styles.detailList}>
             {toast.errorsList.map((err, idx) => (
-              <li key={idx} style={{ marginBottom: '2px' }}>
+              <li key={idx} className={styles.titleTight}>
                 {err}
               </li>
             ))}
@@ -100,15 +86,7 @@ export const ToastNotification: React.FC = () => {
       <button
         type="button"
         onClick={hideToast}
-        style={{
-          background: 'none',
-          border: 'none',
-          color: '#94a3b8',
-          cursor: 'pointer',
-          padding: '2px',
-          borderRadius: '4px',
-          marginLeft: '8px',
-        }}
+        className={styles.dismissBtn}
         aria-label="Close notification"
       >
         <X size={16} />

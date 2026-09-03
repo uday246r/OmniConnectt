@@ -1,12 +1,20 @@
 import React, { useMemo } from 'react';
-import { X, Save, ArrowLeft, CheckCircle2 } from 'lucide-react';
+import { Save, ArrowLeft, CheckCircle2 } from '@omniremit/ui/icons';
+import { Button, Drawer, EmptyState } from '@omniremit/ui';
+import { LeadDiffTable } from '../../shared/LeadDiffTable';
 import { useLeadStore } from '../../store/useLeadStore';
+import drawerLayout from '../../shared/drawerLayout.module.css';
+import form from '../../shared/formField.module.css';
+
+/** Ties step 1's footer submit button to the edit form rendered in the Drawer body. */
+const EDIT_FORM_ID = 'edit-lead-form';
 import { CustomerInformationSection } from './CustomerInformationSection';
 import { PreferredSalesExecutiveSection } from './PreferredSalesExecutiveSection';
 import { HomeFinancingFields } from './ProductSpecificFields/HomeFinancingFields';
 import { MicrofinanceFields } from './ProductSpecificFields/MicrofinanceFields';
 import { DeclarationConsentSection } from './DeclarationConsentSection';
 import { FieldDiff } from '../../types/lead';
+import styles from './EditLeadDrawer.module.css';
 
 export const EditLeadDrawer: React.FC = () => {
   const {
@@ -90,44 +98,61 @@ export const EditLeadDrawer: React.FC = () => {
   };
 
   return (
-    <div className="drawer-overlay" onClick={closeEditLeadDrawer}>
-      <div
-        className="create-lead-drawer"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="drawer-header-blue">
-          <div className="drawer-header-content">
-            <h2 className="drawer-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              {isConfirmingEdit ? 'Confirm Lead Changes' : 'Edit Lead Information'}
-            </h2>
-            <p className="drawer-subtitle">
-              Reason: <span style={{ color: '#dbeafe', fontWeight: 500 }}>"{editReason}"</span>
-            </p>
+    <Drawer
+      open
+      onClose={closeEditLeadDrawer}
+      closeLabel="Close edit drawer"
+      title={isConfirmingEdit ? 'Confirm Lead Changes' : 'Edit Lead Information'}
+      subtitle={`Reason: "${editReason}"`}
+      footer={
+        isConfirmingEdit ? (
+          <div className={drawerLayout.footerSpread}>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => setIsConfirmingEdit(false)}
+              leadingIcon={<ArrowLeft size={16} />}
+            >
+              Back / Edit
+            </Button>
+            <div className={drawerLayout.footerActions}>
+              <Button type="button" variant="secondary" onClick={closeEditLeadDrawer}>
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                loading={isSubmitting}
+                onClick={handleFinalConfirmSave}
+                leadingIcon={<Save size={16} />}
+              >
+                {isSubmitting ? 'Saving...' : 'Confirm & Save'}
+              </Button>
+            </div>
           </div>
-          <button
-            type="button"
-            className="drawer-close-btn"
-            onClick={closeEditLeadDrawer}
-            aria-label="Close edit drawer"
-          >
-            <X size={20} />
-          </button>
-        </div>
-
-        {!isConfirmingEdit ? (
-          /* STEP 1: EDIT FORM */
-          <form onSubmit={handleSaveClick} style={{ display: 'flex', flexDirection: 'column', height: 'calc(100% - 130px)' }}>
-            <div className="drawer-body" style={{ flex: 1, padding: '24px', overflowY: 'auto' }}>
+        ) : (
+          <>
+            <Button type="button" variant="secondary" onClick={closeEditLeadDrawer}>
+              Cancel
+            </Button>
+            <Button type="submit" form={EDIT_FORM_ID} leadingIcon={<Save size={16} />}>
+              Save Changes
+            </Button>
+          </>
+        )
+      }
+    >
+      {!isConfirmingEdit ? (
+        /* STEP 1: EDIT FORM */
+        <form id={EDIT_FORM_ID} onSubmit={handleSaveClick}>
               {/* Product Selection */}
-              <div style={{ marginBottom: '24px' }}>
-                <label className="form-label" style={{ fontWeight: 600, marginBottom: '8px', display: 'block' }}>
-                  Select Financial Product <span style={{ color: '#f43f5e' }}>*</span>
+              <div className={form.stackWide}>
+                <label className={`form-label ${form.blockLabel}`}>
+                  Select Financial Product <span className={form.required}>*</span>
                 </label>
                 <select
                   value={editFormData.product}
                   onChange={(e) => setEditFieldValue('product', e.target.value)}
-                  className="form-input"
-                  style={{ appearance: 'auto', cursor: 'pointer', height: '46px' }}
+                  className={`form-input ${form.select} ${form.selectTall}`}
                 >
                   <option value="">-- Select Product --</option>
                   {products.map((p) => (
@@ -136,117 +161,56 @@ export const EditLeadDrawer: React.FC = () => {
                     </option>
                   ))}
                 </select>
-                {editErrors.product && <div style={{ color: '#f43f5e', fontSize: '12px', marginTop: '4px', fontWeight: 500 }}>{editErrors.product}</div>}
+                {editErrors.product && <div className={form.errorText}>{editErrors.product}</div>}
               </div>
 
               {/* Common Customer Details */}
               <CustomerInformationSection isEdit={true} />
 
               {/* Preferred Sales Executive */}
-              <div style={{ marginTop: '20px' }}>
+              <div className={form.stack}>
                 <PreferredSalesExecutiveSection isEdit={true} />
               </div>
 
               {/* Product Specific Fields — config-driven, see LeadFormContainer's identical comment */}
-              <div style={{ marginTop: '20px' }}>
+              <div className={form.stack}>
                 {fieldConfig.some((f) => f.apiField === 'propertyType') && <HomeFinancingFields isEdit={true} />}
                 {fieldConfig.some((f) => f.apiField === 'dateOfIncorporation') && <MicrofinanceFields isEdit={true} />}
               </div>
 
               {/* Declaration & Consent */}
-              <div style={{ marginTop: '20px' }}>
+              <div className={form.stack}>
                 <DeclarationConsentSection isEdit={true} />
               </div>
-            </div>
-
-            <div className="drawer-footer">
-              <button type="button" className="drawer-btn-cancel" onClick={closeEditLeadDrawer}>
-                Cancel
-              </button>
-              <button type="submit" className="drawer-btn-create">
-                <Save size={16} />
-                <span>Save Changes</span>
-              </button>
-            </div>
-          </form>
-        ) : (
-          /* STEP 2: CONFIRMATION DIFF TABLE */
-          <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100% - 130px)' }}>
-            <div className="drawer-body" style={{ flex: 1, padding: '24px', overflowY: 'auto' }}>
-              <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '8px', padding: '14px 16px', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <CheckCircle2 size={22} style={{ color: '#2563eb', flexShrink: 0 }} />
+        </form>
+      ) : (
+        /* STEP 2: CONFIRMATION DIFF TABLE */
+        <>
+              <div className={form.infoNote}>
+                <CheckCircle2 size={22} className={form.infoIcon} />
                 <div>
-                  <div style={{ fontWeight: 600, fontSize: '14px', color: '#1e3a8a' }}>
+                  <div className={form.infoTitle}>
                     Review Changed Fields Before Persisting
                   </div>
-                  <div style={{ fontSize: '13px', color: '#2563eb', marginTop: '2px' }}>
+                  <div className={styles.changeHint}>
                     The table below highlights only the fields that were modified. Confirming will save changes to the database and generate a backend audit log.
                   </div>
                 </div>
               </div>
 
               {changedFields.length === 0 ? (
-                <div style={{ padding: '32px', textAlign: 'center', color: '#64748b', background: '#f8fafc', borderRadius: '8px', border: '1px border #e2e8f0' }}>
-                  No fields were modified. Click <strong>Save Changes</strong> to exit or <strong>Back</strong> to edit.
-                </div>
+                /* The previous inline style here read `border: '1px border #e2e8f0'` — invalid CSS,
+                   so the border silently never rendered. */
+                <EmptyState
+                  compact
+                  title="No fields were modified"
+                  description="Click Save Changes to exit, or Back to continue editing."
+                />
               ) : (
-                <div style={{ border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13.5px' }}>
-                    <thead>
-                      <tr style={{ background: '#f1f5f9', borderBottom: '1px solid #e2e8f0' }}>
-                        <th style={{ padding: '12px 16px', fontWeight: 600, color: '#334155', width: '25%' }}>Field</th>
-                        <th style={{ padding: '12px 16px', fontWeight: 600, color: '#dc2626', width: '37.5%' }}>Previous Value</th>
-                        <th style={{ padding: '12px 16px', fontWeight: 600, color: '#16a34a', width: '37.5%' }}>New Value</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {changedFields.map((diff, index) => (
-                        <tr
-                          key={diff.field}
-                          style={{
-                            borderBottom: index === changedFields.length - 1 ? 'none' : '1px solid #e2e8f0',
-                            background: index % 2 === 0 ? '#ffffff' : '#f8fafc',
-                          }}
-                        >
-                          <td style={{ padding: '12px 16px', fontWeight: 600, color: '#1e293b' }}>{diff.field}</td>
-                          <td style={{ padding: '12px 16px', color: '#dc2626', background: '#fef2f2', fontFamily: 'monospace' }}>
-                            {diff.previousValue}
-                          </td>
-                          <td style={{ padding: '12px 16px', color: '#15803d', background: '#f0fdf4', fontFamily: 'monospace', fontWeight: 600 }}>
-                            {diff.newValue}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                <LeadDiffTable diffs={changedFields} />
               )}
-            </div>
-
-            <div className="drawer-footer" style={{ justifyContent: 'space-between' }}>
-              <button type="button" className="drawer-btn-cancel" onClick={() => setIsConfirmingEdit(false)}>
-                <ArrowLeft size={16} />
-                <span>Back / Edit</span>
-              </button>
-              <div style={{ display: 'flex', gap: '12px' }}>
-                <button type="button" className="drawer-btn-cancel" onClick={closeEditLeadDrawer}>
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  className="drawer-btn-create"
-                  disabled={isSubmitting}
-                  onClick={handleFinalConfirmSave}
-                  style={isSubmitting ? { opacity: 0.6, cursor: 'not-allowed' } : {}}
-                >
-                  <Save size={16} />
-                  <span>{isSubmitting ? 'Saving...' : 'Confirm & Save'}</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
+        </>
+      )}
+    </Drawer>
   );
 };

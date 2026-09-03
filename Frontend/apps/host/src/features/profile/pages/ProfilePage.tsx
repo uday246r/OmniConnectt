@@ -4,12 +4,11 @@ import { useAuthStore } from '../../auth/store/authStore'
 import { usersApi } from '../../settings-users/api/usersApi'
 import { isApprovalPending } from '../../approvals/api/approvalsApi'
 import { ChangePasswordForm } from '../components/ChangePasswordForm'
-import { Button } from '../../../shared/components/Button/Button'
-import { Input } from '../../../shared/components/Input/Input'
 import { Icon } from '../../../shared/components/Icon/Icon'
 import { required, email as emailRule, firstError } from '../../../shared/validation/rules'
 import { validateFullPhone } from '@omniremit/ui/validation'
 import styles from './ProfilePage.module.css'
+import { Button, Input } from '@omniremit/ui'
 
 function formatDateTime(iso: string | null) {
   if (!iso) return 'Never'

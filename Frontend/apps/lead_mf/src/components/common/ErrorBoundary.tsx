@@ -1,4 +1,5 @@
 import { Component, type ReactNode } from 'react';
+import styles from './ErrorBoundary.module.css';
 
 interface Props {
   children: ReactNode;
@@ -25,13 +26,13 @@ export class ErrorBoundary extends Component<Props, State> {
   public render() {
     if (this.state.hasError) {
       return (
-        <div style={{ padding: '32px', textAlign: 'center', backgroundColor: '#fff', borderRadius: '8px', margin: '24px', border: '1px solid #fee2e2' }}>
-          <h2 style={{ color: '#ef4444', marginBottom: '8px' }}>Lead Management Error</h2>
-          <p style={{ color: '#64748b', marginBottom: '16px' }}>{this.state.error?.message || 'An error occurred while rendering the Lead Management micro-frontend.'}</p>
+        <div className={styles.panel}>
+          <h2 className={styles.heading}>Lead Management Error</h2>
+          <p className={styles.message}>{this.state.error?.message || 'An error occurred while rendering the Lead Management micro-frontend.'}</p>
           <button
             type="button"
             onClick={() => this.setState({ hasError: false })}
-            style={{ padding: '8px 16px', backgroundColor: '#2563eb', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer' }}
+            className={styles.retryBtn}
           >
             Try Again
           </button>

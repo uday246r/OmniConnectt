@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, X } from '@omniremit/ui/icons';
+import styles from './DatePicker.module.css';
 
 interface DatePickerProps {
   id?: string;
@@ -104,7 +105,7 @@ export const DatePicker: React.FC<DatePickerProps> = ({
         </label>
       )}
 
-      <div style={{ position: 'relative' }}>
+      <div className={styles.container}>
         <div
           className={`dropdown-trigger ${isOpen ? 'open' : ''} ${error ? 'has-error' : ''} ${
             !value ? 'placeholder-text' : ''
@@ -115,7 +116,7 @@ export const DatePicker: React.FC<DatePickerProps> = ({
           style={disabled ? { cursor: 'not-allowed', opacity: 0.6, background: '#f1f5f9' } : undefined}
         >
           <span>{value || placeholder}</span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <div className={styles.triggerRow}>
             {value && !disabled && (
               <button
                 type="button"
@@ -123,18 +124,12 @@ export const DatePicker: React.FC<DatePickerProps> = ({
                   e.stopPropagation();
                   onChange('');
                 }}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: '#94a3b8',
-                  cursor: 'pointer',
-                  display: 'flex',
-                }}
+                className={styles.calendarIcon}
               >
                 <X size={14} />
               </button>
             )}
-            <CalendarIcon size={16} style={{ color: '#2563eb' }} />
+            <CalendarIcon size={16} className={styles.footerRow} />
           </div>
         </div>
 
@@ -151,20 +146,11 @@ export const DatePicker: React.FC<DatePickerProps> = ({
                 <ChevronLeft size={16} />
               </button>
 
-              <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+              <div className={styles.clearBtn}>
                 <select
                   value={viewMonth}
                   onChange={(e) => setViewMonth(parseInt(e.target.value, 10))}
-                  style={{
-                    border: '1px solid #e2e8f0',
-                    borderRadius: '4px',
-                    padding: '2px 6px',
-                    fontSize: '13px',
-                    fontWeight: 600,
-                    background: '#ffffff',
-                    color: '#0f172a',
-                    cursor: 'pointer',
-                  }}
+                  className={styles.todayBtn}
                   onClick={(e) => e.stopPropagation()}
                 >
                   {MONTHS.map((m, idx) => (
@@ -177,16 +163,7 @@ export const DatePicker: React.FC<DatePickerProps> = ({
                 <select
                   value={viewYear}
                   onChange={(e) => setViewYear(parseInt(e.target.value, 10))}
-                  style={{
-                    border: '1px solid #e2e8f0',
-                    borderRadius: '4px',
-                    padding: '2px 6px',
-                    fontSize: '13px',
-                    fontWeight: 600,
-                    background: '#ffffff',
-                    color: '#0f172a',
-                    cursor: 'pointer',
-                  }}
+                  className={styles.todayBtn}
                   onClick={(e) => e.stopPropagation()}
                 >
                   {years.map((y) => (

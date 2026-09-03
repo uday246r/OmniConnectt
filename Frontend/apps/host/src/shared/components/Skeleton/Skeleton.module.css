@@ -31,13 +31,24 @@
 
 /* ── Shape variants ─────────────────────────────────────────── */
 .block  { width: 100%; height: 100%; }
-.avatar { border-radius: 50%; flex-shrink: 0; }
-.square { border-radius: 10px; flex-shrink: 0; }
-.pill   { border-radius: 999px; }
+/* Runtime dimensions arrive as custom properties, matching @omniremit/ui's Skeleton. These
+   defaults MUST live with the shape variant, not at the end of the file: a trailing copy sat after
+   every per-instance modifier (.sdcNum, .suc9 and ~60 others), and at equal specificity source
+   order won — so every one of those hand-sized skeleton parts was silently overridden back to the
+   generic default. */
+.avatar {
+  width: var(--sk-size, 32px);
+  height: var(--sk-size, 32px);
+  border-radius: var(--omni-radius-circle);
+  flex-shrink: 0;
+}
+.square { border-radius: var(--omni-radius-lg-minus); flex-shrink: 0; }
+.pill   { border-radius: var(--omni-radius-pill); }
 
 .text {
+  width: var(--sk-width, 100%);
   height: 0.82em;
-  border-radius: 4px;
+  border-radius: var(--omni-radius-xs);
 }
 
 /* ── Text group ─────────────────────────────────────────────── */
@@ -66,7 +77,7 @@
 .tableCell {
   height: 13px;
   flex: 1;
-  border-radius: 4px;
+  border-radius: var(--omni-radius-xs);
 }
 
 /* ── Card-level skeleton wrappers ─────────────────────────── */
@@ -76,9 +87,9 @@
   align-items: center;
   gap: 12px;
   padding: 13px 16px;
-  background: #ffffff;
+  background: var(--omni-color-surface);
   border: 1px solid #eaecf0;
-  border-radius: 14px;
+  border-radius: var(--omni-radius-lg-plus);
   animation: skFadeIn 0.3s ease both;
 }
 
@@ -87,9 +98,9 @@
   align-items: center;
   gap: 12px;
   padding: 13px 16px;
-  background: #ffffff;
+  background: var(--omni-color-surface);
   border: 1px solid #eaecf0;
-  border-radius: 14px;
+  border-radius: var(--omni-radius-lg-plus);
   animation: skFadeIn 0.3s ease both;
 }
 
@@ -98,9 +109,9 @@
   align-items: center;
   gap: 14px;
   padding: 13px 18px;
-  background: #ffffff;
+  background: var(--omni-color-surface);
   border: 1px solid #eaecf0;
-  border-radius: 14px;
+  border-radius: var(--omni-radius-lg-plus);
   animation: skFadeIn 0.3s ease both;
 }
 
@@ -109,9 +120,9 @@
   align-items: center;
   gap: 10px;
   padding: 14px;
-  background: #ffffff;
+  background: var(--omni-color-surface);
   border: 1px solid #eaecf0;
-  border-radius: 14px;
+  border-radius: var(--omni-radius-lg-plus);
   animation: skFadeIn 0.3s ease both;
   position: relative;
   overflow: hidden;
@@ -123,7 +134,7 @@
   position: absolute;
   top: 0; left: 0; right: 0;
   height: 3px;
-  background: #e2e8f0;
+  background: var(--omni-color-border);
   border-radius: 14px 14px 0 0;
 }
 
@@ -150,9 +161,9 @@
   align-items: center;
   gap: 10px;
   padding: 9px 12px;
-  background: #ffffff;
+  background: var(--omni-color-surface);
   border: 1px solid #eaecf0;
-  border-radius: 14px;
+  border-radius: var(--omni-radius-lg-plus);
   animation: skFadeIn 0.3s ease both;
 }
 
@@ -168,8 +179,9 @@
 
 .donutSkelRingWrap {
   position: relative;
-  width: 148px;
-  height: 148px;
+  /* Matches the real donut svg (140x140), so the card does not resize when the chart lands. */
+  width: 140px;
+  height: 140px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -180,6 +192,7 @@
   position: absolute;
   inset: 0;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
 }
@@ -240,3 +253,310 @@
     animation: none;
   }
 }
+
+/* ── Extracted from SkeletonAppCard.tsx (formerly inline) ── */
+.sac1 {
+  width: 38px;
+  height: 38px;
+}
+
+.sac2 {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sac3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sac4 {
+  width: 130px;
+  height: 0.82em;
+}
+
+.sac5 {
+  width: 55px;
+  height: 0.82em;
+}
+
+.sac6 {
+  width: 200px;
+  height: 0.82em;
+}
+
+.sac7 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.sac8 {
+  width: 70px;
+  height: 24px;
+}
+
+.sac9 {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+}
+
+
+/* ── Extracted from SkeletonAuditRow.tsx (formerly inline) ── */
+.sar1 {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+}
+
+.sar2 {
+  flex: 0 0 140px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.sar3 {
+  width: 80%;
+}
+
+.sar4 {
+  width: 60%;
+}
+
+.sar5 {
+  flex: 0 0 100px;
+}
+
+.sar6 {
+  width: 70%;
+}
+
+.sar7 {
+  flex: 0 0 110px;
+}
+
+.sar8 {
+  width: 90px;
+  height: 22px;
+}
+
+.sar9 {
+  flex: 0 0 90px;
+  margin-left: auto;
+}
+
+
+/* ── Extracted from SkeletonDashboardWidget.tsx (formerly inline) ── */
+.sdw1 {
+  width: 36px;
+  height: 36px;
+}
+
+.sdw2 {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  flex: 1;
+}
+
+.sdw3 {
+  width: 55%;
+}
+
+.sdw4 {
+  width: 40%;
+}
+
+.sdw5 {
+  width: 58px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+
+/* ── Extracted from SkeletonDonutChart.tsx (formerly inline) ── */
+/* Stands in for the 24px total; sized to the digits, not to the ring. */
+.sdcNum {
+  width: 34px;
+  height: 24px;
+  border-radius: var(--omni-radius-sm);
+}
+
+/* The small uppercase "Total" caption beneath it. */
+.sdcLabel {
+  width: 30px;
+  height: 9px;
+  margin-top: 3px;
+  border-radius: var(--omni-radius-xs);
+}
+
+.sdc2 {
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+}
+
+.sdc3 {
+  width: 34px;
+  margin-left: auto;
+}
+
+
+/* ── Extracted from SkeletonOverviewActivity.tsx (formerly inline) ── */
+.soa1 {
+  width: 7px;
+  height: 7px;
+  border-radius: var(--omni-radius-circle);
+  flex-shrink: 0;
+  margin-top: 5px;
+}
+
+.soa2 {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  flex: 1;
+}
+
+.soa3 {
+  width: 75%;
+}
+
+.soa4 {
+  width: 35%;
+}
+
+
+/* ── Extracted from SkeletonRoleCard.tsx (formerly inline) ── */
+.src1 {
+  width: 36px;
+  height: 36px;
+}
+
+.src2 {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.src3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.src4 {
+  width: 100px;
+  height: 0.82em;
+}
+
+.src5 {
+  width: 52px;
+  height: 18px;
+}
+
+.src6 {
+  width: 200px;
+  height: 0.82em;
+}
+
+.src7 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.src8 {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+}
+
+
+/* ── Extracted from SkeletonStatCard.tsx (formerly inline) ── */
+.ssc1 {
+  width: 36px;
+  height: 36px;
+}
+
+.ssc2 {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+}
+
+.ssc3 {
+  width: 65%;
+  height: 0.75em;
+}
+
+.ssc4 {
+  width: 45%;
+  height: 1.2em;
+  border-radius: 5px;
+}
+
+
+/* ── Extracted from SkeletonUserCard.tsx (formerly inline) ── */
+.suc1 {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+}
+
+.suc2 {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.suc3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.suc4 {
+  width: 110px;
+  height: 0.82em;
+}
+
+.suc5 {
+  width: 58px;
+  height: 20px;
+}
+
+.suc6 {
+  width: 160px;
+  height: 0.82em;
+}
+
+.suc7 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.suc8 {
+  width: 70px;
+  height: 24px;
+}
+
+.suc9 {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+}
+
+.tableCellLead { flex: 2; }

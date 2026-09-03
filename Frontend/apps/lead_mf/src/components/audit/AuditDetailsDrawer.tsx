@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { Button, DetailField, DetailGrid, DetailSection, Drawer } from '@omniremit/ui';
+import { LeadDiffTable } from '../../shared/LeadDiffTable';
 import {
-  X,
   Shield,
   ShieldCheck,
   Clock,
@@ -17,9 +18,11 @@ import {
   Copy,
   Check,
   LayoutGrid,
-} from 'lucide-react';
+} from '@omniremit/ui/icons';
 import { useLeadStore } from '../../store/useLeadStore';
 import type { FieldDiff } from '../../types/lead';
+import styles from './AuditDetailsDrawer.module.css';
+import { Badge } from '@omniremit/ui';
 
 function formatTimestamp(iso?: string | null): string {
   if (!iso) return '—';
@@ -40,8 +43,14 @@ function formatTimestamp(iso?: string | null): string {
   }
 }
 
+/*
+ * Normalises the IPv6 loopback forms to their IPv4 spelling — '::1' really is 127.0.0.1, so that
+ * conversion states a fact. An ABSENT address is a different matter: this used to return
+ * '127.0.0.1' for it, which asserts the action came from the server itself. It now returns an
+ * empty string so the caller omits the field entirely.
+ */
 function formatIpv4(ip?: string | null): string {
-  if (!ip) return '127.0.0.1';
+  if (!ip) return '';
   try {
     let trimmed = String(ip).trim();
     if (trimmed === '::1' || trimmed === 'localhost') {
@@ -53,9 +62,9 @@ function formatIpv4(ip?: string | null): string {
     if (trimmed === '::') {
       return '127.0.0.1';
     }
-    return trimmed || '127.0.0.1';
+    return trimmed;
   } catch {
-    return '127.0.0.1';
+    return '';
   }
 }
 
@@ -170,32 +179,19 @@ export const AuditDetailsDrawer: React.FC = () => {
   };
 
   return (
-    <div className="drawer-overlay" style={{ zIndex: 1200 }} onClick={handleOverlayClick}>
-      <div className="audit-details-drawer" onClick={(e) => e.stopPropagation()}>
-        {/* Radiant Gradient Header — Exact Host Aesthetic */}
-        <div className="audit-drawer-header">
-          <div className="audit-header-glow" />
-          <div className="audit-header-left">
-            <div className="audit-header-icon-box">
-              <Shield size={22} />
-            </div>
-            <div className="audit-header-text">
-              <h2 className="audit-header-title">Audit Record Details</h2>
-              <p className="audit-header-subtitle">Full event context, actor, and execution metadata</p>
-            </div>
-          </div>
-          <button
-            type="button"
-            className="audit-header-close-btn"
-            onClick={closeAuditDetails}
-            aria-label="Close details drawer"
-          >
-            <X size={18} />
-          </button>
-        </div>
-
-        {/* Scrollable Body */}
-        <div className="audit-drawer-body">
+    <Drawer
+      open
+      onClose={closeAuditDetails}
+      closeLabel="Close details drawer"
+      title="Activity Details"
+      subtitle="What happened, who did it, and when"
+      icon={<Shield size={22} />}
+      footer={
+        <Button type="button" variant="secondary" onClick={closeAuditDetails}>
+          Close Details
+        </Button>
+      }
+    >
           {/* 1. Overview & Event Timeline (Two-Column Layout) */}
           <section className="audit-drawer-section">
             <div className="audit-overview-timeline-grid">
@@ -203,7 +199,7 @@ export const AuditDetailsDrawer: React.FC = () => {
               <div className="audit-overview-col">
                 <h3 className="audit-drawer-section-title">
                   <LayoutGrid size={12} />
-                  Overview
+                  Summary
                 </h3>
                 <dl className="audit-detail-list">
                   {/* Service */}
@@ -212,11 +208,11 @@ export const AuditDetailsDrawer: React.FC = () => {
                       <Layers size={15} />
                     </span>
                     <div className="audit-detail-row-body">
-                      <dt className="audit-detail-row-label">Service</dt>
+                      <dt className="audit-detail-row-label">Application</dt>
                       <dd className="audit-detail-row-value">
-                        <span className="audit-badge audit-badge-primary">
+                        <Badge tone="primary">
                           LeadService
-                        </span>
+                          </Badge>
                       </dd>
                     </div>
                   </div>
@@ -227,11 +223,11 @@ export const AuditDetailsDrawer: React.FC = () => {
                       <Activity size={15} />
                     </span>
                     <div className="audit-detail-row-body">
-                      <dt className="audit-detail-row-label">Action</dt>
+                      <dt className="audit-detail-row-label">What Happened</dt>
                       <dd className="audit-detail-row-value">
-                        <span className="audit-action-badge">
+                        <Badge tone="primary" className={styles.actionCode}>
                           {getActionLabel(selectedAuditLog.actionType)}
-                        </span>
+                          </Badge>
                       </dd>
                     </div>
                   </div>
@@ -246,16 +242,11 @@ export const AuditDetailsDrawer: React.FC = () => {
                       {isSuccess ? <CheckCircle2 size={15} /> : <AlertTriangle size={15} />}
                     </span>
                     <div className="audit-detail-row-body">
-                      <dt className="audit-detail-row-label">Result</dt>
+                      <dt className="audit-detail-row-label">Outcome</dt>
                       <dd className="audit-detail-row-value">
-                        <span
-                          className={`audit-badge ${
-                            isSuccess ? 'audit-badge-success' : 'audit-badge-danger'
-                          }`}
-                        >
-                          <span className="audit-badge-dot" />
+                        <Badge tone={isSuccess ? 'success' : 'danger'} dot>
                           {isSuccess ? 'Success' : selectedAuditLog.status || 'Failed'}
-                        </span>
+                        </Badge>
                       </dd>
                     </div>
                   </div>
@@ -266,7 +257,7 @@ export const AuditDetailsDrawer: React.FC = () => {
                       <Clock size={15} />
                     </span>
                     <div className="audit-detail-row-body">
-                      <dt className="audit-detail-row-label">Timestamp</dt>
+                      <dt className="audit-detail-row-label">Date &amp; Time</dt>
                       <dd className="audit-detail-row-value">
                         {formatTimestamp(selectedAuditLog.timestamp)}
                       </dd>
@@ -279,14 +270,14 @@ export const AuditDetailsDrawer: React.FC = () => {
               <div className="audit-overview-col audit-overview-col-divider">
                 <h3 className="audit-drawer-section-title">
                   <Clock size={12} />
-                  Event Timeline
+                  Timeline
                 </h3>
                 <div className="audit-timeline">
                   <div className="audit-timeline-step">
                     <span className="audit-timeline-dot" />
                     <div className="audit-timeline-step-card">
                       <span className="audit-timeline-label">
-                        Triggered by {selectedAuditLog.userName || 'System'}
+                        {selectedAuditLog.userName ? `Started by ${selectedAuditLog.userName}` : 'Activity recorded'}
                       </span>
                       <span className="audit-timeline-time">
                         <Clock size={12} />
@@ -303,7 +294,7 @@ export const AuditDetailsDrawer: React.FC = () => {
                     />
                     <div className="audit-timeline-step-card">
                       <span className="audit-timeline-label">
-                        {isSuccess ? 'Event Completed Successfully' : 'Event Execution Failed'}
+                        {isSuccess ? 'Finished successfully' : 'Did not complete'}
                       </span>
                       <span className="audit-timeline-time">
                         <ShieldCheck size={12} />
@@ -315,9 +306,9 @@ export const AuditDetailsDrawer: React.FC = () => {
 
                 {selectedAuditLog.reason && (
                   <div className="audit-reason-alert">
-                    <AlertTriangle size={15} style={{ color: '#d97706', flexShrink: 0, marginTop: 1 }} />
+                    <AlertTriangle size={15} className={styles.warnIcon} />
                     <div>
-                      <strong>Audit Reason:</strong> &ldquo;{selectedAuditLog.reason}&rdquo;
+                      <strong>Reason given:</strong> &ldquo;{selectedAuditLog.reason}&rdquo;
                     </div>
                   </div>
                 )}
@@ -325,144 +316,75 @@ export const AuditDetailsDrawer: React.FC = () => {
             </div>
           </section>
 
-          {/* 2. Actor & Authentication Context */}
-          <section className="audit-drawer-section">
-            <h3 className="audit-drawer-section-title">
-              <User size={12} />
-              Actor &amp; Authentication Context
-            </h3>
-            <div className="audit-field-card-grid">
-              <div className="audit-field-card">
-                <span className="audit-field-card-icon">
-                  <User size={15} />
-                </span>
-                <div className="audit-field-card-body">
-                  <span className="audit-field-card-label">Actor Name</span>
-                  <div className="audit-field-card-value">
-                    <div className="audit-user-chip">
-                      <span className="audit-user-avatar">{actorInitial}</span>
-                      <span>{selectedAuditLog.userName || 'System'}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-
-              <div className="audit-field-card">
-                <span className="audit-field-card-icon">
-                  <Shield size={15} />
-                </span>
-                <div className="audit-field-card-body">
-                  <span className="audit-field-card-label">User Role</span>
-                  <span className="audit-field-card-value">
-                    <span className="audit-badge audit-badge-primary">
-                      {selectedAuditLog.userRole || 'User'}
-                    </span>
+          {/*
+            Every field here is dropped when the backend sends nothing for it — DetailField returns
+            null instead of rendering a placeholder. Previously "User Role" fell back to the invented
+            value 'User', "Entity Type" to 'Lead', and the IP row printed an em dash; each of those
+            told the reader something the audit record did not actually say.
+          */}
+          <DetailSection title="Who Did This" icon={<User size={12} />}>
+            <DetailGrid>
+              <DetailField label="Performed By" icon={<User size={15} />}>
+                {selectedAuditLog.userName ? (
+                  <span className="audit-user-chip">
+                    <span className="audit-user-avatar">{actorInitial}</span>
+                    <span>{selectedAuditLog.userName}</span>
                   </span>
-                </div>
-              </div>
+                ) : null}
+              </DetailField>
 
-              <div className="audit-field-card">
-                <span className="audit-field-card-icon">
-                  <Globe size={15} />
-                </span>
-                <div className="audit-field-card-body">
-                  <span className="audit-field-card-label">Client IP (IPv4)</span>
-                  <span className="audit-field-card-value">
-                    <span className="audit-ip-badge">
-                      <span className="audit-ip-dot" />
-                      {formatIpv4(selectedAuditLog.ipAddress)}
-                    </span>
+              <DetailField label="Role" icon={<Shield size={15} />}>
+                {selectedAuditLog.userRole ? (
+                  <Badge tone="primary">{selectedAuditLog.userRole}</Badge>
+                ) : null}
+              </DetailField>
+
+              <DetailField label="IP Address" icon={<Globe size={15} />}>
+                {selectedAuditLog.ipAddress ? (
+                  <span className="audit-ip-badge">
+                    <span className="audit-ip-dot" />
+                    {formatIpv4(selectedAuditLog.ipAddress)}
                   </span>
-                </div>
-              </div>
-            </div>
-          </section>
+                ) : null}
+              </DetailField>
+            </DetailGrid>
+          </DetailSection>
 
-          {/* 3. Target Entity Context */}
-          <section className="audit-drawer-section">
-            <h3 className="audit-drawer-section-title">
-              <Box size={12} />
-              Target Entity Context
-            </h3>
-            <div className="audit-field-card-grid">
-              <div className="audit-field-card">
-                <span className="audit-field-card-icon">
-                  <Layers size={15} />
-                </span>
-                <div className="audit-field-card-body">
-                  <span className="audit-field-card-label">Entity Type</span>
-                  <span className="audit-field-card-value">
-                    <span className="audit-badge audit-badge-primary">
-                      {selectedAuditLog.entityType || 'Lead'}
-                    </span>
-                  </span>
-                </div>
-              </div>
+          <DetailSection
+            title="Affected Record"
+            icon={<Box size={12} />}
+            hidden={!selectedAuditLog.entityType && !selectedAuditLog.description}
+          >
+            <DetailGrid>
+              <DetailField label="Record Type" icon={<Layers size={15} />}>
+                {selectedAuditLog.entityType ? (
+                  <Badge tone="primary">{selectedAuditLog.entityType}</Badge>
+                ) : null}
+              </DetailField>
 
+              <DetailField label="Description" icon={<FileText size={15} />} full>
+                {selectedAuditLog.description}
+              </DetailField>
+            </DetailGrid>
+          </DetailSection>
 
-              <div className="audit-field-card audit-field-card-full">
-                <span className="audit-field-card-icon">
-                  <FileText size={15} />
-                </span>
-                <div className="audit-field-card-body">
-                  <span className="audit-field-card-label">Event Description</span>
-                  <span className="audit-field-card-value">
-                    {selectedAuditLog.description || 'No description provided.'}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          {/* 4. Field-Level Modification Diffs (if edit diffs exist) */}
+          {/* 4. What changed, field by field (if edit diffs exist) */}
           {parsedDiffs.length > 0 && (
             <section className="audit-drawer-section">
               <h3 className="audit-drawer-section-title">
                 <GitCommit size={12} />
-                Field-Level Modification Diffs
+                What Changed
               </h3>
-              <div className="audit-diffs-table-wrap">
-                <table className="audit-diffs-table">
-                  <thead>
-                    <tr>
-                      <th>Field</th>
-                      <th>Previous Value</th>
-                      <th>New Value</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {parsedDiffs.map((diff, idx) => (
-                      <tr key={idx}>
-                        <td className="audit-diff-field-cell">{diff.field}</td>
-                        <td className="audit-diff-prev-cell">{diff.previousValue}</td>
-                        <td className="audit-diff-new-cell">{diff.newValue}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <LeadDiffTable diffs={parsedDiffs} />
             </section>
           )}
 
-        </div>
-
-        {/*
-          Sticky Footer — the raw JSON payload dump, the "Copy JSON"/"Copy ID" controls and the
-          truncated record GUID were removed: this drawer is read by business users reviewing who
-          did what, and internal identifiers are noise they cannot act on. Everything meaningful is
-          already presented as labelled fields above.
-        */}
-        <div className="audit-drawer-footer">
-          <button
-            type="button"
-            className="audit-footer-close-btn"
-            onClick={closeAuditDetails}
-          >
-            Close Details
-          </button>
-        </div>
-      </div>
-    </div>
+      {/*
+        The footer's raw JSON payload dump, the "Copy JSON"/"Copy ID" controls and the truncated
+        record GUID were removed: this drawer is read by business users reviewing who did what, and
+        internal identifiers are noise they cannot act on. Everything meaningful is already
+        presented as labelled fields above. What remains is passed to the Drawer's `footer` slot.
+      */}
+    </Drawer>
   );
 };

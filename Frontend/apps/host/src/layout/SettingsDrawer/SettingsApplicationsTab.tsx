@@ -7,13 +7,11 @@ import { useDebouncedValue } from '../../shared/hooks/useDebouncedValue'
 import { useModuleRegistryStore } from '../../shared/stores/moduleRegistryStore'
 import { Icon } from '../../shared/components/Icon/Icon'
 import { SkeletonAppCard } from '../../shared/components/Skeleton'
-import { Pagination } from '../../shared/components/Pagination/Pagination'
-import { Modal } from '../../shared/components/Modal/Modal'
-import { Button } from '../../shared/components/Button/Button'
 import { ApiError } from '../../shared/api/httpClient'
 import { toast } from '../../shared/stores/toastStore'
 import styles from './SettingsApplicationsTab.module.css'
 import { TOPICS, invalidate, useDataRevision } from '../../shared/stores/invalidationStore'
+import { Button, EmptyState, Modal, Pagination } from '@omniremit/ui'
 
 const PAGE_SIZE = 10
 
@@ -22,7 +20,8 @@ export function SettingsApplicationsTab() {
   const isAdministrator = Boolean(useAuthStore((s) => s.user)?.isAdministrator)
   const hasCapability = useAuthStore((s) => s.hasCapability)
   const pushLayer = useSettingsDrawerStore((s) => s.pushLayer)
-  const dataRevision = useDataRevision(TOPICS.applications)
+  const dataRevision = useDataRevision(TOPICS.applications)
+
   const canRegister = isAdministrator || hasCapability('host.settings.applications', 'Register') || hasCapability('host.settings.applications', 'Create')
   const canEdit = isAdministrator || hasCapability('host.settings.applications', 'Edit')
   const canDelete = isAdministrator || hasCapability('host.settings.applications', 'Delete') || hasCapability('host.settings.applications', 'Remove')
@@ -225,11 +224,13 @@ export function SettingsApplicationsTab() {
               <div key={app.id} className={styles.appCard}>
                 {/* App Icon */}
                 <div
-                  className={styles.appIconWrap}
-                  style={{
-                    background: isMaintenance ? '#fff7ed' : isDisabled ? '#f1f5f9' : '#ede9fe',
-                    color: isMaintenance ? '#f97316' : isDisabled ? '#94a3b8' : '#6366f1',
-                  }}
+                  className={`${styles.appIconWrap} ${
+                    isMaintenance
+                      ? styles.appIconWrapMaintenance
+                      : isDisabled
+                      ? styles.appIconWrapDisabled
+                      : styles.appIconWrapActive
+                  }`}
                 >
                   <Icon.Users width={20} height={20} />
                 </div>
@@ -353,9 +354,7 @@ export function SettingsApplicationsTab() {
             )
           })
         ) : (
-          <div className={styles.emptyState}>
-            <p>No applications registered yet.</p>
-          </div>
+          <EmptyState compact title="No applications registered yet." />
         )}
       </div>
 

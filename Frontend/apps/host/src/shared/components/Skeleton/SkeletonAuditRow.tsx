@@ -8,27 +8,27 @@ export function SkeletonAuditRow() {
   return (
     <div className={styles.auditRowSkel} aria-hidden="true">
       {/* Actor circle avatar */}
-      <div className={[styles.shimmer, styles.avatar].join(' ')} style={{ width: 32, height: 32, flexShrink: 0 }} />
+      <div className={`${[styles.shimmer, styles.avatar].join(' ')} ${styles.sar1}`}  />
 
       {/* Actor name + email */}
-      <div style={{ flex: '0 0 140px', display: 'flex', flexDirection: 'column', gap: 5 }}>
-        <div className={[styles.shimmer, styles.text].join(' ')} style={{ width: '80%' }} />
-        <div className={[styles.shimmer, styles.text].join(' ')} style={{ width: '60%' }} />
+      <div className={styles.sar2}>
+        <div className={`${[styles.shimmer, styles.text].join(' ')} ${styles.sar3}`}  />
+        <div className={`${[styles.shimmer, styles.text].join(' ')} ${styles.sar4}`}  />
       </div>
 
       {/* Entity type column */}
-      <div style={{ flex: '0 0 100px' }}>
-        <div className={[styles.shimmer, styles.text].join(' ')} style={{ width: '70%' }} />
+      <div className={styles.sar5}>
+        <div className={`${[styles.shimmer, styles.text].join(' ')} ${styles.sar6}`}  />
       </div>
 
       {/* Action badge — pill shape */}
-      <div style={{ flex: '0 0 110px' }}>
-        <div className={[styles.shimmer, styles.pill].join(' ')} style={{ width: 90, height: 22 }} />
+      <div className={styles.sar7}>
+        <div className={`${[styles.shimmer, styles.pill].join(' ')} ${styles.sar8}`}  />
       </div>
 
       {/* Timestamp */}
-      <div style={{ flex: '0 0 90px', marginLeft: 'auto' }}>
-        <div className={[styles.shimmer, styles.text].join(' ')} style={{ width: '80%' }} />
+      <div className={styles.sar9}>
+        <div className={`${[styles.shimmer, styles.text].join(' ')} ${styles.sar3}`}  />
       </div>
     </div>
   )

@@ -1,0 +1,43 @@
+/*
+ * Styles extracted from this component's former inline blocks. Values map to platform
+ * tokens where an exact equivalent exists; the rest are the original literals.
+ */
+
+.container {
+  position: relative;
+}
+
+.triggerRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.calendarIcon {
+  background: none;
+  border: none;
+  color: var(--omni-color-text-muted);
+  cursor: pointer;
+  display: flex;
+}
+
+.footerRow {
+  color: var(--omni-color-primary-600);
+}
+
+.clearBtn {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.todayBtn {
+  border: 1px solid #e2e8f0;
+  border-radius: var(--omni-radius-xs);
+  padding: 2px 6px;
+  font-size: var(--omni-font-size-sm);
+  font-weight: var(--omni-font-weight-semibold);
+  background: var(--omni-color-surface);
+  color: var(--omni-color-text-primary);
+  cursor: pointer;
+}

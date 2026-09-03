@@ -1,0 +1,31 @@
+/*
+ * Delete Lead drawer — step-specific layout only.
+ *
+ * The overlay, panel, header, body and footer chrome all come from @omniremit/ui's Drawer
+ * (`tone="danger"`). What remains here is the two-step confirmation's own layout.
+ */
+
+
+
+/* The circular warning mark above the confirmation copy. */
+.warningMark {
+  width: 56px;
+  height: 56px;
+  border-radius: var(--omni-radius-circle);
+  background: var(--omni-color-danger-50);
+  color: var(--omni-color-danger-600);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto var(--omni-space-4);
+}
+
+.confirmIntro {
+  text-align: center;
+  margin-bottom: var(--omni-space-6);
+}
+
+.summaryCardSpaced {
+  padding: var(--omni-space-4) var(--omni-space-5);
+  margin-bottom: var(--omni-space-5);
+}

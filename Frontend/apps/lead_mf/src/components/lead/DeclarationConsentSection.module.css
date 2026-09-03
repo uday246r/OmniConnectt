@@ -1,0 +1,39 @@
+/*
+ * Styles extracted from this component's former inline blocks. Values map to platform
+ * tokens where an exact equivalent exists; the rest are the original literals.
+ */
+
+.section {
+  margin-bottom: 20px;
+}
+
+.sectionLabel {
+  margin-bottom: 10px;
+}
+
+.optionList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.optionRow {
+  margin-top: 8px;
+}
+
+.optionHint {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #f1f5f9;
+}
+
+.errorText {
+  font-size: var(--omni-font-size-sm-minus);
+  color: var(--omni-color-text-secondary);
+}
+
+.noteText {
+  color: var(--omni-color-primary-600);
+  text-decoration: underline;
+  font-weight: var(--omni-font-weight-semibold);
+}

@@ -1,0 +1,87 @@
+/*
+ * The platform card surface.
+ *
+ * One border colour, one shadow ramp, three sizes. Before this there were 45 card rules across the
+ * two remotes and no shared component, yet the surfaces were already converging on the same values
+ * by hand: `.lead-field-card` and `.audit-field-card` were **byte-identical**
+ * (`9px 13px` / `1.5px #e8edf5` / `10px`), and `.lead-section-card` was the host's `.summaryCard`
+ * one step down in radius. Copying a surface by hand is how it drifts; this makes it a component.
+ *
+ * `#e8edf5` is off the token scale deliberately — it is the host's card hairline, a touch cooler
+ * than `--omni-color-border`, and snapping it to the token would restyle the reference.
+ */
+.card {
+  background: var(--omni-color-surface);
+  border: 1.5px solid #e8edf5;
+  box-sizing: border-box;
+  transition: border-color 200ms cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 200ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ── Sizes ─────────────────────────────────────────────────────
+   sm  a field/detail tile inside a drawer or grid
+   md  a section or summary card — the platform default
+   lg  a page-level panel                                        */
+.sm {
+  border-radius: var(--omni-radius-lg-minus);
+  padding: 9px 13px;
+}
+
+.md {
+  border-radius: var(--omni-radius-lg-plus);
+  padding: 18px 20px 16px;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.04);
+}
+
+.lg {
+  border-radius: var(--omni-radius-xl);
+  padding: 20px 22px 18px;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.03), 0 8px 20px -4px rgba(15, 23, 42, 0.04);
+}
+
+/* Row layout, for the icon + content cards that summary tiles use. */
+.row {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+/*
+ * Lifts on hover. Only for a card that DOES something — never decoration: a surface that reacts to
+ * the pointer but cannot be clicked reads as broken.
+ */
+.interactive {
+  cursor: pointer;
+}
+
+.interactive:hover {
+  border-color: var(--omni-color-primary-200, #bfdbfe);
+  box-shadow: 0 12px 28px -4px rgba(37, 99, 235, 0.12);
+  transform: translateY(-2.5px);
+}
+
+.interactive:focus-visible {
+  outline: 2px solid var(--omni-color-primary-600);
+  outline-offset: 2px;
+}
+
+/* The coloured rule some summary cards carry along their top edge. */
+.accent {
+  position: relative;
+  overflow: hidden;
+}
+
+.accent::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3.5px;
+  background: var(--omni-card-accent, var(--omni-color-primary-600));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .interactive:hover { transform: none; }
+}

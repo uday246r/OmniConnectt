@@ -15,7 +15,7 @@
 .icon {
   width: 56px;
   height: 56px;
-  border-radius: 50%;
+  border-radius: var(--omni-radius-circle);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -67,7 +67,7 @@
   background: var(--omni-color-surface-alt);
   border: 1px solid var(--omni-color-border);
   color: var(--omni-color-text-secondary);
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--omni-font-mono);
   font-size: var(--omni-font-size-xs);
   line-height: 1.5;
   white-space: pre-wrap;

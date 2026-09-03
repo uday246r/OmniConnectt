@@ -2,6 +2,7 @@ import React from 'react';
 import { useLeadStore } from '../../store/useLeadStore';
 import { SearchableDropdown } from '../common/SearchableDropdown';
 import { isFieldVisible, isFieldEditable, getFieldLabel } from '../../config/fieldControlRegistry';
+import styles from './PreferredSalesExecutiveSection.module.css';
 
 interface PreferredSalesExecutiveSectionProps {
   isEdit?: boolean;
@@ -29,8 +30,8 @@ export const PreferredSalesExecutiveSection: React.FC<PreferredSalesExecutiveSec
   const checkboxLocked = isEdit && !isFieldEditable(config, 'hasPreferredSalesExecutive');
 
   return (
-    <div style={{ marginTop: '20px', marginBottom: '20px' }}>
-      <label className="custom-checkbox-label" style={{ marginBottom: '14px' }}>
+    <div className={styles.section}>
+      <label className={`custom-checkbox-label ${styles.field}`}>
         <input
           type="checkbox"
           className="custom-checkbox-input"
@@ -38,13 +39,13 @@ export const PreferredSalesExecutiveSection: React.FC<PreferredSalesExecutiveSec
           disabled={checkboxLocked}
           onChange={handleCheckboxToggle}
         />
-        <span style={{ fontWeight: 500, color: '#1e293b' }}>
+        <span className={styles.label}>
           {getFieldLabel(config, 'hasPreferredSalesExecutive', 'Select your preferred Sales Executive')}
         </span>
       </label>
 
       {formData.hasPreferredSalesExecutive && isFieldVisible(config, 'preferredSalesExecutive') && (
-        <div style={{ marginTop: '12px', paddingLeft: '28px' }}>
+        <div className={styles.nested}>
           <SearchableDropdown
             label={getFieldLabel(config, 'preferredSalesExecutive', 'Select your preferred Sales Executive')}
             placeholder="Select Sales Executive"

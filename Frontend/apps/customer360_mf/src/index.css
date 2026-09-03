@@ -1,7 +1,3 @@
-/* Platform table, card and pill treatment, shared with the host and the other remotes.
-   Imported once here so every page in this app inherits it. */
-@import '@omniremit/ui/styles.css';
-
 /* ==========================================================================
    Customer 360 Remote App — Host Design System Tokens & Foundation
    Conforms 100% with OmniRemit Host App & Lead Management Design Standard
@@ -33,7 +29,10 @@
   --primary-500: var(--omni-color-primary-500, #3b82f6);
   --primary-600: var(--omni-color-primary-600, #2563eb);
   --primary-700: var(--omni-color-primary-700, #1d4ed8);
-  --primary-800: #1e40af;
+  /* Aliased like the rest of the ramp. Note the host's --omni-color-primary-800 is #1e3a8a, a
+     deeper navy than the #1e40af this file used, so the literal is kept as the fallback and the
+     host value wins inside the shell — matching every other step of the scale. */
+  --primary-800: var(--omni-color-primary-800, #1e40af);
   --primary-900: var(--omni-color-primary-800, #1e3a8a);
 
   --surface-ground: var(--omni-color-surface-alt, #f8fafc);
@@ -47,6 +46,9 @@
   --border-focus: var(--omni-color-primary-600, #2563eb);
 
   --text-heading: var(--omni-color-text-primary, #0f172a);
+  /* The one text token that was never aliased. It sits between the host's text-primary (#0f172a)
+     and text-secondary (#475569); kept as its own value, but declared here alongside the aliases so
+     it is visible as a deliberate exception rather than an oversight. */
   --text-body: #334155;
   --text-secondary: var(--omni-color-text-secondary, #64748b);
   --text-muted: var(--omni-color-text-muted, #94a3b8);
@@ -72,9 +74,19 @@
   font-family: var(--font-family);
   color: var(--text-body);
   width: 100%;
-  /* Safety net: nothing inside this remote should ever be able to widen the host page and force
-     horizontal scroll on a narrow viewport — clip instead of blowing out the layout. */
-  overflow-x: hidden;
+  /*
+   * `min-width: 0`, not `overflow-x: hidden`.
+   *
+   * The scope root sits in the host's flex layout, where a flex item's default `min-width: auto`
+   * refuses to shrink below its content — that is what lets one wide table push the whole page
+   * sideways. Setting it to 0 lets the remote shrink so its own scroll containers (DataTable's
+   * `overflow-x: auto`) handle the overflow where it belongs.
+   *
+   * Clipping was the previous approach here and it is worse than the problem: `overflow-x: hidden`
+   * makes anything too wide silently UNREACHABLE rather than scrollable. Both remotes now use the
+   * same guard.
+   */
+  min-width: 0;
   box-sizing: border-box;
   background: transparent;
 }
@@ -114,7 +126,7 @@
 
 /* Search Panel Card */
 .c360-search-panel {
-  background: #ffffff;
+  background: var(--omni-color-surface);
   border-radius: var(--radius-lg);
   border: 1px solid var(--border-medium);
   box-shadow: var(--shadow-card);
@@ -126,7 +138,7 @@
 }
 
 .c360-search-panel:focus-within {
-  border-color: #cbd5e1;
+  border-color: var(--omni-color-border-strong);
   box-shadow: 0 4px 16px -2px rgba(15, 23, 42, 0.06);
 }
 
@@ -162,8 +174,8 @@
 }
 
 .c360-label {
-  font-size: 12px;
-  font-weight: 600;
+  font-size: var(--omni-font-size-xs);
+  font-weight: var(--omni-font-weight-semibold);
   color: var(--text-heading);
   letter-spacing: -0.005em;
   display: flex;
@@ -172,18 +184,18 @@
 }
 
 .c360-required {
-  color: #ef4444;
+  color: var(--omni-color-danger-500);
 }
 
 .c360-select {
   height: 44px;
-  border-radius: 10px;
+  border-radius: var(--omni-radius-lg-minus);
   border: 1px solid var(--border-medium);
-  background: #ffffff;
+  background: var(--omni-color-surface);
   padding: 0 14px;
-  font-size: 13.5px;
+  font-size: var(--omni-font-size-sm-plus);
   color: var(--text-heading);
-  font-weight: 500;
+  font-weight: var(--omni-font-weight-medium);
   outline: none;
   transition: all 0.15s ease;
   cursor: pointer;
@@ -191,7 +203,7 @@
 }
 
 .c360-select:hover {
-  border-color: #cbd5e1;
+  border-color: var(--omni-color-border-strong);
 }
 
 .c360-select:focus {
@@ -216,13 +228,13 @@
 .c360-input {
   height: 44px;
   width: 100%;
-  border-radius: 10px;
+  border-radius: var(--omni-radius-lg-minus);
   border: 1px solid var(--border-medium);
-  background: #ffffff;
+  background: var(--omni-color-surface);
   padding: 0 14px 0 40px;
-  font-size: 13.5px;
+  font-size: var(--omni-font-size-sm-plus);
   color: var(--text-heading);
-  font-weight: 500;
+  font-weight: var(--omni-font-weight-medium);
   outline: none;
   transition: all 0.15s ease;
 }
@@ -232,7 +244,7 @@
 }
 
 .c360-input:hover {
-  border-color: #cbd5e1;
+  border-color: var(--omni-color-border-strong);
 }
 
 .c360-input:focus {
@@ -244,73 +256,10 @@
    exactly: 42px height, 18px horizontal padding, 12px radius, 14px/600 text, same gradient and
    shadow depth. Was 44px/20px/10px(fixed, not even the design-token radius)/13.5px — close but
    never quite the same numbers as the same button anywhere in the host. */
-.c360-btn-primary {
-  height: 42px;
-  padding: 0 18px;
-  border-radius: var(--radius-lg);
-  border: 1px solid transparent;
-  background: linear-gradient(135deg, #2f72f5 0%, #1d4ed8 100%);
-  color: #ffffff;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  box-shadow:
-    0 1px 2px rgba(15, 23, 42, 0.18),
-    0 4px 12px rgba(37, 99, 235, 0.32),
-    inset 0 1px 0 rgba(255, 255, 255, 0.14);
-  transition: background 0.16s ease, box-shadow 0.16s ease, transform 0.1s ease;
-  white-space: nowrap;
-}
-
-.c360-btn-primary:hover:not(:disabled) {
-  background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
-  box-shadow:
-    0 2px 4px rgba(15, 23, 42, 0.2),
-    0 8px 20px rgba(37, 99, 235, 0.42),
-    inset 0 1px 0 rgba(255, 255, 255, 0.14);
-}
-
-.c360-btn-primary:active:not(:disabled) {
-  transform: scale(0.977);
-}
-
-.c360-btn-primary:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  box-shadow: none;
-}
-
-.c360-btn-secondary {
-  height: 42px;
-  padding: 0 16px;
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--border-subtle);
-  background: #ffffff;
-  color: var(--text-heading);
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
-  transition: all 0.15s ease;
-  white-space: nowrap;
-}
-
-.c360-btn-secondary:hover {
-  background: #f8fafc;
-  border-color: #cbd5e1;
-}
 
 /* Empty Search State */
 .c360-empty-prompt {
-  background: #ffffff;
+  background: var(--omni-color-surface);
   border-radius: var(--radius-lg);
   border: 1px dashed var(--border-medium);
   padding: 56px 24px;
@@ -325,7 +274,7 @@
 .c360-empty-prompt-icon {
   width: 56px;
   height: 56px;
-  border-radius: 16px;
+  border-radius: var(--omni-radius-xl);
   background: #f1f5f9;
   color: #64748b;
   display: flex;
@@ -335,14 +284,14 @@
 }
 
 .c360-empty-prompt-title {
-  font-size: 16px;
-  font-weight: 700;
+  font-size: var(--omni-font-size-lg);
+  font-weight: var(--omni-font-weight-bold);
   color: var(--text-heading);
   margin: 0;
 }
 
 .c360-empty-prompt-desc {
-  font-size: 13.5px;
+  font-size: var(--omni-font-size-sm-plus);
   color: var(--text-secondary);
   max-width: 440px;
   margin: 0;
@@ -351,7 +300,7 @@
 
 /* Card Containers */
 .c360-card {
-  background: #ffffff;
+  background: var(--omni-color-surface);
   border-radius: var(--radius-lg);
   border: 1px solid var(--border-subtle);
   box-shadow: var(--shadow-card);
@@ -368,8 +317,8 @@
 }
 
 .c360-card-title {
-  font-size: 16px;
-  font-weight: 700;
+  font-size: var(--omni-font-size-lg);
+  font-weight: var(--omni-font-weight-bold);
   color: var(--text-heading);
   margin: 0;
 }
@@ -386,8 +335,8 @@
 
 .c360-tab-item {
   padding: 10px 16px;
-  font-size: 13.5px;
-  font-weight: 600;
+  font-size: var(--omni-font-size-sm-plus);
+  font-weight: var(--omni-font-weight-semibold);
   color: var(--text-secondary);
   background: transparent;
   border: none;
@@ -430,8 +379,8 @@
 }
 
 .c360-data-item {
-  background: #f8fafc;
-  border-radius: 10px;
+  background: var(--omni-color-surface-alt);
+  border-radius: var(--omni-radius-lg-minus);
   padding: 12px 16px;
   border: 1px solid #f1f5f9;
   display: flex;
@@ -440,16 +389,16 @@
 }
 
 .c360-data-label {
-  font-size: 11.5px;
-  font-weight: 600;
+  font-size: var(--omni-font-size-xs-plus);
+  font-weight: var(--omni-font-weight-semibold);
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--text-secondary);
 }
 
 .c360-data-value {
-  font-size: 14px;
-  font-weight: 600;
+  font-size: var(--omni-font-size-md);
+  font-weight: var(--omni-font-weight-semibold);
   color: var(--text-heading);
   word-break: break-word;
 }
@@ -461,32 +410,32 @@
   gap: 5px;
   padding: 4px 10px;
   border-radius: var(--radius-pill);
-  font-size: 12px;
-  font-weight: 600;
+  font-size: var(--omni-font-size-xs);
+  font-weight: var(--omni-font-weight-semibold);
   letter-spacing: -0.01em;
 }
 
 .c360-badge-success {
-  background: #ecfdf5;
-  color: #065f46;
+  background: var(--omni-color-success-50);
+  color: var(--omni-color-success-800);
   border: 1px solid #a7f3d0;
 }
 
 .c360-badge-warning {
-  background: #fffbeb;
-  color: #92400e;
+  background: var(--omni-color-warning-50);
+  color: var(--omni-color-warning-800);
   border: 1px solid #fde68a;
 }
 
 .c360-badge-info {
-  background: #eff6ff;
-  color: #1e40af;
+  background: var(--omni-color-primary-50);
+  color: var(--omni-color-info-text);
   border: 1px solid #bfdbfe;
 }
 
 .c360-badge-danger {
-  background: #fef2f2;
-  color: #991b1b;
+  background: var(--omni-color-danger-50);
+  color: var(--omni-color-danger-800);
   border: 1px solid #fecaca;
 }
 
@@ -498,7 +447,7 @@
 }
 
 .c360-corp-card {
-  background: #ffffff;
+  background: var(--omni-color-surface);
   border-radius: var(--radius-lg);
   border: 1px solid var(--border-subtle);
   box-shadow: var(--shadow-card);
@@ -517,52 +466,6 @@
   box-shadow: var(--shadow-card-hover);
 }
 
-/* Tables */
-.c360-table-container {
-  background: var(--omni-color-surface);
-  border: 1.5px solid var(--omni-color-border);
-  border-radius: var(--omni-radius-xl, 18px);
-  box-shadow: var(--omni-shadow-sm, 0 2px 8px rgba(15, 23, 42, 0.04));
-  overflow: hidden;
-}
-
-.c360-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13px;
-  text-align: left;
-}
-
-/* Matches host's Table.module.css th/td exactly: 12px/16px padding, 12px/600 uppercase header text
-   at 0.03em tracking, and one consistent border color (was 11.5px/700/0.04em with a lighter, ad-hoc
-   #f1f5f9 for the body rows that didn't match the header's own border, or the host's). */
-.c360-table th {
-  background: linear-gradient(180deg, var(--omni-color-surface-alt) 0%, #f1f5f9 100%);
-  padding: 12px 16px;
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--omni-color-text-secondary);
-  border-bottom: 1.5px solid var(--omni-color-border);
-  white-space: nowrap;
-}
-
-.c360-table td {
-  padding: 13px 18px;
-  border-bottom: 1px solid #f1f5f9;
-  color: var(--omni-color-text-primary);
-  vertical-align: middle;
-}
-
-.c360-table tbody tr:hover {
-  background: #f8fafc;
-}
-
-.c360-table tbody tr:last-child td {
-  border-bottom: none;
-}
-
 /* Pagination — same visual pattern as the host's own AuditLogsPage pagination bar, so this table's
    paging controls read as the same platform convention, not an app-specific one-off. */
 .c360-pagination {
@@ -577,12 +480,12 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background: #ffffff;
+  background: var(--omni-color-surface);
   border: 1px solid var(--border-medium);
-  border-radius: 8px;
+  border-radius: var(--omni-radius-md);
   padding: 7px 16px;
-  font-size: 12.5px;
-  font-weight: 600;
+  font-size: var(--omni-font-size-sm-minus);
+  font-weight: var(--omni-font-weight-semibold);
   color: var(--text-secondary);
   cursor: pointer;
   font-family: inherit;
@@ -591,7 +494,7 @@
 
 .c360-page-btn:hover:not(:disabled) {
   background: var(--primary-50);
-  border-color: #93c5fd;
+  border-color: var(--omni-color-primary-300);
   color: var(--primary-600);
   box-shadow: 0 2px 8px rgba(37, 99, 235, 0.1);
 }
@@ -602,8 +505,8 @@
 }
 
 .c360-page-indicator {
-  font-size: 13px;
-  font-weight: 600;
+  font-size: var(--omni-font-size-sm);
+  font-weight: var(--omni-font-weight-semibold);
   color: var(--text-secondary);
   min-width: 100px;
   text-align: center;
@@ -637,8 +540,8 @@
   align-items: center;
   gap: 8px;
   margin: 0 0 16px;
-  font-size: 14px;
-  font-weight: 700;
+  font-size: var(--omni-font-size-md);
+  font-weight: var(--omni-font-weight-bold);
   color: var(--primary-700);
   padding-left: 10px;
   border-left: 3px solid var(--primary-600);
@@ -683,8 +586,8 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 11.5px;
-  font-weight: 600;
+  font-size: var(--omni-font-size-xs-plus);
+  font-weight: var(--omni-font-weight-semibold);
   color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.03em;
@@ -696,8 +599,8 @@
 }
 
 .info-value {
-  font-size: 13.5px;
-  font-weight: 600;
+  font-size: var(--omni-font-size-sm-plus);
+  font-weight: var(--omni-font-weight-semibold);
   color: var(--text-heading);
   word-break: break-word;
 }
@@ -709,61 +612,13 @@
 }
 
 .vip-star {
-  color: #f59e0b;
-  font-size: 14px;
+  color: var(--omni-color-warning-500);
+  font-size: var(--omni-font-size-md);
 }
 
-/* ---- buttons ---- */
-
-.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 8px 16px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border-medium);
-  background: var(--surface-card);
-  color: var(--text-body);
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
-}
-
-.btn:hover {
-  border-color: var(--primary-400);
-  color: var(--primary-700);
-}
-
-.btn:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-
-/* Same gradient as .c360-btn-primary — host's primary button is never a flat fill, only ever this
-   gradient, at every size. */
-.btn-primary,
-.btn.btn-primary {
-  background: linear-gradient(135deg, #2f72f5 0%, #1d4ed8 100%);
-  border-color: transparent;
-  color: #ffffff;
-  box-shadow: var(--shadow-primary-btn);
-}
-
-.btn-primary:hover,
-.btn.btn-primary:hover {
-  background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
-  border-color: var(--primary-700);
-  color: #ffffff;
-}
-
-.btn-secondary,
-.btn.btn-secondary {
-  background: var(--primary-50);
-  border-color: var(--primary-200);
-  color: var(--primary-700);
-}
+/* ---- buttons ----
+   Nothing here any more. Every button in this app renders `<Button>` from @omniremit/ui, so the
+   gradient, sizes, hover and focus rings are the host's, not a copy of them. */
 
 /* ---- spinners / loading / empty / error states ---- */
 
@@ -783,7 +638,7 @@
   height: 32px;
   border: 3px solid var(--border-subtle);
   border-top-color: var(--primary-600);
-  border-radius: 50%;
+  border-radius: var(--omni-radius-circle);
   animation: c360-spin 0.8s linear infinite;
 }
 
@@ -794,7 +649,7 @@
   justify-content: center;
   gap: 14px;
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: var(--omni-font-size-sm);
 }
 
 /* ── Skeleton shimmer — same convention as the host's Skeleton component
@@ -806,7 +661,7 @@
   position: relative;
   overflow: hidden;
   background: #eaecf0;
-  border-radius: 6px;
+  border-radius: var(--omni-radius-sm);
 }
 
 .c360-skel::after {
@@ -822,9 +677,9 @@
   100% { transform: translateX(100%); }
 }
 
-.c360-skel-circle { border-radius: 50%; flex-shrink: 0; }
-.c360-skel-pill { border-radius: 999px; }
-.c360-skel-text { height: 0.85em; border-radius: 4px; }
+.c360-skel-circle { border-radius: var(--omni-radius-circle); flex-shrink: 0; }
+.c360-skel-pill { border-radius: var(--omni-radius-pill); }
+.c360-skel-text { height: 0.85em; border-radius: var(--omni-radius-xs); }
 
 .c360-skel-row {
   display: flex;
@@ -842,7 +697,7 @@
   padding: 32px 20px;
   text-align: center;
   color: var(--text-muted);
-  font-size: 13.5px;
+  font-size: var(--omni-font-size-sm-plus);
   background: var(--surface-ground);
   border: 1px dashed var(--border-medium);
   border-radius: var(--radius-md);
@@ -850,22 +705,22 @@
 
 .error-container {
   padding: 20px;
-  background: #fef2f2;
+  background: var(--omni-color-danger-50);
   border: 1px solid #fecaca;
   border-radius: var(--radius-md);
-  color: #b91c1c;
+  color: var(--omni-color-danger-700);
   text-align: center;
 }
 
 .error-container h3 {
   margin: 0 0 6px;
-  font-size: 14px;
-  color: #991b1b;
+  font-size: var(--omni-font-size-md);
+  color: var(--omni-color-danger-800);
 }
 
 .error-container p {
   margin: 0;
-  font-size: 13px;
+  font-size: var(--omni-font-size-sm);
 }
 
 /* ---- hero banner (AllInteractions.tsx, AllProducts.tsx, AuditLogs.tsx) ----
@@ -873,68 +728,15 @@
    component's own "Hero Banner — Host Pattern" comment — the intent to match
    the host was already there, the CSS backing it just never got written. */
 
-.c360-hero-banner {
-  position: relative;
-  overflow: hidden;
-  display: flex;
-  align-items: center;
-  /* flex-wrap so the right-side action (Export CSV / New Search / etc.) drops below the
-     icon+title block instead of forcing the row — and the whole page — wider than the
-     viewport on a narrow screen. */
-  flex-wrap: wrap;
-  justify-content: space-between;
-  gap: 16px 24px;
-  padding: 28px 32px;
-  border-radius: var(--radius-xl);
-  background: linear-gradient(120deg, var(--primary-800) 0%, var(--primary-600) 45%, var(--primary-500) 100%);
-  box-shadow: 0 4px 20px rgba(37, 99, 235, 0.25), 0 1px 4px rgba(37, 99, 235, 0.15);
-  color: #ffffff;
-}
-
 /* The icon+title flex group every .c360-hero-banner uses (Customer360, AuditLogs, AllProducts,
    AllInteractions, FieldSettings) — was inline-styled per page with no min-width:0, so as a flex
    item it refused to shrink below its title/subtitle's un-wrapped content width. That's the actual
    root cause of the banner (and the whole page under it) rendering wider than the viewport. */
-.c360-hero-left {
-  display: flex;
-  align-items: center;
-  gap: 18px;
-  position: relative;
-  z-index: 1;
-  min-width: 0;
-  flex: 1 1 260px;
-}
-
-.c360-hero-title {
-  margin: 0;
-  font-size: 21px;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-  color: #ffffff;
-}
-
-.c360-hero-subtitle {
-  margin: 4px 0 0;
-  font-size: 13px;
-  color: rgba(255, 255, 255, 0.82);
-}
 
 @media (max-width: 640px) {
   .c360-hero-banner { padding: 20px 20px; }
-  .c360-hero-title { font-size: 18px; }
-  .c360-hero-subtitle { font-size: 12.5px; }
-}
-
-.c360-hero-pill {
-  display: inline-flex;
-  align-items: center;
-  padding: 3px 12px;
-  border-radius: var(--radius-pill);
-  background: rgba(255, 255, 255, 0.18);
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  font-size: 11.5px;
-  font-weight: 600;
-  color: #ffffff;
+  .c360-hero-title { font-size: var(--omni-font-size-lg-plus); }
+  .c360-hero-subtitle { font-size: var(--omni-font-size-sm-minus); }
 }
 
 /* ---- right-side drawer / modal (CaseDetailsModal.tsx, ProductDetailsModal.tsx) ---- */
@@ -946,33 +748,9 @@
    CaseDetailsModal.tsx / ProductDetailsModal.tsx) but produces the identical visual result — the
    overlay itself carries the backdrop's blur+color, in addition to positioning the content panel. */
 
-.drawer-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(15, 23, 42, 0.45);
-  backdrop-filter: blur(4px);
-  display: flex;
-  justify-content: flex-end;
-  z-index: 999;
-  animation: c360-drawer-fade-in 0.2s ease-out;
-}
-
 @keyframes c360-drawer-fade-in {
   from { opacity: 0; }
   to { opacity: 1; }
-}
-
-.drawer-content {
-  position: relative;
-  width: min(800px, 96vw);
-  height: 100vh;
-  background: var(--surface-ground);
-  box-shadow: -12px 0 60px rgba(15, 23, 42, 0.18), -2px 0 8px rgba(15, 23, 42, 0.06);
-  display: flex;
-  flex-direction: column;
-  overflow-y: auto;
-  z-index: 1000;
-  animation: c360-drawer-slide-in 0.28s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 @keyframes c360-drawer-slide-in {
@@ -980,92 +758,7 @@
   to { transform: translateX(0); }
 }
 
-.drawer-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 22px 28px 20px;
-  border-bottom: 1px solid var(--border-subtle);
-  flex-shrink: 0;
-}
-
-.drawer-header.blue-header {
-  position: relative;
-  overflow: hidden;
-  /* Same 4-stop gradient as the host's SettingsDrawer header exactly (was missing the darkest
-     leading stop, --primary-900, that the host's version opens with). */
-  background: linear-gradient(120deg, var(--primary-900) 0%, var(--primary-800) 30%, var(--primary-600) 65%, var(--primary-500) 100%);
-  color: #ffffff;
-  border-bottom: none;
-}
-
 /* Decorative circles, matching the host header's exact treatment. */
-.drawer-header.blue-header::before {
-  content: '';
-  position: absolute;
-  top: -50px;
-  right: -50px;
-  width: 200px;
-  height: 200px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(255, 255, 255, 0.1) 0%, transparent 70%);
-  pointer-events: none;
-}
-
-.drawer-header.blue-header::after {
-  content: '';
-  position: absolute;
-  bottom: -60px;
-  left: 30px;
-  width: 160px;
-  height: 160px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(255, 255, 255, 0.06) 0%, transparent 70%);
-  pointer-events: none;
-}
-
-.drawer-title-text {
-  position: relative;
-  z-index: 1;
-}
-
-.drawer-title-text h3 {
-  margin: 0;
-  font-size: 18px;
-  font-weight: 700;
-  letter-spacing: -0.025em;
-}
-
-.drawer-title-text p {
-  margin: 4px 0 0;
-  font-size: 12px;
-  opacity: 0.85;
-}
-
-.drawer-close-btn {
-  position: relative;
-  z-index: 1;
-  background: rgba(255, 255, 255, 0.15);
-  border: none;
-  border-radius: var(--radius-sm);
-  color: inherit;
-  width: 32px;
-  height: 32px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: background-color 130ms ease;
-}
-
-.drawer-close-btn:hover {
-  background: rgba(255, 255, 255, 0.26);
-}
-
-.drawer-header:not(.blue-header) .drawer-close-btn {
-  background: var(--surface-alt);
-  color: var(--text-secondary);
-}
 
 .drawer-body {
   padding: 20px 24px;
@@ -1088,8 +781,8 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 14px;
-  font-weight: 700;
+  font-size: var(--omni-font-size-md);
+  font-weight: var(--omni-font-weight-bold);
   color: var(--primary-700);
   padding-left: 10px;
   border-left: 3px solid var(--primary-600);
@@ -1118,12 +811,12 @@
 .drawer-field-row .info-label {
   text-transform: none;
   letter-spacing: normal;
-  font-size: 13px;
+  font-size: var(--omni-font-size-sm);
   color: var(--text-secondary);
 }
 
 .drawer-field-row .info-value {
-  font-size: 13px;
+  font-size: var(--omni-font-size-sm);
 }
 
 .drawer-grid {
@@ -1178,8 +871,8 @@
   justify-content: space-between;
   padding: 18px 22px;
   border-bottom: 1px solid var(--border-subtle);
-  font-size: 15px;
-  font-weight: 700;
+  font-size: var(--omni-font-size-md-plus);
+  font-weight: var(--omni-font-weight-bold);
   color: var(--text-heading);
 }
 
@@ -1201,37 +894,6 @@
    "border: transparent by default, only the neutral-equivalent variant gets a visible border"
    convention (host's colored variants — success/warning/danger/info — never show a border; c360's
    active/pending/wip previously all had one, which host's design never does). */
-.status-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 12px;
-  border-radius: var(--radius-pill);
-  font-size: 12px;
-  font-weight: 600;
-  border: 1px solid transparent;
-}
-
-.status-active {
-  background: #ecfdf5;
-  color: #047857;
-}
-
-.status-validated {
-  background: var(--surface-alt);
-  color: var(--text-secondary);
-  border-color: var(--border-medium);
-}
-
-.status-pending {
-  background: #fffbeb;
-  color: #b45309;
-}
-
-.status-wip {
-  background: var(--primary-50);
-  color: var(--primary-700);
-}
 
 .data-table-container {
   overflow-x: auto;
@@ -1310,8 +972,8 @@
   border: 1px solid transparent;
   background: transparent;
   color: var(--text-body);
-  font-size: 13px;
-  font-weight: 500;
+  font-size: var(--omni-font-size-sm);
+  font-weight: var(--omni-font-weight-medium);
   text-align: left;
   cursor: pointer;
   transition: all 0.15s ease;
@@ -1327,7 +989,7 @@
 .left-tab-btn.active {
   background: var(--primary-50);
   color: var(--primary-700);
-  font-weight: 700;
+  font-weight: var(--omni-font-weight-bold);
   border-color: var(--primary-200);
 }
 
@@ -1335,25 +997,17 @@
   flex-shrink: 0;
 }
 
-/* ---- data table (Customer360.tsx's own tables, distinct from .c360-table) ---- */
-
-.table-responsive-wrapper {
-  overflow-x: auto;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-}
-
 .data-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 13px;
+  font-size: var(--omni-font-size-sm);
 }
 
 .data-table th {
   text-align: left;
   padding: 12px 16px;
-  font-size: 11px;
-  font-weight: 700;
+  font-size: var(--omni-font-size-xs-minus);
+  font-weight: var(--omni-font-weight-bold);
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--text-secondary);
@@ -1370,7 +1024,7 @@
 }
 
 .data-table tbody tr:hover {
-  background: #f8fafc;
+  background: var(--omni-color-surface-alt);
 }
 
 .data-table tbody tr:last-child td {
@@ -1379,8 +1033,8 @@
 
 .action-link {
   color: var(--primary-600);
-  font-weight: 600;
-  font-size: 12.5px;
+  font-weight: var(--omni-font-weight-semibold);
+  font-size: var(--omni-font-size-sm-minus);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -1393,137 +1047,14 @@
 }
 
 .account-num-text {
-  font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
-  font-size: 12.5px;
+  font-family: var(--omni-font-mono);
+  font-size: var(--omni-font-size-sm-minus);
   color: var(--text-heading);
 }
 
 /* ============================================================
    HOST-STANDARD AUDIT LOG DETAILS DRAWER
    ============================================================ */
-
-.audit-details-drawer {
-  width: min(740px, 95vw);
-  height: 100vh;
-  background: #ffffff;
-  display: flex;
-  flex-direction: column;
-  box-shadow: -12px 0 60px rgba(15, 23, 42, 0.22), -2px 0 10px rgba(15, 23, 42, 0.08);
-  animation: c360-drawer-slide-in 0.28s cubic-bezier(0.16, 1, 0.3, 1);
-  position: relative;
-  box-sizing: border-box;
-  overflow: hidden;
-  z-index: 1000;
-}
-
-.audit-drawer-header {
-  position: relative;
-  overflow: hidden;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 22px 28px 20px;
-  background: var(--header-gradient);
-  flex-shrink: 0;
-  box-shadow: 0 4px 16px rgba(37, 99, 235, 0.24);
-}
-
-.audit-drawer-header::before {
-  content: '';
-  position: absolute;
-  top: -50px;
-  right: -50px;
-  width: 200px;
-  height: 200px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(255, 255, 255, 0.14) 0%, transparent 70%);
-  pointer-events: none;
-}
-
-.audit-drawer-header::after {
-  content: '';
-  position: absolute;
-  bottom: -60px;
-  left: 30px;
-  width: 160px;
-  height: 160px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(255, 255, 255, 0.08) 0%, transparent 70%);
-  pointer-events: none;
-}
-
-.audit-header-left {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  position: relative;
-  z-index: 1;
-  /* Claim the free space so the title/subtitle stay pinned left and only the close button sits
-     right — matching lead_mf's .audit-header-left and the host's drawer headers. Without this the
-     parent's `justify-content: space-between` centres this block. */
-  flex: 1;
-  min-width: 0;
-}
-
-.audit-header-icon-box {
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.18);
-  color: #ffffff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  border: 1.5px solid rgba(255, 255, 255, 0.32);
-  backdrop-filter: blur(8px);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 2px 8px rgba(0, 0, 0, 0.12);
-}
-
-.audit-header-text {
-  display: flex;
-  flex-direction: column;
-}
-
-.audit-header-title {
-  font-size: 18px;
-  font-weight: 700;
-  color: #ffffff;
-  margin: 0;
-  line-height: 1.25;
-  letter-spacing: -0.025em;
-}
-
-.audit-header-subtitle {
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.82);
-  margin: 4px 0 0;
-  font-weight: 400;
-  letter-spacing: 0.01em;
-}
-
-.audit-header-close-btn {
-  position: relative;
-  z-index: 1;
-  width: 36px;
-  height: 36px;
-  border-radius: 9px;
-  background: rgba(255, 255, 255, 0.16);
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  color: #ffffff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all 140ms ease;
-  backdrop-filter: blur(4px);
-}
-
-.audit-header-close-btn:hover {
-  background: rgba(255, 255, 255, 0.28);
-  border-color: rgba(255, 255, 255, 0.45);
-  transform: scale(1.05);
-}
 
 .audit-drawer-body {
   flex: 1;
@@ -1537,9 +1068,9 @@
 }
 
 .audit-drawer-section {
-  background: #ffffff;
+  background: var(--omni-color-surface);
   border: 1.5px solid #e8edf5;
-  border-radius: 14px;
+  border-radius: var(--omni-radius-lg-plus);
   padding: 18px 20px 16px;
   box-shadow: 0 1px 4px rgba(15, 23, 42, 0.04);
   transition: all 180ms ease;
@@ -1547,23 +1078,24 @@
 
 .audit-drawer-section:hover {
   box-shadow: 0 4px 18px rgba(37, 99, 235, 0.08);
-  border-color: #dbeafe;
+  border-color: var(--omni-color-info-bg);
 }
 
 .audit-drawer-section-title {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 10.5px;
+  /* Matched to the host's .drawerSectionTitle — this pill was a step larger in both remotes. */
+  font-size: var(--omni-font-size-2xs);
   font-weight: 800;
-  color: #1d4ed8;
+  color: var(--omni-color-primary-700);
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  margin: 0 0 14px;
+  margin: 0 0 12px;
   background: linear-gradient(90deg, #eff6ff 0%, #f0f9ff 100%);
   border: 1px solid #dbeafe;
-  border-radius: 16px;
-  padding: 4px 11px;
+  border-radius: var(--omni-radius-xl);
+  padding: 3.5px 10px;
 }
 
 .audit-overview-timeline-grid {
@@ -1582,6 +1114,9 @@
 .audit-overview-col {
   display: flex;
   flex-direction: column;
+  /* Explicit, rather than leaning on each card's own margin — the two drawer columns then keep the
+     same rhythm even when one has more rows than the other. */
+  gap: 10px;
 }
 
 .audit-overview-col-divider {
@@ -1609,12 +1144,16 @@
 .audit-detail-row {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 8px 12px;
-  background: #ffffff;
+  /* Matched to the host'"'"'s .detailRow: gap 10px, padding 9px 12px. lead used 12px/9px 13px and
+     customer360 12px/8px 12px, so the same row sat at three different sizes across the apps.
+     min-width: 0 was also missing in customer360, without which a long value cannot shrink. */
+  gap: 10px;
+  padding: 9px 12px;
+  background: var(--omni-color-surface);
   border: 1.5px solid #e8edf5;
-  border-radius: 10px;
+  border-radius: var(--omni-radius-lg-minus);
   transition: all 180ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  min-width: 0;
   position: relative;
   overflow: hidden;
 }
@@ -1634,7 +1173,7 @@
 
 .audit-detail-row:hover {
   background: #f0f7ff;
-  border-color: #93c5fd;
+  border-color: var(--omni-color-primary-300);
   box-shadow: 0 3px 12px rgba(37, 99, 235, 0.08);
   transform: translateY(-1.5px);
 }
@@ -1650,9 +1189,9 @@
   flex-shrink: 0;
   width: 30px;
   height: 30px;
-  border-radius: 9px;
-  background: #eff6ff;
-  color: #2563eb;
+  border-radius: var(--omni-radius-md-plus);
+  background: var(--omni-color-primary-50);
+  color: var(--omni-color-primary-600);
   box-shadow: 0 1px 3px rgba(37, 99, 235, 0.12);
 }
 
@@ -1670,13 +1209,13 @@
 
 .audit-detail-icon-success {
   background: linear-gradient(135deg, #ecfdf5, #d1fae5);
-  color: #059669;
+  color: var(--omni-color-success-600);
   box-shadow: 0 1px 3px rgba(5, 150, 105, 0.12);
 }
 
 .audit-detail-icon-danger {
   background: linear-gradient(135deg, #fff1f2, #fecdd3);
-  color: #dc2626;
+  color: var(--omni-color-danger-600);
   box-shadow: 0 1px 3px rgba(220, 38, 38, 0.12);
 }
 
@@ -1689,66 +1228,29 @@
 }
 
 .audit-detail-row-label {
-  font-size: 9.5px;
-  font-weight: 700;
-  color: #94a3b8;
+  font-size: var(--omni-font-size-3xs);
+  font-weight: var(--omni-font-weight-bold);
+  color: var(--omni-color-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.06em;
   white-space: nowrap;
 }
 
 .audit-detail-row-value {
-  font-size: 12.5px;
-  color: #0f172a;
+  font-size: var(--omni-font-size-sm-minus);
+  color: var(--omni-color-text-primary);
   margin: 0;
-  font-weight: 600;
-}
-
-.audit-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 3px 9px;
-  border-radius: 999px;
-  font-size: 11.5px;
-  font-weight: 700;
-  white-space: nowrap;
-}
-
-.audit-badge-primary {
-  background: #eff6ff;
-  color: #1d4ed8;
-  border: 1px solid #bfdbfe;
-}
-
-.audit-badge-success {
-  background: #ecfdf5;
-  color: #047857;
-  border: 1px solid #a7f3d0;
-}
-
-.audit-badge-danger {
-  background: #fff1f2;
-  color: #be123c;
-  border: 1px solid #fecdd3;
-}
-
-.audit-badge-dot {
-  width: 5.5px;
-  height: 5.5px;
-  border-radius: 50%;
-  background: currentColor;
-  flex-shrink: 0;
+  font-weight: var(--omni-font-weight-semibold);
 }
 
 .audit-action-badge {
   display: inline-flex;
   align-items: center;
   padding: 3px 9px;
-  border-radius: 6px;
-  font-family: 'SF Mono', 'Fira Code', monospace;
-  font-size: 11px;
-  font-weight: 600;
+  border-radius: var(--omni-radius-sm);
+  font-family: var(--omni-font-mono);
+  font-size: var(--omni-font-size-xs-minus);
+  font-weight: var(--omni-font-weight-semibold);
   background: #f1f5f9;
   color: #334155;
   border: 1px solid #e2e8f0;
@@ -1769,7 +1271,7 @@
   top: 10px;
   bottom: 10px;
   width: 2px;
-  background: #e2e8f0;
+  background: var(--omni-color-border);
 }
 
 .audit-timeline-step {
@@ -1785,20 +1287,20 @@
   top: 6px;
   width: 12px;
   height: 12px;
-  border-radius: 50%;
-  background: #3b82f6;
+  border-radius: var(--omni-radius-circle);
+  background: var(--omni-color-primary-500);
   border: 2px solid #ffffff;
   box-shadow: 0 0 0 2px #bfdbfe;
   flex-shrink: 0;
 }
 
 .audit-timeline-dot-success {
-  background: #10b981;
+  background: var(--omni-color-success-500);
   box-shadow: 0 0 0 2px #a7f3d0;
 }
 
 .audit-timeline-dot-danger {
-  background: #ef4444;
+  background: var(--omni-color-danger-500);
   box-shadow: 0 0 0 2px #fecdd3;
 }
 
@@ -1806,136 +1308,44 @@
   display: flex;
   flex-direction: column;
   gap: 3px;
-  background: #f8fafc;
+  background: var(--omni-color-surface-alt);
   border: 1px solid #e2e8f0;
-  border-radius: 8px;
+  border-radius: var(--omni-radius-md);
   padding: 8px 12px;
   flex: 1;
 }
 
 .audit-timeline-label {
-  font-size: 12px;
-  font-weight: 600;
+  font-size: var(--omni-font-size-xs);
+  font-weight: var(--omni-font-weight-semibold);
   color: #1e293b;
 }
 
 .audit-timeline-time {
-  font-size: 11px;
+  font-size: var(--omni-font-size-xs-minus);
   color: #64748b;
   display: inline-flex;
   align-items: center;
   gap: 4px;
 }
 
-.audit-field-card-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 10px;
-}
-
-@media (max-width: 540px) {
-  .audit-field-card-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-.audit-field-card {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 9px 13px;
-  background: #ffffff;
-  border: 1.5px solid #e8edf5;
-  border-radius: 10px;
-  transition: all 180ms cubic-bezier(0.34, 1.56, 0.64, 1);
-  min-width: 0;
-  position: relative;
-  overflow: hidden;
-}
-
-.audit-field-card-full {
-  grid-column: 1 / -1;
-}
-
-.audit-field-card::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 20%;
-  bottom: 20%;
-  width: 3.5px;
-  border-radius: 0 3px 3px 0;
-  background: linear-gradient(180deg, #3b82f6, #818cf8);
-  opacity: 0;
-  transition: opacity 180ms ease;
-}
-
-.audit-field-card:hover {
-  background: #f0f7ff;
-  border-color: #93c5fd;
-  box-shadow: 0 3px 12px rgba(37, 99, 235, 0.08);
-  transform: translateY(-1.5px);
-}
-
-.audit-field-card:hover::before {
-  opacity: 1;
-}
-
-.audit-field-card-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  width: 30px;
-  height: 30px;
-  border-radius: 9px;
-  background: #eff6ff;
-  color: #2563eb;
-  box-shadow: 0 1px 3px rgba(37, 99, 235, 0.12);
-}
-
-.audit-field-card-body {
-  display: flex;
-  flex-direction: column;
-  gap: 1.5px;
-  min-width: 0;
-  flex: 1;
-}
-
-.audit-field-card-label {
-  font-size: 9.5px;
-  font-weight: 700;
-  color: #94a3b8;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  white-space: nowrap;
-}
-
-.audit-field-card-value {
-  font-size: 12.5px;
-  color: #0f172a;
-  margin: 0;
-  font-weight: 600;
-  overflow-wrap: anywhere;
-}
-
 .audit-user-chip {
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  font-weight: 600;
-  color: #0f172a;
+  font-weight: var(--omni-font-weight-semibold);
+  color: var(--omni-color-text-primary);
 }
 
 .audit-user-avatar {
   width: 22px;
   height: 22px;
-  border-radius: 50%;
+  border-radius: var(--omni-radius-circle);
   background: linear-gradient(135deg, #ede9fe 0%, #ddd6fe 100%);
   color: #6d28d9;
   border: 1px solid #c4b5fd;
-  font-size: 10px;
-  font-weight: 700;
+  font-size: var(--omni-font-size-2xs);
+  font-weight: var(--omni-font-weight-bold);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1943,8 +1353,8 @@
 }
 
 .audit-mono-text {
-  font-family: 'SF Mono', 'Fira Code', monospace;
-  font-size: 12px;
+  font-family: var(--omni-font-mono);
+  font-size: var(--omni-font-size-xs);
   color: #334155;
   letter-spacing: 0.02em;
 }
@@ -1954,31 +1364,31 @@
   align-items: center;
   gap: 6px;
   padding: 3px 9px;
-  border-radius: 6px;
-  background: #f8fafc;
+  border-radius: var(--omni-radius-sm);
+  background: var(--omni-color-surface-alt);
   border: 1px solid #e2e8f0;
-  font-family: 'SF Mono', 'Fira Code', monospace;
-  font-size: 11.5px;
-  font-weight: 600;
+  font-family: var(--omni-font-mono);
+  font-size: var(--omni-font-size-xs-plus);
+  font-weight: var(--omni-font-weight-semibold);
   color: #334155;
 }
 
 .audit-ip-dot {
   width: 5px;
   height: 5px;
-  border-radius: 50%;
-  background: #3b82f6;
+  border-radius: var(--omni-radius-circle);
+  background: var(--omni-color-primary-500);
   box-shadow: 0 0 5px rgba(59, 130, 246, 0.8);
   flex-shrink: 0;
 }
 
 .audit-payload-code-box {
-  background: #0f172a;
-  color: #e2e8f0;
+  background: var(--omni-color-text-primary);
+  color: var(--omni-color-border);
   padding: 13px 15px;
-  border-radius: 10px;
-  font-family: 'SF Mono', 'Fira Code', monospace;
-  font-size: 11.5px;
+  border-radius: var(--omni-radius-lg-minus);
+  font-family: var(--omni-font-mono);
+  font-size: var(--omni-font-size-xs-plus);
   line-height: 1.55;
   overflow-x: auto;
   max-height: 200px;
@@ -1986,41 +1396,52 @@
   border: 1px solid #1e293b;
 }
 
-.audit-drawer-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 14px 28px;
-  border-top: 1px solid #e2e8f0;
-  background: #ffffff;
-  flex-shrink: 0;
-}
+/*
+ * `flex-end`, not `space-between`. The footer has exactly ONE child — the close button — and
+ * space-between pins a lone child to the start, so "Close Details" sat at the far LEFT while the
+ * host's audit drawer and lead_mf's lead drawer both put it on the right. Padding matches the
+ * body's 24px inset rather than 28px, so the button lines up with the cards above it.
+ */
 
 .audit-footer-meta {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 11.5px;
+  font-size: var(--omni-font-size-xs-plus);
   color: #64748b;
 }
 
-.audit-footer-close-btn {
-  height: 38px;
-  padding: 0 20px;
-  background: #ffffff;
-  border: 1.5px solid #e2e8f0;
-  border-radius: 10px;
-  font-size: 13px;
-  font-weight: 600;
-  color: #334155;
-  cursor: pointer;
-  transition: all 120ms ease;
-  font-family: inherit;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+/*
+ * Card frames around tables.
+ *
+ * These were removed with the .c360-table rules when those tables moved to @omniremit/ui's
+ * DataTable, but they are the surrounding CARD, not the table — without them the tables lost their
+ * white surface, border and shadow. Restored, now pointing at the platform tokens.
+ */
+/*
+ * The card frame around a table page's toolbar + table.
+ *
+ * A COLUMN, explicitly. The `.spread` class that used to be applied here alongside it is a
+ * toolbar rule — `display: flex` with `justify-content: space-between` — so the card laid its
+ * toolbar and its table out SIDE BY SIDE, squeezing the toolbar to ~370px of a 1228px card and
+ * wrapping the Refresh button onto its own line. `.spread` now lives on the toolbar where it
+ * belongs (as `c360Common.toolbar`).
+ *
+ * `overflow` must not be hidden: that clips the shared DataTable's own horizontal scroll
+ * container, which is how Field Settings lost its right-hand columns entirely.
+ */
+.c360-table-container {
+  background: var(--omni-color-surface, #ffffff);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-subtle);
+  box-shadow: var(--shadow-card);
+  display: flex;
+  flex-direction: column;
+  overflow: visible;
 }
 
-.audit-footer-close-btn:hover {
-  background: #f8fafc;
-  border-color: #cbd5e1;
-  color: #0f172a;
+.table-responsive-wrapper {
+  overflow-x: auto;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
 }

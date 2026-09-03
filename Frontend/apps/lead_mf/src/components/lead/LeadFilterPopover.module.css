@@ -1,0 +1,324 @@
+/*
+ * Lead filter popover.
+ *
+ * NOTE ON SCOPING: this component renders through createPortal into document.body, so it lands
+ * OUTSIDE `#lead-mf-scope`. Global rules in index.css are prefixed with that id and therefore would
+ * not apply here — which is exactly why every style in this file was inline to begin with. A CSS
+ * Module works because modules are excluded from the prefixer (see postcss.config.cjs) and their
+ * class names are hashed unique, so they apply anywhere in the document.
+ *
+ * Values follow the platform tokens; the popover keeps its own geometry, which is genuinely
+ * specific to a two-column filter panel and not a host pattern being duplicated.
+ */
+
+.popover {
+  position: fixed;
+  /* Anchored to the trigger at runtime, so the offsets arrive as custom properties. */
+  top: var(--lead-filter-top, 0);
+  right: var(--lead-filter-right, 0);
+  /*
+   * Portaled into document.body's root stacking context, this competes directly with modals and
+   * toasts rather than sitting inside the table card's own context. Drawers are at --omni-z-modal
+   * (400) and the local .toast-notification is 1000; this stays above both.
+   */
+  z-index: 1200;
+  background: var(--omni-color-surface);
+  border-radius: var(--omni-radius-xl);
+  box-shadow: 0 12px 32px -4px rgba(15, 23, 42, 0.18), 0 4px 12px rgba(0, 0, 0, 0.06);
+  border: 1px solid var(--omni-color-border);
+  /* Never wider than the viewport. At a fixed 520px this popover overflowed any screen under
+     ~560px, and the file had no media query to rescue it. `min()` needs no breakpoint. */
+  width: min(520px, calc(100vw - 24px));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Little pointer notch aimed at the Filters button. */
+.arrow {
+  position: absolute;
+  top: -6px;
+  right: 80px;
+  width: 12px;
+  height: 12px;
+  background: var(--omni-color-surface);
+  border-top: 1px solid var(--omni-color-border-strong);
+  border-left: 1px solid var(--omni-color-border-strong);
+  transform: rotate(45deg);
+}
+
+.split {
+  display: flex;
+  min-height: 340px;
+  max-height: 420px;
+}
+
+/* ── Left column: category tabs ──────────────────────────────── */
+.tabList {
+  width: 180px;
+  background: var(--omni-color-surface-alt);
+  border-right: 1px solid var(--omni-color-border);
+  display: flex;
+  flex-direction: column;
+  padding: var(--omni-space-2) 0;
+}
+
+.tab {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px var(--omni-space-4);
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-weight: var(--omni-font-weight-medium);
+  font-size: var(--omni-font-size-sm-plus);
+  font-family: inherit;
+  cursor: pointer;
+  text-align: left;
+  transition: background var(--omni-transition-fast), color var(--omni-transition-fast);
+  position: relative;
+}
+
+/* Real :hover — this was previously unreachable, because an inline style cannot express one. */
+.tab:hover {
+  background: var(--omni-color-primary-50);
+  color: var(--omni-color-primary-700);
+}
+
+.tabActive,
+.tabActive:hover {
+  background: var(--omni-color-primary-50);
+  color: var(--omni-color-primary-600);
+  font-weight: var(--omni-font-weight-semibold);
+}
+
+.tabIcon {
+  display: flex;
+  color: var(--omni-color-text-secondary);
+}
+
+.tabActive .tabIcon {
+  color: var(--omni-color-primary-600);
+}
+
+.tabLabel {
+  flex: 1;
+}
+
+/* Dot marking a category that already has a filter applied. */
+.tabDot {
+  width: 7px;
+  height: 7px;
+  border-radius: var(--omni-radius-circle);
+  background: var(--omni-color-primary-600);
+  flex-shrink: 0;
+}
+
+/* ── Right column: the active category's inputs ──────────────── */
+.panel {
+  flex: 1;
+  padding: 18px var(--omni-space-5);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.panelTitle {
+  font-size: var(--omni-font-size-md);
+  font-weight: var(--omni-font-weight-bold);
+  color: var(--text-heading);
+  margin-bottom: var(--omni-space-3);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.searchWrap {
+  position: relative;
+  margin-bottom: 14px;
+}
+
+.searchIcon {
+  position: absolute;
+  left: 10px;
+  top: 10px;
+  color: var(--omni-color-text-muted);
+  pointer-events: none;
+}
+
+.searchInput {
+  width: 100%;
+  padding: var(--omni-space-2) 10px var(--omni-space-2) 32px;
+  border-radius: var(--omni-radius-md);
+  border: 1px solid var(--omni-color-border-strong);
+  font-size: var(--omni-font-size-sm);
+  font-family: inherit;
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color var(--omni-transition-fast), box-shadow var(--omni-transition-fast);
+}
+
+.searchInput:focus {
+  border-color: var(--omni-color-primary-600);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.optionList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow-y: auto;
+  flex: 1;
+  padding-right: var(--omni-space-1);
+}
+
+.option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: var(--omni-font-size-sm);
+  color: var(--omni-color-text-primary);
+  cursor: pointer;
+  font-weight: var(--omni-font-weight-regular);
+}
+
+.optionChecked {
+  font-weight: var(--omni-font-weight-semibold);
+}
+
+.optionBox {
+  width: 16px;
+  height: 16px;
+  border-radius: var(--omni-space-1);
+  accent-color: var(--omni-color-primary-600);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+/* ── Footer ──────────────────────────────────────────────────── */
+.footer {
+  padding: var(--omni-space-3) 18px;
+  background: var(--omni-color-surface);
+  border-top: 1px solid var(--omni-color-border);
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+}
+
+/* ── Single-value tabs (dates, IC, phone, name) ──────────────── */
+.textField {
+  display: flex;
+  flex-direction: column;
+  gap: var(--omni-space-3);
+}
+
+.fieldLabel {
+  font-size: var(--omni-font-size-sm-minus);
+  color: var(--omni-color-text-secondary);
+  font-weight: var(--omni-font-weight-medium);
+}
+
+.textInput {
+  width: 100%;
+  padding: 9px var(--omni-space-3);
+  border-radius: var(--omni-radius-md);
+  border: 1px solid var(--omni-color-border-strong);
+  font-size: var(--omni-font-size-sm-plus);
+  font-family: inherit;
+  color: var(--omni-color-text-primary);
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color var(--omni-transition-fast), box-shadow var(--omni-transition-fast);
+}
+
+.textInput:focus {
+  border-color: var(--omni-color-primary-600);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.noResults {
+  font-size: var(--omni-font-size-sm);
+  color: var(--omni-color-text-muted);
+  padding: var(--omni-space-3) 0;
+}
+
+/* ── Active filter chips ──────────────────────────────────────────────────────────────────────
+ * One chip per criterion that currently has a value, each with its own ✕. Before this the only
+ * way to drop a filter was Reset, which cleared all of them at once.
+ */
+.activeBar {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--omni-space-2);
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--omni-color-border);
+  background: var(--omni-color-surface-alt);
+}
+
+.activeBarLabel {
+  flex-shrink: 0;
+  font-size: var(--omni-font-size-2xs-plus);
+  font-weight: var(--omni-font-weight-bold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--omni-color-text-muted);
+  line-height: 22px;
+}
+
+.activeChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 220px;
+  padding: 2px 4px 2px 8px;
+  border-radius: var(--omni-radius-pill);
+  background: var(--omni-color-primary-50);
+  border: 1px solid #bfdbfe; /* not in scale — matches the host's active-filter border */
+  font-size: var(--omni-font-size-xs-plus);
+  line-height: 18px;
+}
+
+.chipField {
+  font-weight: var(--omni-font-weight-bold);
+  color: var(--omni-color-primary-700);
+}
+
+.chipValue {
+  color: var(--omni-color-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chipRemove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  padding: 0;
+  border: none;
+  border-radius: var(--omni-radius-circle);
+  background: transparent;
+  color: var(--omni-color-primary-700);
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease;
+}
+
+.chipRemove:hover {
+  background: var(--omni-color-primary-600);
+  color: #ffffff;
+}

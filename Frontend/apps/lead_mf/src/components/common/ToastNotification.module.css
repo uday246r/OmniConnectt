@@ -1,0 +1,85 @@
+/*
+ * Styles extracted from this component's former inline blocks. Values map to platform
+ * tokens where an exact equivalent exists; the rest are the original literals.
+ */
+
+.iconSuccess {
+  color: var(--omni-color-success-600);
+  flex-shrink: 0;
+}
+
+.iconWarning {
+  color: var(--omni-color-warning-600);
+  flex-shrink: 0;
+}
+
+.iconError {
+  color: var(--omni-color-danger-600);
+  flex-shrink: 0;
+}
+
+.iconInfo {
+  color: var(--omni-color-primary-600);
+  flex-shrink: 0;
+}
+
+.body {
+  flex: 1;
+}
+
+.title {
+  font-weight: var(--omni-font-weight-semibold);
+  font-size: var(--omni-font-size-md);
+  color: var(--omni-color-text-primary);
+  margin-bottom: 2px;
+}
+
+.message {
+  font-size: var(--omni-font-size-sm);
+  color: var(--omni-color-text-secondary);
+  line-height: 1.4;
+}
+
+.detailList {
+  margin: 6px 0 0 0;
+  padding-left: 16px;
+  font-size: var(--omni-font-size-sm-minus);
+  color: var(--omni-color-danger-600);
+}
+
+.titleTight {
+  margin-bottom: 2px;
+}
+
+.dismissBtn {
+  background: none;
+  border: none;
+  color: var(--omni-color-text-muted);
+  cursor: pointer;
+  padding: 2px;
+  border-radius: var(--omni-radius-xs);
+  margin-left: 8px;
+}
+
+/* Variant background/border are chosen per toast type, so they arrive as custom properties. */
+.toastRoot {
+  position: fixed;
+  top: var(--omni-space-6);
+  right: var(--omni-space-6);
+  z-index: 9999;
+  min-width: min(320px, calc(100vw - 24px));
+  max-width: 460px;
+  background: var(--toast-bg);
+  border: 1px solid var(--toast-border);
+  border-radius: var(--omni-radius-md);
+  padding: 14px 18px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+  animation: slideInRight 0.25s ease-out;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--omni-space-3);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toastRoot { animation: none; }
+}

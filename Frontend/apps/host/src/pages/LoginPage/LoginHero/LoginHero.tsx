@@ -27,11 +27,11 @@ const COLOR_PALETTE: { bg: string; shadow: string }[] = [
 ]
 
 const APPS: AppNode[] = [
-  { id: 'lead',     label: ['Lead',     'Management'], icon: <Icon.User       width={15} height={15} /> },
+  { id: 'lead',     label: ['Lead',     'Management'], icon: <Icon.User width={15} height={15} /> },
   { id: 'market',   label: ['Market',   'Place'],      icon: <Icon.Headphones width={15} height={15} /> },
-  { id: 'case',     label: ['Case',     'Management'], icon: <Icon.Package    width={15} height={15} /> },
-  { id: 'customer', label: ['Customer', '360°'],       icon: <Icon.Users      width={15} height={15} /> },
-  { id: 'product',  label: ['Api',  'Management'], icon: <Icon.Search   width={15} height={15} /> },
+  { id: 'case',     label: ['Case',     'Management'], icon: <Icon.Package width={15} height={15} /> },
+  { id: 'customer', label: ['Customer', '360°'],       icon: <Icon.Users width={15} height={15} /> },
+  { id: 'product',  label: ['Api',  'Management'], icon: <Icon.Search width={15} height={15} /> },
 ]
 
 // ── Auto-position helper ───────────────────────────────────────
@@ -137,11 +137,7 @@ export function LoginHero() {
           {/* Dynamic SVG lines — redrawn automatically */}
           <svg
             aria-hidden="true"
-            style={{
-              position: 'absolute', inset: 0,
-              width: '100%', height: '100%',
-              pointerEvents: 'none', zIndex: 2, overflow: 'visible',
-            }}
+            className={styles.overlayLayer}
           >
             <defs>
               <filter id="lineGlow">

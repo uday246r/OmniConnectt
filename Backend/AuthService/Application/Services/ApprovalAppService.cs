@@ -101,34 +101,55 @@ public class ApprovalAppService(
          * the resulting "user.created"/"role.updated" audit row is attributed exactly as an ungated
          * mutation would be.
          */
-        await using var transaction = await db.Database.BeginTransactionAsync(ct);
-
-        request.Status = ApprovalStatus.Approved;
-        request.DecidedAt = DateTimeOffset.UtcNow;
-
-        try
+        /*
+         * The transaction below MUST run inside an execution strategy.
+         *
+         * AuthService enables EnableRetryOnFailure (Azure SQL auto-pause returns a transient 40613 —
+         * see Program.cs), and EF refuses a user-initiated transaction under a retrying strategy
+         * unless the whole unit is retriable: without this wrapper the very first Approve click
+         * throws "The configured execution strategy 'SqlServerRetryingExecutionStrategy' does not
+         * support user-initiated transactions."
+         *
+         * The guard is the subtle part. Everything inside the transaction rolls back on a transient
+         * failure and is safe to repeat — EXCEPT the remote replay, which is an HTTP POST to another
+         * service's own database and is therefore not covered by our rollback. Re-running the
+         * delegate must not re-send it, or a retried approval would apply a remote Create twice. The
+         * guard is declared OUTSIDE the delegate so it survives across retries; in-process replays
+         * are deliberately NOT guarded, because those really are rolled back and really must re-run.
+         */
+        var remoteReplay = new RemoteReplayGuard();
+        var issuedTempPassword = await db.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
         {
-            await db.SaveChangesAsync(ct);
-        }
-        catch (DbUpdateConcurrencyException)
-        {
-            // Someone else decided this request between our read and our write. Their outcome stands.
-            throw new ConflictAppException(
-                "This request was just decided by someone else. Refresh to see its current status.");
-        }
+            await using var transaction = await db.Database.BeginTransactionAsync(ct);
 
-        // The only thing a replay can produce that is otherwise unrecoverable afterwards is a
-        // Create-User's temporary password (everything else is readable back from the DB, or is a
-        // password hash which is one-way by design) — see ReplayAsync's own doc comment.
-        var issuedTempPassword = await ReplayAsync(request, ct);
+            request.Status = ApprovalStatus.Approved;
+            request.DecidedAt = DateTimeOffset.UtcNow;
 
-        if (issuedTempPassword is not null)
-        {
-            request.TempPasswordCiphertext = secretProtector.Protect(issuedTempPassword);
-            await db.SaveChangesAsync(ct);
-        }
+            try
+            {
+                await db.SaveChangesAsync(ct);
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                // Someone else decided this request between our read and our write. Their outcome stands.
+                throw new ConflictAppException(
+                    "This request was just decided by someone else. Refresh to see its current status.");
+            }
 
-        await transaction.CommitAsync(ct);
+            // The only thing a replay can produce that is otherwise unrecoverable afterwards is a
+            // Create-User's temporary password (everything else is readable back from the DB, or is a
+            // password hash which is one-way by design) — see ReplayAsync's own doc comment.
+            var tempPassword = await ReplayAsync(request, remoteReplay, ct);
+
+            if (tempPassword is not null)
+            {
+                request.TempPasswordCiphertext = secretProtector.Protect(tempPassword);
+                await db.SaveChangesAsync(ct);
+            }
+
+            await transaction.CommitAsync(ct);
+            return tempPassword;
+        });
 
         var checkerName = await db.Users.AsNoTracking().Where(u => u.Id == checkerUserId).Select(u => u.Name).FirstOrDefaultAsync(ct);
         await auditLog.WriteAsync(
@@ -286,7 +307,17 @@ public class ApprovalAppService(
     /// unrecoverable (the created/updated entity is readable from the database afterwards; a
     /// password hash is not reversible).
     /// </summary>
-    private async Task<string?> ReplayAsync(ApprovalRequest request, CancellationToken ct)
+    /// <summary>
+    /// Tracks whether this approval's REMOTE replay POST has already been sent, so a retry of the
+    /// surrounding execution strategy cannot fire it a second time. A plain class (not a bool) so the
+    /// flag is shared by reference with the retry delegate — an async lambda cannot take a `ref`.
+    /// </summary>
+    private sealed class RemoteReplayGuard
+    {
+        public bool Fired { get; set; }
+    }
+
+    private async Task<string?> ReplayAsync(ApprovalRequest request, RemoteReplayGuard remoteReplay, CancellationToken ct)
     {
         switch (request.Module, request.Action)
         {
@@ -366,12 +397,21 @@ public class ApprovalAppService(
                     throw new InvalidOperationException($"No replay handler for {request.Module}/{request.Action}.");
                 }
 
+                // Already sent on an earlier attempt of the retriable unit. The remote applied it to
+                // its OWN database, which our transaction cannot roll back, so re-sending would
+                // duplicate the mutation rather than repeat a no-op.
+                if (remoteReplay.Fired)
+                {
+                    break;
+                }
+
                 await callbackClient.ApplyAsync(
                     request.CallbackUrl,
                     new ApplyApprovedMutationRequest(
                         request.Module, request.Action, request.EntityType, request.EntityId, request.NewDataJson,
                         request.MakerId, request.MakerName, request.CorrelationId),
                     ct);
+                remoteReplay.Fired = true;
                 break;
         }
 

@@ -31,3 +31,7 @@ Thumbs.db
 *.log
 npm-debug.log*
 pnpm-debug.log*
+
+# Code-analysis tool output and local scratch builds — regenerable, never committed.
+graphify-out/
+scratch/

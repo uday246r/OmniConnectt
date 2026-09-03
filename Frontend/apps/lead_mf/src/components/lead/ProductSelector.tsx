@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { SearchableDropdown } from '../common/SearchableDropdown';
 import { useLeadStore } from '../../store/useLeadStore';
+import styles from './ProductSelector.module.css';
 
 export const ProductSelector: React.FC = () => {
   const { formData, setProduct, errors, products, fetchMasterData, validateField } = useLeadStore();
@@ -12,7 +13,7 @@ export const ProductSelector: React.FC = () => {
   }, [products.length, fetchMasterData]);
 
   return (
-    <div style={{ marginBottom: '24px' }}>
+    <div className={styles.grid}>
       <SearchableDropdown
         id="product-selector-field"
         label="Please select a product"

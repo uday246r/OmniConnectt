@@ -1,0 +1,57 @@
+/*
+ * Before/after change table.
+ *
+ * The red/green column semantics are what make this a DIFF rather than a data listing, so it is
+ * deliberately not folded into @omniremit/ui's DataTable — but it renders THROUGH DataTable in
+ * `bare` mode, so it still inherits the platform's header treatment, row rhythm and hover.
+ *
+ * Colours now come from the platform ramps. The two previous implementations had drifted apart on
+ * the "new value" green in particular (#16a34a in the edit drawer vs #15803d in the audit drawer),
+ * neither of which was a platform token.
+ */
+
+.frame {
+  border: 1.5px solid var(--omni-color-border);
+  border-radius: 11px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.03);
+}
+
+.fieldCell {
+  font-weight: var(--omni-font-weight-semibold);
+  color: var(--text-primary);
+  width: 25%;
+}
+
+/* The value cells are monospaced so a changed character is visible at a glance — the whole point of
+   showing the two side by side. */
+.valueCell {
+  font-family: var(--omni-font-mono);
+  font-size: var(--omni-font-size-xs-plus);
+  width: 37.5%;
+}
+
+.previousValue {
+  color: var(--omni-color-danger-600);
+  background: var(--omni-color-danger-50);
+}
+
+.newValue {
+  color: var(--omni-color-success-700);
+  background: var(--omni-color-success-50);
+  font-weight: var(--omni-font-weight-semibold);
+}
+
+/* Header labels carry the same red/green cue as the columns beneath them. */
+.thPrevious {
+  color: var(--omni-color-danger-600);
+}
+
+.thNew {
+  color: var(--omni-color-success-700);
+}
+
+.emptyValue {
+  color: var(--omni-color-text-muted);
+  font-style: italic;
+}

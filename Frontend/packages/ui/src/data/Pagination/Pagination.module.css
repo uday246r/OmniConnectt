@@ -1,0 +1,118 @@
+/*
+ * Chrome follows the host's Audit Logs `.pageBtn` / `.pageIndicator`, which is the reference.
+ *
+ * Laid out as summary-left / controls-right rather than the host's centred row: at 1300px a centred
+ * pager floats in the middle of the card with nothing either side, and the record count — the thing
+ * you actually read after scanning a table — had nowhere to live.
+ */
+.bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--omni-space-3) var(--omni-space-5);
+  padding: 14px var(--omni-space-5);
+  border-top: 1px solid var(--omni-color-border);
+}
+
+.summary {
+  margin: 0;
+  font-size: var(--omni-font-size-sm-minus);
+  color: var(--omni-color-text-secondary);
+}
+
+.summary strong {
+  font-weight: var(--omni-font-weight-bold);
+  color: var(--omni-color-text-primary);
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: var(--omni-space-5);
+  flex-wrap: wrap;
+}
+
+.pageSize {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--omni-space-2);
+}
+
+.pageSizeLabel {
+  font-size: var(--omni-font-size-sm-minus);
+  color: var(--omni-color-text-secondary);
+  white-space: nowrap;
+}
+
+.pageSizeSelect {
+  width: 72px;
+}
+
+.pager {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--omni-space-3);
+}
+
+.pageBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--omni-color-surface);
+  border: 1.5px solid var(--omni-color-border);
+  border-radius: var(--omni-radius-lg-minus);
+  padding: 7px 14px;
+  font-size: var(--omni-font-size-sm-minus);
+  font-weight: var(--omni-font-weight-semibold);
+  color: var(--omni-color-text-secondary);
+  cursor: pointer;
+  font-family: inherit;
+  white-space: nowrap;
+  transition: background 150ms ease, border-color 150ms ease, color 150ms ease, box-shadow 150ms ease;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+}
+
+.pageBtn:hover:not(:disabled) {
+  background: var(--omni-color-primary-50);
+  border-color: var(--omni-color-primary-300); /* not in scale — the host's exact hover border */
+  color: var(--omni-color-primary-600);
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.15);
+}
+
+.pageBtn:focus-visible {
+  outline: 2px solid var(--omni-color-primary-600);
+  outline-offset: 2px;
+}
+
+/*
+ * A disabled pager button stays legible rather than dropping to 0.5 opacity. At the ends of a list
+ * this is the normal state, and a control that looks broken there is worse than one that simply
+ * looks inert.
+ */
+.pageBtn:disabled {
+  background: var(--omni-color-surface-alt);
+  color: var(--omni-color-text-muted);
+  border-color: var(--omni-color-border);
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+.indicator {
+  font-size: var(--omni-font-size-sm-minus);
+  color: var(--omni-color-text-secondary);
+  min-width: 92px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.indicator strong {
+  font-weight: var(--omni-font-weight-bold);
+  color: var(--omni-color-text-primary);
+}
+
+@media (max-width: 720px) {
+  .bar {
+    justify-content: center;
+  }
+}

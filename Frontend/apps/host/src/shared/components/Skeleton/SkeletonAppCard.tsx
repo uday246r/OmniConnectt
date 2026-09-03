@@ -8,23 +8,23 @@ export function SkeletonAppCard() {
   return (
     <div className={styles.appCardSkel} aria-hidden="true">
       {/* Rounded-square app icon */}
-      <div className={[styles.shimmer, styles.square].join(' ')} style={{ width: 38, height: 38 }} />
+      <div className={`${[styles.shimmer, styles.square].join(' ')} ${styles.sac1}`}  />
 
       {/* App info */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div className={[styles.shimmer, styles.text].join(' ')} style={{ width: 130, height: '0.82em' }} />
-          <div className={[styles.shimmer, styles.text].join(' ')} style={{ width: 55, height: '0.82em' }} />
+      <div className={styles.sac2}>
+        <div className={styles.sac3}>
+          <div className={`${[styles.shimmer, styles.text].join(' ')} ${styles.sac4}`}  />
+          <div className={`${[styles.shimmer, styles.text].join(' ')} ${styles.sac5}`}  />
         </div>
-        <div className={[styles.shimmer, styles.text].join(' ')} style={{ width: 200, height: '0.82em' }} />
+        <div className={`${[styles.shimmer, styles.text].join(' ')} ${styles.sac6}`}  />
       </div>
 
       {/* Right: status badge + action buttons */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-        <div className={[styles.shimmer, styles.pill].join(' ')} style={{ width: 70, height: 24 }} />
-        <div className={[styles.shimmer, styles.square].join(' ')} style={{ width: 28, height: 28, borderRadius: 8 }} />
-        <div className={[styles.shimmer, styles.square].join(' ')} style={{ width: 28, height: 28, borderRadius: 8 }} />
-        <div className={[styles.shimmer, styles.square].join(' ')} style={{ width: 28, height: 28, borderRadius: 8 }} />
+      <div className={styles.sac7}>
+        <div className={`${[styles.shimmer, styles.pill].join(' ')} ${styles.sac8}`}  />
+        <div className={`${[styles.shimmer, styles.square].join(' ')} ${styles.sac9}`}  />
+        <div className={`${[styles.shimmer, styles.square].join(' ')} ${styles.sac9}`}  />
+        <div className={`${[styles.shimmer, styles.square].join(' ')} ${styles.sac9}`}  />
       </div>
     </div>
   )

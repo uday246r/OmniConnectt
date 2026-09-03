@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { Navigate } from 'react-router-dom'
 import { useAuthStore } from '../store/authStore'
 import { SkeletonBlock } from '../../../shared/components/Skeleton'
+import styles from './RequireCapability.module.css'
 
 export interface RequireCapabilityProps {
   featureKey: string
@@ -24,7 +25,7 @@ export function RequireCapability({ featureKey, capability = 'View', children }:
 
   if (status === 'idle' || status === 'hydrating') {
     return (
-      <div style={{ padding: 'var(--omni-space-6)' }}>
+      <div className={styles.hydrating}>
         <SkeletonBlock height={40} width={240} />
       </div>
     )

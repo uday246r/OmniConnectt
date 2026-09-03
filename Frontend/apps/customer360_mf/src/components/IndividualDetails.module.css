@@ -1,0 +1,10 @@
+/*
+ * Styles extracted from this component's former inline blocks. Values map to platform
+ * tokens where an exact equivalent exists.
+ */
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}

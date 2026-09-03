@@ -11,9 +11,14 @@ using backend.Infrastructure;
 using backend.Middleware;
 using backend.Options;
 
-// Load Backend/Customer360Service/.env (git-ignored) before configuration is read — matches
-// AuthService/ModuleRegistry/LeadService's Program.cs exactly. Replaces the previous hand-rolled
-// line-by-line loader (same behavior, one well-tested implementation instead of a bespoke one).
+foreach (var path in new[] {
+    Path.Combine(AppContext.BaseDirectory, ".env"),
+    Path.Combine(Directory.GetCurrentDirectory(), "Backend", "Customer360Service", ".env"),
+    Path.Combine(Directory.GetCurrentDirectory(), ".env")
+})
+{
+    if (File.Exists(path)) { Env.Load(path); break; }
+}
 Env.TraversePath().Load();
 
 var builder = WebApplication.CreateBuilder(args);
@@ -37,7 +42,19 @@ var isDbConfigured = !string.IsNullOrWhiteSpace(connectionString);
  * constructor - they take only DbContextOptions, which is what pooling requires.
  */
 builder.Services.AddDbContextPool<Customer360DbContext>(options =>
-    options.UseNpgsql(isDbConfigured ? connectionString : "Host=unconfigured;Database=unconfigured;Username=unconfigured;Password=unconfigured"));
+    options.UseSqlServer(
+        isDbConfigured ? connectionString : "Server=unconfigured;Database=unconfigured;Trusted_Connection=True;TrustServerCertificate=True;",
+        /*
+         * Transient-fault resiliency for Azure SQL — see LeadService/Program.cs for the full
+         * rationale. In short: the serverless tier auto-pauses when idle and the first connection
+         * after that fails with error 40613 ("Database is not currently available"), which EF
+         * already classifies as transient. Without this, startup migration hard-fails on a cold
+         * database. Safe here: this service issues no explicit BeginTransaction.
+         */
+        sqlOptions => sqlOptions.EnableRetryOnFailure(
+            maxRetryCount: 6,
+            maxRetryDelay: TimeSpan.FromSeconds(20),
+            errorNumbersToAdd: null)));
 
 // ---------------------------------------------------------------------------
 // Controllers + JSON serialization
@@ -103,13 +120,10 @@ var jwtAudience = jwtSection["Audience"] ?? "omniremit-host";
 RSA validationRsa;
 if (!string.IsNullOrWhiteSpace(configuredPublicKeyPem))
 {
-    var rsa = RSA.Create();
-    rsa.ImportFromPem(configuredPublicKeyPem.Replace("\\n", "\n"));
-    validationRsa = rsa;
+    validationRsa = Customer360Service.Infrastructure.RsaKeyLoader.LoadPublicKey(configuredPublicKeyPem);
 }
 else
 {
-    // Ephemeral key so the service boots cleanly before Jwt__SigningKeyPublic is provided
     validationRsa = RSA.Create(2048);
 }
 
@@ -172,12 +186,26 @@ if (!isDbConfigured)
 }
 else
 {
-    using var scope = app.Services.CreateScope();
-    var db = scope.ServiceProvider.GetRequiredService<Customer360DbContext>();
-    await db.Database.MigrateAsync();
-    // Seeds default field-visibility/masking rows on first boot only (idempotent — a populated table
-    // is left untouched), so an admin's edits are never overwritten by a redeploy.
-    await scope.ServiceProvider.GetRequiredService<FieldConfigService>().EnsureSeededAsync();
+    // Migration/seed failure must not kill the process — see AuthService/Program.cs for the full
+    // rationale. An unreachable database (Azure SQL firewall 40615, serverless resume 40613) should
+    // leave the service up and reporting Unhealthy, not crash it at startup. That matters more here
+    // than elsewhere: the CRM-proxy endpoints do not touch this database at all and keep working.
+    try
+    {
+        using var scope = app.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<Customer360DbContext>();
+        await db.Database.MigrateAsync();
+        // Seeds default field-visibility/masking rows on first boot only (idempotent — a populated
+        // table is left untouched), so an admin's edits are never overwritten by a redeploy.
+        await scope.ServiceProvider.GetRequiredService<FieldConfigService>().EnsureSeededAsync();
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogError(ex,
+            "Database migration/seed failed — the service will still start, but the field-settings " +
+            "and audit endpoints will fail until the database is reachable. CRM-proxy endpoints are " +
+            "unaffected.");
+    }
 }
 
 if (string.IsNullOrWhiteSpace(configuredPublicKeyPem))

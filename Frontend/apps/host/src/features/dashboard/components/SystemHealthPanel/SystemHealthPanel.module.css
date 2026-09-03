@@ -38,7 +38,7 @@
 .dot {
   width: 9px;
   height: 9px;
-  border-radius: 50%;
+  border-radius: var(--omni-radius-circle);
   flex-shrink: 0;
   margin-top: 6px;
 }

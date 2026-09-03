@@ -1,0 +1,149 @@
+/*
+ * Patterns shared WITHIN customer360_mf.
+ *
+ * Application-level, not global: these are the recurring controls on this app's own list pages
+ * (search box, pagination arrows, status pills, monospaced identifiers). The host composes its
+ * equivalents differently, so promoting them to @omniremit/ui would be inventing a shared
+ * abstraction for a single consumer.
+ *
+ * Every rule here replaces an inline block that was repeated across two or more pages.
+ */
+
+.searchInput {
+  height: 40px;
+  padding-left: 38px;
+  padding-right: 14px;
+  font-size: var(--omni-font-size-sm);
+}
+
+/* Extra right padding only while the clear button is showing. */
+.searchInputClearable {
+  padding-right: 32px;
+}
+
+/* Prev/next arrows on a paginated list. `disabled` replaces the inline opacity/cursor ternaries. */
+.pageNavBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--omni-radius-md);
+  border: 1.5px solid var(--omni-color-border);
+  background: var(--omni-color-surface);
+  color: var(--omni-color-text-primary);
+  cursor: pointer;
+  transition: background var(--omni-transition-fast), border-color var(--omni-transition-fast);
+}
+
+.pageNavBtn:hover:not(:disabled) {
+  background: var(--omni-color-surface-alt);
+  border-color: var(--omni-color-border-strong);
+}
+
+.pageNavBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/*
+ * Status pill. The three colours are chosen per record, so they arrive as custom properties and the
+ * declarations live here — the only inline form this repo permits.
+ */
+.statusPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: var(--omni-radius-pill);
+  background: var(--pill-bg);
+  color: var(--pill-text);
+  font-size: var(--omni-font-size-xs-plus);
+  font-weight: var(--omni-font-weight-semibold);
+}
+
+.statusDot {
+  width: 5px;
+  height: 5px;
+  border-radius: var(--omni-radius-circle);
+  background: var(--pill-dot);
+  flex-shrink: 0;
+}
+
+/* Monospaced identifier (account number, reference, IP). */
+.monoValue {
+  font-family: var(--omni-font-mono);
+  color: var(--omni-color-text-primary);
+  font-weight: var(--omni-font-weight-medium);
+}
+
+.monoAccent {
+  font-family: var(--omni-font-mono);
+  font-weight: var(--omni-font-weight-semibold);
+  color: var(--omni-color-primary-600);
+}
+
+.monoMeta {
+  font-size: var(--omni-font-size-xs-plus);
+  color: var(--omni-color-text-secondary);
+  font-family: var(--omni-font-mono);
+}
+
+/*
+ * Button sitting ON the blue page banner. Mirrors @omniremit/ui's Button `onHeader` variant; kept
+ * local because these call sites are plain <button> elements wired to this app's own handlers.
+ */
+
+/* Compact variant used in the customer header strip. */
+
+@media (prefers-reduced-motion: reduce) {
+  .headerAction:hover:not(:disabled) { transform: none; }
+}
+
+
+/* A value that is genuinely absent, as opposed to one that is merely empty. Pairs with
+   EMPTY_VALUE (the em dash) from @omniremit/ui so a missing value reads the same here as in the
+   host. */
+.mutedText {
+  color: var(--omni-color-text-muted);
+}
+
+/*
+ * Table toolbar: search on the left, actions on the right.
+ *
+ * The three table pages (Audit Logs, All Products, All Interactions) each had this element left
+ * with an EMPTY className — collateral from an earlier automated class-renaming pass — so the row
+ * had no layout at all. The search box stayed at its intrinsic width and the Refresh / action
+ * button wrapped onto its own line beneath it.
+ */
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--omni-space-3);
+  padding: var(--omni-space-4);
+  border-bottom: 1px solid var(--omni-color-border);
+  flex-wrap: wrap;
+}
+
+/* The search side takes the slack; action buttons keep their intrinsic width. */
+/*
+ * Capped at 520px, matching lead_mf's audit toolbar. Unbounded it grew to the full width of the
+ * card — a search box the width of a 1500px table looks like the page's main input rather than one
+ * control among several, and pushed Refresh and Rows to the far edge.
+ */
+.toolbarSearch {
+  flex: 1 1 260px;
+  max-width: 520px;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--omni-space-3);
+}
+
+/* Pushes the trailing controls (Rows, Refresh, Export) to the right of the toolbar. */
+.toolbarActions {
+  display: flex;
+  align-items: center;
+  gap: var(--omni-space-3);
+  margin-left: auto;
+}

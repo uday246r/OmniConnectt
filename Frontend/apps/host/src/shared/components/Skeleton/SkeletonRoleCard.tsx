@@ -8,21 +8,21 @@ export function SkeletonRoleCard() {
   return (
     <div className={styles.roleCardSkel} aria-hidden="true">
       {/* Rounded-square icon */}
-      <div className={[styles.shimmer, styles.square].join(' ')} style={{ width: 36, height: 36 }} />
+      <div className={`${[styles.shimmer, styles.square].join(' ')} ${styles.src1}`}  />
 
       {/* Name + description */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div className={[styles.shimmer, styles.text].join(' ')} style={{ width: 100, height: '0.82em' }} />
-          <div className={[styles.shimmer, styles.pill].join(' ')} style={{ width: 52, height: 18 }} />
+      <div className={styles.src2}>
+        <div className={styles.src3}>
+          <div className={`${[styles.shimmer, styles.text].join(' ')} ${styles.src4}`}  />
+          <div className={`${[styles.shimmer, styles.pill].join(' ')} ${styles.src5}`}  />
         </div>
-        <div className={[styles.shimmer, styles.text].join(' ')} style={{ width: 200, height: '0.82em' }} />
+        <div className={`${[styles.shimmer, styles.text].join(' ')} ${styles.src6}`}  />
       </div>
 
       {/* Right: edit icon button */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-        <div className={[styles.shimmer, styles.square].join(' ')} style={{ width: 28, height: 28, borderRadius: 8 }} />
-        <div className={[styles.shimmer, styles.square].join(' ')} style={{ width: 28, height: 28, borderRadius: 8 }} />
+      <div className={styles.src7}>
+        <div className={`${[styles.shimmer, styles.square].join(' ')} ${styles.src8}`}  />
+        <div className={`${[styles.shimmer, styles.square].join(' ')} ${styles.src8}`}  />
       </div>
     </div>
   )

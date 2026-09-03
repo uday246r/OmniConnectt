@@ -12,7 +12,7 @@ import CaseDetailsModal from '../components/CaseDetailsModal';
 import ProductDetailsModal from '../components/ProductDetailsModal';
 import DynamicProfileSection, { groupBySection } from '../components/DynamicProfileSection';
 import { useFieldReveal } from '../hooks/useFieldReveal';
-import { Eye, EyeOff, ChevronRight, ChevronDown, SlidersHorizontal, Building2, Layers, User, Briefcase, Globe, Shield, FileText, Calendar, DollarSign, MapPin, Mail, Phone, TrendingUp, Search, RotateCcw, AlertCircle, Loader2 } from 'lucide-react';
+import { Eye, EyeOff, ChevronRight, ChevronDown, SlidersHorizontal, Building2, Layers, User, Briefcase, Globe, Shield, FileText, Calendar, DollarSign, MapPin, Mail, Phone, TrendingUp, Search, RotateCcw, AlertCircle, Loader2 } from '@omniremit/ui/icons';
 import { useNavigationStore } from '../store/navigationStore';
 import type {
   IndividualProfile,
@@ -24,12 +24,16 @@ import type {
 } from '../types/api';
 
 import { DEFAULT_INDIVIDUAL_FIELD_CONFIGS, DEFAULT_CORPORATE_FIELD_CONFIGS } from '../constants/defaultFieldConfigs';
+import styles from './Customer360.module.css';
+import { Button, DataTable, EMPTY_VALUE, PageHeader, ResponsiveRows, getInitials } from '@omniremit/ui';
+import { StatusBadge } from '../shared/StatusBadge';
+import { formatValue, formatCurrency as formatMoney } from '../shared/formatValue';
 
 
 /** One "sub-item" row skeleton — matches .left-tab-btn's real height/padding (10px 14px, 13px text). */
 function NavItemSkeleton({ indent = false }: { indent?: boolean }) {
   return (
-    <div className="c360-skel" style={{ height: 34, borderRadius: 8, marginLeft: indent ? 12 : 0 }} />
+    <div className={`c360-skel ${styles.treeRow}${indent ? ` ${styles.treeRowIndent}` : ''}`} />
   );
 }
 
@@ -42,15 +46,15 @@ function NavItemSkeleton({ indent = false }: { indent?: boolean }) {
 function InfoSectionSkeleton({ cardCount = 9 }: { cardCount?: number }) {
   return (
     <div className="section-container" aria-hidden="true">
-      <div className="c360-skel c360-skel-text" style={{ width: 150, height: 14, marginBottom: 16 }} />
+      <div className={`c360-skel c360-skel-text ${styles.spacer}`} />
       <div className="info-cards-grid">
         {Array.from({ length: cardCount }, (_, i) => (
-          <div key={i} className="info-card">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <div className="c360-skel c360-skel-circle" style={{ width: 12, height: 12 }} />
-              <div className="c360-skel c360-skel-text" style={{ width: '55%', height: '0.7em' }} />
+          <div key={i} className={`info-card ${styles.row}`}>
+            <div>
+              <div className={`c360-skel c360-skel-circle ${styles.box}`} />
+              <div className={`c360-skel c360-skel-text ${styles.box2}`} />
             </div>
-            <div className="c360-skel c360-skel-text" style={{ width: '75%', height: '1em' }} />
+            <div className={`c360-skel c360-skel-text ${styles.box3}`} />
           </div>
         ))}
       </div>
@@ -66,14 +70,14 @@ function InfoSectionSkeleton({ cardCount = 9 }: { cardCount?: number }) {
  */
 function IndividualLeftColumnSkeleton() {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', width: '100%', gap: 12 }}>
+    <div className={styles.stack}>
       <NavItemSkeleton />
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 4 }}>
+      <div className={styles.stack2}>
         {[0, 1, 2, 3].map((i) => <NavItemSkeleton key={i} indent />)}
       </div>
-      <div style={{ width: '100%', height: 1, background: '#F3F4F6', margin: '4px 0' }} />
+      <div className={styles.box4} />
       <NavItemSkeleton />
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 4 }}>
+      <div className={styles.stack2}>
         {[0, 1, 2].map((i) => <NavItemSkeleton key={i} indent />)}
       </div>
     </div>
@@ -88,7 +92,7 @@ function IndividualLeftColumnSkeleton() {
  */
 function NonIndividualLeftColumnSkeleton() {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', width: '100%', gap: 8 }}>
+    <div className={styles.stack3}>
       {[0, 1, 2, 3, 4, 5].map((i) => <NavItemSkeleton key={i} />)}
     </div>
   );
@@ -106,11 +110,11 @@ function ProfileWorkspaceSkeleton({ isIndividual }: { isIndividual: boolean }) {
   return (
     <div className="customer-layout-container" aria-hidden="true">
       <div className="customer-left-column">
-        <div className="c360-skel c360-skel-circle" style={{ width: 80, height: 80, aspectRatio: '1 / 1', flexShrink: 0, marginBottom: 16 }} />
-        <div className="c360-skel c360-skel-text" style={{ width: '72%', height: 16, marginBottom: 8 }} />
-        <div className="c360-skel c360-skel-text" style={{ width: '52%', marginBottom: 14 }} />
-        <div className="c360-skel c360-skel-pill" style={{ width: 130, height: 22, marginBottom: 22 }} />
-        <div style={{ width: '100%', height: 1, background: '#E5E7EB', marginBottom: 16 }} />
+        <div className={`c360-skel c360-skel-circle ${styles.spacer2}`} />
+        <div className={`c360-skel c360-skel-text ${styles.spacer3}`} />
+        <div className={`c360-skel c360-skel-text ${styles.spacer4}`} />
+        <div className={`c360-skel c360-skel-pill ${styles.spacer5}`} />
+        <div className={styles.spacer6} />
         {isIndividual ? <IndividualLeftColumnSkeleton /> : <NonIndividualLeftColumnSkeleton />}
       </div>
 
@@ -231,7 +235,7 @@ export default function Customer360() {
     if (!realVal || realVal.trim() === '' || realVal.toLowerCase() === 'null') return;
     const isRevealing = !revealed[fieldKey];
     setRevealed(prev => ({ ...prev, [fieldKey]: isRevealing }));
-    
+
     if (isRevealing) {
       // `profile` is typed as the CustomerProfile union, but every real call site of this function
       // (the four corporate signatory/TIN/phone reveal buttons) only ever fires with a corporate
@@ -402,7 +406,7 @@ export default function Customer360() {
     setSearchError('');
     try {
       const { loadProfileById } = useCustomerStore.getState();
-      
+
       let apiType = searchIdType;
       if (searchIdType === 'Phone') apiType = 'PHONENO';
       if (searchIdType === 'Name') apiType = 'FULLNAME';
@@ -732,111 +736,36 @@ export default function Customer360() {
     (safeIntPageNumber - 1) * intPageSize,
     safeIntPageNumber * intPageSize
   );
-
-  const getInitials = (name: string | null | undefined): string => {
-    if (!name) return '-';
-    const parts = name.split(' ').filter(Boolean);
-    if (parts.length >= 2) {
-      return (parts[0][0] + parts[1][0]).toUpperCase();
-    }
-    return parts[0][0].toUpperCase();
-  };
-
-  const formatValue = (val: unknown): string => {
-    if (val === null || val === undefined) return '-';
-    const s = String(val).trim();
-    if (s === '' || s.toLowerCase() === 'null' || s.toLowerCase() === 'undefined') {
-      return '-';
-    }
-    return s;
-  };
-
-  const formatCurrency = (val: unknown): string => {
-    const formatted = formatValue(val);
-    if (formatted === '-') return '-';
-    if (formatted.includes('MYR') || formatted.includes('SGD') || formatted.includes('RM') || formatted.includes('$')) {
-      return formatted;
-    }
-    let cleanVal = formatted.replace(/,/g, '');
-    if (!isNaN(Number(cleanVal)) && cleanVal !== '') {
-      const num = parseFloat(cleanVal);
-      const formattedNum = num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-      const currency = ((profile as CorporateProfile | null)?.country || '').toUpperCase() === 'SG' ? 'SGD' : 'MYR';
-      return `${currency} ${formattedNum}`;
-    }
-    const currency = ((profile as CorporateProfile | null)?.country || '').toUpperCase() === 'SG' ? 'SGD' : 'MYR';
-    return `${currency} ${formatted}`;
-  };
+  // formatValue/formatCurrency live in src/shared — formatValue alone had been copied
+  // verbatim into four components. Currency follows the corporate profile's country.
+  const formatCurrency = (val: unknown) =>
+    formatMoney(val, (profile as CorporateProfile | null)?.country);
 
   const renderIndividualSearchPanel = () => (
     <>
-      {/* Hero Banner — same treatment as AllProducts.tsx / AllInteractions.tsx / AuditLogs.tsx
-          (.c360-hero-banner, matching the host's own dashboard banner gradient) so this page's
-          "upper part" is standardized with the rest of the app instead of its own one-off look. */}
-      <div className="c360-hero-banner" style={{ marginBottom: 20 }}>
-        <div style={{ position: 'absolute', top: '-40px', right: '-40px', width: '180px', height: '180px', borderRadius: '50%', background: 'rgba(255, 255, 255, 0.08)', pointerEvents: 'none' }} />
-        <div style={{ position: 'absolute', bottom: '-50px', right: '120px', width: '130px', height: '130px', borderRadius: '50%', background: 'rgba(255, 255, 255, 0.05)', pointerEvents: 'none' }} />
+      {/* The page banner is the platform PageHeader — the same component the host's Audit Logs and
+          Approval Center render, and lead_mf's dashboard. This page used to carry its own copy that
+          drifted on gradient angle and title size. */}
+      <PageHeader
+        icon={<User size={24} />}
+        title="Individual Customer Search"
+        subtitle={
+          !searchIdType ? 'Select an ID type and enter value to look up customer profile.' :
+          searchIdType === 'Phone' ? 'Search customer by phone number.' :
+          searchIdType === 'Name' ? 'Search customer by full registered name.' :
+          searchIdType === 'NRIC' ? 'Search customer by National ID (NRIC).' :
+          `Search customer by ${(dropdownOptions.secondaryIdTypes.find(opt => opt.value === searchSubtype)?.label || 'secondary document')}.`
+        }
+        actions={
+          isSearched ? (
+            <Button variant="onHeader" onClick={handleBackToSearch} leadingIcon={<RotateCcw size={14} />}>
+              New Search
+            </Button>
+          ) : undefined
+        }
+      />
 
-        <div className="c360-hero-left">
-          <div
-            style={{
-              width: '50px',
-              height: '50px',
-              borderRadius: '14px',
-              background: 'rgba(255, 255, 255, 0.18)',
-              border: '1.5px solid rgba(255, 255, 255, 0.3)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#ffffff',
-              flexShrink: 0,
-            }}
-          >
-            <User size={24} />
-          </div>
-          <div>
-            <h1 className="c360-hero-title">Individual Customer Search</h1>
-            <p className="c360-hero-subtitle">
-              {!searchIdType ? 'Select an ID type and enter value to look up customer profile.' :
-               searchIdType === 'Phone' ? 'Search customer by phone number.' :
-               searchIdType === 'Name' ? 'Search customer by full registered name.' :
-               searchIdType === 'NRIC' ? 'Search customer by National ID (NRIC).' :
-               `Search customer by ${(dropdownOptions.secondaryIdTypes.find(opt => opt.value === searchSubtype)?.label || 'secondary document')}.`}
-            </p>
-          </div>
-        </div>
-
-        {isSearched && (
-          <button
-            type="button"
-            onClick={handleBackToSearch}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '7px',
-              height: '40px',
-              padding: '0 18px',
-              borderRadius: '12px',
-              border: '1px solid rgba(255, 255, 255, 0.35)',
-              background: 'rgba(255, 255, 255, 0.95)',
-              color: '#1d4ed8',
-              fontSize: '13.5px',
-              fontWeight: 700,
-              cursor: 'pointer',
-              boxShadow: '0 2px 10px rgba(0, 0, 0, 0.12)',
-              transition: 'all 0.15s ease',
-              fontFamily: 'inherit',
-              flexShrink: 0,
-              position: 'relative',
-              zIndex: 1,
-            }}
-          >
-            <RotateCcw size={14} /> New Search
-          </button>
-        )}
-      </div>
-
-      <div className="c360-search-panel" style={{ marginBottom: 20 }}>
+      <div className={`c360-search-panel ${styles.spacer7}`}>
       <form onSubmit={(e) => { e.preventDefault(); handleSearch(); }}>
         <div className="c360-search-form-row">
           {/* ID Type Select */}
@@ -887,7 +816,7 @@ export default function Customer360() {
               </select>
             </div>
           ) : (
-            <div style={{ display: 'none' }} />
+            <div className={styles.rule} />
           )}
 
           {/* Search Input — only once the operator has actually chosen what they're searching by.
@@ -896,7 +825,7 @@ export default function Customer360() {
               confusing/broken; for Secondary ID specifically, the document type must be picked too,
               since the placeholder/label below depends on it. */}
           {searchIdType && (searchIdType !== 'SecondaryID' || searchSubtype) && (
-            <div className="c360-form-group" style={{ gridColumn: searchIdType === 'SecondaryID' ? 'span 1' : 'span 2' }}>
+            <div className={`c360-form-group ${searchIdType === 'SecondaryID' ? styles.searchSpanNarrow : styles.searchSpan}`}>
               <label className="c360-label">
                 {searchIdType === 'Phone' ? 'Phone Number' :
                  searchIdType === 'Name' ? 'Full Name' :
@@ -926,27 +855,18 @@ export default function Customer360() {
           )}
 
           {/* Action Buttons */}
-          <button
+          <Button
             type="submit"
-            disabled={loadingSearch || !searchIdType || !searchVal}
-            className="c360-btn-primary"
+            loading={loadingSearch}
+            disabled={!searchIdType || !searchVal}
+            leadingIcon={<Search size={15} />}
           >
-            {loadingSearch ? (
-              <>
-                <Loader2 size={16} className="c360-spinner" />
-                Searching...
-              </>
-            ) : (
-              <>
-                <Search size={15} />
-                Search Profile
-              </>
-            )}
-          </button>
+            {loadingSearch ? 'Searching...' : 'Search Profile'}
+          </Button>
         </div>
 
         {searchError && (
-          <div style={{ marginTop: '12px', color: '#dc2626', fontSize: '13px', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <div className={styles.row3}>
             <AlertCircle size={15} />
             {searchError}
           </div>
@@ -958,70 +878,25 @@ export default function Customer360() {
 
   const renderCorporateSearchPanel = () => (
     <>
-      {/* Hero Banner — same treatment as AllProducts.tsx / AllInteractions.tsx / AuditLogs.tsx. */}
-      <div className="c360-hero-banner" style={{ marginBottom: 20 }}>
-        <div style={{ position: 'absolute', top: '-40px', right: '-40px', width: '180px', height: '180px', borderRadius: '50%', background: 'rgba(255, 255, 255, 0.08)', pointerEvents: 'none' }} />
-        <div style={{ position: 'absolute', bottom: '-50px', right: '120px', width: '130px', height: '130px', borderRadius: '50%', background: 'rgba(255, 255, 255, 0.05)', pointerEvents: 'none' }} />
+      <PageHeader
+        icon={<Building2 size={24} />}
+        title="Non-Individual (Corporate) Search"
+        subtitle={
+          !corpSearchType ? 'Select a search type and enter a value to look up a company profile.' :
+          corpSearchType === 'BRN' ? 'Search registered company by Business Registration Number (BRN).' :
+          corpSearchType === 'OLDBRN' ? 'Search registered company by Old BRN.' :
+          'Search registered company by Company Name.'
+        }
+        actions={
+          isSearchedCorp ? (
+            <Button variant="onHeader" onClick={handleBackToSearchCorp} leadingIcon={<RotateCcw size={14} />}>
+              New Search
+            </Button>
+          ) : undefined
+        }
+      />
 
-        <div className="c360-hero-left">
-          <div
-            style={{
-              width: '50px',
-              height: '50px',
-              borderRadius: '14px',
-              background: 'rgba(255, 255, 255, 0.18)',
-              border: '1.5px solid rgba(255, 255, 255, 0.3)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#ffffff',
-              flexShrink: 0,
-            }}
-          >
-            <Building2 size={24} />
-          </div>
-          <div>
-            <h1 className="c360-hero-title">Non-Individual (Corporate) Search</h1>
-            <p className="c360-hero-subtitle">
-              {!corpSearchType ? 'Select a search type and enter a value to look up a company profile.' :
-               corpSearchType === 'BRN' ? 'Search registered company by Business Registration Number (BRN).' :
-               corpSearchType === 'OLDBRN' ? 'Search registered company by Old BRN.' :
-               'Search registered company by Company Name.'}
-            </p>
-          </div>
-        </div>
-
-        {isSearchedCorp && (
-          <button
-            type="button"
-            onClick={handleBackToSearchCorp}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '7px',
-              height: '40px',
-              padding: '0 18px',
-              borderRadius: '12px',
-              border: '1px solid rgba(255, 255, 255, 0.35)',
-              background: 'rgba(255, 255, 255, 0.95)',
-              color: '#1d4ed8',
-              fontSize: '13.5px',
-              fontWeight: 700,
-              cursor: 'pointer',
-              boxShadow: '0 2px 10px rgba(0, 0, 0, 0.12)',
-              transition: 'all 0.15s ease',
-              fontFamily: 'inherit',
-              flexShrink: 0,
-              position: 'relative',
-              zIndex: 1,
-            }}
-          >
-            <RotateCcw size={14} /> New Search
-          </button>
-        )}
-      </div>
-
-      <div className="c360-search-panel" style={{ marginBottom: 20 }}>
+      <div className={`c360-search-panel ${styles.spacer7}`}>
       <form onSubmit={(e) => { e.preventDefault(); handleCorpSearch(); }}>
         <div className="c360-search-form-row">
           {/* Search Type Select */}
@@ -1052,7 +927,7 @@ export default function Customer360() {
               else case) even with nothing selected — indistinguishable from genuinely having chosen
               Company Name search. */}
           {corpSearchType && (
-            <div className="c360-form-group" style={{ gridColumn: 'span 2' }}>
+            <div className={`c360-form-group ${styles.rule2}`}>
               <label className="c360-label">
                 {corpSearchType === 'BRN' ? 'BRN (Business Registration Number)' :
                  corpSearchType === 'OLDBRN' ? 'Old Registration Number' :
@@ -1080,27 +955,18 @@ export default function Customer360() {
           )}
 
           {/* Action Buttons */}
-          <button
+          <Button
             type="submit"
-            disabled={loadingCorpSearch || !corpSearchType || !corpSearchVal}
-            className="c360-btn-primary"
+            loading={loadingCorpSearch}
+            disabled={!corpSearchType || !corpSearchVal}
+            leadingIcon={<Search size={15} />}
           >
-            {loadingCorpSearch ? (
-              <>
-                <Loader2 size={16} className="c360-spinner" />
-                Searching...
-              </>
-            ) : (
-              <>
-                <Search size={15} />
-                Search Company
-              </>
-            )}
-          </button>
+            {loadingCorpSearch ? 'Searching...' : 'Search Company'}
+          </Button>
         </div>
 
         {corpSearchError && (
-          <div style={{ marginTop: '12px', color: '#dc2626', fontSize: '13px', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <div className={styles.row3}>
             <AlertCircle size={15} />
             {corpSearchError}
           </div>
@@ -1153,12 +1019,12 @@ export default function Customer360() {
     return (
       <div>
         {isIndividual ? renderIndividualSearchPanel() : renderCorporateSearchPanel()}
-        <div className="error-container" style={{ marginTop: 20 }}>
+        <div className={`error-container ${styles.spacer8}`}>
           <h3>Error Loading Profile</h3>
           <p>{getFriendlyErrorMessage({ message: error ?? undefined, status: errorStatus ?? undefined }, isIndividual ? 'individual-search' : 'corporate-search')}</p>
-          <button className="c360-btn-primary" onClick={loadActiveProfile} style={{ marginTop: 12 }}>
+          <Button onClick={loadActiveProfile} className={styles.spacer9}>
             Retry
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -1187,86 +1053,63 @@ export default function Customer360() {
           <div className="customer-layout-container">
 
           {/* Left Column: Summary Card */}
-          <div className="customer-left-column">
+          <div className={`customer-left-column ${styles.avatar}`}>
             {/* Purple circle avatar */}
-            <div style={{
-              width: 80,
-              height: 80,
-              aspectRatio: '1 / 1',
-              flexShrink: 0,
-              borderRadius: '50%',
-              backgroundColor: '#004EEB',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#FFFFFF',
-              fontSize: 28,
-              fontWeight: 700,
-              marginBottom: 16
-            }}>
+            <div>
               {getInitials(individualProfile.fullName)}
             </div>
 
             {/* Name and Title */}
-            <h3 style={{ fontSize: 18, fontWeight: 700, color: '#1F2937', margin: '0 0 4px 0', textAlign: 'center' }}>
+            <h3 className={styles.strong}>
               {individualProfile.fullName}
             </h3>
-            <div style={{ fontSize: 13, color: '#6B7280', marginBottom: 12, textAlign: 'center' }}>
+            <div className={styles.spacer10}>
               Job Title: {individualProfile.designation || '-'}
             </div>
 
             {/* Badges */}
-            <span style={{
-              fontSize: 11,
-              fontWeight: 700,
-              color: '#004EEB',
-              backgroundColor: '#E6EEFF',
-              padding: '4px 12px',
-              borderRadius: 16,
-              marginBottom: 20
-            }}>
+            <span className={styles.strong2}>
               Customer Status: {individualProfile.flags || '-'}
             </span>
 
             {/* Divider line for visual layout */}
-            <div style={{ width: '100%', height: '1px', backgroundColor: '#E5E7EB', margin: '16px 0' }}></div>
+            <div className={styles.box5}></div>
 
             {/* Navigation buttons inside left card */}
-            <div style={{ display: 'flex', flexDirection: 'column', width: '100%', gap: 12 }}>
+            <div className={styles.stack}>
               {/* Customer Details Group */}
               <div>
-                <button 
-                  className="left-tab-btn" 
+                <button
+                  className={`left-tab-btn ${styles.strong3}`}
                   onClick={() => setDetailsExpanded(!detailsExpanded)}
-                  style={{ justifyContent: 'space-between', fontWeight: 800, color: '#374151' }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div className={styles.row4}>
                     <User size={16} />
                     <span>Customer Details</span>
                   </div>
                   {detailsExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
                 </button>
                 {detailsExpanded && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 4, paddingLeft: 12 }}>
-                    <button 
+                  <div className={styles.stack4}>
+                    <button
                       className={`left-tab-btn ${activeTab === 'personal_details' ? 'active' : ''}`}
                       onClick={() => setActiveTab('personal_details')}
                     >
                       <span>Personal Details</span>
                     </button>
-                    <button 
+                    <button
                       className={`left-tab-btn ${activeTab === 'residency_contact_details' ? 'active' : ''}`}
                       onClick={() => setActiveTab('residency_contact_details')}
                     >
                       <span>Residency & Contact Details</span>
                     </button>
-                    <button 
+                    <button
                       className={`left-tab-btn ${activeTab === 'employment_details' ? 'active' : ''}`}
                       onClick={() => setActiveTab('employment_details')}
                     >
                       <span>Employment Details</span>
                     </button>
-                    <button 
+                    <button
                       className={`left-tab-btn ${activeTab === 'additional_relationship_details' ? 'active' : ''}`}
                       onClick={() => setActiveTab('additional_relationship_details')}
                     >
@@ -1277,36 +1120,35 @@ export default function Customer360() {
               </div>
 
               {/* Divider between sections */}
-              <div style={{ width: '100%', height: '1px', backgroundColor: '#F3F4F6', margin: '4px 0' }}></div>
+              <div className={styles.box6}></div>
 
               {/* Customer Workspace Group */}
               <div>
-                <button 
-                  className="left-tab-btn" 
+                <button
+                  className={`left-tab-btn ${styles.strong3}`}
                   onClick={() => setWorkspaceExpanded(!workspaceExpanded)}
-                  style={{ justifyContent: 'space-between', fontWeight: 800, color: '#374151' }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div className={styles.row4}>
                     <Briefcase size={16} />
                     <span>Customer Workspace</span>
                   </div>
                   {workspaceExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
                 </button>
                 {workspaceExpanded && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 4, paddingLeft: 12 }}>
-                    <button 
+                  <div className={styles.stack4}>
+                    <button
                       className={`left-tab-btn ${activeTab === 'user_interactions' ? 'active' : ''}`}
                       onClick={() => setActiveTab('user_interactions')}
                     >
                       <span>User Interactions</span>
                     </button>
-                    <button 
+                    <button
                       className={`left-tab-btn ${activeTab === 'products' ? 'active' : ''}`}
                       onClick={() => setActiveTab('products')}
                     >
                       <span>Products</span>
                     </button>
-                    <button 
+                    <button
                       className={`left-tab-btn ${activeTab === 'rm_details' ? 'active' : ''}`}
                       onClick={() => setActiveTab('rm_details')}
                     >
@@ -1324,7 +1166,7 @@ export default function Customer360() {
             {/* Tab switchers moved to left column */}
 
             {/* Active Content container */}
-            <div 
+            <div
               className={['personal_details', 'residency_contact_details', 'employment_details', 'additional_relationship_details', 'overview', 'company_info', 'contact_relationship', 'rmManager'].includes(activeTab) ? "" : "data-table-container"}
               style={
                 ['personal_details', 'residency_contact_details', 'employment_details', 'additional_relationship_details', 'overview', 'company_info', 'contact_relationship', 'rmManager'].includes(activeTab)
@@ -1346,42 +1188,37 @@ export default function Customer360() {
               {activeTab === 'user_interactions' && (
                 <div>
                   {/* Search & filters */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, gap: 16 }}>
-                    <div style={{ position: 'relative', flexGrow: 1, maxWidth: 360 }}>
-                      <input 
-                        type="text" 
-                        placeholder="Search interactions..." 
+                  <div className={styles.spread}>
+                    <div className={styles.rule3}>
+                      <input
+                        type="text"
+                        placeholder="Search interactions..."
                         value={intSearchQuery}
                         onChange={(e) => {
                           setIntSearchQuery(e.target.value);
                           setIntPageNumber(1);
                         }}
-                        style={{ width: '100%', height: 38, padding: '0 12px', borderRadius: 6, border: '1px solid #E5E7EB', outline: 'none', fontSize: 13 }}
+                        className={styles.panel2}
                       />
                     </div>
-                    <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-                      <button 
-                        className="btn" 
-                        style={{ 
-                          height: 38,
-                          backgroundColor: intShowFilter ? '#EFF6FF' : '#FFFFFF',
-                          borderColor: intShowFilter ? '#004EEB' : '#E5E7EB',
-                          color: intShowFilter ? '#004EEB' : '#374151'
-                        }}
+                    <div className={styles.row5}>
+                      <button
+                        className={`btn ${styles.filterToggle}${intShowFilter ? ` ${styles.filterToggleOn}` : ''}`}
+
                         onClick={() => setIntShowFilter(!intShowFilter)}
                       >
-                        <SlidersHorizontal size={13} style={{ marginRight: 6 }} />
+                        <SlidersHorizontal size={13} className={styles.rule4} />
                         Filter
                       </button>
-                      <div style={{ fontSize: 13, color: '#6B7280', display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div className={styles.row6}>
                         Show
-                        <select 
+                        <select
                           value={intShowMode}
                           onChange={(e) => {
                             setIntShowMode(e.target.value);
                             setIntPageNumber(1);
                           }}
-                          style={{ padding: '4px 8px', borderRadius: 4, border: '1px solid #E5E7EB', backgroundColor: '#FFFFFF', fontSize: 13 }}
+                          className={styles.panel3}
                         >
                           <option value="5">5</option>
                           <option value="10">10</option>
@@ -1389,8 +1226,8 @@ export default function Customer360() {
                           <option value="all">All</option>
                         </select>
                         {intShowMode === 'custom' && (
-                          <input 
-                            type="number" 
+                          <input
+                            type="number"
                             min="1"
                             value={intCustomSize}
                             onChange={(e) => {
@@ -1402,7 +1239,7 @@ export default function Customer360() {
                                 setIntCustomSize(e.target.value);
                               }
                             }}
-                            style={{ width: 60, height: 30, padding: '0 8px', borderRadius: 4, border: '1px solid #E5E7EB', outline: 'none', fontSize: 13 }}
+                            className={styles.panel4}
                           />
                         )}
                       </div>
@@ -1410,133 +1247,139 @@ export default function Customer360() {
                   </div>
 
                   {intShowFilter && (
-                    <div style={{ 
-                      display: 'flex', 
-                      gap: 16, 
-                      marginTop: -10,
-                      marginBottom: 20, 
-                      padding: 12, 
-                      backgroundColor: '#F9FAFB', 
-                      borderRadius: 6, 
-                      border: '1px solid #E5E7EB',
-                      alignItems: 'center' 
-                    }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                        <label style={{ fontSize: 11, fontWeight: 600, color: '#6B7280' }}>Status</label>
-                        <select 
-                          value={intStatusFilter} 
+                    <div className={styles.panel5}>
+                      <div className={styles.stack5}>
+                        <label className={styles.text}>Status</label>
+                        <select
+                          value={intStatusFilter}
                           onChange={(e) => {
                             setIntStatusFilter(e.target.value);
                             setIntPageNumber(1);
                           }}
-                          style={{ padding: '4px 8px', borderRadius: 4, border: '1px solid #D1D5DB', backgroundColor: '#FFFFFF', fontSize: 12, outline: 'none' }}
+                          className={styles.panel6}
                         >
                           <option value="">All Statuses</option>
                           {intData.uniqueStatuses.map(s => <option key={s} value={s}>{s}</option>)}
                         </select>
                       </div>
 
-                      <button 
-                        className="btn" 
+                      <button
+                        className={`btn ${styles.row7}`}
                         onClick={() => { setIntStatusFilter(''); setIntPageNumber(1); }}
-                        style={{ alignSelf: 'flex-end', height: 28, padding: '0 12px', fontSize: 12, display: 'flex', alignItems: 'center', backgroundColor: '#FFFFFF' }}
                       >
                         Clear
                       </button>
                     </div>
                   )}
 
-                  {loadingInteractions ? (
-                    <div style={{ padding: 24, textAlign: 'center' }}>Loading interactions...</div>
-                  ) : interactionsError ? (
+                  {interactionsError ? (
                     <div className="error-container">
                       <p>{getFriendlyErrorMessage({ message: interactionsError ?? undefined, status: interactionsErrorStatus ?? undefined })}</p>
-                      <button className="btn btn-primary" onClick={() => loadInteractions(individualProfile.nationalId as string)} style={{ marginTop: 12 }}>
+                      <Button onClick={() => loadInteractions(individualProfile.nationalId as string)} className={styles.spacer9}>
                         Retry
-                      </button>
+                      </Button>
                     </div>
-                  ) : intData.filtered.length === 0 ? (
+                  ) : !loadingInteractions && intData.filtered.length === 0 ? (
                     <div className="empty-state">No interactions found.</div>
                   ) : (
-                    <div className="table-responsive-wrapper">
-                    <table className="data-table">
-                      <thead>
-                        <tr>
-                          <th>Case ID</th>
-                          <th>Category</th>
-                          <th>Status</th>
-                          <th>Source</th>
-                          <th>Classification</th>
-                          <th>Date Complaint</th>
-                          <th>Action</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {paginatedInteractions.map((item) => (
-                          <tr key={item.caseId}>
-                            <td className="account-num-text">{formatValue(item.caseId)}</td>
-                            <td>{formatValue(item.category)}</td>
-                            <td>
-                              <span className={`status-badge ${
-                                (getLegacyInteractionField(item, 'status') || item.statusParent || '').toLowerCase().includes('closed') ? 'status-validated' :
-                                (getLegacyInteractionField(item, 'status') || item.statusParent || '').toLowerCase().includes('progress') ? 'status-wip' : 'status-pending'
-                              }`}>
-                                {formatValue(getLegacyInteractionField(item, 'status') || item.statusParent)}
-                              </span>
-                            </td>
-                            <td>{formatValue(getLegacyInteractionField(item, 'source') || item.sourceName)}</td>
-                            <td>{formatValue(item.classification || item.subCategory1)}</td>
-                            <td>{formatValue((item.dateComplaint || item.dateCase || '').split(' ')[0] || item.positionDate)}</td>
-                            <td>
-                              <span 
-                                className="action-link" 
-                                style={{ color: '#004EEB', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
+                    <DataTable bare>
+                      <ResponsiveRows
+                        rows={paginatedInteractions}
+                        loading={loadingInteractions}
+                        loadingRows={5}
+                        rowKey={(item) => String(item.caseId)}
+                        columns={[
+                          {
+                            key: 'caseId',
+                            label: 'Case ID',
+                            priority: 'always',
+                            render: (item) => (
+                              <span className="account-num-text">{formatValue(item.caseId)}</span>
+                            ),
+                          },
+                          {
+                            key: 'category',
+                            label: 'Category',
+                            priority: 'high',
+                            render: (item) => formatValue(item.category),
+                          },
+                          {
+                            key: 'status',
+                            label: 'Status',
+                            priority: 'always',
+                            render: (item) => (
+                              <StatusBadge
+                                status={formatValue(
+                                  getLegacyInteractionField(item, 'status') || item.statusParent
+                                )}
+                              />
+                            ),
+                          },
+                          {
+                            key: 'source',
+                            label: 'Source',
+                            priority: 'low',
+                            render: (item) =>
+                              formatValue(getLegacyInteractionField(item, 'source') || item.sourceName),
+                          },
+                          {
+                            key: 'classification',
+                            label: 'Classification',
+                            priority: 'low',
+                            render: (item) => formatValue(item.classification || item.subCategory1),
+                          },
+                          {
+                            key: 'complaintDate',
+                            label: 'Complaint Date',
+                            priority: 'low',
+                            render: (item) =>
+                              formatValue(
+                                (item.dateComplaint || item.dateCase || '').split(' ')[0] ||
+                                  item.positionDate
+                              ),
+                          },
+                          {
+                            key: 'action',
+                            label: 'Action',
+                            priority: 'always',
+                            align: 'right',
+                            render: (item) => (
+                              <span
+                                className={`action-link ${styles.row8}`}
                                 onClick={() => openCaseModal(item)}
                               >
                                 <Eye size={13} />
                                 View
                               </span>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                    </div>
+                            ),
+                          },
+                        ]}
+                      />
+                    </DataTable>
                   )}
 
                   {/* Pagination */}
                   {intTotalPages > 1 && (
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 20 }}>
-                      <button 
-                        className="btn" 
-                        style={{ width: 32, height: 32, borderRadius: '50%', padding: 0, justifyContent: 'center' }}
+                    <div className={styles.row9}>
+                      <button
+                        className={`btn ${styles.avatar2}`}
                         disabled={safeIntPageNumber === 1}
                         onClick={() => setIntPageNumber(safeIntPageNumber - 1)}
                       >
                         &lt;
                       </button>
                       {Array.from({ length: intTotalPages }, (_, i) => i + 1).map((p) => (
-                        <button 
-                          key={p} 
-                          className="btn" 
-                          style={{ 
-                            width: 32, 
-                            height: 32, 
-                            borderRadius: '50%', 
-                            padding: 0, 
-                            justifyContent: 'center', 
-                            backgroundColor: safeIntPageNumber === p ? '#004EEB' : '#FFFFFF', 
-                            color: safeIntPageNumber === p ? '#FFFFFF' : '#374151', 
-                            borderColor: safeIntPageNumber === p ? '#004EEB' : '#E5E7EB' 
-                          }}
+                        <button
+                          key={p}
+                          className={`btn ${styles.pageDot}${safeIntPageNumber === p ? ` ${styles.pageDotActive}` : ''}`}
+
                           onClick={() => setIntPageNumber(p)}
                         >
                           {p}
                         </button>
                       ))}
-                      <button 
-                        className="btn" 
-                        style={{ width: 32, height: 32, borderRadius: '50%', padding: 0, justifyContent: 'center' }}
+                      <button
+                        className={`btn ${styles.avatar2}`}
                         disabled={safeIntPageNumber === intTotalPages}
                         onClick={() => setIntPageNumber(safeIntPageNumber + 1)}
                       >
@@ -1551,29 +1394,15 @@ export default function Customer360() {
               {activeTab === 'products' && (
                 <div>
                   {/* Tabbed layout for Products Held / Interested Products */}
-                  <div style={{ display: 'flex', gap: 24, borderBottom: '1px solid #E5E7EB', paddingBottom: 12, marginBottom: 24 }}>
-                    <span 
-                      style={{ 
-                        fontWeight: 700, 
-                        fontSize: 13, 
-                        color: productsTab === 'held' ? '#004EEB' : '#6B7280', 
-                        cursor: 'pointer', 
-                        borderBottom: productsTab === 'held' ? '2px solid #004EEB' : 'none', 
-                        paddingBottom: 10 
-                      }}
+                  <div className={styles.row10}>
+                    <span
+                      className={`${styles.subTab}${productsTab === 'held' ? ` ${styles.subTabActive}` : ''}`}
                       onClick={() => setProductsTab('held')}
                     >
                       Product Held
                     </span>
-                    <span 
-                      style={{ 
-                        fontWeight: 700, 
-                        fontSize: 13, 
-                        color: productsTab === 'interested' ? '#004EEB' : '#6B7280', 
-                        cursor: 'pointer', 
-                        borderBottom: productsTab === 'interested' ? '2px solid #004EEB' : 'none', 
-                        paddingBottom: 10 
-                      }}
+                    <span
+                      className={`${styles.subTab}${productsTab === 'interested' ? ` ${styles.subTabActive}` : ''}`}
                       onClick={() => setProductsTab('interested')}
                     >
                       Interested Products
@@ -1583,33 +1412,28 @@ export default function Customer360() {
                   {productsTab === 'held' && (
                     <div>
                       {/* Search & filters */}
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, gap: 16 }}>
-                        <div style={{ position: 'relative', flexGrow: 1, maxWidth: 360 }}>
-                          <input 
-                            type="text" 
-                            placeholder="Search products..." 
+                      <div className={styles.spread}>
+                        <div className={styles.rule3}>
+                          <input
+                            type="text"
+                            placeholder="Search products..."
                             value={indSearchQuery}
                             onChange={(e) => setIndSearchQuery(e.target.value)}
-                            style={{ width: '100%', height: 38, padding: '0 12px', borderRadius: 6, border: '1px solid #E5E7EB', outline: 'none', fontSize: 13 }}
+                            className={styles.panel2}
                           />
                         </div>
-                        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-                          <button 
-                            className="btn" 
-                            style={{ 
-                              height: 38, 
-                              backgroundColor: indShowFilter ? '#EFF6FF' : '#FFFFFF', 
-                              borderColor: indShowFilter ? '#004EEB' : '#E5E7EB', 
-                              color: indShowFilter ? '#004EEB' : '#374151' 
-                            }}
+                        <div className={styles.row5}>
+                          <button
+                            className={`btn ${styles.filterToggle}${indShowFilter ? ` ${styles.filterToggleOn}` : ''}`}
+
                             onClick={() => setIndShowFilter(!indShowFilter)}
                           >
-                            <SlidersHorizontal size={13} style={{ marginRight: 6 }} />
+                            <SlidersHorizontal size={13} className={styles.rule4} />
                             Filter
                           </button>
-                          <div style={{ fontSize: 13, color: '#6B7280', display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <div className={styles.row6}>
                             Show
-                            <select 
+                            <select
                               value={indShowMode}
                               onChange={(e) => {
                                 const mode = e.target.value;
@@ -1628,7 +1452,7 @@ export default function Customer360() {
                                   loadProducts(customerId, 1, targetSize);
                                 }
                               }}
-                              style={{ padding: '4px 8px', borderRadius: 4, border: '1px solid #E5E7EB', backgroundColor: '#FFFFFF', fontSize: 13 }}
+                              className={styles.panel3}
                             >
                               <option value="5">5</option>
                               <option value="10">10</option>
@@ -1636,10 +1460,10 @@ export default function Customer360() {
                               <option value="all">All</option>
                             </select>
                             {indShowMode === 'custom' && (
-                              <input 
-                                type="number" 
-                                min="1" 
-                                value={indCustomSize} 
+                              <input
+                                type="number"
+                                min="1"
+                                value={indCustomSize}
                                 onChange={(e) => {
                                   const val = parseInt(e.target.value, 10);
                                   if (!isNaN(val) && val > 0) {
@@ -1650,7 +1474,7 @@ export default function Customer360() {
                                     setIndCustomSize(e.target.value);
                                   }
                                 }}
-                                style={{ width: 60, height: 30, padding: '0 8px', borderRadius: 4, border: '1px solid #E5E7EB', outline: 'none', fontSize: 13 }}
+                                className={styles.panel4}
                               />
                             )}
                           </div>
@@ -1658,154 +1482,185 @@ export default function Customer360() {
                       </div>
 
                       {indShowFilter && (
-                        <div style={{ 
-                          display: 'flex', 
-                          gap: 16, 
-                          marginTop: -10,
-                          marginBottom: 20, 
-                          padding: 12, 
-                          backgroundColor: '#F9FAFB', 
-                          borderRadius: 6, 
-                          border: '1px solid #E5E7EB',
-                          alignItems: 'center' 
-                        }}>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                            <label style={{ fontSize: 11, fontWeight: 600, color: '#6B7280' }}>Product Type</label>
-                            <select 
-                              value={indTypeFilter} 
+                        <div className={styles.panel5}>
+                          <div className={styles.stack5}>
+                            <label className={styles.text}>Product Type</label>
+                            <select
+                              value={indTypeFilter}
                               onChange={(e) => setIndTypeFilter(e.target.value)}
-                              style={{ padding: '4px 8px', borderRadius: 4, border: '1px solid #D1D5DB', backgroundColor: '#FFFFFF', fontSize: 12, outline: 'none' }}
+                              className={styles.panel6}
                             >
                               <option value="">All Types</option>
                               {indData.uniqueTypes.map(t => <option key={t} value={t}>{t}</option>)}
                             </select>
                           </div>
-                          
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                            <label style={{ fontSize: 11, fontWeight: 600, color: '#6B7280' }}>Status</label>
-                            <select 
-                              value={indStatusFilter} 
+
+                          <div className={styles.stack5}>
+                            <label className={styles.text}>Status</label>
+                            <select
+                              value={indStatusFilter}
                               onChange={(e) => setIndStatusFilter(e.target.value)}
-                              style={{ padding: '4px 8px', borderRadius: 4, border: '1px solid #D1D5DB', backgroundColor: '#FFFFFF', fontSize: 12, outline: 'none' }}
+                              className={styles.panel6}
                             >
                               <option value="">All Statuses</option>
                               {indData.uniqueStatuses.map(s => <option key={s} value={s}>{s}</option>)}
                             </select>
                           </div>
 
-                          <button 
-                            className="btn" 
+                          <button
+                            className={`btn ${styles.row7}`}
                             onClick={() => { setIndTypeFilter(''); setIndStatusFilter(''); }}
-                            style={{ alignSelf: 'flex-end', height: 28, padding: '0 12px', fontSize: 12, display: 'flex', alignItems: 'center', backgroundColor: '#FFFFFF' }}
                           >
                             Clear
                           </button>
                         </div>
                       )}
 
-                      {loadingProducts ? (
-                        <div style={{ padding: 24, textAlign: 'center' }}>Loading products...</div>
-                      ) : productsError ? (
+                      {productsError ? (
                         <div className="error-container">
                           <p>{getFriendlyErrorMessage({ message: productsError ?? undefined, status: productsErrorStatus ?? undefined })}</p>
-                          <button className="btn btn-primary" onClick={() => loadProducts(individualProfile.nationalId as string, pageNumber, pageSize)} style={{ marginTop: 12 }}>
+                          <Button onClick={() => loadProducts(individualProfile.nationalId as string, pageNumber, pageSize)} className={styles.spacer9}>
                             Retry
-                          </button>
+                          </Button>
                         </div>
-                      ) : indData.filtered.length === 0 ? (
+                      ) : !loadingProducts && indData.filtered.length === 0 ? (
                         <div className="empty-state">No products found.</div>
                       ) : (
-                        <div className="table-responsive-wrapper" style={{ maxHeight: '420px', overflowY: 'auto' }}>
-                        <table className="data-table" style={{ width: '100%' }}>
-                          <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
-                            <tr>
-                              <th>Product Name</th>
-                              <th>Type</th>
-                              <th>Account No</th>
-                              <th>Tenure</th>
-                              <th>Account Status</th>
-                              <th>Balance</th>
-                              <th>Outstanding</th>
-                              <th>Maturity Date</th>
-                              <th>Timeline & Summary</th>
-                              <th>Campaign Code</th>
-                              <th>Action</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {indData.filtered.map((item) => (
-                              <tr key={item.accountNumber || getLegacyProductField(item, 'accountNo')}>
-                                <td style={{ fontWeight: 700, color: '#004EEB' }}>{formatValue(item.productName)}</td>
-                                <td>{formatValue(item.type || item.productCategory)}</td>
-                                <td className="account-num-text">{formatValue(item.accountNumber || getLegacyProductField(item, 'accountNo'))}</td>
-                                <td>{formatValue(item.tenure)}</td>
-                                <td>
-                                  <span className={`status-badge ${
-                                    (item.derivedAccountStatus || item.financingStatus || '').toLowerCase().includes('active') ? 'status-active' : 'status-pending'
-                                  }`} style={{
-                                    backgroundColor: (item.derivedAccountStatus || item.financingStatus || '').toLowerCase().includes('active') ? '#ECFDF5' : '#FCE7F3',
-                                    color: (item.derivedAccountStatus || item.financingStatus || '').toLowerCase().includes('active') ? '#065F46' : '#9D174D',
-                                    border: 'none'
-                                  }}>
-                                    {formatValue(item.derivedAccountStatus || item.financingStatus)}
+                        <DataTable bare>
+                          <ResponsiveRows
+                            rows={indData.filtered}
+                            loading={loadingProducts}
+                            loadingRows={5}
+                            rowKey={(item) =>
+                              String(item.accountNumber || getLegacyProductField(item, 'accountNo'))
+                            }
+                            columns={[
+                              {
+                                key: 'productName',
+                                label: 'Product Name',
+                                priority: 'always',
+                                render: (item) => (
+                                  <span className={styles.strong4}>{formatValue(item.productName)}</span>
+                                ),
+                              },
+                              {
+                                key: 'type',
+                                label: 'Type',
+                                priority: 'low',
+                                render: (item) => formatValue(item.type || item.productCategory),
+                              },
+                              {
+                                key: 'accountNumber',
+                                label: 'Account Number',
+                                priority: 'high',
+                                render: (item) => (
+                                  <span className="account-num-text">
+                                    {formatValue(item.accountNumber || getLegacyProductField(item, 'accountNo'))}
                                   </span>
-                                </td>
-                                <td>{formatCurrency(item.balances || getLegacyProductField(item, 'placementAmount'))}</td>
-                                <td>{formatCurrency(item.outstanding)}</td>
-                                <td>{formatValue(item.maturityDate)}</td>
-                                <td>{formatValue(getLegacyProductField(item, 'timelineSummary') || getLegacyProductField(item, 'timelineAndSummary'))}</td>
-                                <td>{formatValue(item.campaignCode)}</td>
-                                <td>
+                                ),
+                              },
+                              {
+                                key: 'tenure',
+                                label: 'Tenure',
+                                priority: 'low',
+                                render: (item) => formatValue(item.tenure),
+                              },
+                              {
+                                key: 'accountStatus',
+                                label: 'Account Status',
+                                priority: 'always',
+                                render: (item) => (
+                                  <StatusBadge
+                                    status={formatValue(item.derivedAccountStatus || item.financingStatus)}
+                                  />
+                                ),
+                              },
+                              {
+                                key: 'balance',
+                                label: 'Balance',
+                                priority: 'high',
+                                render: (item) =>
+                                  formatCurrency(
+                                    item.balances || getLegacyProductField(item, 'placementAmount')
+                                  ),
+                              },
+                              {
+                                key: 'outstanding',
+                                label: 'Outstanding',
+                                priority: 'low',
+                                render: (item) => formatCurrency(item.outstanding),
+                              },
+                              {
+                                key: 'maturityDate',
+                                label: 'Maturity Date',
+                                priority: 'low',
+                                render: (item) => formatValue(item.maturityDate),
+                              },
+                              {
+                                key: 'timeline',
+                                clamp: true,
+                                label: 'Timeline & Summary',
+                                priority: 'low',
+                                render: (item) =>
+                                  formatValue(
+                                    getLegacyProductField(item, 'timelineSummary') ||
+                                      getLegacyProductField(item, 'timelineAndSummary')
+                                  ),
+                              },
+                              {
+                                key: 'campaignCode',
+                                label: 'Campaign Code',
+                                priority: 'low',
+                                render: (item) => formatValue(item.campaignCode),
+                              },
+                              {
+                                key: 'action',
+                                label: 'Action',
+                                priority: 'always',
+                                align: 'right',
+                                render: (item) => (
                                   <span
-                                    className="action-link"
-                                    style={{ color: '#004EEB', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
-                                    onClick={() => openProductModal((item.accountNumber || getLegacyProductField(item, 'accountNo')) as string, (item.type || item.productCategory) as string)}
+                                    className={`action-link ${styles.row8}`}
+                                    onClick={() =>
+                                      openProductModal(
+                                        (item.accountNumber ||
+                                          getLegacyProductField(item, 'accountNo')) as string,
+                                        (item.type || item.productCategory) as string
+                                      )
+                                    }
                                   >
                                     <Eye size={13} />
                                     View
                                   </span>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                        </div>
+                                ),
+                              },
+                            ]}
+                          />
+                        </DataTable>
                       )}
 
                       {/* Pagination */}
                       {totalPages > 1 && (
-                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 20 }}>
-                          <button 
-                            className="btn" 
-                            style={{ width: 32, height: 32, borderRadius: '50%', padding: 0, justifyContent: 'center' }}
+                        <div className={styles.row9}>
+                          <button
+                            className={`btn ${styles.avatar2}`}
                             disabled={pageNumber === 1 || loadingProducts}
                             onClick={() => loadProducts(individualProfile.nationalId as string, pageNumber - 1)}
                           >
                             &lt;
                           </button>
                           {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-                            <button 
-                              key={p} 
-                              className="btn" 
-                              style={{ 
-                                width: 32, 
-                                height: 32, 
-                                borderRadius: '50%', 
-                                padding: 0, 
-                                justifyContent: 'center', 
-                                backgroundColor: pageNumber === p ? '#004EEB' : '#FFFFFF', 
-                                color: pageNumber === p ? '#FFFFFF' : '#374151', 
-                                borderColor: pageNumber === p ? '#004EEB' : '#E5E7EB' 
-                              }}
+                            <button
+                              key={p}
+                              className={`btn ${styles.pageDot}${pageNumber === p ? ` ${styles.pageDotActive}` : ''}`}
                               disabled={loadingProducts}
                               onClick={() => loadProducts(individualProfile.nationalId as string, p)}
                             >
                               {p}
                             </button>
                           ))}
-                          <button 
-                            className="btn" 
-                            style={{ width: 32, height: 32, borderRadius: '50%', padding: 0, justifyContent: 'center' }}
+                          <button
+                            className={`btn ${styles.avatar2}`}
                             disabled={pageNumber === totalPages || loadingProducts}
                             onClick={() => loadProducts(individualProfile.nationalId as string, pageNumber + 1)}
                           >
@@ -1817,68 +1672,90 @@ export default function Customer360() {
                   )}
 
                   {productsTab === 'interested' && (
-                    <div className="table-responsive-wrapper">
-                      <table className="data-table" style={{ width: '100%' }}>
-                        <thead>
-                          <tr>
-                            <th>Product Name</th>
-                            <th>Product Category</th>
-                            <th>Engagement Count</th>
-                            <th>Eligibility Score</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {profile.interestedProductName || profile.interestedProductCategory ? (
-                            <tr>
-                              <td style={{ fontWeight: 700, color: '#004EEB' }}>{formatValue(profile.interestedProductName)}</td>
-                              <td>{formatValue(profile.interestedProductCategory)}</td>
-                              <td>{formatValue(profile.engagementCount)}</td>
-                              <td>{formatValue(profile.eligibilityScore)}</td>
-                            </tr>
-                          ) : (
-                            <tr>
-                              <td colSpan={4} style={{ textAlign: 'center', padding: 24, color: '#6B7280' }}>
-                                No interested products found.
-                              </td>
-                            </tr>
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
+                    <DataTable bare>
+                      <ResponsiveRows
+                        rows={
+                          profile.interestedProductName || profile.interestedProductCategory
+                            ? [profile]
+                            : []
+                        }
+                        rowKey={() => 'interested-product'}
+                        empty="No interested products found."
+                        columns={[
+                          {
+                            key: 'name',
+                            label: 'Product Name',
+                            priority: 'always',
+                            render: (row) => (
+                              <span className={styles.strong4}>
+                                {formatValue(row.interestedProductName)}
+                              </span>
+                            ),
+                          },
+                          {
+                            key: 'category',
+                            label: 'Product Category',
+                            priority: 'always',
+                            render: (row) => formatValue(row.interestedProductCategory),
+                          },
+                          {
+                            key: 'engagement',
+                            label: 'Engagement Count',
+                            priority: 'low',
+                            render: (row) => formatValue(row.engagementCount),
+                          },
+                          {
+                            key: 'eligibility',
+                            label: 'Eligibility Score',
+                            priority: 'low',
+                            render: (row) => formatValue(row.eligibilityScore),
+                          },
+                        ]}
+                      />
+                    </DataTable>
                   )}
                 </div>
               )}
 
               {/* RM DETAILS TAB */}
               {activeTab === 'rm_details' && (
-                <div className="table-responsive-wrapper">
-                  <table className="data-table" style={{ width: '100%' }}>
-                    <thead>
-                      <tr>
-                        <th>RM Name</th>
-                        <th>RM ID</th>
-                        <th>RM Branch Code</th>
-                        <th>RM Contact Number</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {profile.rmName || profile.rmId ? (
-                        <tr>
-                          <td style={{ fontWeight: 700, color: '#004EEB' }}>{formatValue(profile.rmName)}</td>
-                          <td className="account-num-text">{formatValue(profile.rmId)}</td>
-                          <td>{formatValue(profile.rmBranchCode)}</td>
-                          <td>{formatValue(profile.rmContactNo)}</td>
-                        </tr>
-                      ) : (
-                        <tr>
-                          <td colSpan={4} style={{ textAlign: 'center', padding: 24, color: '#6B7280' }}>
-                            No Relationship Manager details found.
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
+                <DataTable bare>
+                  <ResponsiveRows
+                    rows={profile.rmName || profile.rmId ? [profile] : []}
+                    rowKey={() => 'relationship-manager'}
+                    empty="No Relationship Manager details found."
+                    columns={[
+                      {
+                        key: 'rmName',
+                        label: 'Relationship Manager',
+                        priority: 'always',
+                        render: (row) => (
+                          <span className={styles.strong4}>{formatValue(row.rmName)}</span>
+                        ),
+                      },
+                      {
+                        key: 'rmId',
+                        label: 'Manager ID',
+                        priority: 'high',
+                        render: (row) => (
+                          <span className="account-num-text">{formatValue(row.rmId)}</span>
+                        ),
+                      },
+                      {
+                        key: 'rmBranchCode',
+                        label: 'Branch Code',
+                        priority: 'low',
+                        render: (row) => formatValue(row.rmBranchCode),
+                      },
+                      {
+                        key: 'rmContactNo',
+                        label: 'Manager Contact',
+                        priority: 'low',
+                        render: (row) => formatValue(row.rmContactNo),
+                      },
+                    ]}
+                  />
+                </DataTable>
               )}
             </div>
           </div>
@@ -1888,53 +1765,31 @@ export default function Customer360() {
         <div>
           <div className="customer-layout-container">
           {/* Left Column: Summary Card */}
-          <div className="customer-left-column">
+          <div className={`customer-left-column ${styles.avatar}`}>
             {/* Blue circle avatar for company */}
-            <div style={{
-               width: 80,
-               height: 80,
-               aspectRatio: '1 / 1',
-               flexShrink: 0,
-               borderRadius: '50%',
-               backgroundColor: '#004EEB',
-               display: 'flex',
-               alignItems: 'center',
-               justifyContent: 'center',
-               color: '#FFFFFF',
-               fontSize: 28,
-               fontWeight: 700,
-               marginBottom: 16
-             }}>
+            <div>
                {getInitials(corporateProfile.organizationName)}
              </div>
 
             {/* Company Name */}
-            <h3 style={{ fontSize: 18, fontWeight: 700, color: '#1F2937', margin: '0 0 4px 0', textAlign: 'center' }}>
+            <h3 className={styles.strong}>
               {corporateProfile.organizationName}
             </h3>
-            <div style={{ fontSize: 13, color: '#6B7280', marginBottom: 12, textAlign: 'center' }}>
+            <div className={styles.spacer10}>
               BRN: {corporateProfile.brn || '-'}
             </div>
 
             {/* Badges */}
-            <span style={{
-              fontSize: 11,
-              fontWeight: 700,
-              color: '#004EEB',
-              backgroundColor: '#E6EEFF',
-              padding: '4px 12px',
-              borderRadius: 16,
-              marginBottom: 20
-            }}>
+            <span className={styles.strong2}>
               Customer Status: {corporateProfile.lifecycleTrig || '-'}
             </span>
 
             {/* Divider line for visual layout */}
-            <div style={{ width: '100%', height: '1px', backgroundColor: '#E5E7EB', margin: '16px 0' }}></div>
+            <div className={styles.box5}></div>
 
             {/* Navigation buttons inside left card */}
-            <div style={{ display: 'flex', flexDirection: 'column', width: '100%', gap: 8 }}>
-              <button 
+            <div className={styles.stack3}>
+              <button
                 className={`left-tab-btn ${activeTab === 'overview' ? 'active' : ''}`}
                 onClick={() => setActiveTab('overview')}
               >
@@ -1942,7 +1797,7 @@ export default function Customer360() {
                 <span>Company Overview</span>
               </button>
 
-              <button 
+              <button
                 className={`left-tab-btn ${activeTab === 'company_info' ? 'active' : ''}`}
                 onClick={() => setActiveTab('company_info')}
               >
@@ -1950,7 +1805,7 @@ export default function Customer360() {
                 <span>Company Information</span>
               </button>
 
-              <button 
+              <button
                 className={`left-tab-btn ${activeTab === 'contact_relationship' ? 'active' : ''}`}
                 onClick={() => setActiveTab('contact_relationship')}
               >
@@ -1958,7 +1813,7 @@ export default function Customer360() {
                 <span>Contact & Relationship</span>
               </button>
 
-              <button 
+              <button
                 className={`left-tab-btn ${activeTab === 'rmManager' ? 'active' : ''}`}
                 onClick={() => setActiveTab('rmManager')}
               >
@@ -1966,7 +1821,7 @@ export default function Customer360() {
                 <span>RM Manager Information</span>
               </button>
 
-              <button 
+              <button
                 className={`left-tab-btn ${activeTab === 'products_signatories' ? 'active' : ''}`}
                 onClick={() => {
                   setActiveTab('products_signatories');
@@ -1977,7 +1832,7 @@ export default function Customer360() {
                 <span>Products & Signatories</span>
               </button>
 
-              <button 
+              <button
                 className={`left-tab-btn ${activeTab === 'interestedProducts' ? 'active' : ''}`}
                 onClick={() => setActiveTab('interestedProducts')}
               >
@@ -1990,7 +1845,7 @@ export default function Customer360() {
           {/* Right Column: Content Workspace */}
           <div className="customer-right-column">
 
-            <div 
+            <div
               className={['overview', 'company_info', 'contact_relationship', 'rmManager'].includes(activeTab) ? "" : "data-table-container"}
               style={
                 ['overview', 'company_info', 'contact_relationship', 'rmManager'].includes(activeTab)
@@ -2027,7 +1882,7 @@ export default function Customer360() {
                 const grouped = groupBySection(configsForTab);
 
                 return (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  <div className={styles.stack6}>
                     {grouped.map(({ section, fields }) => (
                       <DynamicProfileSection
                         key={section}
@@ -2047,29 +1902,15 @@ export default function Customer360() {
               {activeTab === 'products_signatories' && (
                 <div>
                   {/* Subtab Navigation side-by-side at the top */}
-                  <div style={{ display: 'flex', gap: 24, borderBottom: '1px solid #E5E7EB', paddingBottom: 12, marginBottom: 24 }}>
-                    <span 
-                      style={{ 
-                        fontWeight: 700, 
-                        fontSize: 13, 
-                        color: corpSubTab === 'products' ? '#004EEB' : '#6B7280', 
-                        cursor: 'pointer', 
-                        borderBottom: corpSubTab === 'products' ? '2px solid #004EEB' : 'none', 
-                        paddingBottom: 10 
-                      }}
+                  <div className={styles.row10}>
+                    <span
+                      className={`${styles.subTab}${corpSubTab === 'products' ? ` ${styles.subTabActive}` : ''}`}
                       onClick={() => setCorpSubTab('products')}
                     >
                       Products Held
                     </span>
-                    <span 
-                      style={{ 
-                        fontWeight: 700, 
-                        fontSize: 13, 
-                        color: corpSubTab === 'signatories' ? '#004EEB' : '#6B7280', 
-                        cursor: 'pointer', 
-                        borderBottom: corpSubTab === 'signatories' ? '2px solid #004EEB' : 'none', 
-                        paddingBottom: 10 
-                      }}
+                    <span
+                      className={`${styles.subTab}${corpSubTab === 'signatories' ? ` ${styles.subTabActive}` : ''}`}
                       onClick={() => setCorpSubTab('signatories')}
                     >
                       Signatories
@@ -2079,33 +1920,27 @@ export default function Customer360() {
                   {corpSubTab === 'products' ? (
                     <div>
                       {/* Search & filters */}
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, gap: 16 }}>
-                        <div style={{ position: 'relative', flexGrow: 1, maxWidth: 360 }}>
-                          <input 
-                            type="text" 
-                            placeholder="Search products..." 
+                      <div className={styles.spread}>
+                        <div className={styles.rule3}>
+                          <input
+                            type="text"
+                            placeholder="Search products..."
                             value={corpSearchQuery}
                             onChange={(e) => setCorpSearchQuery(e.target.value)}
-                            style={{ width: '100%', height: 38, padding: '0 12px', borderRadius: 6, border: '1px solid #E5E7EB', outline: 'none', fontSize: 13 }}
+                            className={styles.panel2}
                           />
                         </div>
-                        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-                          <button 
-                            className="btn" 
-                            style={{ 
-                              height: 38, 
-                              backgroundColor: corpShowFilter ? '#EFF6FF' : '#FFFFFF', 
-                              borderColor: corpShowFilter ? '#004EEB' : '#E5E7EB', 
-                              color: corpShowFilter ? '#004EEB' : '#374151' 
-                            }}
+                        <div className={styles.row5}>
+                          <button
+                            className={`btn ${styles.filterToggle}${corpShowFilter ? ` ${styles.filterToggleOn}` : ''}`}
                             onClick={() => setCorpShowFilter(!corpShowFilter)}
                           >
-                            <SlidersHorizontal size={13} style={{ marginRight: 6 }} />
+                            <SlidersHorizontal size={13} className={styles.rule4} />
                             Filter
                           </button>
-                          <div style={{ fontSize: 13, color: '#6B7280', display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <div className={styles.row6}>
                             Show
-                            <select 
+                            <select
                               value={corpShowMode}
                               onChange={(e) => {
                                 const mode = e.target.value;
@@ -2124,7 +1959,7 @@ export default function Customer360() {
                                   loadProducts(customerId, 1, targetSize);
                                 }
                               }}
-                              style={{ padding: '4px 8px', borderRadius: 4, border: '1px solid #E5E7EB', backgroundColor: '#FFFFFF', fontSize: 13 }}
+                              className={styles.panel3}
                             >
                               <option value="5">5</option>
                               <option value="10">10</option>
@@ -2132,10 +1967,10 @@ export default function Customer360() {
                               <option value="all">All</option>
                             </select>
                             {corpShowMode === 'custom' && (
-                              <input 
-                                type="number" 
-                                min="1" 
-                                value={corpCustomSize} 
+                              <input
+                                type="number"
+                                min="1"
+                                value={corpCustomSize}
                                 onChange={(e) => {
                                   const val = parseInt(e.target.value, 10);
                                   if (!isNaN(val) && val > 0) {
@@ -2146,7 +1981,7 @@ export default function Customer360() {
                                     setCorpCustomSize(e.target.value);
                                   }
                                 }}
-                                style={{ width: 60, height: 30, padding: '0 8px', borderRadius: 4, border: '1px solid #E5E7EB', outline: 'none', fontSize: 13 }}
+                                className={styles.panel4}
                               />
                             )}
                           </div>
@@ -2154,153 +1989,161 @@ export default function Customer360() {
                       </div>
 
                       {corpShowFilter && (
-                        <div style={{ 
-                          display: 'flex', 
-                          gap: 16, 
-                          marginTop: -10,
-                          marginBottom: 20, 
-                          padding: 12, 
-                          backgroundColor: '#F9FAFB', 
-                          borderRadius: 6, 
-                          border: '1px solid #E5E7EB',
-                          alignItems: 'center' 
-                        }}>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                            <label style={{ fontSize: 11, fontWeight: 600, color: '#6B7280' }}>Product Type</label>
-                            <select 
-                              value={corpTypeFilter} 
+                        <div className={styles.panel5}>
+                          <div className={styles.stack5}>
+                            <label className={styles.text}>Product Type</label>
+                            <select
+                              value={corpTypeFilter}
                               onChange={(e) => setCorpTypeFilter(e.target.value)}
-                              style={{ padding: '4px 8px', borderRadius: 4, border: '1px solid #D1D5DB', backgroundColor: '#FFFFFF', fontSize: 12, outline: 'none' }}
+                              className={styles.panel6}
                             >
                               <option value="">All Types</option>
                               {corpData.uniqueTypes.map(t => <option key={t} value={t}>{t}</option>)}
                             </select>
                           </div>
-                          
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                            <label style={{ fontSize: 11, fontWeight: 600, color: '#6B7280' }}>Status</label>
-                            <select 
-                              value={corpStatusFilter} 
+
+                          <div className={styles.stack5}>
+                            <label className={styles.text}>Status</label>
+                            <select
+                              value={corpStatusFilter}
                               onChange={(e) => setCorpStatusFilter(e.target.value)}
-                              style={{ padding: '4px 8px', borderRadius: 4, border: '1px solid #D1D5DB', backgroundColor: '#FFFFFF', fontSize: 12, outline: 'none' }}
+                              className={styles.panel6}
                             >
                               <option value="">All Statuses</option>
                               {corpData.uniqueStatuses.map(s => <option key={s} value={s}>{s}</option>)}
                             </select>
                           </div>
 
-                          <button 
-                            className="btn" 
+                          <button
+                            className={`btn ${styles.row7}`}
                             onClick={() => { setCorpTypeFilter(''); setCorpStatusFilter(''); }}
-                            style={{ alignSelf: 'flex-end', height: 28, padding: '0 12px', fontSize: 12, display: 'flex', alignItems: 'center', backgroundColor: '#FFFFFF' }}
                           >
                             Clear
                           </button>
                         </div>
                       )}
 
-                      {loadingProducts ? (
-                        <div style={{ padding: 24, textAlign: 'center' }}>Loading products...</div>
-                      ) : productsError ? (
+                      {productsError ? (
                         <div className="error-container">
                           <p>{getFriendlyErrorMessage({ message: productsError ?? undefined, status: productsErrorStatus ?? undefined })}</p>
-                          <button className="btn btn-primary" onClick={() => loadProducts(corporateProfile.brn as string, pageNumber, pageSize)} style={{ marginTop: 12 }}>
+                          <Button onClick={() => loadProducts(corporateProfile.brn as string, pageNumber, pageSize)} className={styles.spacer9}>
                             Retry
-                          </button>
+                          </Button>
                         </div>
-                      ) : corpData.filtered.length === 0 ? (
+                      ) : !loadingProducts && corpData.filtered.length === 0 ? (
                         <div className="empty-state">No products found.</div>
                       ) : (
                         <div>
-                          <div className="table-responsive-wrapper" style={{ maxHeight: '420px', overflowY: 'auto' }}>
-                          <table className="data-table">
-                            <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
-                              <tr>
-                                <th>Category</th>
-                                <th>Sub Category</th>
-                                <th>Product Name</th>
-                                <th>Account Number</th>
-                                <th>Account Status</th>
-                                <th>Balance</th>
-                                <th>Outstanding</th>
-                                <th>Last Contact Date</th>
-                                <th>Action</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {corpData.filtered.map((item) => (
-                                <tr key={item.accountNumber}>
-                                  <td>
-                                    <span style={{
-                                      padding: '4px 10px',
-                                      borderRadius: '4px',
-                                      fontSize: '12px',
-                                      fontWeight: 600,
-                                      backgroundColor: item.type === 'Deposit' ? '#EFF6FF' : '#FFFBEB',
-                                      color: item.type === 'Deposit' ? '#1E40AF' : '#B45309'
-                                    }}>
+                          <DataTable bare>
+                            <ResponsiveRows
+                              rows={corpData.filtered}
+                              loading={loadingProducts}
+                              loadingRows={5}
+                              rowKey={(item) => String(item.accountNumber)}
+                              columns={[
+                                {
+                                  key: 'category',
+                                  label: 'Category',
+                                  priority: 'always',
+                                  render: (item) => (
+                                    <span
+                                      className={`${styles.typeChip}${item.type === 'Deposit' ? ` ${styles.typeChipDeposit}` : ''}`}
+                                    >
                                       {item.type}
                                     </span>
-                                  </td>
-                                  <td>{item.productCategory}</td>
-                                  <td style={{ fontWeight: 600 }}>{item.productName}</td>
-                                  <td className="account-num-text">{item.accountNumber}</td>
-                                  <td>
-                                    <span className={`status-badge ${
-                                      (item.derivedAccountStatus || item.financingStatus || '').toLowerCase().includes('active') ? 'status-active' : 'status-validated'
-                                    }`}>
-                                      {item.derivedAccountStatus || item.financingStatus || '-'}
-                                    </span>
-                                  </td>
-                                  <td>{item.balances || '-'}</td>
-                                  <td>{item.outstanding || '-'}</td>
-                                  <td>{item.lastContactDate || '-'}</td>
-                                  <td>
-                                    <span className="action-link" style={{ display: 'flex', alignItems: 'center', gap: 4 }} onClick={() => openProductModal(item.accountNumber, item.type as string)}>
+                                  ),
+                                },
+                                {
+                                  key: 'subCategory',
+                                  label: 'Sub Category',
+                                  priority: 'low',
+                                  render: (item) => item.productCategory,
+                                },
+                                {
+                                  key: 'productName',
+                                  label: 'Product Name',
+                                  priority: 'always',
+                                  render: (item) => (
+                                    <span className={styles.rule8}>{item.productName}</span>
+                                  ),
+                                },
+                                {
+                                  key: 'accountNumber',
+                                  label: 'Account Number',
+                                  priority: 'high',
+                                  render: (item) => (
+                                    <span className="account-num-text">{item.accountNumber}</span>
+                                  ),
+                                },
+                                {
+                                  key: 'accountStatus',
+                                  label: 'Account Status',
+                                  priority: 'always',
+                                  render: (item) => (
+                                    <StatusBadge
+                                      status={item.derivedAccountStatus || item.financingStatus || EMPTY_VALUE}
+                                    />
+                                  ),
+                                },
+                                {
+                                  key: 'balance',
+                                  label: 'Balance',
+                                  priority: 'high',
+                                  render: (item) => item.balances || EMPTY_VALUE,
+                                },
+                                {
+                                  key: 'outstanding',
+                                  label: 'Outstanding',
+                                  priority: 'low',
+                                  render: (item) => item.outstanding || EMPTY_VALUE,
+                                },
+                                {
+                                  key: 'lastContactDate',
+                                  label: 'Last Contact Date',
+                                  priority: 'low',
+                                  render: (item) => item.lastContactDate || EMPTY_VALUE,
+                                },
+                                {
+                                  key: 'action',
+                                  label: 'Action',
+                                  priority: 'always',
+                                  align: 'right',
+                                  render: (item) => (
+                                    <span
+                                      className={`action-link ${styles.row11}`}
+                                      onClick={() => openProductModal(item.accountNumber, item.type as string)}
+                                    >
                                       <Eye size={13} />
                                       View
                                     </span>
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                          </div>
-                          
+                                  ),
+                                },
+                              ]}
+                            />
+                          </DataTable>
+
                           {/* Pagination */}
                           {totalPages > 1 && (
-                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 20 }}>
-                              <button 
-                                className="btn" 
-                                style={{ width: 32, height: 32, borderRadius: '50%', padding: 0, justifyContent: 'center' }}
+                            <div className={styles.row9}>
+                              <button
+                                className={`btn ${styles.avatar2}`}
                                 disabled={pageNumber === 1 || loadingProducts}
                                 onClick={() => loadProducts(corporateProfile.brn as string, pageNumber - 1)}
                               >
                                 &lt;
                               </button>
                               {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-                                <button 
-                                  key={p} 
-                                  className="btn" 
-                                  style={{ 
-                                    width: 32, 
-                                    height: 32, 
-                                    borderRadius: '50%', 
-                                    padding: 0, 
-                                    justifyContent: 'center', 
-                                    backgroundColor: pageNumber === p ? '#004EEB' : '#FFFFFF', 
-                                    color: pageNumber === p ? '#FFFFFF' : '#374151', 
-                                    borderColor: pageNumber === p ? '#004EEB' : '#E5E7EB' 
-                                  }}
+                                <button
+                                  key={p}
+                                  className={`btn ${styles.pageDot}${pageNumber === p ? ` ${styles.pageDotActive}` : ''}`}
                                   disabled={loadingProducts}
                                   onClick={() => loadProducts(corporateProfile.brn as string, p)}
                                 >
                                   {p}
                                 </button>
                               ))}
-                              <button 
-                                className="btn" 
-                                style={{ width: 32, height: 32, borderRadius: '50%', padding: 0, justifyContent: 'center' }}
+                              <button
+                                className={`btn ${styles.avatar2}`}
                                 disabled={pageNumber === totalPages || loadingProducts}
                                 onClick={() => loadProducts(corporateProfile.brn as string, pageNumber + 1)}
                               >
@@ -2317,54 +2160,98 @@ export default function Customer360() {
                         <FileText size={16} />
                         Authorized Signatories
                       </h4>
-                      <div className="table-responsive-wrapper">
-                      <table className="data-table">
-                        <thead>
-                          <tr>
-                            <th>Signatory Name</th>
-                            <th>Date of Birth</th>
-                            <th>ID Number</th>
-                            <th>Phone Number</th>
-                            <th>Position</th>
-                          </tr>
-                        </thead>
-                         <tbody>
-                           <tr>
-                             <td style={{ fontWeight: 600 }}>{corporateProfile.signatoryName || '-'}</td>
-                             <td>{corporateProfile.signatoryDateOfBirth || '-'}</td>
-                             <td>
-                               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                                 <span>{revealed['sigId'] ? (corporateProfile.signatoryIdNumber || '-') : maskNRIC(corporateProfile.signatoryIdNumber)}</span>
-                                 {corporateProfile.signatoryIdNumber && corporateProfile.signatoryIdNumber.trim() !== '' && corporateProfile.signatoryIdNumber.toLowerCase() !== 'null' && (
-                                   <button
-                                     onClick={() => handleToggleReveal('sigId', 'Signatory ID Number', corporateProfile.signatoryIdNumber!)}
-                                     style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', color: '#004EEB', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                                     title={revealed['sigId'] ? 'Hide details' : 'Reveal details'}
-                                   >
-                                     {revealed['sigId'] ? <EyeOff size={14} /> : <Eye size={14} />}
-                                   </button>
-                                 )}
-                               </div>
-                             </td>
-                             <td>
-                               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                                 <span>{revealed['sigPhone'] ? (corporateProfile.signatoryPhoneNumber || '-') : maskPhone(corporateProfile.signatoryPhoneNumber)}</span>
-                                 {corporateProfile.signatoryPhoneNumber && corporateProfile.signatoryPhoneNumber.trim() !== '' && corporateProfile.signatoryPhoneNumber.toLowerCase() !== 'null' && (
-                                   <button
-                                     onClick={() => handleToggleReveal('sigPhone', 'Signatory Phone Number', corporateProfile.signatoryPhoneNumber!)}
-                                     style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', color: '#004EEB', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                                     title={revealed['sigPhone'] ? 'Hide details' : 'Reveal details'}
-                                   >
-                                     {revealed['sigPhone'] ? <EyeOff size={14} /> : <Eye size={14} />}
-                                   </button>
-                                 )}
-                               </div>
-                             </td>
-                             <td>{corporateProfile.signatoryPosition || '-'}</td>
-                           </tr>
-                         </tbody>
-                      </table>
-                      </div>
+                      <DataTable bare>
+                        <ResponsiveRows
+                          rows={[corporateProfile]}
+                          rowKey={() => 'signatory'}
+                          columns={[
+                            {
+                              key: 'name',
+                              label: 'Signatory Name',
+                              priority: 'always',
+                              render: (row) => (
+                                <span className={styles.rule8}>
+                                  {row.signatoryName || EMPTY_VALUE}
+                                </span>
+                              ),
+                            },
+                            {
+                              key: 'dob',
+                              label: 'Date of Birth',
+                              priority: 'low',
+                              render: (row) => row.signatoryDateOfBirth || EMPTY_VALUE,
+                            },
+                            {
+                              key: 'id',
+                              label: 'ID Number',
+                              priority: 'always',
+                              render: (row) => (
+                                <div className={styles.spread2}>
+                                  <span>
+                                    {revealed['sigId']
+                                      ? row.signatoryIdNumber || EMPTY_VALUE
+                                      : maskNRIC(row.signatoryIdNumber)}
+                                  </span>
+                                  {row.signatoryIdNumber &&
+                                    row.signatoryIdNumber.trim() !== '' &&
+                                    row.signatoryIdNumber.toLowerCase() !== 'null' && (
+                                      <button
+                                        onClick={() =>
+                                          handleToggleReveal(
+                                            'sigId',
+                                            'Signatory ID Number',
+                                            row.signatoryIdNumber!
+                                          )
+                                        }
+                                        className={styles.row12}
+                                        title={revealed['sigId'] ? 'Hide details' : 'Reveal details'}
+                                      >
+                                        {revealed['sigId'] ? <EyeOff size={14} /> : <Eye size={14} />}
+                                      </button>
+                                    )}
+                                </div>
+                              ),
+                            },
+                            {
+                              key: 'phone',
+                              label: 'Phone Number',
+                              priority: 'high',
+                              render: (row) => (
+                                <div className={styles.spread2}>
+                                  <span>
+                                    {revealed['sigPhone']
+                                      ? row.signatoryPhoneNumber || EMPTY_VALUE
+                                      : maskPhone(row.signatoryPhoneNumber)}
+                                  </span>
+                                  {row.signatoryPhoneNumber &&
+                                    row.signatoryPhoneNumber.trim() !== '' &&
+                                    row.signatoryPhoneNumber.toLowerCase() !== 'null' && (
+                                      <button
+                                        onClick={() =>
+                                          handleToggleReveal(
+                                            'sigPhone',
+                                            'Signatory Phone Number',
+                                            row.signatoryPhoneNumber!
+                                          )
+                                        }
+                                        className={styles.row12}
+                                        title={revealed['sigPhone'] ? 'Hide details' : 'Reveal details'}
+                                      >
+                                        {revealed['sigPhone'] ? <EyeOff size={14} /> : <Eye size={14} />}
+                                      </button>
+                                    )}
+                                </div>
+                              ),
+                            },
+                            {
+                              key: 'position',
+                              label: 'Position',
+                              priority: 'low',
+                              render: (row) => row.signatoryPosition || EMPTY_VALUE,
+                            },
+                          ]}
+                        />
+                      </DataTable>
                     </div>
                   )}
                 </div>
@@ -2373,30 +2260,46 @@ export default function Customer360() {
               {/* INTERESTED PRODUCTS */}
               {activeTab === 'interestedProducts' && (
                 <div>
-                  <h4 className="info-section-title" style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#004EEB', fontSize: 13, fontWeight: 700, textTransform: 'uppercase', marginBottom: 10 }}>
+                  <h4 className={`info-section-title ${styles.label}`}>
                     <TrendingUp size={14} />
                     Interested Products
                   </h4>
-                  <div className="table-responsive-wrapper">
-                  <table className="data-table">
-                    <thead>
-                      <tr>
-                        <th>Product Name</th>
-                        <th>Product Category</th>
-                        <th>Engagement Count</th>
-                        <th>Eligibility Score</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr>
-                        <td style={{ fontWeight: 600 }}>{formatValue(profile.interestedProductName || profile.interestedProduct)}</td>
-                        <td>{formatValue(profile.interestedProductCategory)}</td>
-                        <td>{formatValue(profile.engagementCount)}</td>
-                        <td>{formatValue(profile.eligibilityScore)}</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                  </div>
+                  <DataTable bare>
+                    <ResponsiveRows
+                      rows={[profile]}
+                      rowKey={() => 'interested-product-corporate'}
+                      columns={[
+                        {
+                          key: 'name',
+                          label: 'Product Name',
+                          priority: 'always',
+                          render: (row) => (
+                            <span className={styles.rule8}>
+                              {formatValue(row.interestedProductName || row.interestedProduct)}
+                            </span>
+                          ),
+                        },
+                        {
+                          key: 'category',
+                          label: 'Product Category',
+                          priority: 'always',
+                          render: (row) => formatValue(row.interestedProductCategory),
+                        },
+                        {
+                          key: 'engagement',
+                          label: 'Engagement Count',
+                          priority: 'low',
+                          render: (row) => formatValue(row.engagementCount),
+                        },
+                        {
+                          key: 'eligibility',
+                          label: 'Eligibility Score',
+                          priority: 'low',
+                          render: (row) => formatValue(row.eligibilityScore),
+                        },
+                      ]}
+                    />
+                  </DataTable>
                 </div>
               )}
             </div>

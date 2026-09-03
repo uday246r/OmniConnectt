@@ -9,13 +9,11 @@ import { useSettingsDrawerStore } from '../../shared/stores/settingsDrawerStore'
 import { useDebouncedValue } from '../../shared/hooks/useDebouncedValue'
 import { Icon } from '../../shared/components/Icon/Icon'
 import { SkeletonUserCard } from '../../shared/components/Skeleton'
-import { Pagination } from '../../shared/components/Pagination/Pagination'
-import { Modal } from '../../shared/components/Modal/Modal'
-import { Button } from '../../shared/components/Button/Button'
 import { ApiError } from '../../shared/api/httpClient'
 import { toast } from '../../shared/stores/toastStore'
 import styles from './SettingsUsersTab.module.css'
 import { TOPICS, invalidate, useDataRevision } from '../../shared/stores/invalidationStore'
+import { Button, EmptyState, Modal, Pagination } from '@omniremit/ui'
 
 const PAGE_SIZE = 10
 
@@ -28,7 +26,8 @@ export function SettingsUsersTab() {
   // all, so an operator saw a live Delete button and a working deactivate toggle on their own row.
   const currentUserId = useAuthStore((s) => s.user?.id)
   const pushLayer = useSettingsDrawerStore((s) => s.pushLayer)
-  const dataRevision = useDataRevision(TOPICS.users)
+  const dataRevision = useDataRevision(TOPICS.users)
+
   const canCreate = isAdministrator || hasCapability('host.settings.users', 'Create')
   const canEdit = isAdministrator || hasCapability('host.settings.users', 'Edit')
   const canDelete = isAdministrator || hasCapability('host.settings.users', 'Delete')
@@ -288,9 +287,10 @@ export function SettingsUsersTab() {
 
                 <div className={styles.userMeta}>
                   <span
-                    className={isActive ? styles.activeBadge : styles.inactiveBadge}
+                    className={`${isActive ? styles.activeBadge : styles.inactiveBadge} ${
+                      canDisable && !isSelf ? styles.clickable : styles.notClickable
+                    }`}
                     onClick={() => !isSelf && handleToggleStatusClick(u)}
-                    style={{ cursor: canDisable && !isSelf ? 'pointer' : 'default' }}
                     title={
                       isSelf
                         ? 'You cannot change your own account status'
@@ -329,9 +329,7 @@ export function SettingsUsersTab() {
             )
           })
         ) : (
-          <div className={styles.emptyState}>
-            <p>No users found matching the selected filters.</p>
-          </div>
+          <EmptyState compact title="No users found matching the selected filters." />
         )}
       </div>
 

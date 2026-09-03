@@ -39,7 +39,7 @@ namespace backend.Data
             {
                 if (action.Equals("VIEW", StringComparison.OrdinalIgnoreCase))
                 {
-                    query = query.Where(l => EF.Functions.ILike(l.Action, "VIEW%"));
+                    query = query.Where(l => EF.Functions.Like(l.Action, "VIEW%"));
                 }
                 else
                 {
@@ -52,9 +52,9 @@ namespace backend.Data
             {
                 var pattern = $"%{search}%";
                 query = query.Where(l =>
-                    EF.Functions.ILike(l.User, pattern) ||
-                    (l.Description != null && EF.Functions.ILike(l.Description, pattern)) ||
-                    EF.Functions.ILike(l.Status, pattern));
+                    EF.Functions.Like(l.User, pattern) ||
+                    (l.Description != null && EF.Functions.Like(l.Description, pattern)) ||
+                    EF.Functions.Like(l.Status, pattern));
             }
 
             var totalCount = await query.CountAsync();

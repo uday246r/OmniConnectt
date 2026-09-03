@@ -1,0 +1,50 @@
+/*
+ * The "there is nothing here" panel, for the case that is NOT a table row.
+ *
+ * For an empty table use `DataTable.Empty`, which renders inside the table so the header and column
+ * widths survive. This one is for cards, drawer sections and full panels.
+ *
+ * Values follow the host's `.emptyCell` treatment (muted text, medium weight, generous vertical
+ * breathing room) so the two read as the same idea at different scales.
+ */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 56px var(--omni-space-6);
+  gap: var(--omni-space-2);
+}
+
+.icon {
+  color: var(--omni-color-text-muted);
+  margin-bottom: var(--omni-space-1);
+  opacity: 0.65;
+}
+
+.title {
+  margin: 0;
+  color: var(--omni-color-text-muted);
+  font-size: var(--omni-font-size-md);
+  font-weight: var(--omni-font-weight-medium);
+}
+
+.description {
+  margin: 0;
+  color: var(--omni-color-text-muted);
+  font-size: var(--omni-font-size-sm);
+  font-weight: var(--omni-font-weight-regular);
+  max-width: 42ch;
+  line-height: var(--omni-line-height-normal);
+}
+
+.action {
+  margin-top: var(--omni-space-3);
+}
+
+/* Sits inside a card or drawer section rather than a full page — same treatment, less height. */
+.compact {
+  padding: var(--omni-space-6) var(--omni-space-4);
+}

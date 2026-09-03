@@ -1,5 +1,7 @@
 import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
+import { Button } from '@omniremit/ui';
+import styles from './LeadFilterPopover.module.css';
 import {
   Layers,
   Building2,
@@ -9,7 +11,8 @@ import {
   User,
   Flag,
   Search,
-} from 'lucide-react';
+  X,
+} from '@omniremit/ui/icons';
 import { useLeadStore } from '../../store/useLeadStore';
 import { FilterCriterion } from '../../types/lead';
 
@@ -86,11 +89,22 @@ export const LeadFilterPopover: React.FC<LeadFilterPopoverProps> = ({ isOpen, on
     };
   }, [isOpen, anchorRef]);
 
-  // Close when clicking outside. popoverRef.current.contains(e.target) is unaffected by the portal —
-  // it checks real DOM containment, which doesn't care where in the tree the node was mounted.
+  /*
+   * Close when clicking outside. popoverRef.current.contains(e.target) is unaffected by the portal —
+   * it checks real DOM containment, which doesn't care where in the tree the node was mounted.
+   *
+   * The ANCHOR must be excluded, not just the popover. The trigger's own handler is
+   * `setShowFilters(!showFilters)`, and mousedown fires before click: pressing the trigger while
+   * the popover was open ran onClose() first (state -> false), then the trigger's click toggled it
+   * straight back to true. The popover shut and immediately reopened, so it could not be dismissed
+   * from its own button. Treating the anchor as "inside" lets the trigger toggle do its job.
+   */
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      const insidePopover = popoverRef.current?.contains(target);
+      const insideAnchor = anchorRef.current?.contains(target);
+      if (!insidePopover && !insideAnchor) {
         onClose();
       }
     };
@@ -100,6 +114,16 @@ export const LeadFilterPopover: React.FC<LeadFilterPopoverProps> = ({ isOpen, on
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
+  }, [isOpen, onClose, anchorRef]);
+
+  // Escape closes it too. Nothing here handled the keyboard at all.
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
   }, [isOpen, onClose]);
 
   if (!isOpen || !coords) return null;
@@ -165,6 +189,20 @@ export const LeadFilterPopover: React.FC<LeadFilterPopoverProps> = ({ isOpen, on
     onClose();
   };
 
+  /** Every criterion that currently carries a value, in the rail's own order. */
+  const activeChips = TABS.map((tab) => ({
+    field: tab.id,
+    label: tab.label,
+    value: getRuleValue(tab.id),
+  })).filter((c) => c.value.trim().length > 0);
+
+  /** Drop one criterion and refetch, leaving the others alone. */
+  const handleRemoveFilter = (field: FilterCriterion) => {
+    setRuleValue(field, '');
+    setSearchQueries((prev) => ({ ...prev, [field]: '' }));
+    fetchLeads();
+  };
+
   const handleApply = () => {
     fetchLeads();
     onClose();
@@ -173,53 +211,54 @@ export const LeadFilterPopover: React.FC<LeadFilterPopoverProps> = ({ isOpen, on
   return createPortal(
     <div
       ref={popoverRef}
-      style={{
-        position: 'fixed',
-        top: coords.top,
-        right: coords.right,
-        // Portaled into document.body's root stacking context, this now competes directly with
-        // modals/toasts (.toast-notification is 1000, .drawer-overlay is 200) instead of the table
-        // card's own stacking context it used to live inside — bumped above both.
-        zIndex: 1200,
-        background: '#ffffff',
-        borderRadius: '16px',
-        boxShadow: '0 12px 32px -4px rgba(15, 23, 42, 0.18), 0 4px 12px rgba(0,0,0,0.06)',
-        border: '1px solid #e2e8f0',
-        width: '520px',
-        display: 'flex',
-        flexDirection: 'column',
-        overflow: 'hidden',
-      }}
+      className={styles.popover}
+      /* Anchor offsets are computed from the trigger's position, so they arrive as custom
+         properties; the declarations live in LeadFilterPopover.module.css. */
+      style={
+        {
+          '--lead-filter-top': `${coords.top}px`,
+          '--lead-filter-right': `${coords.right}px`,
+        } as React.CSSProperties
+      }
     >
       {/* Arrow Indicator */}
-      <div
-        style={{
-          position: 'absolute',
-          top: '-6px',
-          right: '80px',
-          width: '12px',
-          height: '12px',
-          background: '#ffffff',
-          borderTop: '1px solid #cbd5e1',
-          borderLeft: '1px solid #cbd5e1',
-          transform: 'rotate(45deg)',
-          zIndex: 1001,
-        }}
+      <div className={styles.arrow}
       />
 
+      {/*
+        * Active filters, each individually removable.
+        *
+        * Previously the ONLY way to drop a filter was Reset, which cleared every one of them — so
+        * narrowing by Product and Branch and then wanting just Product back meant re-entering both.
+        * The host shows an active filter per column and a per-column Reset; this is the equivalent
+        * for a popover that edits several criteria at once.
+        */}
+      {activeChips.length > 0 && (
+        <div className={styles.activeBar}>
+          <span className={styles.activeBarLabel}>Active</span>
+          <div className={styles.activeChips}>
+            {activeChips.map((chip) => (
+              <span key={chip.field} className={styles.chip}>
+                <span className={styles.chipField}>{chip.label}</span>
+                <span className={styles.chipValue} title={chip.value}>{chip.value}</span>
+                <button
+                  type="button"
+                  className={styles.chipRemove}
+                  onClick={() => handleRemoveFilter(chip.field)}
+                  aria-label={`Remove ${chip.label} filter`}
+                >
+                  <X size={11} />
+                </button>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Main Content Split View */}
-      <div style={{ display: 'flex', minHeight: '340px', maxHeight: '420px' }}>
+      <div className={styles.split}>
         {/* Left Column — Subcategory Tabs */}
-        <div
-          style={{
-            width: '180px',
-            background: '#f8fafc',
-            borderRight: '1px solid #e2e8f0',
-            display: 'flex',
-            flexDirection: 'column',
-            padding: '8px 0',
-          }}
-        >
+        <div className={styles.tabList}>
           {TABS.map((tab) => {
             const isSelected = activeTab === tab.id;
             const hasRule = !!getRuleValue(tab.id);
@@ -229,35 +268,14 @@ export const LeadFilterPopover: React.FC<LeadFilterPopoverProps> = ({ isOpen, on
                 key={tab.id}
                 type="button"
                 onClick={() => setActiveTab(tab.id)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '10px',
-                  padding: '11px 16px',
-                  border: 'none',
-                  background: isSelected ? '#eff6ff' : 'transparent',
-                  color: isSelected ? '#2563eb' : '#475569',
-                  fontWeight: isSelected ? 600 : 500,
-                  fontSize: '13.5px',
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                  transition: 'all 0.15s ease',
-                  position: 'relative',
-                }}
+                className={`${styles.tab}${isSelected ? ` ${styles.tabActive}` : ''}`}
               >
-                <span style={{ color: isSelected ? '#2563eb' : '#64748b', display: 'flex' }}>
+                <span className={styles.tabIcon}>
                   {tab.icon}
                 </span>
-                <span style={{ flex: 1 }}>{tab.label}</span>
+                <span className={styles.tabLabel}>{tab.label}</span>
                 {hasRule && (
-                  <span
-                    style={{
-                      width: '7px',
-                      height: '7px',
-                      borderRadius: '50%',
-                      background: '#2563eb',
-                    }}
-                  />
+                  <span className={styles.tabDot} />
                 )}
               </button>
             );
@@ -265,44 +283,28 @@ export const LeadFilterPopover: React.FC<LeadFilterPopoverProps> = ({ isOpen, on
         </div>
 
         {/* Right Column — Tab Specific Input Options */}
-        <div
-          style={{
-            flex: 1,
-            padding: '18px 20px',
-            display: 'flex',
-            flexDirection: 'column',
-            overflowY: 'auto',
-          }}
-        >
-          <div style={{ fontSize: '14px', fontWeight: 700, color: '#0f172a', marginBottom: '12px' }}>
+        <div className={styles.panel}>
+          <div className={styles.panelTitle}>
             {TABS.find((t) => t.id === activeTab)?.label}
           </div>
 
           {/* Tab 1: Product */}
           {activeTab === 'product' && (
-            <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+            <div className={styles.field}>
               {/* Search Bar */}
-              <div style={{ position: 'relative', marginBottom: '14px' }}>
-                <Search size={15} color="#94a3b8" style={{ position: 'absolute', left: '10px', top: '10px' }} />
+              <div className={styles.searchWrap}>
+                <Search size={15} className={styles.searchIcon} />
                 <input
                   type="text"
                   placeholder="Search product..."
                   value={currentSearch}
                   onChange={(e) => handleSearchChange('product', e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '8px 10px 8px 32px',
-                    borderRadius: '8px',
-                    border: '1px solid #cbd5e1',
-                    fontSize: '13px',
-                    outline: 'none',
-                    boxSizing: 'border-box',
-                  }}
+                  className={styles.searchInput}
                 />
               </div>
 
               {/* Checkbox Options — NO numbers rendered as requested */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', overflowY: 'auto', flex: 1, paddingRight: '4px' }}>
+              <div className={styles.optionList}>
                 {filteredProducts.map((p) => {
                   const selectedList = getRuleValue('product').split(',').map((s) => s.trim());
                   const checked = selectedList.includes(p);
@@ -310,27 +312,13 @@ export const LeadFilterPopover: React.FC<LeadFilterPopoverProps> = ({ isOpen, on
                   return (
                     <label
                       key={p}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '10px',
-                        fontSize: '13px',
-                        color: '#334155',
-                        cursor: 'pointer',
-                        fontWeight: checked ? 600 : 400,
-                      }}
+                      className={`${styles.option}${checked ? ` ${styles.optionChecked}` : ''}`}
                     >
                       <input
                         type="checkbox"
                         checked={checked}
                         onChange={() => toggleMultiValue('product', p)}
-                        style={{
-                          width: '16px',
-                          height: '16px',
-                          borderRadius: '4px',
-                          accentColor: '#2563eb',
-                          cursor: 'pointer',
-                        }}
+                        className={styles.optionBox}
                       />
                       <span>{p}</span>
                     </label>
@@ -342,27 +330,19 @@ export const LeadFilterPopover: React.FC<LeadFilterPopoverProps> = ({ isOpen, on
 
           {/* Tab 2: Branch */}
           {activeTab === 'branch' && (
-            <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-              <div style={{ position: 'relative', marginBottom: '14px' }}>
-                <Search size={15} color="#94a3b8" style={{ position: 'absolute', left: '10px', top: '10px' }} />
+            <div className={styles.field}>
+              <div className={styles.searchWrap}>
+                <Search size={15} className={styles.searchIcon} />
                 <input
                   type="text"
                   placeholder="Search branch..."
                   value={currentSearch}
                   onChange={(e) => handleSearchChange('branch', e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '8px 10px 8px 32px',
-                    borderRadius: '8px',
-                    border: '1px solid #cbd5e1',
-                    fontSize: '13px',
-                    outline: 'none',
-                    boxSizing: 'border-box',
-                  }}
+                  className={styles.searchInput}
                 />
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', overflowY: 'auto', flex: 1, paddingRight: '4px' }}>
+              <div className={styles.optionList}>
                 {filteredBranches.length > 0 ? (
                   filteredBranches.map((b) => {
                     const selectedList = getRuleValue('branch').split(',').map((s) => s.trim());
@@ -371,34 +351,20 @@ export const LeadFilterPopover: React.FC<LeadFilterPopoverProps> = ({ isOpen, on
                     return (
                       <label
                         key={b}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '10px',
-                          fontSize: '13px',
-                          color: '#334155',
-                          cursor: 'pointer',
-                          fontWeight: checked ? 600 : 400,
-                        }}
+                        className={`${styles.option}${checked ? ` ${styles.optionChecked}` : ''}`}
                       >
                         <input
                           type="checkbox"
                           checked={checked}
                           onChange={() => toggleMultiValue('branch', b)}
-                          style={{
-                            width: '16px',
-                            height: '16px',
-                            borderRadius: '4px',
-                            accentColor: '#2563eb',
-                            cursor: 'pointer',
-                          }}
+                          className={styles.optionBox}
                         />
                         <span>{b}</span>
                       </label>
                     );
                   })
                 ) : (
-                  <div style={{ fontSize: '13px', color: '#94a3b8', padding: '12px 0' }}>
+                  <div className={styles.noResults}>
                     No branches found.
                   </div>
                 )}
@@ -408,56 +374,38 @@ export const LeadFilterPopover: React.FC<LeadFilterPopoverProps> = ({ isOpen, on
 
           {/* Tab 4: Created From */}
           {activeTab === 'createdFrom' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <label style={{ fontSize: '12.5px', color: '#64748b', fontWeight: 500 }}>
+            <div className={styles.textField}>
+              <label className={styles.fieldLabel}>
                 Select Start Creation Date
               </label>
               <input
                 type="date"
                 value={getRuleValue('createdFrom')}
                 onChange={(e) => setRuleValue('createdFrom', e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '9px 12px',
-                  borderRadius: '8px',
-                  border: '1px solid #cbd5e1',
-                  fontSize: '13.5px',
-                  color: '#0f172a',
-                  outline: 'none',
-                  boxSizing: 'border-box',
-                }}
+                className={styles.textInput}
               />
             </div>
           )}
 
           {/* Tab 5: Created To */}
           {activeTab === 'createdTo' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <label style={{ fontSize: '12.5px', color: '#64748b', fontWeight: 500 }}>
+            <div className={styles.textField}>
+              <label className={styles.fieldLabel}>
                 Select End Creation Date
               </label>
               <input
                 type="date"
                 value={getRuleValue('createdTo')}
                 onChange={(e) => setRuleValue('createdTo', e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '9px 12px',
-                  borderRadius: '8px',
-                  border: '1px solid #cbd5e1',
-                  fontSize: '13.5px',
-                  color: '#0f172a',
-                  outline: 'none',
-                  boxSizing: 'border-box',
-                }}
+                className={styles.textInput}
               />
             </div>
           )}
 
           {/* Tab 6: IC Number */}
           {activeTab === 'icNumber' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <label style={{ fontSize: '12.5px', color: '#64748b', fontWeight: 500 }}>
+            <div className={styles.textField}>
+              <label className={styles.fieldLabel}>
                 Search IC Number
               </label>
               <input
@@ -465,24 +413,15 @@ export const LeadFilterPopover: React.FC<LeadFilterPopoverProps> = ({ isOpen, on
                 placeholder="Enter IC Number (e.g. 123456-98-7890)"
                 value={getRuleValue('icNumber')}
                 onChange={(e) => setRuleValue('icNumber', e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '9px 12px',
-                  borderRadius: '8px',
-                  border: '1px solid #cbd5e1',
-                  fontSize: '13.5px',
-                  color: '#0f172a',
-                  outline: 'none',
-                  boxSizing: 'border-box',
-                }}
+                className={styles.textInput}
               />
             </div>
           )}
 
           {/* Tab 7: Phone Number */}
           {activeTab === 'phone' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <label style={{ fontSize: '12.5px', color: '#64748b', fontWeight: 500 }}>
+            <div className={styles.textField}>
+              <label className={styles.fieldLabel}>
                 Search Phone Number
               </label>
               <input
@@ -490,24 +429,15 @@ export const LeadFilterPopover: React.FC<LeadFilterPopoverProps> = ({ isOpen, on
                 placeholder="Enter Phone Number (e.g. 897657863)"
                 value={getRuleValue('phone')}
                 onChange={(e) => setRuleValue('phone', e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '9px 12px',
-                  borderRadius: '8px',
-                  border: '1px solid #cbd5e1',
-                  fontSize: '13.5px',
-                  color: '#0f172a',
-                  outline: 'none',
-                  boxSizing: 'border-box',
-                }}
+                className={styles.textInput}
               />
             </div>
           )}
 
           {/* Tab 8: Name */}
           {activeTab === 'name' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <label style={{ fontSize: '12.5px', color: '#64748b', fontWeight: 500 }}>
+            <div className={styles.textField}>
+              <label className={styles.fieldLabel}>
                 Search Customer Name
               </label>
               <input
@@ -515,43 +445,26 @@ export const LeadFilterPopover: React.FC<LeadFilterPopoverProps> = ({ isOpen, on
                 placeholder="Enter Customer Name..."
                 value={getRuleValue('name')}
                 onChange={(e) => setRuleValue('name', e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '9px 12px',
-                  borderRadius: '8px',
-                  border: '1px solid #cbd5e1',
-                  fontSize: '13.5px',
-                  color: '#0f172a',
-                  outline: 'none',
-                  boxSizing: 'border-box',
-                }}
+                className={styles.textInput}
               />
             </div>
           )}
 
           {/* Tab 9: Status */}
           {activeTab === 'status' && (
-            <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-              <div style={{ position: 'relative', marginBottom: '14px' }}>
-                <Search size={15} color="#94a3b8" style={{ position: 'absolute', left: '10px', top: '10px' }} />
+            <div className={styles.field}>
+              <div className={styles.searchWrap}>
+                <Search size={15} className={styles.searchIcon} />
                 <input
                   type="text"
                   placeholder="Search status..."
                   value={currentSearch}
                   onChange={(e) => handleSearchChange('status', e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '8px 10px 8px 32px',
-                    borderRadius: '8px',
-                    border: '1px solid #cbd5e1',
-                    fontSize: '13px',
-                    outline: 'none',
-                    boxSizing: 'border-box',
-                  }}
+                  className={styles.searchInput}
                 />
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', overflowY: 'auto', flex: 1, paddingRight: '4px' }}>
+              <div className={styles.optionList}>
                 {filteredStatuses.map((st) => {
                   const selectedList = getRuleValue('status').split(',').map((item) => item.trim());
                   const checked = selectedList.includes(st);
@@ -559,27 +472,13 @@ export const LeadFilterPopover: React.FC<LeadFilterPopoverProps> = ({ isOpen, on
                   return (
                     <label
                       key={st}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '10px',
-                        fontSize: '13px',
-                        color: '#334155',
-                        cursor: 'pointer',
-                        fontWeight: checked ? 600 : 400,
-                      }}
+                      className={`${styles.option}${checked ? ` ${styles.optionChecked}` : ''}`}
                     >
                       <input
                         type="checkbox"
                         checked={checked}
                         onChange={() => toggleMultiValue('status', st)}
-                        style={{
-                          width: '16px',
-                          height: '16px',
-                          borderRadius: '4px',
-                          accentColor: '#2563eb',
-                          cursor: 'pointer',
-                        }}
+                        className={styles.optionBox}
                       />
                       <span>{st}</span>
                     </label>
@@ -593,42 +492,16 @@ export const LeadFilterPopover: React.FC<LeadFilterPopoverProps> = ({ isOpen, on
 
       {/* Bottom Action Footer */}
       <div
-        style={{
-          padding: '12px 18px',
-          background: '#ffffff',
-          borderTop: '1px solid #eaecf0',
-          display: 'flex',
-          justifyContent: 'flex-end',
-          alignItems: 'center',
-          gap: '10px',
-        }}
+        className={styles.footer}
       >
-        <button
-          type="button"
-          onClick={handleReset}
-          className="drawer-btn-cancel"
-          style={{
-            height: '36px',
-            padding: '0 16px',
-            fontSize: '13px',
-            borderRadius: '10px',
-          }}
-        >
+        {/* Was drawer-btn-cancel shrunk inline to 36px/13px — which is the shared Button's `sm`
+            size, so it now uses that rather than a per-call-site override. */}
+        <Button type="button" size="sm" variant="secondary" onClick={handleReset}>
           Reset
-        </button>
-        <button
-          type="button"
-          onClick={handleApply}
-          className="drawer-btn-create"
-          style={{
-            height: '36px',
-            padding: '0 18px',
-            fontSize: '13px',
-            borderRadius: '10px',
-          }}
-        >
+        </Button>
+        <Button type="button" size="sm" onClick={handleApply}>
           Apply Filters
-        </button>
+        </Button>
       </div>
     </div>,
     document.body,

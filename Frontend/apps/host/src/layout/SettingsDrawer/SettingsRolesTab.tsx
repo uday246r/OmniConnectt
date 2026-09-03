@@ -8,13 +8,11 @@ import { useSettingsDrawerStore } from '../../shared/stores/settingsDrawerStore'
 import { useDebouncedValue } from '../../shared/hooks/useDebouncedValue'
 import { Icon } from '../../shared/components/Icon/Icon'
 import { SkeletonRoleCard } from '../../shared/components/Skeleton'
-import { Pagination } from '../../shared/components/Pagination/Pagination'
-import { Modal } from '../../shared/components/Modal/Modal'
-import { Button } from '../../shared/components/Button/Button'
 import { ApiError } from '../../shared/api/httpClient'
 import { toast } from '../../shared/stores/toastStore'
 import styles from './SettingsRolesTab.module.css'
 import { TOPICS, invalidate, useDataRevision } from '../../shared/stores/invalidationStore'
+import { Button, EmptyState, Modal, Pagination } from '@omniremit/ui'
 
 const PAGE_SIZE = 10
 
@@ -28,7 +26,8 @@ export function SettingsRolesTab() {
   const currentUserRoleId = useAuthStore((s) => s.user?.roleId)
   const pushLayer = useSettingsDrawerStore((s) => s.pushLayer)
   // Bumped by every form layer that saves, so closing an editor refreshes this list.
-  const dataRevision = useDataRevision(TOPICS.roles)
+  const dataRevision = useDataRevision(TOPICS.roles)
+
   const canCreate = isAdministrator || hasCapability('host.settings.roles', 'Create')
   const canEdit = isAdministrator || hasCapability('host.settings.roles', 'Edit')
   const canDelete = isAdministrator || hasCapability('host.settings.roles', 'Delete')
@@ -213,9 +212,10 @@ export function SettingsRolesTab() {
             </div>
           ))
         ) : (
-          <div className={styles.emptyState}>
-            <p>{search ? 'No roles match this search.' : 'No roles found.'}</p>
-          </div>
+          <EmptyState
+            compact
+            title={search ? 'No roles match this search.' : 'No roles found.'}
+          />
         )}
       </div>
 

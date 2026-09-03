@@ -1,0 +1,178 @@
+/*
+ * The platform's blue page banner.
+ *
+ * theme.css already anticipated this component: `--omni-gradient-page-header` and
+ * `--omni-shadow-page-header` were added there precisely so "every page-level banner in the host AND
+ * in both remotes renders from one definition". The tokens existed; what was missing was a component
+ * to render them, so four screens kept hand-rolling the banner instead:
+ *
+ *   host  AuditLogsPage      radius 20, padding 28/32, gradient 135deg  <- the reference
+ *   host  ApprovalCenterPage same treatment, separately declared
+ *   lead  ViewLeadPage       radius 18, padding 24/30, gradient 120deg  <- drifted
+ *   lead  AuditLogsPage      its own variant again
+ *
+ * Values below are the host's. The two decorative light blooms are its ::before/::after circles,
+ * which both remotes had also reimplemented by hand as absolutely-positioned <div>s.
+ */
+
+.header {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--omni-space-5);
+  flex-wrap: wrap;
+  border-radius: 20px; /* off-scale: --omni-radius-xl is 16px */
+  padding: 28px 32px;
+  background: var(--omni-gradient-page-header);
+  border: none;
+  box-shadow: var(--omni-shadow-page-header);
+}
+
+.header::before,
+.header::after {
+  content: '';
+  position: absolute;
+  border-radius: var(--omni-radius-circle);
+  pointer-events: none;
+}
+
+.header::before {
+  top: -60px;
+  right: -60px;
+  width: 240px;
+  height: 240px;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.18) 0%, rgba(255, 255, 255, 0) 70%);
+}
+
+.header::after {
+  bottom: -80px;
+  right: 140px;
+  width: 180px;
+  height: 180px;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0) 70%);
+}
+
+/* Everything below sits above the blooms. */
+.left,
+.actions {
+  position: relative;
+  z-index: 1;
+}
+
+/*
+ * The title block absorbs the slack so the actions stay pinned right for as long as they fit.
+ * Without `flex: 1 1 auto` + `min-width: 0` the left group keeps its full intrinsic width — a long
+ * subtitle refuses to re-wrap — and the header's `flex-wrap` then drops the actions onto their own
+ * line far sooner than it needs to. Customer360's Field Settings showed this: "Save Changes" sat
+ * under the subtitle instead of opposite the title. The wrap is still there as the genuine
+ * narrow-viewport fallback; this just stops it firing early.
+ */
+.left {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.actions {
+  flex: 0 0 auto;
+}
+
+.left {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  min-width: 0;
+}
+
+/* Glass tile for the page icon — same treatment as the Drawer's header icon. */
+.icon {
+  width: 50px;
+  height: 50px;
+  border-radius: var(--omni-radius-lg-plus);
+  background: var(--omni-color-on-header-surface);
+  border: 1.5px solid var(--omni-color-on-header-border);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--omni-color-on-header-text);
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.titleGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.titleRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.title {
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--omni-color-on-header-text);
+  margin: 0;
+  letter-spacing: -0.03em;
+  line-height: 1.2;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+}
+
+.subtitle {
+  font-size: var(--omni-font-size-sm-plus);
+  color: var(--omni-color-on-header-muted);
+  margin: 0;
+  font-weight: var(--omni-font-weight-regular);
+  max-width: 620px;
+  line-height: 1.45;
+  /*
+   * Two lines maximum. `max-width` alone bounded the line length but not the line COUNT, so a long
+   * subtitle wrapped to three or four lines and stretched the blue banner down the page — most
+   * visible on Field Settings and My Requests.
+   */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Glass pill beside the title — record counts, "live" indicators, environment tags. */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--omni-color-on-header-surface);
+  border: 1px solid var(--omni-color-on-header-border);
+  backdrop-filter: blur(8px);
+  padding: 3px 10px;
+  border-radius: var(--omni-radius-pill);
+  font-size: var(--omni-font-size-xs-minus);
+  font-weight: var(--omni-font-weight-bold);
+  color: var(--omni-color-on-header-text);
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: var(--omni-space-3);
+  flex-wrap: wrap;
+}
+
+@media (max-width: 640px) {
+  .header {
+    padding: 20px 22px;
+  }
+  .title {
+    font-size: var(--omni-font-size-xl);
+  }
+}

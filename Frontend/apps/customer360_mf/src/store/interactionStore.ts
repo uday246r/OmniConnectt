@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { api, ApiError } from '../services/api';
 import type { Interaction } from '../types/api';
+import { readStoredPageSize } from '@omniremit/ui';
 
 // Stale-response guard for loadInteractions — see productStore.ts for the
 // full rationale (mirrors customerStore's _searchVersion pattern).
@@ -47,7 +48,7 @@ export const useInteractionStore = create<InteractionStoreState>((set, get) => (
 
   // Pagination
   pageNumber: 1,
-  pageSize: 5,
+  pageSize: readStoredPageSize('c360.interactions', 5),
   totalCount: 0,
   totalPages: 1,
 

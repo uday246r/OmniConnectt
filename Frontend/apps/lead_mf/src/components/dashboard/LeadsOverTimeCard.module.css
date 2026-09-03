@@ -1,0 +1,56 @@
+/*
+ * Leads-over-Time card — the granularity select and chart area.
+ * Card shell and header come from the app-level dashboardCard sheet.
+ */
+
+.granularitySelect {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--omni-space-1);
+  background: var(--omni-color-surface-alt);
+  border: 1px solid var(--omni-color-border);
+  border-radius: var(--omni-radius-sm-minus);
+  padding: 5px 10px;
+  font-size: var(--omni-font-size-xs);
+  font-weight: var(--omni-font-weight-semibold);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 130ms ease, color 130ms ease, border-color 130ms ease;
+  outline: none;
+  font-family: inherit;
+  appearance: none;
+  -webkit-appearance: none;
+  min-width: 80px;
+}
+
+/* Was three JS handlers writing background/color/borderColor on hover. */
+.granularitySelect:hover {
+  background: var(--omni-color-primary-600);
+  color: var(--omni-color-text-on-primary);
+  border-color: var(--omni-color-primary-600);
+}
+
+.chartArea {
+  height: 200px;
+  width: 100%;
+}
+
+.chartState {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--omni-color-text-muted);
+  font-size: var(--omni-font-size-sm);
+}
+
+.footnote {
+  font-size: var(--omni-font-size-xs-minus);
+  color: var(--omni-color-text-muted);
+  font-weight: var(--omni-font-weight-medium);
+  margin-top: -8px;
+}
+
+.footnoteStrong {
+  color: var(--omni-color-text-secondary);
+}

@@ -1,9 +1,7 @@
 import { useState } from 'react'
-import { Badge, type BadgeTone } from '../../../../shared/components/Badge/Badge'
-import { Button } from '../../../../shared/components/Button/Button'
-import { Modal } from '../../../../shared/components/Modal/Modal'
 import type { RemoteAppDto, RemoteAppStatus } from '../../api/remoteAppsApi'
 import styles from './StatusToggle.module.css'
+import { Badge, Button, Modal, type BadgeTone } from '@omniremit/ui'
 
 const STATUS_TONE: Record<RemoteAppStatus, BadgeTone> = {
   Active: 'success',

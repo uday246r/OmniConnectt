@@ -445,11 +445,7 @@ export function DashboardPage() {
                         strokeDasharray={segment.strokeDasharray}
                         strokeDashoffset={segment.strokeDashoffset}
                         strokeLinecap="round"
-                        style={{
-                          transformOrigin: 'center',
-                          transform: 'rotate(-90deg)',
-                          transition: 'stroke-dashoffset 0.4s ease, stroke-dasharray 0.4s ease',
-                        }}
+                        className={styles.donutSegment}
                       />
                     ) : null,
                   )}
@@ -467,7 +463,7 @@ export function DashboardPage() {
                 {roleDistribution.map((item) => (
                   <div key={item.name} className={styles.legendItem}>
                     <div className={styles.legendLeft}>
-                      <span className={styles.legendDot} style={{ background: item.color }} />
+                      <span className={`${styles.legendDot} ${styles.legendSwatch}`} style={{ '--legend-color': item.color } as React.CSSProperties} />
                       <span className={styles.legendName}>{item.name}</span>
                     </div>
                     <span className={styles.legendStat}>
@@ -594,7 +590,7 @@ export function DashboardPage() {
                   <div key={log.id || index} className={styles.activityRow}>
                     <div
                       className={styles.activityIconWrap}
-                      style={{ background: iconTheme.bg, color: iconTheme.color }}
+                      style={{ '--tile-bg': iconTheme.bg, '--tile-color': iconTheme.color } as React.CSSProperties}
                     >
                       <iconTheme.IconElem width={16} height={16} />
                     </div>
@@ -665,7 +661,7 @@ export function DashboardPage() {
                     <div key={app.id || app.key} className={styles.appRow}>
                       <div
                         className={styles.appRowIcon}
-                        style={{ background: colorTheme.bg, color: colorTheme.color }}
+                        style={{ '--tile-bg': colorTheme.bg, '--tile-color': colorTheme.color } as React.CSSProperties}
                       >
                         {index === 0 ? (
                           <Icon.Users width={16} height={16} />
@@ -686,10 +682,7 @@ export function DashboardPage() {
                         <div className={styles.progressBarTrack}>
                           <div
                             className={styles.progressBarFill}
-                            style={{
-                              width: isMaintenance ? '40%' : '100%',
-                              background: isMaintenance ? '#f59e0b' : colorTheme.color,
-                            }}
+                            style={{ '--bar-width': isMaintenance ? '40%' : '100%', '--bar-color': isMaintenance ? 'var(--omni-color-warning-500)' : colorTheme.color } as React.CSSProperties}
                           />
                         </div>
                       </div>

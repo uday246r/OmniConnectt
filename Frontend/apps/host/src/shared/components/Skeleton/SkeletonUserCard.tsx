@@ -8,23 +8,23 @@ export function SkeletonUserCard() {
   return (
     <div className={styles.userCardSkel} aria-hidden="true">
       {/* Circle avatar */}
-      <div className={[styles.shimmer, styles.avatar].join(' ')} style={{ width: 40, height: 40, flexShrink: 0 }} />
+      <div className={`${[styles.shimmer, styles.avatar].join(' ')} ${styles.suc1}`}  />
 
       {/* Name + email */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div className={[styles.shimmer, styles.text].join(' ')} style={{ width: 110, height: '0.82em' }} />
+      <div className={styles.suc2}>
+        <div className={styles.suc3}>
+          <div className={`${[styles.shimmer, styles.text].join(' ')} ${styles.suc4}`}  />
           {/* Role pill */}
-          <div className={[styles.shimmer, styles.pill].join(' ')} style={{ width: 58, height: 20 }} />
+          <div className={`${[styles.shimmer, styles.pill].join(' ')} ${styles.suc5}`}  />
         </div>
-        <div className={[styles.shimmer, styles.text].join(' ')} style={{ width: 160, height: '0.82em' }} />
+        <div className={`${[styles.shimmer, styles.text].join(' ')} ${styles.suc6}`}  />
       </div>
 
       {/* Right: status badge + 2 icon buttons */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-        <div className={[styles.shimmer, styles.pill].join(' ')} style={{ width: 70, height: 24 }} />
-        <div className={[styles.shimmer, styles.square].join(' ')} style={{ width: 28, height: 28, borderRadius: 8 }} />
-        <div className={[styles.shimmer, styles.square].join(' ')} style={{ width: 28, height: 28, borderRadius: 8 }} />
+      <div className={styles.suc7}>
+        <div className={`${[styles.shimmer, styles.pill].join(' ')} ${styles.suc8}`}  />
+        <div className={`${[styles.shimmer, styles.square].join(' ')} ${styles.suc9}`}  />
+        <div className={`${[styles.shimmer, styles.square].join(' ')} ${styles.suc9}`}  />
       </div>
     </div>
   )

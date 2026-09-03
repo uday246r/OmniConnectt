@@ -1,0 +1,181 @@
+/*
+ * Form field patterns shared WITHIN lead_mf.
+ *
+ * The lead drawers and the create/edit forms all declared these same blocks inline: a field group,
+ * a bold label with a red required marker, a tinted textarea/input with a focus ring, and an error
+ * line. Application-level rather than global — the host's own form controls come from
+ * @omniremit/ui's Input/Checkbox, which these screens do not use because they are wired to this
+ * app's own validation and field-config system.
+ */
+
+.group {
+  margin-bottom: var(--omni-space-5);
+}
+
+.groupTight {
+  margin-bottom: var(--omni-space-3);
+}
+
+.label {
+  font-weight: var(--omni-font-weight-semibold);
+  color: var(--text-primary);
+}
+
+.required {
+  color: var(--omni-color-danger-600);
+}
+
+/*
+ * Textarea / text control. Focus styling was previously three JS handlers writing borderColor,
+ * background and boxShadow directly onto the element; it is :focus now.
+ */
+.control {
+  width: 100%;
+  padding: var(--omni-space-3) 14px;
+  border-radius: var(--omni-radius-lg);
+  border: 1.5px solid var(--omni-color-border);
+  font-size: var(--omni-font-size-md);
+  font-family: inherit;
+  color: var(--omni-color-text-primary);
+  background: var(--omni-color-surface-alt);
+  outline: none;
+  resize: vertical;
+  box-sizing: border-box;
+  transition: border-color var(--omni-transition-fast), background var(--omni-transition-fast),
+    box-shadow var(--omni-transition-fast);
+}
+
+.control:focus {
+  border-color: var(--omni-color-primary-600);
+  background: var(--omni-color-surface);
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.09);
+}
+
+.controlError {
+  border-color: #f43f5e;
+}
+
+.errorText {
+  color: #f43f5e;
+  font-size: var(--omni-font-size-xs);
+  margin-top: var(--omni-space-1);
+  font-weight: var(--omni-font-weight-medium);
+}
+
+/* ── Summary / detail cards inside a drawer body ─────────────── */
+.summaryCard {
+  background: var(--omni-color-surface-alt);
+  border: 1px solid var(--omni-color-border);
+  border-radius: var(--omni-radius-md);
+  padding: var(--omni-space-4);
+}
+
+.sectionHeading {
+  font-size: var(--omni-font-size-lg-plus);
+  font-weight: var(--omni-font-weight-bold);
+  color: var(--omni-color-text-primary);
+  margin-bottom: 6px;
+}
+
+.sectionText {
+  font-size: var(--omni-font-size-sm-plus);
+  color: var(--omni-color-text-secondary);
+}
+
+/* Two-column key/value grid inside a summary card. */
+.detailGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--omni-space-3);
+  font-size: var(--omni-font-size-sm-plus);
+}
+
+.detailLabel {
+  color: var(--omni-color-text-secondary);
+  font-size: var(--omni-font-size-xs);
+  display: block;
+}
+
+.detailValue {
+  color: var(--omni-color-text-primary);
+}
+
+.detailFooter {
+  margin-top: 14px;
+  padding-top: var(--omni-space-3);
+  border-top: 1px solid var(--omni-color-border-strong);
+}
+
+.reasonQuote {
+  margin: var(--omni-space-1) 0 0;
+  color: var(--omni-color-danger-900);
+  font-weight: var(--omni-font-weight-medium);
+  font-size: var(--omni-font-size-sm);
+}
+
+/* Native select rendered with the platform's own arrow rather than a custom one. */
+.select {
+  appearance: auto;
+  cursor: pointer;
+}
+
+.selectError {
+  border-color: #f43f5e;
+  background: #fff5f6;
+}
+
+.selectTall {
+  height: 46px;
+}
+
+.blockLabel {
+  font-weight: var(--omni-font-weight-semibold);
+  margin-bottom: var(--omni-space-2);
+  display: block;
+}
+
+.inlineError {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--omni-color-danger-600);
+  font-size: var(--omni-font-size-sm);
+  margin-top: var(--omni-space-2);
+}
+
+.stack {
+  margin-top: var(--omni-space-5);
+}
+
+.stackWide {
+  margin-bottom: var(--omni-space-6);
+}
+
+/* Informational callout above a review/confirmation step. */
+.infoNote {
+  background: var(--omni-color-primary-50);
+  border: 1px solid var(--omni-color-primary-200);
+  border-radius: var(--omni-radius-md);
+  padding: 14px var(--omni-space-4);
+  margin-bottom: var(--omni-space-5);
+  display: flex;
+  align-items: center;
+  gap: var(--omni-space-3);
+}
+
+.infoIcon {
+  color: var(--omni-color-primary-600);
+  flex-shrink: 0;
+}
+
+.infoTitle {
+  font-weight: var(--omni-font-weight-semibold);
+  font-size: var(--omni-font-size-md);
+  color: var(--omni-color-primary-800);
+}
+
+/* Multi-line reason fields need room to type without immediately scrolling. */
+.controlTall {
+  min-height: 100px;
+  line-height: 1.5;
+}

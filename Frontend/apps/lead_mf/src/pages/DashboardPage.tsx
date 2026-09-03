@@ -5,6 +5,8 @@ import { KpiCardSection } from '../components/dashboard/KpiCardSection';
 import { LeadsByBranchCard } from '../components/dashboard/LeadsByBranchCard';
 import { RecentLeadsCard } from '../components/dashboard/RecentLeadsCard';
 import { LeadDetailsDrawer } from '../components/lead/LeadDetailsDrawer';
+import styles from './DashboardPage.module.css';
+import shell from '../shared/leadPage.module.css';
 
 /*
  * These two cards are the only recharts consumers on the dashboard, and recharts is by a wide margin
@@ -27,12 +29,7 @@ const LeadsByProductCard = lazy(() =>
 /** Mirrors the chart cards' own in-card loading treatment so the swap is not a visual jolt. */
 const ChartCardFallback: React.FC = () => (
   <div
-    style={{
-      background: '#ffffff',
-      borderRadius: '16px',
-      border: '1px solid #eaecf0',
-      minHeight: '320px',
-    }}
+    className={styles.panel}
   />
 );
 
@@ -48,23 +45,8 @@ export const DashboardPage: React.FC = () => {
 
   return (
     <div
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '22px',
-        maxWidth: '1340px',
-        width: '100%',
-        paddingBottom: '32px',
-        fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
-        boxSizing: 'border-box',
-      }}
+      className={shell.page}
     >
-      {/* Inject responsive grid CSS for chart rows */}
-      <style>{`
-        @media (max-width: 768px) {
-          .lead-dash-charts-grid { grid-template-columns: 1fr !important; }
-        }
-      `}</style>
 
       {/* Hero Welcome Banner */}
       <DashboardHeader />
@@ -74,12 +56,7 @@ export const DashboardPage: React.FC = () => {
 
       {/* Row 1: Charts — 2-column grid */}
       <div
-        className="lead-dash-charts-grid"
-        style={{
-          display: 'grid',
-          gridTemplateColumns: '1fr 1fr',
-          gap: '20px',
-        }}
+        className={styles.chartRow}
       >
         {/* One boundary per card so a slow chunk cannot hold the other chart back. */}
         <Suspense fallback={<ChartCardFallback />}>
@@ -93,11 +70,7 @@ export const DashboardPage: React.FC = () => {
       {/* Row 2: Branch Distribution — Top Sales Executives removed, so this is a single column now
           rather than leaving an empty gap where it used to sit. */}
       <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: '1fr',
-          gap: '20px',
-        }}
+        className={styles.section}
       >
         <LeadsByBranchCard />
       </div>

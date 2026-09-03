@@ -121,7 +121,7 @@ export function ApprovalsMenu() {
               </div>
             ) : listQuery.isError ? (
               <div className={styles.emptyState}>
-                <div className={styles.emptyIconBox} style={{ background: '#fef2f2', color: '#ef4444' }}>
+                <div className={`${styles.emptyIconBox} ${styles.emptyIconDanger}`}>
                   <Icon.AlertCircle width={20} height={20} />
                 </div>
                 <p className={styles.emptyTitle}>Could not load approvals</p>
@@ -129,7 +129,7 @@ export function ApprovalsMenu() {
               </div>
             ) : items.length === 0 ? (
               <div className={styles.emptyState}>
-                <div className={styles.emptyIconBox} style={{ background: '#ecfdf5', color: '#059669' }}>
+                <div className={`${styles.emptyIconBox} ${styles.emptyIconSuccess}`}>
                   <Icon.CheckCircle width={20} height={20} />
                 </div>
                 <p className={styles.emptyTitle}>All caught up</p>

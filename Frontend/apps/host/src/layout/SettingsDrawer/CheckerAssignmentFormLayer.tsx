@@ -20,7 +20,6 @@ interface CheckerAssignmentFormLayerProps {
   /** Pre-selected module, when opened via a specific module card's "Add Checker" button. */
   module?: string
 }
-
 /**
  * Assigns one checker to one module. Deliberately a single simple form, not a wizard — there's only
  * two fields — but follows the same header/popLayer/invalidate shape every other form layer here

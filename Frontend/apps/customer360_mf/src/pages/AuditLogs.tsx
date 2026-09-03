@@ -16,55 +16,72 @@ import {
   Layers,
   Activity,
   Key,
-  Globe,
   Box,
   Copy,
   Check,
   LayoutGrid,
-} from 'lucide-react';
+} from '@omniremit/ui/icons';
 import { api, ApiError } from '../services/api';
 import type { AuditLog } from '../types/api';
 import { getFriendlyErrorMessage } from '../utils/errorMessages';
-import { C360TableSkeleton } from '../components/common/PageSkeletons';
+import styles from './AuditLogs.module.css';
+import cc from '../shared/c360Common.module.css';
+import { ActorCell, Badge, Button, ColumnFilter, DataTable, DetailField, DetailGrid, DetailSection, DetailSections, Drawer, EMPTY_VALUE, FilterBar, PageHeader, Pagination, ResponsiveRows, RowAction, RowsPerPage, SearchField, formatAuditTimestamp, readStoredPageSize, type ActiveFilter, type BadgeTone } from '@omniremit/ui';
+import { resolveActor } from '../shared/resolveActor';
 
-const getActionBadge = (action?: string) => {
+/* Action -> platform badge tone. Was four hardcoded {bg,text,border,dot} palettes handed to the
+   pill through inline custom properties; the tones carry the same colours from the token set. */
+const actionTone = (action?: string): BadgeTone => {
   const a = (action || '').toLowerCase();
-  if (a.includes('create') || a.includes('add') || a.includes('insert')) {
-    return { bg: '#ecfdf5', text: '#047857', border: '#a7f3d0', dot: '#10b981' };
-  }
-  if (a.includes('edit') || a.includes('update') || a.includes('modify')) {
-    return { bg: '#eff6ff', text: '#1d4ed8', border: '#bfdbfe', dot: '#2563eb' };
-  }
-  if (a.includes('delete') || a.includes('remove') || a.includes('purge')) {
-    return { bg: '#fff1f2', text: '#be123c', border: '#fecdd3', dot: '#f43f5e' };
-  }
-  return { bg: '#eff6ff', text: '#1d4ed8', border: '#bfdbfe', dot: '#2563eb' };
+  if (a.includes('create') || a.includes('add') || a.includes('insert')) return 'success';
+  if (a.includes('delete') || a.includes('remove') || a.includes('purge')) return 'danger';
+  return 'primary';
 };
 
-function formatAuditTimestamp(iso?: string | null): string {
-  if (!iso) return '—';
-  try {
-    const date = new Date(iso);
-    if (Number.isNaN(date.getTime())) return String(iso);
-
-    return date.toLocaleString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-    });
-  } catch {
-    return String(iso);
-  }
-}
+/** A row's own outcome. Success unless the record says otherwise. */
+const isSuccessStatus = (status?: string) => {
+  const v = (status || '').toUpperCase();
+  return v === '' || v === 'SUCCESS';
+};
 
 function getActorInitial(name?: string | null): string {
   if (!name) return 'S';
   const parts = name.trim().split(/\s+/);
   return (parts[0]?.charAt(0) || 'S').toUpperCase();
 }
+
+/* The vocabulary the Action column filters on. Was a toolbar <select>; the host puts this control
+   in the column header instead, which is where it now lives. */
+const STATUS_FILTER_OPTIONS = [
+  { value: 'SUCCESS', label: 'Success' },
+  { value: 'FAILED', label: 'Failed' },
+];
+
+const ACTION_FILTER_OPTIONS = [
+  { value: 'VIEW', label: 'View Profile' },
+  { value: 'LOOKUP', label: 'Lookup Search' },
+  { value: 'UPDATE', label: 'Profile Update' },
+  { value: 'EXPORT', label: 'Data Export' },
+];
+
+/*
+ * The raw action code (VIEW, LOOKUP, PROFILE.UPDATE) is what the API stores; ACTION_FILTER_OPTIONS
+ * already carries the plain-English name for each. Using it here means the table, the filter chips
+ * and the details drawer all say the same human-readable thing instead of shouting a code.
+ */
+const formatActionLabel = (action?: string | null): string => {
+  if (!action) return 'Activity';
+  const known = ACTION_FILTER_OPTIONS.find((o) => o.value === action.toUpperCase());
+  if (known) return known.label;
+  const segment = action.includes('.') ? action.slice(action.lastIndexOf('.') + 1) : action;
+  return segment
+    .replace(/_/g, ' ')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(' ');
+};
 
 export default function AuditLogs() {
   const [logs, setLogs] = useState<AuditLog[]>([]);
@@ -73,13 +90,65 @@ export default function AuditLogs() {
 
   // Pagination states
   const [pageNumber, setPageNumber] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  // Opens at whatever size this user last chose here.
+  const [pageSize, setPageSize] = useState(() => readStoredPageSize('c360.audit', 10));
   const [totalCount, setTotalCount] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
 
   // Filter states
   const [searchQuery, setSearchQuery] = useState('');
   const [actionFilter, setActionFilter] = useState('');
+  // Status has no server-side parameter, so it narrows the page already fetched. Kept explicit so
+  // nobody later assumes it paginates like `action` and `search` do.
+  const [statusFilter, setStatusFilter] = useState('');
+  // Client-side, like status: GET /v1/audit accepts `search` and `action` only, so these narrow the
+  // page already fetched rather than the query.
+  const [actorFilter, setActorFilter] = useState('');
+  const [customerFilter, setCustomerFilter] = useState('');
+
+  /*
+   * Actor and Customer offer the values that ACTUALLY appear in the loaded audit rows, so the list
+   * can never suggest something that returns nothing. Typing narrows it. Both were empty
+   * type-to-search boxes, which told you nothing about who or what was in the data.
+   */
+  const distinct = (pick: (l: AuditLog) => string | null | undefined) => {
+    const seen = new Map<string, string>();
+    for (const log of logs) {
+      const v = (pick(log) ?? '').trim();
+      if (v && !seen.has(v.toLowerCase())) seen.set(v.toLowerCase(), v);
+    }
+    return [...seen.values()].sort((a, b) => a.localeCompare(b)).map((v) => ({ value: v, label: v }));
+  };
+
+  /*
+   * Status, Actor and Customer filter CLIENT-SIDE — GET /v1/audit accepts `search` and `action`
+   * only — while paging is server-side. With a client filter on, the pager would claim
+   * "Showing 11 to 13 of 13" above rows that had all been filtered out. It now describes what is
+   * on screen instead, and server paging is suppressed while one is active.
+   */
+  const visibleLogs = logs.filter((log) => {
+    if (statusFilter && (isSuccessStatus(log.status) ? 'SUCCESS' : 'FAILED') !== statusFilter) return false;
+    if (actorFilter) {
+      const actor = resolveActor(log.user);
+      const hay = `${actor.name ?? ''} ${actor.id ?? ''} ${log.user ?? ''}`.toLowerCase();
+      if (!hay.includes(actorFilter.toLowerCase())) return false;
+    }
+    if (customerFilter) {
+      const hay = `${log.customerName ?? ''} ${log.customerId ?? ''}`.toLowerCase();
+      if (!hay.includes(customerFilter.toLowerCase())) return false;
+    }
+    return true;
+  });
+  const clientFiltered = Boolean(statusFilter || actorFilter || customerFilter);
+
+  const actorOptions = React.useMemo(
+    () => distinct((l) => resolveActor(l.user).name ?? l.user),
+    [logs]
+  );
+  const customerOptions = React.useMemo(
+    () => distinct((l) => l.customerName || l.customerId),
+    [logs]
+  );
 
   // Selected Log for Details Drawer
   const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null);
@@ -173,391 +242,331 @@ export default function AuditLogs() {
   };
 
   const isSuccess = (selectedLog?.status || '').toUpperCase() === 'SUCCESS' || !selectedLog?.status;
-  const actorName = selectedLog?.user || 'System Officer';
-  const actorInitial = getActorInitial(actorName);
+  const resolvedActor = resolveActor(selectedLog?.user);
+  /*
+   * Stays null when the name cannot be resolved, so the Performed By field is omitted
+   * entirely. It previously rendered a truncated database GUID as though it were a name
+   * ("Officer 1a2b3c"), or the invented title 'System Officer'.
+   */
+  const actorName = resolvedActor.name;
+  const actorInitial = actorName ? getActorInitial(actorName) : '';
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+    <div className={styles.stack}>
       {/* Hero Banner — Host Pattern */}
-      <div className="c360-hero-banner">
-        <div style={{ position: 'absolute', top: '-40px', right: '-40px', width: '180px', height: '180px', borderRadius: '50%', background: 'rgba(255, 255, 255, 0.08)', pointerEvents: 'none' }} />
-        <div style={{ position: 'absolute', bottom: '-50px', right: '120px', width: '130px', height: '130px', borderRadius: '50%', background: 'rgba(255, 255, 255, 0.05)', pointerEvents: 'none' }} />
-
-        <div className="c360-hero-left">
-          <div
-            style={{
-              width: '50px',
-              height: '50px',
-              borderRadius: '14px',
-              background: 'rgba(255, 255, 255, 0.18)',
-              border: '1.5px solid rgba(255, 255, 255, 0.3)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#ffffff',
-              flexShrink: 0,
-            }}
+      <PageHeader
+        icon={<ShieldCheck size={24} />}
+        title="Customer 360° Audit Trail"
+        pill={`${totalCount || logs.length} Events Logged`}
+        subtitle="Immutable compliance and security logs of all customer profile lookups, views, and data access events"
+        actions={
+          <Button
+            variant="onHeader"
+            onClick={handleExportCSV}
+            disabled={logs.length === 0}
+            leadingIcon={<Download size={15} />}
           >
-            <ShieldCheck size={24} />
-          </div>
+            Export CSV
+          </Button>
+        }
+      />
 
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <h1 className="c360-hero-title">Customer 360° Audit Trail</h1>
-              <span className="c360-hero-pill">
-                {totalCount || logs.length} Events Logged
-              </span>
-            </div>
-            <p className="c360-hero-subtitle">
-              Immutable compliance and security logs of all customer profile lookups, views, and data access events
-            </p>
-          </div>
-        </div>
-
-        <button
-          type="button"
-          onClick={handleExportCSV}
-          disabled={logs.length === 0}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '7px',
-            height: '40px',
-            padding: '0 18px',
-            borderRadius: '12px',
-            border: '1px solid rgba(255, 255, 255, 0.35)',
-            background: 'rgba(255, 255, 255, 0.95)',
-            color: '#1d4ed8',
-            fontSize: '13.5px',
-            fontWeight: 700,
-            cursor: logs.length === 0 ? 'not-allowed' : 'pointer',
-            opacity: logs.length === 0 ? 0.6 : 1,
-            boxShadow: '0 2px 10px rgba(0, 0, 0, 0.12)',
-            transition: 'all 0.15s ease',
-            fontFamily: 'inherit',
-            flexShrink: 0,
-            position: 'relative',
-            zIndex: 1,
-          }}
-        >
-          <Download size={15} />
-          <span>Export CSV</span>
-        </button>
-      </div>
+      <FilterBar
+        filters={[
+          actionFilter && {
+            key: 'action',
+            label: 'Action',
+            value: ACTION_FILTER_OPTIONS.find((o) => o.value === actionFilter)?.label ?? actionFilter,
+            onRemove: () => setActionFilter(''),
+          },
+          actorFilter && { key: 'actor', label: 'Performed By', value: actorFilter, onRemove: () => setActorFilter('') },
+          customerFilter && { key: 'customer', label: 'Customer', value: customerFilter, onRemove: () => setCustomerFilter('') },
+          statusFilter && {
+            key: 'status',
+            label: 'Status',
+            value: STATUS_FILTER_OPTIONS.find((o) => o.value === statusFilter)?.label ?? statusFilter,
+            onRemove: () => setStatusFilter(''),
+          },
+          searchQuery && { key: 'search', label: 'Search', value: `"${searchQuery}"`, onRemove: () => setSearchQuery('') },
+        ].filter(Boolean) as ActiveFilter[]}
+        onClearAll={() => {
+          setActionFilter('');
+          setActorFilter('');
+          setCustomerFilter('');
+          setStatusFilter('');
+          setSearchQuery('');
+        }}
+      />
 
       {/* Main Table Card */}
       <div className="c360-table-container">
         {/* Controls Toolbar */}
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            gap: '12px',
-            padding: '16px 20px',
-            borderBottom: '1px solid #eaecf0',
-            background: '#ffffff',
-            flexWrap: 'wrap',
-          }}
+        <div className={cc.toolbar}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, maxWidth: '520px', flexWrap: 'wrap' }}>
-            <div className="c360-input-wrapper" style={{ flex: '1 1 240px' }}>
-              <Search size={16} className="c360-input-icon" />
-              <input
-                type="text"
+          <div className={cc.toolbarSearch}>
+            <div className={styles.rule}>
+              <SearchField
                 placeholder="Search audit trail by officer, customer, or description..."
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="c360-input"
+                onValueChange={setSearchQuery}
               />
             </div>
 
-            <select
-              value={actionFilter}
-              onChange={(e) => setActionFilter(e.target.value)}
-              className="c360-select"
-              style={{ width: '160px', flexShrink: 0 }}
-            >
-              <option value="">All Actions</option>
-              <option value="VIEW">View Profile</option>
-              <option value="LOOKUP">Lookup Search</option>
-              <option value="UPDATE">Profile Update</option>
-              <option value="EXPORT">Data Export</option>
-            </select>
           </div>
+
+          <div className={cc.toolbarActions}>
+          {/* Rows-per-page belongs with the table controls, not in the footer — the host's Audit
+              Logs is the reference for both the placement and the "ROWS" label. */}
+          <RowsPerPage storageKey="c360.audit" value={pageSize} onChange={(n) => { setPageSize(n); setPageNumber(1); }} />
 
           <button
             type="button"
             onClick={fetchLogs}
             disabled={loading}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              height: '38px',
-              padding: '0 14px',
-              borderRadius: '10px',
-              border: '1px solid #eaecf0',
-              background: '#ffffff',
-              color: '#334155',
-              fontSize: '13px',
-              fontWeight: 600,
-              cursor: 'pointer',
-              boxShadow: '0 1px 2px rgba(15, 23, 42, 0.05)',
-              fontFamily: 'inherit',
-            }}
+            className={styles.panel}
           >
             <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
             <span>Refresh</span>
           </button>
         </div>
+        </div>
 
         {/* Error Banner */}
         {error && (
-          <div style={{ padding: '16px 20px', background: '#fef2f2', borderBottom: '1px solid #fecaca', color: '#b91c1c', display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px' }}>
-            <AlertTriangle size={18} style={{ flexShrink: 0 }} />
+          <div className={styles.row4}>
+            <AlertTriangle size={18} className={styles.rule2} />
             <span>{error}</span>
           </div>
         )}
 
-        {/* Table / Empty State */}
-        {loading && logs.length === 0 ? (
-          <C360TableSkeleton columns={6} />
-        ) : logs.length === 0 ? (
-          <div style={{ padding: '48px 20px', textAlign: 'center', color: '#64748b' }}>
-            <ShieldCheck size={36} style={{ margin: '0 auto 10px', color: '#94a3b8', opacity: 0.7 }} />
-            <h3 style={{ margin: '0 0 4px', fontSize: '15px', color: '#0f172a', fontWeight: 600 }}>No audit logs found</h3>
-            <p style={{ margin: 0, fontSize: '13px', color: '#64748b' }}>
+        {/*
+          * Table / Empty State.
+          *
+          * The table uses priority columns + a row expander: as the window narrows, What Happened
+          * and Customer Reference drop out first and each row grows a chevron revealing them
+          * underneath, rather than the table scrolling sideways with half its columns off screen.
+          * `minWidth` is deliberately gone — the point is that it no longer needs a scroller.
+          */}
+        {logs.length === 0 && !loading ? (
+          <div className={styles.text3}>
+            <ShieldCheck size={36} className={styles.muted} />
+            <h3 className={styles.text4}>No audit logs found</h3>
+            <p className={styles.text5}>
               {searchQuery || actionFilter ? 'Try clearing filters or search queries.' : 'No customer audit events recorded yet.'}
             </p>
           </div>
         ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table className="c360-table">
-              <thead>
-                <tr>
-                  <th>Timestamp</th>
-                  <th>Action</th>
-                  <th>Actor / Officer</th>
-                  <th>Customer Reference</th>
-                  <th>Description</th>
-                  <th>Status</th>
-                  <th style={{ textAlign: 'right' }}>Details</th>
-                </tr>
-              </thead>
-              <tbody>
-                {logs.map((log, idx) => {
-                  const badge = getActionBadge(log.action);
-
-                  return (
-                    <tr
-                      key={idx}
-                      style={{ transition: 'background 0.12s ease' }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.background = '#f8fafc';
+          <DataTable>
+            <ResponsiveRows
+              loading={loading && logs.length === 0}
+              loadingRows={pageSize}
+              rows={visibleLogs}
+              rowKey={(log, i) => String(log.id ?? i)}
+              empty="No audit records found matching the selected filters."
+              columns={[
+                {
+                  key: 'timestamp',
+                  label: 'Date & Time',
+                  priority: 'always',
+                  render: (log) => (
+                    <span className={styles.text6}>{formatAuditTimestamp(log.timestamp)}</span>
+                  ),
+                },
+                {
+                  key: 'actor',
+                  label: 'Performed By',
+                  priority: 'always',
+                  header: (
+                    <ColumnFilter
+                      key="actor"
+                      label="Performed By"
+                      title="Filter Performed By"
+                      value={actorFilter}
+                      onChange={setActorFilter}
+                      options={actorOptions}
+                      allLabel="Everyone"
+                      searchable={actorOptions.length > 6}
+                      searchPlaceholder="Type a name to narrow…"
+                      emptyHint="Nobody in this log matches that."
+                    />
+                  ),
+                  render: (log) => {
+                    const actor = resolveActor(log.user);
+                    return (
+                      /*
+                       * No raw identifier here. The fallback used to be shortId(actor.id) — a
+                       * truncated database GUID, meaningless to the people who read this log. When
+                       * the name cannot be resolved, saying so plainly is more useful.
+                       */
+                      <ActorCell
+                        name={actor.name ?? (actor.id ? null : 'System')}
+                        fallback="Unknown user"
+                      />
+                    );
+                  },
+                },
+                {
+                  key: 'action',
+                  label: 'What Happened',
+                  priority: 'always',
+                  header: (
+                    <ColumnFilter
+                      key="action"
+                      label="What Happened"
+                      value={actionFilter}
+                      onChange={setActionFilter}
+                      options={ACTION_FILTER_OPTIONS}
+                      allLabel="All Actions"
+                    />
+                  ),
+                  render: (log) => (
+                    <Badge tone={actionTone(log.action)} dot>
+                      {formatActionLabel(log.action)}
+                    </Badge>
+                  ),
+                },
+                {
+                  key: 'customer',
+                  label: 'Customer',
+                  priority: 'low',
+                  header: (
+                    <ColumnFilter
+                      key="customer"
+                      label="Customer"
+                      title="Filter Customer"
+                      value={customerFilter}
+                      onChange={setCustomerFilter}
+                      options={customerOptions}
+                      allLabel="All Customers"
+                      searchable={customerOptions.length > 6}
+                      searchPlaceholder="Type to narrow customers…"
+                      emptyHint="No customer in this log matches that."
+                    />
+                  ),
+                  render: (log) =>
+                    log.customerName ? (
+                      <>
+                        <div className={styles.text7}>{log.customerName}</div>
+                        {log.customerId && <div className={cc.monoMeta}>{log.customerId}</div>}
+                      </>
+                    ) : log.customerId ? (
+                      <div className={cc.monoMeta}>{log.customerId}</div>
+                    ) : (
+                      <span className={cc.mutedText}>{EMPTY_VALUE}</span>
+                    ),
+                },
+                {
+                  key: 'description',
+                  label: 'Description',
+                  priority: 'low',
+                  render: (log) => <span className={styles.text8}>{log.description || EMPTY_VALUE}</span>,
+                },
+                {
+                  key: 'status',
+                  label: 'Outcome',
+                  priority: 'high',
+                  header: (
+                    <ColumnFilter
+                      key="status"
+                      label="Outcome"
+                      value={statusFilter}
+                      onChange={setStatusFilter}
+                      options={STATUS_FILTER_OPTIONS}
+                      allLabel="All Outcomes"
+                    />
+                  ),
+                  render: (log) => (
+                    <Badge tone={isSuccessStatus(log.status) ? 'success' : 'danger'} dot>
+                      {log.status || 'Success'}
+                    </Badge>
+                  ),
+                },
+                {
+                  key: 'details',
+                  label: 'Details',
+                  priority: 'always',
+                  align: 'right',
+                  render: (log) => (
+                    <RowAction
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedLog(log);
+                        setDetailsOpen(true);
                       }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.background = 'transparent';
-                      }}
-                    >
-                      <td style={{ whiteSpace: 'nowrap', color: '#0f172a', fontWeight: 500 }}>
-                        {formatAuditTimestamp(log.timestamp)}
-                      </td>
-                      <td>
-                        <span
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '5px',
-                            padding: '3px 10px',
-                            borderRadius: '999px',
-                            background: badge.bg,
-                            color: badge.text,
-                            fontSize: '11.5px',
-                            fontWeight: 750,
-                            border: `1px solid ${badge.border}`,
-                          }}
-                        >
-                          <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: badge.dot }} />
-                          {(log.action || 'VIEW').toUpperCase()}
-                        </span>
-                      </td>
-                      <td style={{ fontWeight: 600, color: '#0f172a' }}>{log.user || 'System'}</td>
-                      <td>
-                        <div style={{ fontWeight: 600, color: '#0f172a' }}>{log.customerName || '-'}</div>
-                        {log.customerId && (
-                          <div style={{ fontSize: '11.5px', color: '#64748b', fontFamily: "'SF Mono', 'Fira Code', monospace" }}>
-                            {log.customerId}
-                          </div>
-                        )}
-                      </td>
-                      <td style={{ color: '#334155', maxWidth: '280px' }}>{log.description || '-'}</td>
-                      <td>
-                        <span
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '5px',
-                            padding: '3px 9px',
-                            borderRadius: '999px',
-                            fontSize: '11.5px',
-                            fontWeight: 700,
-                            background: isSuccess ? '#ecfdf5' : '#fff1f2',
-                            color: isSuccess ? '#047857' : '#be123c',
-                            border: `1px solid ${isSuccess ? '#a7f3d0' : '#fecdd3'}`,
-                          }}
-                        >
-                          <span
-                            style={{
-                              width: '5px',
-                              height: '5px',
-                              borderRadius: '50%',
-                              backgroundColor: isSuccess ? '#10b981' : '#f43f5e',
-                            }}
-                          />
-                          {log.status || 'Success'}
-                        </span>
-                      </td>
-                      <td style={{ textAlign: 'right' }}>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedLog(log);
-                            setDetailsOpen(true);
-                          }}
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                            padding: '5px 11px',
-                            borderRadius: '8px',
-                            border: '1px solid #bfdbfe',
-                            background: '#eff6ff',
-                            color: '#1d4ed8',
-                            fontSize: '12px',
-                            fontWeight: 600,
-                            cursor: 'pointer',
-                            fontFamily: 'inherit',
-                            transition: 'all 0.12s ease',
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.background = '#dbeafe';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.background = '#eff6ff';
-                          }}
-                        >
-                          <Eye size={13} />
-                          <span>Inspect</span>
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                    />
+                  ),
+                },
+              ]}
+            />
+          </DataTable>
         )}
       </div>
 
-      {/* Pagination */}
-      {totalCount > pageSize && (
-        <div className="c360-pagination">
-          <button
-            type="button"
-            className="c360-page-btn"
-            disabled={pageNumber <= 1}
-            onClick={() => setPageNumber((p) => p - 1)}
-          >
-            &lt; Previous
-          </button>
-          <span className="c360-page-indicator">
-            Page {pageNumber} of {totalPages}
-          </span>
-          <button
-            type="button"
-            className="c360-page-btn"
-            disabled={pageNumber >= totalPages}
-            onClick={() => setPageNumber((p) => p + 1)}
-          >
-            Next &gt;
-          </button>
-        </div>
-      )}
+      <Pagination
+        page={clientFiltered ? 1 : pageNumber}
+        pageSize={clientFiltered ? Math.max(visibleLogs.length, 1) : pageSize}
+        total={clientFiltered ? visibleLogs.length : totalCount}
+        itemLabel="event"
+        onPageChange={setPageNumber}
+      />
+
 
       {/* Details Drawer — Host & Lead Standard Structured Inspect Drawer */}
       {detailsOpen && selectedLog && (
-        <div
-          className="drawer-overlay"
-          style={{ zIndex: 1200 }}
-          onClick={() => setDetailsOpen(false)}
+        <Drawer
+          open={detailsOpen}
+          onClose={() => setDetailsOpen(false)}
+          title="Activity Details"
+          subtitle="What happened, who did it, and when"
+          icon={<Shield size={22} />}
+          footer={
+            <Button type="button" variant="secondary" onClick={() => setDetailsOpen(false)}>
+              Close Details
+            </Button>
+          }
         >
-          <div className="audit-details-drawer" onClick={(e) => e.stopPropagation()}>
-            {/* Radiant Gradient Header */}
-            <div className="audit-drawer-header">
-              <div className="audit-header-left">
-                <div className="audit-header-icon-box">
-                  <Shield size={22} />
-                </div>
-                <div className="audit-header-text">
-                  <h2 className="audit-header-title">Audit Record Details</h2>
-                  <p className="audit-header-subtitle">Full event context, actor, and execution metadata</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                className="audit-header-close-btn"
-                onClick={() => setDetailsOpen(false)}
-                aria-label="Close details drawer"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            {/* Scrollable Body */}
-            <div className="audit-drawer-body">
-              {/* 1. Overview & Event Timeline (Two-Column Layout) */}
+            <DetailSections>
+              {/* Summary + timeline, side by side */}
               <section className="audit-drawer-section">
                 <div className="audit-overview-timeline-grid">
-                  {/* Left Column: Overview */}
                   <div className="audit-overview-col">
                     <h3 className="audit-drawer-section-title">
                       <LayoutGrid size={12} />
-                      Overview
+                      Summary
                     </h3>
                     <dl className="audit-detail-list">
-                      {/* Service */}
+                      {/*
+                        Not read from the record, and not a fabrication either: every row on this
+                        page is the Customer 360 audit trail, so naming the application states a
+                        fact about where the event came from. It keeps the Summary block structurally
+                        identical to the host and lead drawers, which both lead with it.
+                      */}
                       <div className="audit-detail-row">
                         <span className="audit-detail-icon">
                           <Layers size={15} />
                         </span>
                         <div className="audit-detail-row-body">
-                          <dt className="audit-detail-row-label">Service</dt>
+                          <dt className="audit-detail-row-label">Application</dt>
                           <dd className="audit-detail-row-value">
-                            <span className="audit-badge audit-badge-primary">
-                              Customer360Service
-                            </span>
+                            <Badge tone="primary">Customer 360</Badge>
                           </dd>
                         </div>
                       </div>
 
-                      {/* Action */}
                       <div className="audit-detail-row">
                         <span className="audit-detail-icon audit-detail-icon-neutral">
                           <Activity size={15} />
                         </span>
                         <div className="audit-detail-row-body">
-                          <dt className="audit-detail-row-label">Action</dt>
+                          <dt className="audit-detail-row-label">What Happened</dt>
                           <dd className="audit-detail-row-value">
                             <span className="audit-action-badge">
-                              {selectedLog.action || 'PROFILE.VIEW'}
+                              {formatActionLabel(selectedLog.action)}
                             </span>
                           </dd>
                         </div>
                       </div>
 
-                      {/* Result */}
                       <div className="audit-detail-row">
                         <span
                           className={`audit-detail-icon ${
@@ -567,27 +576,21 @@ export default function AuditLogs() {
                           {isSuccess ? <CheckCircle2 size={15} /> : <AlertTriangle size={15} />}
                         </span>
                         <div className="audit-detail-row-body">
-                          <dt className="audit-detail-row-label">Result</dt>
+                          <dt className="audit-detail-row-label">Outcome</dt>
                           <dd className="audit-detail-row-value">
-                            <span
-                              className={`audit-badge ${
-                                isSuccess ? 'audit-badge-success' : 'audit-badge-danger'
-                              }`}
-                            >
-                              <span className="audit-badge-dot" />
-                              {isSuccess ? 'Success' : selectedLog.status || 'Failed'}
-                            </span>
+                            <Badge tone={isSuccess ? 'success' : 'danger'} dot>
+                              {isSuccess ? 'Successful' : selectedLog.status || 'Failed'}
+                            </Badge>
                           </dd>
                         </div>
                       </div>
 
-                      {/* Timestamp */}
                       <div className="audit-detail-row">
                         <span className="audit-detail-icon audit-detail-icon-purple">
                           <Clock size={15} />
                         </span>
                         <div className="audit-detail-row-body">
-                          <dt className="audit-detail-row-label">Timestamp</dt>
+                          <dt className="audit-detail-row-label">Date &amp; Time</dt>
                           <dd className="audit-detail-row-value">
                             {formatAuditTimestamp(selectedLog.timestamp)}
                           </dd>
@@ -596,18 +599,17 @@ export default function AuditLogs() {
                     </dl>
                   </div>
 
-                  {/* Right Column: Event Timeline */}
                   <div className="audit-overview-col audit-overview-col-divider">
                     <h3 className="audit-drawer-section-title">
                       <Clock size={12} />
-                      Event Timeline
+                      Timeline
                     </h3>
                     <div className="audit-timeline">
                       <div className="audit-timeline-step">
                         <span className="audit-timeline-dot" />
                         <div className="audit-timeline-step-card">
                           <span className="audit-timeline-label">
-                            Triggered by {selectedLog.user || 'System Officer'}
+                            {actorName ? `Started by ${actorName}` : 'Activity recorded'}
                           </span>
                           <span className="audit-timeline-time">
                             <Clock size={12} />
@@ -624,11 +626,11 @@ export default function AuditLogs() {
                         />
                         <div className="audit-timeline-step-card">
                           <span className="audit-timeline-label">
-                            {isSuccess ? 'Event Completed Successfully' : 'Event Execution Failed'}
+                            {isSuccess ? 'Finished successfully' : 'Did not complete'}
                           </span>
                           <span className="audit-timeline-time">
                             <ShieldCheck size={12} />
-                            Customer 360 CRM
+                            Customer 360
                           </span>
                         </div>
                       </div>
@@ -637,137 +639,60 @@ export default function AuditLogs() {
                 </div>
               </section>
 
-              {/* 2. Actor & Authentication Context */}
-              <section className="audit-drawer-section">
-                <h3 className="audit-drawer-section-title">
-                  <User size={12} />
-                  Actor &amp; Authentication Context
-                </h3>
-                <div className="audit-field-card-grid">
-                  <div className="audit-field-card">
-                    <span className="audit-field-card-icon">
-                      <User size={15} />
-                    </span>
-                    <div className="audit-field-card-body">
-                      <span className="audit-field-card-label">Actor / Officer Name</span>
-                      <div className="audit-field-card-value">
-                        <div className="audit-user-chip">
-                          <span className="audit-user-avatar">{actorInitial}</span>
-                          <span>{selectedLog.user || 'System Officer'}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="audit-field-card">
-                    <span className="audit-field-card-icon">
-                      <Shield size={15} />
-                    </span>
-                    <div className="audit-field-card-body">
-                      <span className="audit-field-card-label">Access Channel</span>
-                      <span className="audit-field-card-value">
-                        <span className="audit-badge audit-badge-primary">
-                          CRM Core Access
-                        </span>
+              {/*
+                Every field below disappears when the backend sends nothing for it — DetailField
+                returns null rather than printing a placeholder. This section previously showed an
+                "Access Channel" badge reading "CRM Core Access" and a "Client IP" of "127.0.0.1",
+                both hardcoded in the markup rather than returned by the API: invented values in an
+                audit trail, which is the one place they must never appear. Gone until the endpoint
+                actually supplies them.
+              */}
+              <DetailSection title="Who Did This" icon={<User size={12} />} hidden={!actorName}>
+                <DetailGrid>
+                  <DetailField label="Performed By" icon={<User size={15} />}>
+                    {actorName ? (
+                      <span className="audit-user-chip">
+                        <span className="audit-user-avatar">{actorInitial}</span>
+                        <span>{actorName}</span>
                       </span>
-                    </div>
-                  </div>
+                    ) : null}
+                  </DetailField>
+                </DetailGrid>
+              </DetailSection>
 
-                  <div className="audit-field-card">
-                    <span className="audit-field-card-icon">
-                      <Globe size={15} />
-                    </span>
-                    <div className="audit-field-card-body">
-                      <span className="audit-field-card-label">Client IP (IPv4)</span>
-                      <span className="audit-field-card-value">
-                        <span className="audit-ip-badge">
-                          <span className="audit-ip-dot" />
-                          127.0.0.1
-                        </span>
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </section>
-
-              {/* 3. Target Customer & Entity Context */}
-              <section className="audit-drawer-section">
-                <h3 className="audit-drawer-section-title">
-                  <Box size={12} />
-                  Target Customer &amp; Entity Context
-                </h3>
-                <div className="audit-field-card-grid">
-                  <div className="audit-field-card">
-                    <span className="audit-field-card-icon">
-                      <User size={15} />
-                    </span>
-                    <div className="audit-field-card-body">
-                      <span className="audit-field-card-label">Customer Name</span>
-                      <span className="audit-field-card-value" style={{ fontWeight: 600 }}>
-                        {selectedLog.customerName || 'General / System Scope'}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="audit-field-card">
-                    <span className="audit-field-card-icon">
-                      <Layers size={15} />
-                    </span>
-                    <div className="audit-field-card-body">
-                      <span className="audit-field-card-label">Customer Type</span>
-                      <span className="audit-field-card-value">
-                        <span className="audit-badge audit-badge-primary">
-                          {selectedLog.customerType || 'Individual Profile'}
-                        </span>
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="audit-field-card">
-                    <span className="audit-field-card-icon">
-                      <Target size={15} />
-                    </span>
-                    <div className="audit-field-card-body">
-                      <span className="audit-field-card-label">Target Field / Attribute</span>
-                      <span className="audit-field-card-value">
-                        {selectedLog.field || 'Full Profile View'}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="audit-field-card audit-field-card-full">
-                    <span className="audit-field-card-icon">
-                      <FileText size={15} />
-                    </span>
-                    <div className="audit-field-card-body">
-                      <span className="audit-field-card-label">Event Description</span>
-                      <span className="audit-field-card-value">
-                        {selectedLog.description || 'No description provided.'}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </section>
-
-            </div>
-
-            {/*
-              Sticky Footer — the raw JSON payload dump, the "Copy JSON"/"Copy ID" controls and the
-              truncated record GUID were removed: this drawer is read by business users reviewing
-              who did what, and internal identifiers are noise they cannot act on. Everything
-              meaningful is already presented as labelled fields above.
-            */}
-            <div className="audit-drawer-footer">
-              <button
-                type="button"
-                className="audit-footer-close-btn"
-                onClick={() => setDetailsOpen(false)}
+              <DetailSection
+                title="Customer & Record"
+                icon={<Box size={12} />}
+                hidden={
+                  !selectedLog.customerName &&
+                  !selectedLog.customerType &&
+                  !selectedLog.field &&
+                  !selectedLog.description
+                }
               >
-                Close Details
-              </button>
-            </div>
-          </div>
-        </div>
+                <DetailGrid>
+                  <DetailField label="Customer" icon={<User size={15} />}>
+                    {selectedLog.customerName}
+                  </DetailField>
+
+                  <DetailField label="Customer Type" icon={<Layers size={15} />}>
+                    {selectedLog.customerType ? (
+                      <Badge tone="primary">{selectedLog.customerType}</Badge>
+                    ) : null}
+                  </DetailField>
+
+                  <DetailField label="Field Changed" icon={<Target size={15} />}>
+                    {selectedLog.field}
+                  </DetailField>
+
+                  <DetailField label="Description" icon={<FileText size={15} />} full>
+                    {selectedLog.description}
+                  </DetailField>
+                </DetailGrid>
+              </DetailSection>
+            </DetailSections>
+
+        </Drawer>
       )}
     </div>
   );

@@ -9,13 +9,13 @@ export function SkeletonOverviewActivity() {
     <div className={styles.activityItemSkel} aria-hidden="true">
       {/* Dot indicator */}
       <div
-        className={styles.shimmer}
-        style={{ width: 7, height: 7, borderRadius: '50%', flexShrink: 0, marginTop: 5 }}
+        className={`${styles.shimmer} ${styles.soa1}`}
+
       />
       {/* Text */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 5, flex: 1 }}>
-        <div className={[styles.shimmer, styles.text].join(' ')} style={{ width: '75%' }} />
-        <div className={[styles.shimmer, styles.text].join(' ')} style={{ width: '35%' }} />
+      <div className={styles.soa2}>
+        <div className={`${[styles.shimmer, styles.text].join(' ')} ${styles.soa3}`}  />
+        <div className={`${[styles.shimmer, styles.text].join(' ')} ${styles.soa4}`}  />
       </div>
     </div>
   )

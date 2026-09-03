@@ -2,16 +2,13 @@ using AuthService.Application.Exceptions;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.EntityFrameworkCore;
-using Npgsql;
+using Microsoft.Data.SqlClient;
 
 namespace AuthService.Infrastructure;
 
 /// <summary>Maps the small set of domain exceptions Application/Services throws onto the right HTTP status, as ProblemDetails.</summary>
 public class AppExceptionFilter(ILogger<AppExceptionFilter> logger) : IExceptionFilter
 {
-    /// <summary>PostgreSQL SQLSTATE for unique_violation.</summary>
-    private const string UniqueViolation = "23505";
-
     public void OnException(ExceptionContext context)
     {
         var (status, title) = context.Exception switch
@@ -63,8 +60,8 @@ public class AppExceptionFilter(ILogger<AppExceptionFilter> logger) : IException
     private static (int, string) TranslateDbUpdate(DbUpdateException ex)
     {
         // A unique violation is a genuine conflict the caller can act on, so it earns a 409 and a
-        // readable message. Anything else is a server-side fault and must not describe itself.
-        if (ex.InnerException is PostgresException { SqlState: UniqueViolation })
+        // readable message (SQL Server error 2601 / 2627 for duplicate key / unique constraint).
+        if (ex.InnerException is SqlException sqlEx && (sqlEx.Number == 2601 || sqlEx.Number == 2627))
         {
             return (StatusCodes.Status409Conflict,
                 "That value is already in use by another record.");

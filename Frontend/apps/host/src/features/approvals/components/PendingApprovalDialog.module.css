@@ -1,6 +1,6 @@
 .lead {
   margin: 0 0 16px;
-  font-size: 13.5px;
+  font-size: var(--omni-font-size-sm-plus);
   line-height: 1.6;
   color: var(--omni-color-text-primary, #0f172a);
 }
@@ -18,8 +18,8 @@
 }
 
 .detailList dt {
-  font-size: 10.5px;
-  font-weight: 700;
+  font-size: var(--omni-font-size-2xs-plus);
+  font-weight: var(--omni-font-weight-bold);
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--omni-color-text-secondary, #64748b);
@@ -28,15 +28,15 @@
 
 .detailList dd {
   margin: 0;
-  font-size: 13px;
-  font-weight: 600;
+  font-size: var(--omni-font-size-sm);
+  font-weight: var(--omni-font-weight-semibold);
   color: var(--omni-color-text-primary, #0f172a);
   overflow-wrap: anywhere;
 }
 
 .footnote {
   margin: 0;
-  font-size: 12.5px;
+  font-size: var(--omni-font-size-sm-minus);
   line-height: 1.55;
   color: var(--omni-color-text-secondary, #64748b);
 }

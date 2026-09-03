@@ -14,7 +14,6 @@ import { permissionsApi, type PermissionFeatureDto } from '../../shared/api/perm
 import { useSettingsDrawerStore } from '../../shared/stores/settingsDrawerStore'
 import { useClickOutside } from '../../shared/hooks/useClickOutside'
 import { Icon } from '../../shared/components/Icon/Icon'
-import { Switch } from '../../shared/components/Switch/Switch'
 import { SkeletonBlock } from '../../shared/components/Skeleton'
 import { resolveIcon } from '../../shared/components/Icon/resolveIcon'
 import { toast } from '../../shared/stores/toastStore'
@@ -40,6 +39,7 @@ import {
 } from '../../shared/permissions/catalog'
 import styles from './UserFormLayer.module.css'
 import { TOPICS, invalidate } from '../../shared/stores/invalidationStore'
+import { Switch } from '@omniremit/ui'
 
 /*
  * Phone rules come from the shared package so the host, the remotes and (via the widened server
@@ -62,6 +62,7 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
   // Gates which roles this operator may hand out — see filteredRoles.
   const isAdministrator = Boolean(useAuthStore((s) => s.user)?.isAdministrator)
   const popLayer = useSettingsDrawerStore((s) => s.popLayer)
+
   const [currentStep, setCurrentStep] = useState<Step>('basic')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -526,50 +527,50 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
     return (
       <div className={styles.layer}>
         {/* Skeleton Header — mirrors real gradient header */}
-        <div className={styles.header} style={{ pointerEvents: 'none' }}>
+        <div className={`${styles.header} ${styles.ufl1}`} >
           <div className={styles.headerTitleWrap}>
-            <div className={styles.headerIconBox} style={{ opacity: 0.55 }}>
+            <div className={`${styles.headerIconBox} ${styles.ufl2}`} >
               <SkeletonBlock width={22} height={22} radius="6px" />
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <div className={styles.ufl3}>
               <SkeletonBlock width={160} height={16} radius="5px" />
               <SkeletonBlock width={230} height={12} radius="4px" />
             </div>
           </div>
-          <div style={{ width: 34, height: 34, borderRadius: 10, background: 'rgba(255,255,255,0.18)' }} />
+          <div className={styles.ufl4} />
         </div>
 
         {/* Step badges skeleton */}
-        <div style={{ display: 'flex', gap: 8, padding: '14px 24px 0', alignItems: 'center' }}>
+        <div className={styles.ufl5}>
           {[120, 140, 100].map((w, i) => (
             <SkeletonBlock key={i} width={w} height={32} radius="9px" />
           ))}
         </div>
 
         {/* Form card skeleton */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '16px 24px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div className={styles.ufl6}>
           {/* Card 1 — Basic details */}
-          <div style={{ background: '#fff', border: '1px solid #eaecf0', borderRadius: 14, padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div className={styles.ufl7}>
             <SkeletonBlock width={130} height={13} radius="4px" />
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div className={styles.ufl8}>
               {/* Name + Email row */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+              <div className={styles.ufl9}>
+                <div className={styles.ufl10}>
                   <SkeletonBlock width="40%" height={11} radius="3px" />
                   <SkeletonBlock width="100%" height={38} radius="9px" />
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                <div className={styles.ufl10}>
                   <SkeletonBlock width="40%" height={11} radius="3px" />
                   <SkeletonBlock width="100%" height={38} radius="9px" />
                 </div>
               </div>
               {/* Phone + Role row */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+              <div className={styles.ufl9}>
+                <div className={styles.ufl10}>
                   <SkeletonBlock width="40%" height={11} radius="3px" />
                   <SkeletonBlock width="100%" height={38} radius="9px" />
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                <div className={styles.ufl10}>
                   <SkeletonBlock width="35%" height={11} radius="3px" />
                   <SkeletonBlock width="100%" height={38} radius="9px" />
                 </div>
@@ -578,8 +579,8 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
           </div>
 
           {/* Card 2 — Account status */}
-          <div style={{ background: '#fff', border: '1px solid #eaecf0', borderRadius: 14, padding: '18px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+          <div className={styles.ufl11}>
+            <div className={styles.ufl10}>
               <SkeletonBlock width={110} height={13} radius="4px" />
               <SkeletonBlock width={200} height={11} radius="3px" />
             </div>
@@ -588,7 +589,7 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
         </div>
 
         {/* Bottom bar skeleton */}
-        <div className={styles.bottomBar} style={{ pointerEvents: 'none' }}>
+        <div className={`${styles.bottomBar} ${styles.ufl1}`} >
           <SkeletonBlock width={90} height={36} radius="9px" />
           <SkeletonBlock width={100} height={36} radius="9px" />
         </div>
@@ -918,7 +919,7 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
                           <div className={styles.roleTriggerLeft}>
                             {selectedRole ? (
                               <>
-                                <Icon.ShieldCheck width={15} height={15} style={{ color: '#2563eb', flexShrink: 0 }} />
+                                <Icon.ShieldCheck width={15} height={15} className={styles.ufl12} />
                                 <span className={styles.roleTriggerName}>{selectedRole.name}</span>
                                 {selectedRole.isAdministrator && (
                                   <span className={styles.roleTriggerBadge}>Full Admin</span>
@@ -1012,7 +1013,7 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
                       </div>
 
                       {selectedRole?.isAdministrator && (
-                        <div className={styles.adminRoleNotice} style={{ marginTop: '8px' }}>
+                        <div className={`${styles.adminRoleNotice} ${styles.ufl13}`} >
                           <Icon.ShieldCheck width={16} height={16} />
                           <span>This user will have full unrestricted Administrator capabilities across all applications.</span>
                         </div>
@@ -1054,7 +1055,7 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
                    * new capability the role gains later is still covered automatically. Hide the
                    * section entirely and say so plainly instead.
                    */
-                  <div className={styles.adminRoleNotice} style={{ fontSize: '13px', padding: '16px 18px' }}>
+                  <div className={`${styles.adminRoleNotice} ${styles.ufl14}`} >
                     <Icon.ShieldCheck width={20} height={20} />
                     <span>
                       Platform Administrator has full access to all features and applications. Granular
@@ -1378,21 +1379,21 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
                 </div>
 
                 <div className={styles.reviewCard}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #f1f5f9', paddingBottom: '8px' }}>
-                    <h4 className={styles.reviewCardTitle} style={{ borderBottom: 'none', paddingBottom: 0 }}>
+                  <div className={styles.ufl15}>
+                    <h4 className={`${styles.reviewCardTitle} ${styles.ufl16}`} >
                       Effective Capabilities ({selectedPermKeys.size})
                     </h4>
-                    <span style={{ fontSize: '11px', color: '#64748b' }}>
-                      {grantsList.length > 0 && <strong style={{ color: '#059669', marginRight: '8px' }}>+{grantsList.length} Granted</strong>}
-                      {revokesList.length > 0 && <strong style={{ color: '#dc2626' }}>-{revokesList.length} Revoked</strong>}
+                    <span className={styles.ufl17}>
+                      {grantsList.length > 0 && <strong className={styles.ufl18}>+{grantsList.length} Granted</strong>}
+                      {revokesList.length > 0 && <strong className={styles.ufl19}>-{revokesList.length} Revoked</strong>}
                     </span>
                   </div>
 
                   {computedOverrides.length > 0 ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '12px' }}>
+                    <div className={styles.ufl20}>
                       {grantsList.length > 0 && (
                         <div>
-                          <span style={{ fontSize: '11px', fontWeight: 600, color: '#065f46', display: 'block', marginBottom: '6px' }}>
+                          <span className={styles.ufl21}>
                             Extra Granted Overrides ({grantsList.length})
                           </span>
                           <div className={styles.overridesList}>
@@ -1409,7 +1410,7 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
 
                       {revokesList.length > 0 && (
                         <div>
-                          <span style={{ fontSize: '11px', fontWeight: 600, color: '#991b1b', display: 'block', marginBottom: '6px' }}>
+                          <span className={styles.ufl22}>
                             Revoked Role Permissions ({revokesList.length})
                           </span>
                           <div className={styles.overridesList}>
@@ -1425,7 +1426,7 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
                       )}
                     </div>
                   ) : (
-                    <div className={styles.noOverridesCard} style={{ marginTop: '10px' }}>
+                    <div className={`${styles.noOverridesCard} ${styles.ufl23}`} >
                       <Icon.Info width={18} height={18} className={styles.noOverridesIcon} />
                       <p className={styles.noOverridesText}>
                         No custom overrides added. The user will inherit all {rolePermissions.size} permissions dynamically configured under the <strong>{selectedRole ? selectedRole.name : 'assigned role'}</strong>.
