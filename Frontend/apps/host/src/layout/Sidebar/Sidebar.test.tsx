@@ -198,3 +198,19 @@ describe('failure states', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Could not load navigation.')
   })
 })
+
+describe('active state', () => {
+  it('marks only the child as the current page, not its parent too', () => {
+    // A NavLink to /apps/lead matches /apps/lead/view-lead by prefix, so without `end` both rows
+    // claimed aria-current="page" — found while verifying against the real app. Only one row can be
+    // the current page, and announcing two leaves a screen-reader user unable to tell which.
+    renderSidebar(sections(), '/apps/lead/view-lead')
+
+    const current = screen
+      .getAllByRole('link')
+      .filter((a) => a.getAttribute('aria-current') === 'page')
+      .map((a) => a.getAttribute('href'))
+
+    expect(current).toEqual(['/apps/lead/view-lead'])
+  })
+})

@@ -79,7 +79,16 @@ function NavRow({ node, health }: { node: NavNodeDto; health: SidebarProps['heal
       <div className={styles.rowWrap}>
         <NavLink
           to={node.routePath}
-          end={node.routePath === '/'}
+          /*
+           * `end` for any row that has children, not just the dashboard.
+           *
+           * Without it a NavLink to /apps/lead also matches /apps/lead/view-lead, so both the parent
+           * and the child were marked aria-current="page" at once. Only one row can be the current
+           * page, and announcing two leaves a screen-reader user unable to tell which. The parent
+           * still reads as containing the active page because it is expanded and its child is
+           * highlighted.
+           */
+          end={node.routePath === '/' || hasChildren}
           className={({ isActive }) =>
             classNames(navItemClass({ isActive }), node.state !== 'visible' && navItemStyles.navItemLocked)
           }
