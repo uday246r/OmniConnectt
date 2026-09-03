@@ -12,7 +12,7 @@ namespace AuthService.Application.Services;
 public class UserAppService(
     AuthDbContext db, PasswordHasher passwordHasher, AuditLogAppService auditLog,
     IHttpContextAccessor httpContextAccessor, ApprovalGatingService gating,
-    SetPasswordInviteService invites)
+    SetPasswordInviteService invites, FineCapabilityService fineCapabilities)
 {
     private const string ServiceName = "AuthService";
 
@@ -329,6 +329,10 @@ public class UserAppService(
 
         await db.SaveChangesAsync(ct);
 
+        // This edit can move the user to a different role, which changes every capability they inherit
+        // — so it counts even though no permission row was touched here.
+        fineCapabilities.Invalidate(user.Id);
+
         // Bundled from the same submission as the core-field edit — see UpdateUserWithOverridesRequest's
         // doc comment. Applied AFTER the core fields commit, same ordering the ungated path always used
         // when this was two separate calls.
@@ -586,6 +590,10 @@ public class UserAppService(
         }
 
         await db.SaveChangesAsync(ct);
+
+        // This user's overrides changed and nobody else's did, so the targeted eviction is enough.
+        fineCapabilities.Invalidate(userId);
+
         return await LoadOverridesAsync(userId, ct);
     }
 

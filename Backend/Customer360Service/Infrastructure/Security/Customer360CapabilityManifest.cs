@@ -15,6 +15,13 @@ namespace backend.Infrastructure.Security;
 /// someone the customer view while leaving one panel off it, which no endpoint attribute can express
 /// because the panel and the data are the same request.
 /// </para>
+/// <para>
+/// That sameness is why the three panel capabilities are real boundaries: each sits on the endpoint
+/// that serves the panel, so a caller without one gets a 403 rather than a hidden div.
+/// <c>export.csv</c> is not, and should not be read as one — the audit CSV is assembled in the
+/// browser from rows the user already holds under <c>audit:View</c>, so withholding it withholds the
+/// convenience, not the data.
+/// </para>
 /// </remarks>
 public static class Customer360CapabilityManifest
 {

@@ -23,6 +23,16 @@ namespace LeadManagement.Api.Infrastructure.Security;
 /// speculatively: there are no bulk actions below because this app has no bulk selection UI, and a
 /// capability that gates nothing is a checkbox that lies to whoever ticks it.
 /// </para>
+/// <para>
+/// <b>Which of these are security boundaries, and which are not.</b> Every chart and widget, and the
+/// In Progress and Conversion Rate cards, have an endpoint each and are refused server-side by
+/// [RequiresFineCapability]. Total Leads, New Leads and Converted share one response and are redacted
+/// out of it instead — a different mechanism, the same guarantee. <c>export.csv</c> is neither: the
+/// audit CSV is assembled in the browser from rows the user already holds under <c>AuditLog:View</c>,
+/// so withholding the button withholds the convenience, not the data. It is worth granting — an
+/// export is a distinct act and the audit trail records it — but it must not be mistaken for a
+/// control over who can obtain the rows.
+/// </para>
 /// </remarks>
 public static class LeadCapabilityManifest
 {

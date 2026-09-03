@@ -17,10 +17,12 @@ namespace LeadManagement.Api.Models.Dtos
 
     public class KpiSummaryDto
     {
-        public int TotalLeads { get; set; }
-        public int NewLeads { get; set; }
+        // Nullable so a card the caller was not granted can be withheld without claiming it reads zero.
+        // See KpiVisibilityService.
+        public int? TotalLeads { get; set; }
+        public int? NewLeads { get; set; }
         public int? InProgressLeads { get; set; }
-        public int ConvertedLeads { get; set; }
+        public int? ConvertedLeads { get; set; }
         public double? ConversionRate { get; set; }
 
         public List<KpiSparklinePointDto> TotalLeadsTrend { get; set; } = new();
@@ -69,7 +71,7 @@ namespace LeadManagement.Api.Models.Dtos
     {
         public int Rank { get; set; }
         public string Name { get; set; } = string.Empty;
-        public int ConvertedLeads { get; set; }
+        public int? ConvertedLeads { get; set; }
         public double ConversionRate { get; set; }
     }
 }

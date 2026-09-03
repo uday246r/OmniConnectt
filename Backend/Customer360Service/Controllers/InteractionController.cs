@@ -12,6 +12,7 @@ namespace backend.Controllers
     [ApiController]
     [Route("v1/interactions")]
     [RequiresCapability("interactions", "View")]
+    [RequiresFineCapability("profile", "panel.interactions")]
     public class InteractionController : ControllerBase
     {
         private readonly CrmProxyService _crmProxy;

@@ -15,7 +15,19 @@ export interface OmniRemitHostBridge {
   getAccessToken: () => string | null
   /** Same dedup'd refresh-then-return-token flow the host's own pages use before a mutation. Prefer this over getAccessToken() right before an API call, in case the token expired while the remote's UI (e.g. a modal) sat open. */
   ensureFreshAccessToken: () => Promise<string>
-  /** Mirrors authStore's own capability check — administrators always true, everyone else checked against the JWT's cached `perms` claim. No network call. */
+  /**
+   * Mirrors authStore's own capability check. Administrators are always true; everyone else is
+   * checked against the union of the JWT's cached `perms` claim and the fine-grained set the host
+   * fetched at sign-in. No network call either way.
+   *
+   * The two sources are deliberately not distinguished here. A remote asks for
+   * `hasCapability('remote.lead.dashboard', 'kpi.total-leads')` exactly as it asks for
+   * `hasCapability('remote.lead.lead', 'View')`, and the host decides which delivery path answers.
+   * That is what lets a remote declare a hundred widget capabilities without either side changing.
+   *
+   * It resolves what to RENDER. It is not a security boundary — every capability worth withholding
+   * is also enforced by the service that owns the data.
+   */
   hasCapability: (featureKey: string, capability: string) => boolean
   getUser: () => { id: string; name: string; email: string; isAdministrator: boolean } | null
   /** Base URLs so a remote's own API client doesn't have to guess or hardcode the host's environment. */

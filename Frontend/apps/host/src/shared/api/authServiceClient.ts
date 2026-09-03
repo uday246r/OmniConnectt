@@ -75,6 +75,20 @@ export const authServiceClient = {
 
   me: (accessToken: string) => apiFetch<CurrentUserDto>(`${base}/api/auth/me`, { accessToken }),
 
+  /**
+   * The caller's capabilities that are deliberately not in the access token — widgets, charts,
+   * exports, panels.
+   *
+   * They are split off because a token carrying every one of them would grow past what Kestrel and
+   * most proxies accept once each app declares its own; API capabilities, which the authorization
+   * filters read from the claim, stay exactly where they are. This is for rendering only — each of
+   * these is separately enforced server-side.
+   */
+  fineCapabilities: (accessToken: string) =>
+    apiFetch<{ capabilities: string[] }>(`${base}/api/me/capabilities`, { accessToken }).then(
+      (r) => r.capabilities,
+    ),
+
   changePassword: (accessToken: string, body: { currentPassword: string; newPassword: string }) =>
     apiFetch<{ message: string }>(`${base}/api/auth/change-password`, { method: 'POST', accessToken, body }),
 }

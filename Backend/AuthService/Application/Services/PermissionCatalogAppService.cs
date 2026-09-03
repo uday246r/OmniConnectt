@@ -13,7 +13,7 @@ namespace AuthService.Application.Services;
 /// — and their own dynamically-declared capabilities — in sync. See
 /// Controllers/InternalController.cs for the API-key-gated HTTP surface over this.
 /// </summary>
-public class PermissionCatalogAppService(AuthDbContext db, IMemoryCache cache)
+public class PermissionCatalogAppService(AuthDbContext db, IMemoryCache cache, FineCapabilityService fineCapabilities)
 {
     public async Task<IReadOnlyList<PermissionFeatureDto>> GetCatalogAsync(bool activeOnly, CancellationToken ct = default)
     {
@@ -94,6 +94,10 @@ public class PermissionCatalogAppService(AuthDbContext db, IMemoryCache cache)
         // A resynced remote's new pages should appear in the sidebar on the next request, not after
         // the catalog cache happens to expire.
         cache.Remove(NavigationAppService.CatalogCacheKey);
+
+        // A sync can deactivate a capability, which withdraws it from everyone at once. Leaving the
+        // cached sets in place would keep serving a capability the catalog no longer has.
+        fineCapabilities.InvalidateAll();
     }
 
     /// <summary>

@@ -23,6 +23,7 @@ public class StaleGrantReportTests : IDisposable
 {
     private readonly AuthDbContext db;
     private readonly PermissionCatalogAppService catalog;
+    private readonly FineCapabilityService fine;
     private readonly CapturingLogger logger = new();
 
     public StaleGrantReportTests()
@@ -32,7 +33,10 @@ public class StaleGrantReportTests : IDisposable
             .Options;
 
         db = new AuthDbContext(options);
-        catalog = new PermissionCatalogAppService(db, new MemoryCache(new MemoryCacheOptions()));
+
+        var memory = new MemoryCache(new MemoryCacheOptions());
+        fine = new FineCapabilityService(db, memory);
+        catalog = new PermissionCatalogAppService(db, memory, fine);
     }
 
     public void Dispose()

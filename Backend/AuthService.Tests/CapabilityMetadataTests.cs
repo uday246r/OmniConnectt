@@ -18,6 +18,7 @@ public class CapabilityMetadataTests : IDisposable
 {
     private readonly AuthDbContext db;
     private readonly PermissionCatalogAppService catalog;
+    private readonly FineCapabilityService fine;
 
     public CapabilityMetadataTests()
     {
@@ -28,7 +29,10 @@ public class CapabilityMetadataTests : IDisposable
             .Options;
 
         db = new AuthDbContext(options);
-        catalog = new PermissionCatalogAppService(db, new MemoryCache(new MemoryCacheOptions()));
+
+        var memory = new MemoryCache(new MemoryCacheOptions());
+        fine = new FineCapabilityService(db, memory);
+        catalog = new PermissionCatalogAppService(db, memory, fine);
     }
 
     public void Dispose()
@@ -225,6 +229,135 @@ public class CapabilityMetadataTests : IDisposable
         await catalog.DeactivateRemoteAppFeatureAsync("remote.lead");
 
         Assert.Empty((await new PermissionClaimsBuilder(db).BuildAsync(user)).Permissions);
+    }
+
+    // ------------------------------------------------- the other half of the delivery split
+
+    [Fact]
+    public async Task The_fine_grained_set_is_exactly_what_the_token_leaves_out()
+    {
+        // Together these two assertions are the contract: every capability a user holds is delivered
+        // by exactly one path, and neither path drops one. A capability appearing in both would be
+        // harmless but wasteful; one appearing in neither would be a permission granted and never
+        // honoured, which is the failure worth guarding against.
+        var feature = await SyncAsync(
+            Cap("View"),
+            Cap("Export"),
+            Cap("kpi.total-leads", type: "Widget"),
+            Cap("export.csv", type: "Export"));
+
+        var user = await GrantAsync(feature, "View", "Export", "kpi.total-leads", "export.csv");
+
+        var minted = (await new PermissionClaimsBuilder(db).BuildAsync(user)).Permissions;
+        var resolved = await fine.GetForUserAsync(user.Id);
+
+        Assert.Equal(["remote.lead:Export", "remote.lead:View"], minted);
+        Assert.Equal(["remote.lead:export.csv", "remote.lead:kpi.total-leads"], resolved);
+        Assert.Empty(minted.Intersect(resolved));
+    }
+
+    [Fact]
+    public async Task A_capability_the_user_was_never_granted_is_not_in_their_fine_grained_set()
+    {
+        var feature = await SyncAsync(
+            Cap("kpi.total-leads", type: "Widget"),
+            Cap("kpi.conversion-rate", type: "Widget"));
+
+        var user = await GrantAsync(feature, "kpi.total-leads");
+
+        Assert.Equal(["remote.lead:kpi.total-leads"], await fine.GetForUserAsync(user.Id));
+    }
+
+    [Fact]
+    public async Task A_revoke_override_beats_the_role_grant_it_contradicts()
+    {
+        var feature = await SyncAsync(Cap("kpi.total-leads", type: "Widget"));
+        var user = await GrantAsync(feature, "kpi.total-leads");
+
+        db.UserPermissionOverrides.Add(new UserPermissionOverride
+        {
+            Id = Guid.NewGuid(),
+            UserId = user.Id,
+            FeatureId = feature.Id,
+            Capability = "kpi.total-leads",
+            Effect = PermissionEffect.Revoke,
+        });
+        await db.SaveChangesAsync();
+        fine.InvalidateAll();
+
+        Assert.Empty(await fine.GetForUserAsync(user.Id));
+    }
+
+    [Fact]
+    public async Task A_user_with_no_role_still_gets_capabilities_granted_directly_to_them()
+    {
+        // The mirror of a bug already fixed on the JWT path, where "no role" short-circuited before
+        // overrides were read at all. The same shape of mistake here would be just as invisible.
+        var feature = await SyncAsync(Cap("kpi.total-leads", type: "Widget"));
+
+        var user = new User { Id = Guid.NewGuid(), Name = "Roleless", Email = "roleless@example.com" };
+        db.Users.Add(user);
+        db.UserPermissionOverrides.Add(new UserPermissionOverride
+        {
+            Id = Guid.NewGuid(),
+            UserId = user.Id,
+            FeatureId = feature.Id,
+            Capability = "kpi.total-leads",
+            Effect = PermissionEffect.Grant,
+        });
+        await db.SaveChangesAsync();
+
+        Assert.Equal(["remote.lead:kpi.total-leads"], await fine.GetForUserAsync(user.Id));
+    }
+
+    [Fact]
+    public async Task An_administrator_holds_every_fine_grained_capability()
+    {
+        // Unlike the token, which signals this with a flag and an empty list, the browser needs the
+        // set enumerated — it has no administrator flag of its own to branch on.
+        var feature = await SyncAsync(
+            Cap("kpi.total-leads", type: "Widget"),
+            Cap("export.csv", type: "Export"));
+
+        var user = await GrantAsync(feature, administrator: true);
+
+        Assert.Equal(["remote.lead:export.csv", "remote.lead:kpi.total-leads"], await fine.GetForUserAsync(user.Id));
+    }
+
+    [Fact]
+    public async Task A_withdrawn_capability_drops_out_of_the_fine_grained_set_too()
+    {
+        var feature = await SyncAsync(Cap("kpi.total-leads", type: "Widget"), Cap("kpi.old", type: "Widget"));
+        var user = await GrantAsync(feature, "kpi.total-leads", "kpi.old");
+
+        await SyncAsync(Cap("kpi.total-leads", type: "Widget"));
+
+        Assert.Equal(["remote.lead:kpi.total-leads"], await fine.GetForUserAsync(user.Id));
+    }
+
+    [Fact]
+    public async Task The_answer_uses_the_catalogs_spelling_not_the_grants()
+    {
+        // Capability keys are authored by hand in two places and matched case-insensitively, so a
+        // grant can legitimately disagree with the catalog on casing. The browser has no catalog to
+        // normalise against, so it has to be handed one consistent spelling.
+        var feature = await SyncAsync(Cap("kpi.total-leads", type: "Widget"));
+        var user = await GrantAsync(feature, "KPI.Total-Leads");
+
+        Assert.Equal(["remote.lead:kpi.total-leads"], await fine.GetForUserAsync(user.Id));
+    }
+
+    [Fact]
+    public async Task A_deleted_user_holds_nothing()
+    {
+        var feature = await SyncAsync(Cap("kpi.total-leads", type: "Widget"));
+        var user = await GrantAsync(feature, "kpi.total-leads");
+
+        user.IsDeleted = true;
+        await db.SaveChangesAsync();
+        fine.InvalidateAll();
+
+        Assert.Empty(await fine.GetForUserAsync(user.Id));
     }
 
     private async Task<User> GrantAsync(PermissionFeature feature, params string[] capabilities) =>
