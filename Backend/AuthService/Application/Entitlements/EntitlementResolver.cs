@@ -78,10 +78,24 @@ public static class EntitlementResolver
         return EntitlementOutcome.Available;
     }
 
+    /// <summary>
+    /// Features that can never be gated by entitlement, however their rows are set.
+    /// <para>
+    /// The licensing screen is the only way to undo a licensing mistake. If it could be un-licensed
+    /// it would lock the operator out of its own recovery path, leaving a config flag or a manual
+    /// UPDATE as the only way back — a lock whose key is stored inside the lock.
+    /// </para>
+    /// </summary>
+    private static readonly HashSet<string> UngateableFeatureKeys =
+        new(StringComparer.OrdinalIgnoreCase) { "host.settings.licensing" };
+
+    /// <summary>True when this feature is exempt from the entitlement gate entirely.</summary>
+    public static bool IsUngateable(string featureKey) => UngateableFeatureKeys.Contains(featureKey);
+
     /// <summary>Convenience for the authorization filters, which only care whether to let the request through.</summary>
     public static bool IsAllowed(
         string featureKey,
         IReadOnlyDictionary<string, EntitlementEntry> map,
         DateTimeOffset now)
-        => Outcome(Resolve(featureKey, map, now)) == EntitlementOutcome.Available;
+        => IsUngateable(featureKey) || Outcome(Resolve(featureKey, map, now)) == EntitlementOutcome.Available;
 }

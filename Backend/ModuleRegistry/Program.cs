@@ -73,6 +73,9 @@ var probeTimeout = remoteHealthSection.GetValue<TimeSpan?>(nameof(RemoteHealthOp
 
 builder.Services.AddHttpClient<AuthServiceClient>(client => client.Timeout = TimeSpan.FromSeconds(10));
 builder.Services.AddHttpClient<RemoteManifestClient>(client => client.Timeout = probeTimeout);
+// Singleton: it caches the entitlement map across requests, which is the point of it. AddHttpClient
+// above already registers IHttpClientFactory, which the gate resolves per refresh.
+builder.Services.AddSingleton<ModuleRegistry.Infrastructure.Security.EntitlementGate>();
 builder.Services.AddScoped<RemoteAppAppService>();
 // Singleton: the background sweep and the on-demand refresh endpoint must share one set of
 // consecutive-failure counters, or they would disagree about whether an app has failed often enough

@@ -184,3 +184,37 @@ public class EntitlementResolverTests
         Assert.False(EntitlementResolver.IsAllowed("Remote.Lead", map, Now));
     }
 }
+
+/// <summary>
+/// The licensing feature's own exemption. Worth its own fixture because the failure mode is not a
+/// wrong answer but an unrecoverable installation.
+/// </summary>
+public class UngateableFeatureTests
+{
+    private static readonly DateTimeOffset Now = new(2026, 9, 3, 12, 0, 0, TimeSpan.Zero);
+
+    [Fact]
+    public void The_licensing_screen_cannot_be_un_licensed()
+    {
+        // Otherwise switching this row off locks the operator out of the only screen that can switch
+        // it back on, and the only way back is a config flag or a manual UPDATE.
+        var map = new Dictionary<string, EntitlementEntry>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["host.settings.licensing"] = new(
+                "host.settings.licensing",
+                EntitlementStatus.Unlicensed,
+                EntitlementVisibility.Hidden,
+                null, null, null),
+        };
+
+        Assert.True(EntitlementResolver.IsAllowed("host.settings.licensing", map, Now));
+        Assert.True(EntitlementResolver.IsUngateable("host.settings.licensing"));
+    }
+
+    [Fact]
+    public void Ordinary_features_are_not_exempt()
+    {
+        Assert.False(EntitlementResolver.IsUngateable("host.settings.users"));
+        Assert.False(EntitlementResolver.IsUngateable("remote.lead"));
+    }
+}
