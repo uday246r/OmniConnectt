@@ -104,6 +104,8 @@
   /* ---- Sidebar (clean white) ---- */
   --omni-sidebar-bg: #ffffff;
   --omni-sidebar-border: #eaecf0;
+  /* The lighter internal divider between sidebar sections — distinct from the outer border above. */
+  --omni-sidebar-divider: #f1f3f7;
   --omni-sidebar-text: #475569;
   --omni-sidebar-text-active: #1d4ed8;
   --omni-sidebar-text-muted: #94a3b8;

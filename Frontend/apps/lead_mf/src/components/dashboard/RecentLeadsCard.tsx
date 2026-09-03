@@ -3,15 +3,17 @@ import { Eye, ArrowRight, Clock } from '@omniremit/ui/icons';
 import { DataTable, ResponsiveRows, getInitials } from '@omniremit/ui';
 import card from '../../shared/dashboardCard.module.css';
 import { useLeadStore } from '../../store/useLeadStore';
+import { useHostNavigate } from '../../navigation/HostNavigation';
 import styles from './RecentLeadsCard.module.css';
 import { LeadStatusBadge } from '../../shared/LeadStatusBadge';
 export const RecentLeadsCard: React.FC = () => {
-  const { recentLeads, isLoadingDashboard, setActivePage, openDetailsDrawer } = useLeadStore();
+  const { recentLeads, isLoadingDashboard, openDetailsDrawer } = useLeadStore();
+  const navigate = useHostNavigate();
 
   const handleViewAll = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    setActivePage('view-lead');
+    navigate('view-lead');
   };
 
   const handleActionClick = (e: React.MouseEvent, lead: any) => {

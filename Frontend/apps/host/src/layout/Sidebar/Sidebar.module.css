@@ -11,9 +11,9 @@
   height: 100vh;
   position: sticky;
   top: 0;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: var(--omni-font-family);
   background: var(--omni-color-surface);
-  border-right: 1px solid #eaecf0;
+  border-right: 1px solid var(--omni-sidebar-border);
   box-shadow: 1px 0 8px rgba(15, 23, 42, 0.04);
 }
 
@@ -23,7 +23,7 @@
   align-items: center;
   gap: 10px;
   padding: 20px 18px 16px;
-  border-bottom: 1px solid #f1f3f7;
+  border-bottom: 1px solid var(--omni-sidebar-divider);
   flex-shrink: 0;
 }
 
@@ -50,7 +50,7 @@
   text-transform: uppercase;
   color: var(--omni-color-primary-600);
   background: var(--omni-color-primary-50);
-  border: 1px solid #bfdbfe;
+  border: 1px solid var(--omni-color-primary-200);
   padding: 2px 5px;
   border-radius: var(--omni-radius-xs);
   line-height: 1.5;
@@ -65,7 +65,7 @@
   display: flex;
   flex-direction: column;
   scrollbar-width: thin;
-  scrollbar-color: #e2e8f0 transparent;
+  scrollbar-color: var(--omni-color-border) transparent;
 }
 
 .nav::-webkit-scrollbar       { width: 3px; }
@@ -96,7 +96,7 @@
   height: 16px;
   border-radius: var(--omni-radius-circle);
   background: var(--omni-color-danger-500);
-  color: #fff;
+  color: var(--omni-color-text-on-primary);
   font-size: var(--omni-font-size-2xs);
   font-weight: var(--omni-font-weight-bold);
   display: flex;
@@ -123,7 +123,7 @@
   margin: 2px 2px 4px;
   border-radius: var(--omni-radius-md);
   background: var(--omni-color-danger-50);
-  border: 1px solid #fecaca;
+  border: 1px solid var(--omni-color-danger-200);
   color: var(--omni-color-danger-600);
   font-size: var(--omni-font-size-xs);
 }
@@ -132,7 +132,7 @@
 .systemSection {
   margin-top: auto;
   padding-top: 6px;
-  border-top: 1px solid #f1f3f7;
+  border-top: 1px solid var(--omni-sidebar-divider);
 }
 
 /* ── Mobile responsive sidebar ──────────────────────────────── */
@@ -193,4 +193,21 @@
     padding-left: 8px;
     padding-right: 8px;
   }
+}
+
+/*
+ * The link and its chevron sit side by side. The chevron is a sibling of the anchor, not a child of
+ * it: nesting a button inside a link is invalid markup, and it was exactly that nesting — each remote
+ * appending its chevron into the host's own <a> — that forced the old code to intercept row clicks
+ * and re-dispatch them at whatever button it could find.
+ */
+.rowWrap {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.rowWrap > a {
+  flex: 1;
+  min-width: 0;
 }

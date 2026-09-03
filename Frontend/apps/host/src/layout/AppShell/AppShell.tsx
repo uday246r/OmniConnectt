@@ -1,6 +1,6 @@
 import { Suspense, useEffect, useState, useCallback } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
-import { Sidebar, type SidebarAppItem } from '../Sidebar/Sidebar'
+import { Sidebar } from '../Sidebar/Sidebar'
 import { Topbar, type TopbarSettingsAccess } from '../Topbar/Topbar'
 import { useSettingsDrawerStore } from '../../shared/stores/settingsDrawerStore'
 import { lazyWithPreload, preloadWhenIdle } from '../../shared/utils/lazyWithPreload'
@@ -22,16 +22,17 @@ const { Component: SettingsDrawer, preload: preloadSettingsDrawer } = lazyWithPr
 import { ToastContainer } from '../../shared/components/Toast'
 
 export interface AppShellProps {
-  apps?: SidebarAppItem[]
-  appsError?: string | null
+  /**
+   * Reachability per app key, overlaid onto the sidebar. Kept out of the navigation tree on purpose:
+   * the registry rewrites it on a probe interval, so a cached tree would report it wrongly.
+   */
+  appHealth?: Record<string, 'Unknown' | 'Healthy' | 'Unreachable'>
   userName?: string
   settingsAccess?: TopbarSettingsAccess
-  canAccessAuditLogs?: boolean
-  canAccessApprovals?: boolean
   onLogout?: () => void
 }
 
-export function AppShell({ apps, appsError, userName, settingsAccess, canAccessAuditLogs, canAccessApprovals, onLogout }: AppShellProps) {
+export function AppShell({ appHealth, userName, settingsAccess, onLogout }: AppShellProps) {
   // Subscribed so the drawer is only mounted when it is actually open — mounting it unconditionally
   // would resolve the lazy component on first render and negate the split.
   const drawerOpen = useSettingsDrawerStore((s) => s.isOpen)
@@ -75,12 +76,14 @@ export function AppShell({ apps, appsError, userName, settingsAccess, canAccessA
       {/* Global Toast Notification System */}
       <ToastContainer />
 
-      {/* Sidebar — only receives app-list and system-access props; profile is in Topbar */}
+      {/*
+        The sidebar renders itself from the navigation tree — it no longer takes an app list or
+        per-section access flags, because the server already decided both. Health is the one thing
+        still passed in: it changes on a probe interval, so it is deliberately not part of the cached
+        tree and is overlaid here instead.
+      */}
       <Sidebar
-        apps={apps}
-        error={appsError}
-        canAccessAuditLogs={canAccessAuditLogs}
-        canAccessApprovals={canAccessApprovals}
+        health={appHealth}
         mobileOpen={sidebarOpen}
         onMobileClose={closeSidebar}
       />

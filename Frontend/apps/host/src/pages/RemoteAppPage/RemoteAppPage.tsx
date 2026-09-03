@@ -1,31 +1,38 @@
 import { lazy, Suspense, useState, type ComponentType, type LazyExoticComponent } from 'react'
-import { useParams } from 'react-router-dom'
-import type { SidebarAppDto } from '../../shared/api/moduleRegistryClient'
-import { useModuleRegistryStore } from '../../shared/stores/moduleRegistryStore'
+import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import { registerSessionCleanup } from '../../features/auth/store/authStore'
+import { useNavigationStore } from '../../shared/stores/navigationStore'
+import type { NavNodeDto } from '../../shared/api/navigationApi'
 import { loadRemoteAppModule } from '../../shared/federation/remoteLoader'
 import { FederationErrorBoundary } from '../../shared/components/ErrorBoundary/FederationErrorBoundary'
 import { SkeletonBlock } from '../../shared/components/Skeleton'
 import { MaintenancePage } from '../MaintenancePage/MaintenancePage'
 import { NotFoundPage } from '../NotFoundPage/NotFoundPage'
+import { LockedPage } from '../LockedPage/LockedPage'
 import styles from './RemoteAppPage.module.css'
+
+/** The props every remote's exported App accepts. The host is the only caller. */
+interface RemoteAppProps {
+  page?: string
+  onNavigate?: (page: string) => void
+}
 
 // React.lazy() must return the same component reference across renders or it re-suspends forever
 // — cache one lazy-wrapped loader per remote app key for the life of the tab.
-const lazyComponentCache = new Map<string, LazyExoticComponent<ComponentType>>()
+const lazyComponentCache = new Map<string, LazyExoticComponent<ComponentType<RemoteAppProps>>>()
 
 // Module-level and therefore shared across sign-ins. Evict on logout so the next user does not
 // inherit federated components loaded under the previous user's session.
 registerSessionCleanup(() => lazyComponentCache.clear())
 
-function getLazyComponent(app: SidebarAppDto) {
-  let cached = lazyComponentCache.get(app.key)
+function getLazyComponent(appKey: string, manifestUrl: string) {
+  let cached = lazyComponentCache.get(appKey)
   if (!cached) {
     cached = lazy(async () => {
-      const mod = await loadRemoteAppModule(app)
-      return { default: mod.default }
+      const mod = await loadRemoteAppModule({ key: appKey, manifestUrl })
+      return { default: mod.default as ComponentType<RemoteAppProps> }
     })
-    lazyComponentCache.set(app.key, cached)
+    lazyComponentCache.set(appKey, cached)
   }
   return cached
 }
@@ -39,29 +46,66 @@ function LoadingFrame() {
 }
 
 /**
- * Renders a registered remote app by federation key: Active loads it via Module Federation
- * (registerRemotes/loadRemote against its manifest URL, see shared/federation/remoteLoader.ts),
- * Maintenance shows the admin-authored message instead, and a key the registry doesn't recognize
- * (removed, or never existed) falls through to NotFoundPage.
+ * Mounts a remote app, but only after the host has decided the caller may reach it.
+ *
+ * The order matters and is the whole point of this component: every gate runs BEFORE
+ * loadRemoteAppModule is called, so an unlicensed or forbidden app is never fetched over the network
+ * at all. Previously this checked only the registry's status and mounted for any authenticated user,
+ * which meant a remote's bundle was downloadable by typing its URL.
+ *
+ * The navigation tree is the source of truth for access. A node absent from it is one the server
+ * decided this user must not see, so there is nothing to reason about here beyond "is it present,
+ * and in what state".
  */
 export function RemoteAppPage() {
-  const { appKey } = useParams<{ appKey: string }>()
-  const status = useModuleRegistryStore((s) => s.status)
-  const app = useModuleRegistryStore((s) => (appKey ? s.getApp(appKey) : undefined))
+  const { appKey, page } = useParams<{ appKey: string; page?: string }>()
+  const navigate = useNavigate()
+  const status = useNavigationStore((s) => s.status)
+  const node = useNavigationStore((s) => (appKey ? s.findApp(appKey) : undefined))
 
   if (status === 'idle' || status === 'loading') {
     return <LoadingFrame />
   }
 
-  if (!app) {
+  // Absent from the tree: either no such app, or one this user has no access to. Both answer 404,
+  // deliberately — distinguishing them would confirm the existence of apps the caller cannot use.
+  if (!node?.remote) {
     return <NotFoundPage />
   }
 
-  if (app.status === 'Maintenance') {
-    return <MaintenancePage appDisplayName={app.displayName} message={app.maintenanceMessage} />
+  if (node.state === 'locked') {
+    return <LockedPage appDisplayName={node.label} reason={node.lockReason} />
   }
 
-  return <ActiveRemoteApp app={app} />
+  if (node.state === 'maintenance') {
+    return <MaintenancePage appDisplayName={node.label} message={node.maintenanceMessage} />
+  }
+
+  // /apps/lead with no page lands on the first page the caller can actually see, rather than
+  // whichever page the remote happens to default to — which may be one they lack permission for.
+  if (!page && node.remote.defaultRoutePath) {
+    return <Navigate to={node.remote.defaultRoutePath} replace />
+  }
+
+  // A page segment that is not in this app's children is a stale bookmark or a hand-typed guess.
+  if (page && !node.children.some((c) => c.page === page)) {
+    return <NotFoundPage />
+  }
+
+  const child = page ? node.children.find((c) => c.page === page) : undefined
+
+  // A child can be locked while its app is not — a sub-module sold separately.
+  if (child && child.state === 'locked') {
+    return <LockedPage appDisplayName={child.label} reason={child.lockReason} />
+  }
+
+  return (
+    <ActiveRemoteApp
+      node={node}
+      page={page}
+      onNavigate={(target) => navigate(`/apps/${node.remote!.appKey}/${target}`)}
+    />
+  )
 }
 
 /**
@@ -70,21 +114,30 @@ export function RemoteAppPage() {
  * bumping alone wouldn't help if the cache still held the failed lazy wrapper, and evicting alone
  * wouldn't re-render without something changing.
  */
-function ActiveRemoteApp({ app }: { app: SidebarAppDto }) {
+function ActiveRemoteApp({
+  node,
+  page,
+  onNavigate,
+}: {
+  node: NavNodeDto
+  page?: string
+  onNavigate: (page: string) => void
+}) {
   const [attempt, setAttempt] = useState(0)
-  const LazyRemote = getLazyComponent(app)
+  const appKey = node.remote!.appKey
+  const LazyRemote = getLazyComponent(appKey, node.remote!.manifestUrl)
 
   return (
     <FederationErrorBoundary
       key={attempt}
-      appDisplayName={app.displayName}
+      appDisplayName={node.label}
       onRetry={() => {
-        lazyComponentCache.delete(app.key)
+        lazyComponentCache.delete(appKey)
         setAttempt((n) => n + 1)
       }}
     >
       <Suspense fallback={<LoadingFrame />}>
-        <LazyRemote />
+        <LazyRemote page={page} onNavigate={onNavigate} />
       </Suspense>
     </FederationErrorBoundary>
   )

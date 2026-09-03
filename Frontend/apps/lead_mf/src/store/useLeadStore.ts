@@ -51,8 +51,6 @@ export interface FilterRule {
 
 interface LeadStoreState {
   // Navigation
-  activePage: NavigationPage;
-  setActivePage: (page: NavigationPage) => void;
   isSidebarExpanded: boolean;
   toggleSidebar: () => void;
 
@@ -285,18 +283,13 @@ const initialKpiSummary: KpiSummary = {
 };
 
 export const useLeadStore = create<LeadStoreState>((set, get) => ({
-  activePage: 'dashboard',
-  setActivePage: (page) => {
-    set({ activePage: page });
-    if (page === 'view-lead') {
-      get().fetchLeads();
-      void get().fetchCommonFieldConfig();
-    } else if (page === 'dashboard') {
-      get().fetchDashboardData();
-    } else if (page === 'audit-logs') {
-      get().fetchAuditLogs();
-    }
-  },
+  // activePage and setActivePage are gone. The host owns which page is showing — it comes in as a
+  // prop resolved from the URL, so /apps/lead/view-lead is now a real, refresh-safe address instead
+  // of internal state the address bar never reflected.
+  //
+  // setActivePage also dispatched per-page fetches. That is no longer needed: switching pages
+  // unmounts one page component and mounts another, and every page already fetches what it needs in
+  // its own mount effect, so the dispatch was a second copy of the same rule.
   isSidebarExpanded: true,
   toggleSidebar: () => set((state) => ({ isSidebarExpanded: !state.isSidebarExpanded })),
 

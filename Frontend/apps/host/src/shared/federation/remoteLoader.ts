@@ -1,5 +1,4 @@
 import { loadRemote, registerRemotes } from '@module-federation/runtime'
-import type { SidebarAppDto } from '../api/moduleRegistryClient'
 import type { RemoteAppModule } from './types'
 
 // The host's ModuleFederation instance (name: "omniremit_host") is auto-initialized by the
@@ -8,8 +7,18 @@ import type { RemoteAppModule } from './types'
 
 const registeredKeys = new Set<string>()
 
+/**
+ * The minimum a remote needs to be mounted. Narrowed from the registry DTO because the navigation
+ * tree is what supplies these now, and it carries only what mounting actually requires.
+ */
+export interface RemoteAppRef {
+  key: string
+  manifestUrl: string
+  displayName?: string
+}
+
 /** Registers a remote's manifest URL with the runtime at most once per session — safe to call on every navigation. */
-function registerRemoteApp(app: SidebarAppDto) {
+function registerRemoteApp(app: RemoteAppRef) {
   if (registeredKeys.has(app.key)) {
     return
   }
@@ -19,13 +28,13 @@ function registerRemoteApp(app: SidebarAppDto) {
 }
 
 /** Registers (if needed) then loads a remote's exposed ./App module. Only call this for Active apps — Maintenance/Disabled never reach this. */
-export async function loadRemoteAppModule(app: SidebarAppDto): Promise<RemoteAppModule> {
+export async function loadRemoteAppModule(app: RemoteAppRef): Promise<RemoteAppModule> {
   registerRemoteApp(app)
 
   const mod = await loadRemote<RemoteAppModule>(`${app.key}/App`)
   if (!mod?.default) {
     throw new Error(
-      `Failed to load "${app.displayName}". Its manifest may be unreachable, or it doesn't expose "./App" as required.`,
+      `Failed to load "${app.displayName ?? app.key}". Its manifest may be unreachable, or it doesn't expose "./App" as required.`,
     )
   }
 

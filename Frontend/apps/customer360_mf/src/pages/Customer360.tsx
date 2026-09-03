@@ -13,7 +13,7 @@ import ProductDetailsModal from '../components/ProductDetailsModal';
 import DynamicProfileSection, { groupBySection } from '../components/DynamicProfileSection';
 import { useFieldReveal } from '../hooks/useFieldReveal';
 import { Eye, EyeOff, ChevronRight, ChevronDown, SlidersHorizontal, Building2, Layers, User, Briefcase, Globe, Shield, FileText, Calendar, DollarSign, MapPin, Mail, Phone, TrendingUp, Search, RotateCcw, AlertCircle, Loader2 } from '@omniremit/ui/icons';
-import { useNavigationStore } from '../store/navigationStore';
+import { useHostNavigate } from '../navigation/HostNavigation';
 import type {
   IndividualProfile,
   CorporateProfile,
@@ -150,7 +150,7 @@ export default function Customer360() {
     setPageSize
   } = useProductStore();
 
-  const { setActivePage } = useNavigationStore();
+  const navigate = useHostNavigate();
 
   // Adjust tabs based on customerType
   const isIndividual = customerType === 'individual';

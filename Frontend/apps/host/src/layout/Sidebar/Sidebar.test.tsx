@@ -1,0 +1,200 @@
+import { render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { MemoryRouter } from 'react-router-dom'
+import { beforeEach, describe, expect, it } from 'vitest'
+import { Sidebar } from './Sidebar'
+import { useNavigationStore } from '../../shared/stores/navigationStore'
+import type { NavNodeDto, NavSectionDto } from '../../shared/api/navigationApi'
+
+/**
+ * The sidebar renders whatever the server sends and nothing else.
+ *
+ * These tests exist because the previous arrangement had no way to be tested at all: each remote
+ * located the host's anchor by query selector, appended a chevron into it and portalled a hardcoded
+ * submenu beside it, retrying for four seconds. Behaviour that depends on two applications racing
+ * over one DOM node cannot be asserted.
+ */
+
+function node(over: Partial<NavNodeDto> & Pick<NavNodeDto, 'key' | 'label' | 'routePath'>): NavNodeDto {
+  return {
+    iconKey: null,
+    page: null,
+    order: 0,
+    kind: 'host',
+    state: 'visible',
+    lockReason: null,
+    maintenanceMessage: null,
+    remote: null,
+    children: [],
+    ...over,
+  }
+}
+
+const LEAD = node({
+  key: 'remote.lead',
+  label: 'Lead Management',
+  routePath: '/apps/lead',
+  kind: 'remote-app',
+  remote: {
+    appKey: 'lead',
+    manifestUrl: 'http://localhost:5002/mf-manifest.json',
+    containerName: 'lead_mf',
+    defaultRoutePath: '/apps/lead/view-lead',
+  },
+  children: [
+    node({ key: 'remote.lead.lead#view-lead', label: 'View Leads', routePath: '/apps/lead/view-lead', kind: 'submodule', page: 'view-lead' }),
+    node({ key: 'remote.lead.lead#create-lead', label: 'Create Lead', routePath: '/apps/lead/create-lead', kind: 'submodule', page: 'create-lead' }),
+  ],
+})
+
+function sections(items: NavNodeDto[] = [LEAD]): NavSectionDto[] {
+  return [{ key: 'apps', label: 'Apps', order: 20, items }]
+}
+
+function renderSidebar(tree: NavSectionDto[], route = '/') {
+  useNavigationStore.setState({ status: 'loaded', sections: tree, error: null, expanded: new Set() })
+  return render(
+    <MemoryRouter initialEntries={[route]}>
+      <Sidebar />
+    </MemoryRouter>,
+  )
+}
+
+beforeEach(() => {
+  localStorage.clear()
+  useNavigationStore.setState({ status: 'idle', sections: [], error: null, expanded: new Set() })
+})
+
+describe('rendering the server tree', () => {
+  it('renders section labels from the server rather than hardcoded strings', () => {
+    renderSidebar([{ key: 'apps', label: 'Applications', order: 20, items: [LEAD] }])
+
+    expect(screen.getByText('Applications')).toBeInTheDocument()
+  })
+
+  it('renders both rows a single feature owns', async () => {
+    // View Leads and Create Lead are the same remote.lead.lead feature. This is the pair a
+    // one-row-per-module design silently dropped.
+    renderSidebar(sections())
+    await userEvent.click(screen.getByRole('button', { name: /expand lead management/i }))
+
+    expect(screen.getByRole('link', { name: /view leads/i })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /create lead/i })).toBeInTheDocument()
+  })
+
+  it('renders nothing for a node the server omitted', () => {
+    renderSidebar(sections([]))
+
+    expect(screen.queryByText('Lead Management')).not.toBeInTheDocument()
+  })
+})
+
+describe('the chevron, owned by the host', () => {
+  it('is absent when a row has no children', () => {
+    renderSidebar(sections([node({ key: 'host.dashboard', label: 'Dashboard', routePath: '/' })]))
+
+    expect(screen.queryByRole('button', { name: /expand/i })).not.toBeInTheDocument()
+  })
+
+  it('starts collapsed, so children are not in the document', () => {
+    renderSidebar(sections())
+
+    expect(screen.queryByRole('link', { name: /view leads/i })).not.toBeInTheDocument()
+  })
+
+  it('expands and collapses, and reports its state to assistive tech', async () => {
+    renderSidebar(sections())
+    const chevron = screen.getByRole('button', { name: /expand lead management/i })
+
+    expect(chevron).toHaveAttribute('aria-expanded', 'false')
+
+    await userEvent.click(chevron)
+    expect(screen.getByRole('button', { name: /collapse lead management/i })).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByRole('link', { name: /view leads/i })).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: /collapse lead management/i }))
+    expect(screen.queryByRole('link', { name: /view leads/i })).not.toBeInTheDocument()
+  })
+
+  it('is a separate control from the link, so expanding does not navigate', async () => {
+    // The old implementation appended the chevron INSIDE the anchor and had to intercept and
+    // re-dispatch clicks. Keeping them siblings is what makes both independently reachable.
+    renderSidebar(sections())
+    const chevron = screen.getByRole('button', { name: /expand lead management/i })
+
+    expect(chevron.closest('a')).toBeNull()
+  })
+
+  it('expands the group containing the current route on load', () => {
+    // A refresh onto a sub-page must not show it collapsed and apparently missing.
+    renderSidebar(sections(), '/apps/lead/view-lead')
+
+    expect(screen.getByRole('link', { name: /view leads/i })).toBeInTheDocument()
+  })
+
+  it('persists which groups were open, so a reload restores them', async () => {
+    const { unmount } = renderSidebar(sections())
+    await userEvent.click(screen.getByRole('button', { name: /expand lead management/i }))
+    unmount()
+
+    // The store rehydrates from localStorage on creation, so asserting on what was written is what
+    // actually proves a reload would restore it — re-rendering here would only re-read the store
+    // that is already in memory.
+    expect(JSON.parse(localStorage.getItem('omni.sidebar.expanded')!)).toContain('remote.lead')
+  })
+
+  it('renders expanded when the store already has the group open', () => {
+    useNavigationStore.setState({
+      status: 'loaded',
+      sections: sections(),
+      error: null,
+      expanded: new Set(['remote.lead']),
+    })
+    render(
+      <MemoryRouter>
+        <Sidebar />
+      </MemoryRouter>,
+    )
+
+    expect(screen.getByRole('link', { name: /view leads/i })).toBeInTheDocument()
+  })
+})
+
+describe('locked and maintenance states', () => {
+  it('marks a locked row and surfaces the reason', () => {
+    renderSidebar(sections([{ ...LEAD, state: 'locked', lockReason: 'Not in your plan.' }]))
+
+    expect(screen.getByRole('link', { name: /lead management/i })).toHaveAttribute('title', 'Not in your plan.')
+  })
+
+  it('marks a row under maintenance with its message', () => {
+    renderSidebar(sections([{ ...LEAD, state: 'maintenance', maintenanceMessage: 'Back at 09:00.' }]))
+
+    expect(screen.getByRole('link', { name: /lead management/i })).toHaveAttribute('title', 'Back at 09:00.')
+  })
+
+  it('badges an unreachable app from the health overlay, not the tree', () => {
+    useNavigationStore.setState({ status: 'loaded', sections: sections(), error: null, expanded: new Set() })
+    render(
+      <MemoryRouter>
+        <Sidebar health={{ lead: 'Unreachable' }} />
+      </MemoryRouter>,
+    )
+
+    const row = screen.getByRole('link', { name: /lead management/i })
+    expect(within(row).getByTitle('App server not responding')).toBeInTheDocument()
+  })
+})
+
+describe('failure states', () => {
+  it('shows the error rather than an empty sidebar', () => {
+    useNavigationStore.setState({ status: 'error', sections: [], error: 'Could not load navigation.', expanded: new Set() })
+    render(
+      <MemoryRouter>
+        <Sidebar />
+      </MemoryRouter>,
+    )
+
+    expect(screen.getByRole('status')).toHaveTextContent('Could not load navigation.')
+  })
+})

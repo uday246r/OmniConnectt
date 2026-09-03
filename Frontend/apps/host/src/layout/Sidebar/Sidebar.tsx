@@ -1,27 +1,19 @@
-import { NavLink } from 'react-router-dom'
+import { useEffect } from 'react'
+import { NavLink, useLocation } from 'react-router-dom'
 import { classNames } from '../../shared/utils/classNames'
 import { SkeletonBlock } from '../../shared/components/Skeleton'
 import { Icon } from '../../shared/components/Icon/Icon'
 import { resolveIcon } from '../../shared/components/Icon/resolveIcon'
 import { BrandMark } from '../../shared/components/BrandMark/BrandMark'
 import { navItemStyles } from '@omniremit/ui'
+import { useNavigationStore } from '../../shared/stores/navigationStore'
+import type { NavNodeDto } from '../../shared/api/navigationApi'
 import styles from './Sidebar.module.css'
 import { APP_NAME } from '../../shared/config/branding'
 
-export interface SidebarAppItem {
-  key: string
-  displayName: string
-  iconKey?: string | null
-  health?: 'Unknown' | 'Healthy' | 'Unreachable'
-}
-
 export interface SidebarProps {
-  apps?: SidebarAppItem[]
-  canAccessAuditLogs?: boolean
-  canAccessApprovals?: boolean
-  error?: string | null
-  userName?: string
-  onLogout?: () => void
+  /** Health per app key, overlaid from the registry. Not part of the navigation tree — see below. */
+  health?: Record<string, 'Unknown' | 'Healthy' | 'Unreachable'>
   /** Mobile: whether the sidebar is slid in over the content */
   mobileOpen?: boolean
   /** Mobile: called when the user taps the backdrop or a close trigger */
@@ -29,45 +21,149 @@ export interface SidebarProps {
 }
 
 /*
- * Row classes come from @omniremit/ui so the host's own nav rows and the sub-navigation rows the
- * remotes portal into this very sidebar are the same stylesheet rather than two copies that had
- * drifted on padding, gap, radius and font-size. The markup stays a NavLink — the chevron/portal
- * coordination documented below depends on it.
+ * The host renders the entire sidebar from GET /api/navigation, and owns every part of it: the rows,
+ * the chevrons, the expand/collapse state and the active state.
+ *
+ * What this replaces is worth remembering. Each remote used to locate the host's own <a href="/apps/…">
+ * by query selector, appendChild a hand-built chevron button with an inline SVG onto it, create a
+ * sibling div and portal its sub-menu into that — retrying every 150ms for four seconds until the
+ * host element appeared. The host cooperated by hardcoding '.lead-sidebar-chevron-btn,
+ * .c360-sidebar-chevron-btn' and synthesising clicks on whatever matched. Two applications wrote into
+ * one element, each remote kept its own copy of the expand state, and their submenu items were
+ * hardcoded arrays with a `visible` boolean for permissions.
+ *
+ * Now: the server decides what exists and who may see it, and this component renders exactly that.
  */
+
 function navItemClass({ isActive }: { isActive: boolean }) {
   return classNames(navItemStyles.navItem, isActive && navItemStyles.navItemActive)
 }
 
-// Each remote with an expandable sub-menu (Customer 360, Lead Management) injects its own chevron
-// toggle button as a DOM child of this NavLink — see HostSidebarCustomer360Nav.tsx /
-// HostSidebarLeadNav.tsx, which portal their sub-nav in and `appendChild` the chevron directly onto
-// the anchor found by this same href. The host has no direct handle on that button or the remote's
-// expand/collapse state, so "click anywhere on the row toggles it" is done by finding whichever
-// chevron is present at click time (it can mount up to ~4s after the remote loads, hence a live
-// query rather than a cached ref) and forwarding the click to it — a real click event, not touching
-// the remote's internal state directly.
-//
-// This only ever fires for clicks that DIDN'T land on the chevron itself: the chevron's own onclick
-// calls stopPropagation() in the bubble phase, which stops this row-level onClick (registered via
-// React's root-level delegated listener) from also running — so clicking the chevron toggles once,
-// not twice.
-const SUB_NAV_CHEVRON_SELECTOR = '.c360-sidebar-chevron-btn, .lead-sidebar-chevron-btn'
-
-function forwardClickToChevron(e: React.MouseEvent<HTMLAnchorElement>) {
-  const chevron = e.currentTarget.querySelector<HTMLButtonElement>(SUB_NAV_CHEVRON_SELECTOR)
-  if (chevron) {
-    e.preventDefault()
-    chevron.click()
-  }
-  // No chevron found (app has no sub-menu, or the remote hasn't mounted its chevron yet) — let the
-  // NavLink navigate normally.
+/** Health is deliberately not part of the tree — it changes on a probe interval, so it is overlaid here. */
+function unreachableBadge(node: NavNodeDto, health: SidebarProps['health']) {
+  const appKey = node.remote?.appKey
+  if (!appKey || health?.[appKey] !== 'Unreachable') return null
+  return (
+    <span className={styles.unreachableBadge} title="App server not responding">!</span>
+  )
 }
 
-export function Sidebar({ apps, canAccessAuditLogs, canAccessApprovals, error, mobileOpen }: SidebarProps) {
+function StateBadge({ node }: { node: NavNodeDto }) {
+  if (node.state === 'locked') {
+    return (
+      <span className={navItemStyles.navItemBadge} title={node.lockReason ?? 'Not included in your plan'}>
+        <Icon.Lock width={13} height={13} />
+      </span>
+    )
+  }
+  if (node.state === 'maintenance') {
+    return (
+      <span className={navItemStyles.navItemBadge} title={node.maintenanceMessage ?? 'Under maintenance'}>
+        <Icon.AlertTriangle width={13} height={13} />
+      </span>
+    )
+  }
+  return null
+}
+
+function NavRow({ node, health }: { node: NavNodeDto; health: SidebarProps['health'] }) {
+  const expanded = useNavigationStore((s) => s.expanded)
+  const toggleExpanded = useNavigationStore((s) => s.toggleExpanded)
+
+  const hasChildren = node.children.length > 0
+  const isOpen = expanded.has(node.key)
+  const NodeIcon = resolveIcon(node.iconKey)
+
+  return (
+    <>
+      <div className={styles.rowWrap}>
+        <NavLink
+          to={node.routePath}
+          end={node.routePath === '/'}
+          className={({ isActive }) =>
+            classNames(navItemClass({ isActive }), node.state !== 'visible' && navItemStyles.navItemLocked)
+          }
+          title={node.lockReason ?? node.maintenanceMessage ?? undefined}
+        >
+          <span className={navItemStyles.navIcon} aria-hidden="true">
+            <NodeIcon width={17} height={17} />
+          </span>
+          <span className={navItemStyles.navLabel}>{node.label}</span>
+          {unreachableBadge(node, health)}
+          <StateBadge node={node} />
+        </NavLink>
+
+        {/*
+          A real button, outside the link rather than appended inside it. Keeping it a sibling is what
+          makes "expand" and "navigate" two distinct, independently keyboard-reachable actions —
+          nesting an interactive control inside an anchor is invalid, and was the reason the old code
+          had to intercept clicks and re-dispatch them.
+        */}
+        {hasChildren && (
+          <button
+            type="button"
+            className={classNames(navItemStyles.navChevron, isOpen && navItemStyles.navChevronOpen)}
+            aria-expanded={isOpen}
+            aria-label={`${isOpen ? 'Collapse' : 'Expand'} ${node.label}`}
+            onClick={() => toggleExpanded(node.key)}
+          >
+            <Icon.ChevronRight width={14} height={14} />
+          </button>
+        )}
+      </div>
+
+      {hasChildren && isOpen && (
+        <div className={navItemStyles.navChildren}>
+          {node.children.map((child) => {
+            const ChildIcon = resolveIcon(child.iconKey)
+            return (
+              <NavLink
+                key={child.key}
+                to={child.routePath}
+                className={({ isActive }) =>
+                  classNames(
+                    navItemClass({ isActive }),
+                    navItemStyles.navChildItem,
+                    child.state !== 'visible' && navItemStyles.navItemLocked,
+                  )
+                }
+                title={child.lockReason ?? child.maintenanceMessage ?? undefined}
+              >
+                <span className={navItemStyles.navIcon} aria-hidden="true">
+                  <ChildIcon width={15} height={15} />
+                </span>
+                <span className={navItemStyles.navLabel}>{child.label}</span>
+                <StateBadge node={child} />
+              </NavLink>
+            )
+          })}
+        </div>
+      )}
+    </>
+  )
+}
+
+export function Sidebar({ health, mobileOpen }: SidebarProps) {
+  const status = useNavigationStore((s) => s.status)
+  const sections = useNavigationStore((s) => s.sections)
+  const error = useNavigationStore((s) => s.error)
+  const setExpanded = useNavigationStore((s) => s.setExpanded)
+  const location = useLocation()
+
+  // Open the group containing the current route, so a refresh onto /apps/lead/view-lead shows that
+  // row highlighted inside an expanded parent rather than collapsed and apparently absent.
+  useEffect(() => {
+    for (const section of sections) {
+      for (const item of section.items) {
+        if (item.children.some((c) => location.pathname.startsWith(c.routePath))) {
+          setExpanded(item.key, true)
+        }
+      }
+    }
+  }, [location.pathname, sections, setExpanded])
+
   return (
     <aside className={classNames(styles.sidebar, mobileOpen ? styles.sidebarMobileOpen : '')}>
-
-      {/* ── Brand ─────────────────────────────────────────── */}
       <div className={styles.brand}>
         <BrandMark size={34} />
         <div className={styles.brandNames}>
@@ -79,111 +175,27 @@ export function Sidebar({ apps, canAccessAuditLogs, canAccessApprovals, error, m
         </div>
       </div>
 
-      {/* ── Navigation — everything lives inside here ─────── */}
       <nav className={styles.nav} aria-label="Primary">
-
-        {/* Dashboard */}
-        <div className={styles.sectionLabel}>Main</div>
-        <NavLink to="/" end className={navItemClass}>
-          <span className={navItemStyles.navIcon} aria-hidden="true">
-            <Icon.Home width={17} height={17} />
-          </span>
-          <span className={navItemStyles.navLabel}>Dashboard</span>
-        </NavLink>
-
-        {/* Apps section — remote apps inject entries here */}
-        <div className={styles.sectionLabel}>Apps</div>
-
-        {/* Loading */}
-        {apps === undefined &&
-          Array.from({ length: 3 }, (_, i) => (
+        {status === 'loading' &&
+          sections.length === 0 &&
+          Array.from({ length: 5 }, (_, i) => (
             <div className={styles.skeletonItem} key={i}>
               <SkeletonBlock height={34} />
             </div>
           ))}
 
-        {/* Error */}
-        {error && (
-          <div className={styles.errorState} role="status">{error}</div>
-        )}
+        {error && <div className={styles.errorState} role="status">{error}</div>}
 
-        {/* Empty */}
-        {!error && apps?.length === 0 && (
-          <div className={styles.emptyState}>No apps registered yet.</div>
-        )}
-
-        {/* App links */}
-        {apps?.map((app) => {
-          const isUnreachable = app.health === 'Unreachable'
-          // The registry stores an icon per app; every entry was rendered with the same Users icon, so
-          // a Helpdesk and an Inventory app were visually identical in the nav.
-          const AppIcon = resolveIcon(app.iconKey)
-          return (
-            <NavLink
-              key={app.key}
-              to={`/apps/${app.key}`}
-              className={({ isActive }) =>
-                classNames(navItemClass({ isActive }), isUnreachable && styles.navItemUnreachable)
-              }
-              title={isUnreachable ? `${app.displayName} is not responding` : undefined}
-              onClick={forwardClickToChevron}
-            >
-              <span className={navItemStyles.navIcon} aria-hidden="true">
-                <AppIcon width={17} height={17} />
-              </span>
-              <span className={navItemStyles.navLabel}>{app.displayName}</span>
-              {isUnreachable && (
-                <span className={styles.unreachableBadge} title="App server not responding">!</span>
-              )}
-            </NavLink>
-          )
-        })}
-
-        {/* ── System section — pushed to bottom of nav with margin-top: auto
-            so it sits right below the apps list, never floats to the bottom
-            of 100vh creating a giant empty gap ─────────────────────────── */}
-        {/* "My Requests" is shown to every authenticated user — it tracks their own submitted
-            requests regardless of whether they hold Approval Center or Audit Log access, since
-            approvalsApi.listMine is scoped to the caller's own id server-side. */}
-        <div className={styles.systemSection}>
-          <div className={styles.sectionLabel}>System</div>
-          {canAccessApprovals && (
-            <NavLink to="/system/approvals" className={navItemClass}>
-              <span className={navItemStyles.navIcon} aria-hidden="true">
-                <Icon.UserCheck width={17} height={17} />
-              </span>
-              <span className={navItemStyles.navLabel}>Approval Center</span>
-            </NavLink>
-          )}
-          {/*
-            Shown to everyone, administrators included.
-
-            This was previously hidden from administrators on the grounds that they never create
-            approval requests. That is only true of SUPER administrators: UsersController passes
-            `bypassApproval: IsSuperAdmin()`, so any other administrator is an ordinary maker whose
-            gated mutations queue like anybody else's. Hiding the page left them with no way to
-            collect the temporary password for an account they had just created — the button exists
-            only on this page. An empty page for the few who genuinely never make requests is a far
-            smaller cost than an unreachable credential.
-          */}
-          <NavLink to="/my-requests" className={navItemClass}>
-            <span className={navItemStyles.navIcon} aria-hidden="true">
-              <Icon.Clock width={17} height={17} />
-            </span>
-            <span className={navItemStyles.navLabel}>My Requests</span>
-          </NavLink>
-          {canAccessAuditLogs && (
-            <NavLink to="/system/audit-logs" className={navItemClass}>
-              <span className={navItemStyles.navIcon} aria-hidden="true">
-                <Icon.FileText width={17} height={17} />
-              </span>
-              <span className={navItemStyles.navLabel}>Audit Logs</span>
-            </NavLink>
-          )}
-        </div>
-
+        {sections.map((section) => (
+          <div key={section.key} className={section.key === 'system' ? styles.systemSection : undefined}>
+            {/* Section labels come from the server too — the host no longer hardcodes "Main"/"Apps". */}
+            <div className={styles.sectionLabel}>{section.label}</div>
+            {section.items.map((item) => (
+              <NavRow key={item.key} node={item} health={health} />
+            ))}
+          </div>
+        ))}
       </nav>
-
     </aside>
   )
 }

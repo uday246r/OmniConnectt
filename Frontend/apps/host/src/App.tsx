@@ -7,6 +7,7 @@ import { RequirePasswordChange } from './features/auth/components/RequirePasswor
 import { useSilentRefresh } from './features/auth/hooks/useSilentRefresh'
 import { useAuthStore } from './features/auth/store/authStore'
 import { useModuleRegistryStore } from './shared/stores/moduleRegistryStore'
+import { useNavigationStore } from './shared/stores/navigationStore'
 import { useSettingsDrawerStore, type SettingsTab } from './shared/stores/settingsDrawerStore'
 import { RouteFallback } from './shared/components/RouteFallback/RouteFallback'
 import { LoginPage } from './pages/LoginPage/LoginPage'
@@ -172,8 +173,21 @@ function AuthenticatedShell() {
 
   const registryStatus = useModuleRegistryStore((s) => s.status)
   const registryApps = useModuleRegistryStore((s) => s.apps)
-  const registryError = useModuleRegistryStore((s) => s.error)
   const fetchForSidebar = useModuleRegistryStore((s) => s.fetchForSidebar)
+
+  // The sidebar is now rendered entirely from this tree. Same one-shot-on-idle discipline as the
+  // registry fetch below it, and for the same reason.
+  const navStatus = useNavigationStore((s) => s.status)
+  const fetchNavigation = useNavigationStore((s) => s.fetch)
+
+  useEffect(() => {
+    if (!accessToken || navStatus !== 'idle') return
+    void ensureFreshAccessToken()
+      .then((token) => fetchNavigation(token))
+      .catch(() => {
+        // ensureFreshAccessToken already routes to /login via authStore on failure
+      })
+  }, [accessToken, navStatus, ensureFreshAccessToken, fetchNavigation])
 
   useEffect(() => {
     if (!accessToken) return
@@ -241,17 +255,19 @@ function AuthenticatedShell() {
     roles: isAdministrator || hasCapability(FEATURE_KEYS.roles, 'View'),
     applications: isAdministrator || hasCapability(FEATURE_KEYS.applications, 'View'),
   }
-  const canAccessAuditLogs = isAdministrator || hasCapability(FEATURE_KEYS.auditLogs, 'View')
-  const canAccessApprovals = isAdministrator || hasCapability(FEATURE_KEYS.approvals, 'View')
+  // canAccessAuditLogs / canAccessApprovals are gone: the sidebar no longer takes per-section access
+  // flags from the client, because the navigation tree already applied those same permissions
+  // server-side. Deciding visibility twice, in two languages, is how the two drift apart.
+
+  // Health is keyed by app for the sidebar's "not responding" badge. It stays a separate feed from
+  // the navigation tree because the registry rewrites it on a probe interval.
+  const appHealth = Object.fromEntries(registryApps.map((a) => [a.key, a.health]))
 
   return (
     <AppShell
-      apps={registryStatus === 'idle' || registryStatus === 'loading' ? undefined : registryApps}
-      appsError={registryError}
+      appHealth={appHealth}
       userName={user?.name}
       settingsAccess={settingsAccess}
-      canAccessAuditLogs={canAccessAuditLogs}
-      canAccessApprovals={canAccessApprovals}
       onLogout={() => {
         void logout().then(() => navigate('/login', { replace: true }))
       }}
@@ -347,7 +363,13 @@ function AppRoutes() {
         <Route element={<AuthenticatedPagesLayout />}>
           <Route index element={<DashboardPage />} />
           <Route path="profile" element={<ProfilePage />} />
+          {/*
+            Two routes, one component. /apps/lead resolves to the first page the caller can see;
+            /apps/lead/view-lead is a real address that survives a refresh and can be linked or
+            bookmarked. Neither hardcodes a page name — the segments come from the navigation tree.
+          */}
           <Route path="apps/:appKey" element={<RemoteAppPage />} />
+          <Route path="apps/:appKey/:page" element={<RemoteAppPage />} />
 
           <Route
             path="system/audit-logs"

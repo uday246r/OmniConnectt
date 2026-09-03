@@ -107,3 +107,78 @@
     white-space: nowrap;
   }
 }
+
+/*
+ * ── Host-owned sidebar structure ──────────────────────────────────────────────
+ *
+ * These classes exist because the host now renders the entire sidebar, including each remote's
+ * sub-pages. Previously every remote appended its own hand-built chevron <button> — with inline
+ * styles and an inline SVG — as a DOM child of the host's anchor, and portalled its rows in beside
+ * it. Two apps writing into one element produced two chevrons that never quite matched.
+ */
+
+/* The chevron. A real button so it is focusable and announces its state. */
+.navChevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  margin-left: auto;
+  flex-shrink: 0;
+  border: none;
+  border-radius: var(--omni-radius-xs);
+  background: transparent;
+  color: var(--omni-color-text-muted);
+  cursor: pointer;
+  padding: 0;
+  transition: background var(--omni-transition-fast), color var(--omni-transition-fast), transform var(--omni-transition-fast);
+}
+
+.navChevron:hover {
+  background: var(--omni-color-surface-alt);
+  color: var(--omni-color-text-primary);
+}
+
+.navChevron:focus-visible {
+  outline: 2px solid var(--omni-color-primary-600);
+  outline-offset: 1px;
+}
+
+/* Rotation carries the open/closed state; the icon itself never changes. */
+.navChevronOpen {
+  transform: rotate(90deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .navChevron { transition: none; }
+}
+
+/* The nested rows under an expanded app. Indented and rule-lined so the hierarchy reads at a glance. */
+.navChildren {
+  display: flex;
+  flex-direction: column;
+  margin: 2px 0 4px 0;
+  padding-left: 12px;
+  border-left: 1px solid var(--omni-color-border);
+  margin-left: 16px;
+}
+
+.navChildItem {
+  font-size: var(--omni-font-size-sm);
+  padding: 6px 10px;
+}
+
+/* Locked and maintenance rows stay legible but visibly not-current. */
+.navItemLocked,
+.navItemLocked:hover {
+  color: var(--omni-color-text-muted);
+}
+
+.navItemBadge {
+  display: inline-flex;
+  align-items: center;
+  margin-left: auto;
+  flex-shrink: 0;
+  color: var(--omni-color-text-muted);
+}

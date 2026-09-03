@@ -3,6 +3,7 @@ import { Layers, UserPlus, Sparkles } from '@omniremit/ui/icons';
 import { Button, PageHeader } from '@omniremit/ui';
 import { TimeRangeFilterDropdown } from './TimeRangeFilterDropdown';
 import { useLeadStore } from '../../store/useLeadStore';
+import { useHostNavigate } from '../../navigation/HostNavigation';
 import { canCreateLead } from '../../api/hostBridge';
 
 /**
@@ -15,7 +16,7 @@ import { canCreateLead } from '../../api/hostBridge';
  * breakpoint by hand — PageHeader carries that breakpoint itself.
  */
 export const DashboardHeader: React.FC = () => {
-  const { setActivePage } = useLeadStore();
+  const navigate = useHostNavigate();
   const userCanCreate = canCreateLead();
 
   return (
@@ -34,7 +35,7 @@ export const DashboardHeader: React.FC = () => {
             <Button
               type="button"
               variant="onHeader"
-              onClick={() => setActivePage('create-lead')}
+              onClick={() => navigate('create-lead')}
               leadingIcon={<UserPlus size={15} />}
             >
               Create New Lead
