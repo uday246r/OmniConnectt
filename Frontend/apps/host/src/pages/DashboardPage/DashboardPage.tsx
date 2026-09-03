@@ -4,7 +4,7 @@ import { useAuthStore } from '../../features/auth/store/authStore'
 import { remoteAppsApi, type RemoteAppDto } from '../../features/settings-applications/api/remoteAppsApi'
 import { auditLogsApi, type AuditLogDto } from '../../features/system-audit-logs/api/auditLogsApi'
 import { dashboardApi, type DashboardStatsDto, type HealthEntryDto } from '../../features/dashboard/api/dashboardApi'
-import { ApiError } from '../../shared/api/httpClient'
+import { ApiError, isAbortError } from '../../shared/api/httpClient'
 import { SkeletonStatCard, SkeletonDashboardWidget, SkeletonAuditRow, SkeletonDonutChart } from '../../shared/components/Skeleton'
 import { Icon } from '../../shared/components/Icon/Icon'
 import styles from './DashboardPage.module.css'
@@ -152,12 +152,27 @@ export function DashboardPage() {
           setError(null)
         }
       } catch (err) {
+        /*
+         * An aborted request is not a failed one, and must leave every piece of state alone.
+         *
+         * This effect cancels its request whenever it is superseded — StrictMode's double-invoke in
+         * development, and any change of token or dataRevision in production. Treating that
+         * cancellation like a network error made the dashboard accuse itself of being broken on an
+         * ordinary page load: the banner read "Could not load dashboard metrics", every card showed
+         * 0, and System Status sat on "Checking", until the run that replaced this one happened to
+         * finish and clear it. The zeroes were the initial state, never overwritten.
+         *
+         * Returning here also skips setLoading(false) below, which matters just as much: the newer
+         * request is still in flight, so dropping the skeleton would expose those same zeroes as
+         * though they were real figures.
+         */
+        if (isAbortError(err)) return
         // Surfaced instead of console-only: the page otherwise rendered zeroes, which reads as "the
         // platform has no users" rather than "the request failed".
         setError(err instanceof ApiError ? err.message : 'Could not load dashboard metrics.')
-      } finally {
-        setLoading(false)
       }
+
+      setLoading(false)
     }
 
     await loadDashboardData()
