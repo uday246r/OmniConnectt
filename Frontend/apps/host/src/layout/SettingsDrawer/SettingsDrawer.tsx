@@ -7,7 +7,6 @@ import { SettingsUsersTab } from './SettingsUsersTab'
 import { SettingsRolesTab } from './SettingsRolesTab'
 import { SettingsApplicationsTab } from './SettingsApplicationsTab'
 import { SettingsCheckerAssignmentTab } from './SettingsCheckerAssignmentTab'
-import { SettingsLicensingTab } from './SettingsLicensingTab'
 import { RoleFormLayer } from './RoleFormLayer'
 import { UserFormLayer } from './UserFormLayer'
 import { ApplicationFormLayer } from './ApplicationFormLayer'
@@ -39,8 +38,6 @@ export function SettingsDrawer() {
   // separate, further-narrowed capability) is what actually lets them add/remove assignments, see
   // SettingsCheckerAssignmentTab's own canManage check.
   const canAccessCheckerAssignment = isAdministrator || hasCapability('host.system.checker-assignment', 'View')
-  // View gates the tab; SettingsLicensingTab checks Manage itself before allowing edits.
-  const canAccessLicensing = isAdministrator || hasCapability('host.settings.licensing', 'View')
 
   // ESC key to close or pop layer
   useEffect(() => {
@@ -145,16 +142,6 @@ export function SettingsDrawer() {
                   <span>Checker Assignment</span>
                 </button>
               )}
-              {canAccessLicensing && (
-                <button
-                  type="button"
-                  className={`${styles.tabBtn} ${activeTab === 'licensing' ? styles.tabBtnActive : ''}`}
-                  onClick={() => goToTab('licensing')}
-                >
-                  <Icon.Key width={16} height={16} />
-                  <span>Licensing</span>
-                </button>
-              )}
             </div>
 
             {/* Tab Body */}
@@ -163,7 +150,6 @@ export function SettingsDrawer() {
               {activeTab === 'roles' && <SettingsRolesTab />}
               {activeTab === 'applications' && <SettingsApplicationsTab />}
               {activeTab === 'checker-assignment' && canAccessCheckerAssignment && <SettingsCheckerAssignmentTab />}
-              {activeTab === 'licensing' && canAccessLicensing && <SettingsLicensingTab />}
             </div>
           </div>
         )}

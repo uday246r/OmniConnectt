@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-export type SettingsTab = 'users' | 'roles' | 'applications' | 'departments' | 'general' | 'checker-assignment' | 'licensing'
+export type SettingsTab = 'users' | 'roles' | 'applications' | 'departments' | 'general' | 'checker-assignment'
 
 export type DrawerLayer =
   | { type: 'root'; tab?: SettingsTab }

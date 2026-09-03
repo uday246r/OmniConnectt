@@ -31,7 +31,6 @@ function node(over: Partial<NavNodeDto> & Pick<NavNodeDto, 'key' | 'label' | 'ro
     order: 0,
     kind: 'host',
     state: 'visible',
-    lockReason: null,
     maintenanceMessage: null,
     remote: null,
     children: [],
@@ -56,7 +55,7 @@ const LEAD = node({
 })
 
 function sections(items: NavNodeDto[]): NavSectionDto[] {
-  return [{ key: 'apps', label: 'Apps', order: 20, items }]
+  return [{ key: 'apps', label: 'Apps', order: 20, pinToBottom: false, items }]
 }
 
 function renderAt(route: string, tree: NavNodeDto[]) {
@@ -77,13 +76,6 @@ beforeEach(() => {
 })
 
 describe('access is checked before the remote loads', () => {
-  it('never fetches the bundle for a locked app', async () => {
-    renderAt('/apps/lead/view-lead', [{ ...LEAD, state: 'locked', lockReason: 'Not in your plan.' }])
-
-    expect(await screen.findByText(/not included in your plan/i)).toBeInTheDocument()
-    expect(loadRemoteAppModule).not.toHaveBeenCalled()
-  })
-
   it('never fetches the bundle for an app the tree omitted', async () => {
     // Absent from the tree means either no such app or no access. Both answer 404 — distinguishing
     // them would confirm the existence of apps the caller cannot use.
@@ -97,18 +89,6 @@ describe('access is checked before the remote loads', () => {
     renderAt('/apps/lead', [{ ...LEAD, state: 'maintenance', maintenanceMessage: 'Back at 09:00.' }])
 
     expect(await screen.findByText(/under maintenance/i)).toBeInTheDocument()
-    expect(loadRemoteAppModule).not.toHaveBeenCalled()
-  })
-
-  it('never fetches the bundle for a locked sub-page of an unlocked app', async () => {
-    // A module can be sold separately from the app containing it.
-    const locked = {
-      ...LEAD,
-      children: [{ ...LEAD.children[0], state: 'locked' as const, lockReason: 'Add-on.' }],
-    }
-    renderAt('/apps/lead/view-lead', [locked])
-
-    expect(await screen.findByText(/not included in your plan/i)).toBeInTheDocument()
     expect(loadRemoteAppModule).not.toHaveBeenCalled()
   })
 

@@ -16,9 +16,10 @@ public class AuthDbContext(DbContextOptions<AuthDbContext> options) : DbContext(
     public DbSet<ApprovalRequest> ApprovalRequests => Set<ApprovalRequest>();
     public DbSet<CheckerAssignment> CheckerAssignments => Set<CheckerAssignment>();
     public DbSet<SetPasswordInvite> SetPasswordInvites => Set<SetPasswordInvite>();
-    public DbSet<ModuleEntitlement> ModuleEntitlements => Set<ModuleEntitlement>();
     public DbSet<FeatureNavItem> FeatureNavItems => Set<FeatureNavItem>();
     public DbSet<RemoteAppNavMetadata> RemoteAppNavMetadata => Set<RemoteAppNavMetadata>();
+    public DbSet<NavSection> NavSections => Set<NavSection>();
+    public DbSet<HostNavItem> HostNavItems => Set<HostNavItem>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -83,34 +84,6 @@ public class AuthDbContext(DbContextOptions<AuthDbContext> options) : DbContext(
             entity.Property(f => f.Source).HasConversion<string>().HasMaxLength(20);
         });
 
-        modelBuilder.Entity<ModuleEntitlement>(entity =>
-        {
-            // One platform-default row per feature, and later one row per (feature, company).
-            //
-            // SQL Server allows only a single NULL per unique index, so this one index enforces
-            // "exactly one default row per feature" on its own. Under Postgres — which this schema
-            // was originally written for — NULLs compare distinct and this would have needed a
-            // filtered index instead, the way User.Email and the approval indexes still do.
-            // HasFilter(null) is load-bearing, not tidying. EF's SQL Server convention adds
-            // "WHERE [CompanyId] IS NOT NULL" to any unique index over a nullable column, which would
-            // exempt exactly the rows this index exists to constrain and allow two platform-default
-            // rows for one feature. Unfiltered, SQL Server treats NULLs as equal for uniqueness and
-            // permits only one — which is the invariant we want.
-            entity.HasIndex(e => new { e.FeatureId, e.CompanyId }).IsUnique().HasFilter(null);
-
-            // Restrict, matching RolePermission: features are soft-deactivated via IsActive and
-            // never deleted, so a cascade here would only ever fire on a mistake.
-            entity.HasOne(e => e.Feature)
-                .WithMany()
-                .HasForeignKey(e => e.FeatureId)
-                .OnDelete(DeleteBehavior.Restrict);
-
-            entity.Property(e => e.Status).HasConversion<string>().HasMaxLength(20);
-            entity.Property(e => e.Visibility).HasConversion<string>().HasMaxLength(20);
-            entity.Property(e => e.PlanTier).HasMaxLength(50);
-            entity.Property(e => e.LockReason).HasMaxLength(500);
-        });
-
         modelBuilder.Entity<FeatureNavItem>(entity =>
         {
             entity.HasIndex(n => new { n.FeatureId, n.NavKey }).IsUnique();
@@ -146,6 +119,38 @@ public class AuthDbContext(DbContextOptions<AuthDbContext> options) : DbContext(
             entity.Property(m => m.ContainerName).HasMaxLength(200);
             entity.Property(m => m.Status).HasMaxLength(20);
             entity.Property(m => m.MaintenanceMessage).HasMaxLength(2000);
+        });
+
+        modelBuilder.Entity<NavSection>(entity =>
+        {
+            // The key IS the identity — sections are referenced by name from HostNavItem and from the
+            // tree builder, so a surrogate id would only add a lookup.
+            entity.HasKey(s => s.Key);
+            entity.Property(s => s.Key).HasMaxLength(50);
+            entity.Property(s => s.Label).HasMaxLength(100);
+        });
+
+        modelBuilder.Entity<HostNavItem>(entity =>
+        {
+            entity.HasIndex(h => h.Key).IsUnique();
+
+            entity.HasOne(h => h.Section)
+                .WithMany()
+                .HasForeignKey(h => h.SectionKey)
+                // Restrict: removing a section that still has rows should fail loudly rather than
+                // silently deleting navigation.
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.Property(h => h.Key).HasMaxLength(100);
+            entity.Property(h => h.Label).HasMaxLength(200);
+            entity.Property(h => h.IconKey).HasMaxLength(100);
+            entity.Property(h => h.RoutePath).HasMaxLength(400);
+            entity.Property(h => h.SectionKey).HasMaxLength(50);
+
+            // Deliberately a plain string, not a foreign key to PermissionFeature: it is nullable for
+            // ungated rows, and features are keyed by a string the seeder owns anyway.
+            entity.Property(h => h.RequiredFeatureKey).HasMaxLength(200);
+            entity.Property(h => h.RequiredCapability).HasMaxLength(50);
         });
 
         modelBuilder.Entity<PermissionFeatureCapability>(entity =>

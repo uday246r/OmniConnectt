@@ -49,13 +49,6 @@ function unreachableBadge(node: NavNodeDto, health: SidebarProps['health']) {
 }
 
 function StateBadge({ node }: { node: NavNodeDto }) {
-  if (node.state === 'locked') {
-    return (
-      <span className={navItemStyles.navItemBadge} title={node.lockReason ?? 'Not included in your plan'}>
-        <Icon.Lock width={13} height={13} />
-      </span>
-    )
-  }
   if (node.state === 'maintenance') {
     return (
       <span className={navItemStyles.navItemBadge} title={node.maintenanceMessage ?? 'Under maintenance'}>
@@ -92,7 +85,7 @@ function NavRow({ node, health }: { node: NavNodeDto; health: SidebarProps['heal
           className={({ isActive }) =>
             classNames(navItemClass({ isActive }), node.state !== 'visible' && navItemStyles.navItemLocked)
           }
-          title={node.lockReason ?? node.maintenanceMessage ?? undefined}
+          title={node.maintenanceMessage ?? undefined}
         >
           <span className={navItemStyles.navIcon} aria-hidden="true">
             <NodeIcon width={17} height={17} />
@@ -136,7 +129,7 @@ function NavRow({ node, health }: { node: NavNodeDto; health: SidebarProps['heal
                     child.state !== 'visible' && navItemStyles.navItemLocked,
                   )
                 }
-                title={child.lockReason ?? child.maintenanceMessage ?? undefined}
+                title={child.maintenanceMessage ?? undefined}
               >
                 <span className={navItemStyles.navIcon} aria-hidden="true">
                   <ChildIcon width={15} height={15} />
@@ -196,7 +189,7 @@ export function Sidebar({ health, mobileOpen }: SidebarProps) {
         {error && <div className={styles.errorState} role="status">{error}</div>}
 
         {sections.map((section) => (
-          <div key={section.key} className={section.key === 'system' ? styles.systemSection : undefined}>
+          <div key={section.key} className={section.pinToBottom ? styles.systemSection : undefined}>
             {/* Section labels come from the server too — the host no longer hardcodes "Main"/"Apps". */}
             <div className={styles.sectionLabel}>{section.label}</div>
             {section.items.map((item) => (

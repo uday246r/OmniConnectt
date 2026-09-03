@@ -87,9 +87,6 @@ builder.Services.AddHttpContextAccessor();
 // Explicit timeout: a gating check now sits in the hot path of every Field Settings mutation, so an
 // unbounded default (100s) would hang the request instead of just delaying a best-effort audit push.
 builder.Services.AddHttpClient<AuthServiceClient>(client => client.Timeout = TimeSpan.FromSeconds(10));
-// Singleton: it caches the entitlement map across requests, which is the point of it. AddHttpClient
-// above already registers IHttpClientFactory, which the gate resolves per refresh.
-builder.Services.AddSingleton<backend.Infrastructure.Security.EntitlementGate>();
 
 // ---------------------------------------------------------------------------
 // CORS Policy

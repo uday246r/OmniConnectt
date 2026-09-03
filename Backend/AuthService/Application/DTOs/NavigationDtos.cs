@@ -11,10 +11,16 @@ public record NavigationResponseDto(
     IReadOnlyList<NavSectionDto> Sections);
 
 /// <summary>
-/// A labelled group of rows. Sections exist so the host stops hardcoding "Main", "Apps" and "System"
-/// as literals in its sidebar component.
+/// A labelled group of rows. Sections come from the database, so the host hardcodes neither their
+/// labels nor their keys.
 /// </summary>
-public record NavSectionDto(string Key, string Label, int Order, IReadOnlyList<NavNodeDto> Items);
+public record NavSectionDto(
+    string Key,
+    string Label,
+    int Order,
+    /// <summary>Pins the section to the bottom of the sidebar, so the frontend need not know any section by name.</summary>
+    bool PinToBottom,
+    IReadOnlyList<NavNodeDto> Items);
 
 /// <summary>One row. Children are its sub-pages; the host renders the chevron when there are any.</summary>
 public record NavNodeDto(
@@ -31,12 +37,11 @@ public record NavNodeDto(
     /// <summary>"host" | "remote-app" | "submodule".</summary>
     string Kind,
     /// <summary>
-    /// "visible" | "locked" | "maintenance". There is deliberately no "hidden" or "forbidden": a row
-    /// the caller must not see is absent from the array entirely, because emitting it would ship the
-    /// whole product's module list to every browser.
+    /// "visible" | "maintenance". There is deliberately no "forbidden" or "hidden": a row the caller
+    /// must not see is absent from the array entirely, because emitting it would ship the whole
+    /// product's module list to every browser.
     /// </summary>
     string State,
-    string? LockReason,
     string? MaintenanceMessage,
     /// <summary>Present only for a remote-app row — everything the host needs to mount the container.</summary>
     RemoteMountDto? Remote,
@@ -47,5 +52,5 @@ public record RemoteMountDto(
     string AppKey,
     string ManifestUrl,
     string? ContainerName,
-    /// <summary>Where /apps/{key} should land — the first visible child, so the app root is never a blank page.</summary>
+    /// <summary>Where /apps/{key} should land — the first row the caller can actually see.</summary>
     string? DefaultRoutePath);

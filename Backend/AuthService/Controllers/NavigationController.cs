@@ -49,7 +49,7 @@ public class NavigationController(NavigationAppService navigation) : ControllerB
         var tree = await navigation.GetAsync(permissions, isAdministrator, ct);
 
         // The version hashes the rendered tree, so a 304 is only ever served against the same user's
-        // same sidebar. Revalidate rather than blind-cache: licensing can change under a live token.
+        // same sidebar. Revalidate rather than blind-cache: a resync can change the tree under a live token.
         var etag = $"\"{tree.Version}\"";
         Response.Headers.ETag = etag;
         Response.Headers.CacheControl = "private, no-cache";

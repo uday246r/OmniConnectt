@@ -27,7 +27,6 @@ public static class AuthDbSeeder
         public const string SystemAuditLogs = "host.system.audit-logs";
         public const string SystemApprovals = "host.system.approvals";
         public const string SystemCheckerAssignment = "host.system.checker-assignment";
-        public const string SettingsLicensing = "host.settings.licensing";
     }
 
     private static readonly string[] StandardCrud = ["View", "Create", "Edit", "Delete"];
@@ -51,7 +50,6 @@ public static class AuthDbSeeder
     // checkers are.
     private static readonly string[] ApprovalsCapabilities = ["View", "Approve"];
     private static readonly string[] CheckerAssignmentCapabilities = ["View", "Manage"];
-    private static readonly string[] LicensingCapabilities = ["View", "Manage"];
 
     /// <summary>Pre-rename feature key. Its absence is the marker that legacy data migrations are already done.</summary>
     private const string LegacyMaintenanceFeatureKey = "host.settings.maintenance";
@@ -83,51 +81,63 @@ public static class AuthDbSeeder
         var features = await SeedHostFeaturesAsync(db, ct);
         var roles = await SeedRolesAsync(db, features, ct);
         await SeedSuperAdminUserAsync(db, roles, logger, ct);
-        await SeedDefaultEntitlementsAsync(db, logger, ct);
+        await SeedNavigationAsync(db, logger, ct);
+        await LegacyFeatureCleanup.RunAsync(db, logger, ct);
     }
 
     /// <summary>
-    /// Gives every feature an explicit Licensed entitlement row if it has none.
+    /// Seeds the sidebar's sections and the host's own rows.
     /// <para>
-    /// The resolver already treats a missing row as licensed, so this is not what keeps the product
-    /// working — it is what gives the Licensing admin screen something to edit. Without it the screen
-    /// would open on an empty list for an installation that predates the table, and switching a module
-    /// off would mean creating a row through a UI that had nothing to show.
+    /// These used to be a static C# list, which meant renaming a heading or reordering the sidebar
+    /// required redeploying this service. They are data now: the navigation endpoint reads them, and
+    /// the browser renders whatever it is given.
     /// </para>
     /// <para>
-    /// Anti-join rather than load-all-then-filter, and it only ever inserts, so the cost on a warm
-    /// boot is one query returning nothing. Features registered later by the Module Registry get
-    /// their row at creation time in PermissionCatalogAppService instead of waiting for a restart.
+    /// Insert-only, keyed on what already exists, so an operator who has since renamed a label or
+    /// moved a row keeps their change across restarts. There is deliberately no "Setup" section: those
+    /// five screens live behind the Topbar gear, and duplicating them in the sidebar meant one
+    /// destination reachable two ways.
     /// </para>
     /// </summary>
-    private static async Task SeedDefaultEntitlementsAsync(AuthDbContext db, ILogger logger, CancellationToken ct)
+    private static async Task SeedNavigationAsync(AuthDbContext db, ILogger logger, CancellationToken ct)
     {
-        var unlicensedFeatureIds = await db.PermissionFeatures
-            .Where(f => !db.ModuleEntitlements.Any(e => e.FeatureId == f.Id && e.CompanyId == null))
-            .Select(f => f.Id)
-            .ToListAsync(ct);
-
-        if (unlicensedFeatureIds.Count == 0)
+        var seedSections = new[]
         {
-            return;
+            new NavSection { Key = "main", Label = "Main", SortOrder = 10, PinToBottom = false },
+            new NavSection { Key = "apps", Label = "Apps", SortOrder = 20, PinToBottom = false },
+            // Pinned so it sits below the apps list rather than floating at the bottom of the viewport.
+            new NavSection { Key = "system", Label = "System", SortOrder = 30, PinToBottom = true },
+        };
+
+        var existingSections = await db.NavSections.Select(s => s.Key).ToListAsync(ct);
+        var newSections = seedSections.Where(s => !existingSections.Contains(s.Key)).ToList();
+        if (newSections.Count > 0)
+        {
+            db.NavSections.AddRange(newSections);
+            await db.SaveChangesAsync(ct);
         }
 
-        var now = DateTimeOffset.UtcNow;
-        db.ModuleEntitlements.AddRange(unlicensedFeatureIds.Select(featureId => new ModuleEntitlement
+        var seedItems = new[]
         {
-            Id = Guid.NewGuid(),
-            FeatureId = featureId,
-            CompanyId = null,
-            Status = EntitlementStatus.Licensed,
-            Visibility = EntitlementVisibility.Normal,
-            PlanTier = "Included",
-            CreatedAt = now,
-            UpdatedAt = now,
-        }));
+            new HostNavItem { Id = Guid.NewGuid(), Key = "host.dashboard", Label = "Dashboard", IconKey = "Home", RoutePath = "/", SectionKey = "main", SortOrder = 10, RequiredFeatureKey = HostFeatureKeys.Dashboard, RequiredCapability = "View" },
+            new HostNavItem { Id = Guid.NewGuid(), Key = "host.system.approvals", Label = "Approval Center", IconKey = "UserCheck", RoutePath = "/system/approvals", SectionKey = "system", SortOrder = 10, RequiredFeatureKey = HostFeatureKeys.SystemApprovals, RequiredCapability = "View" },
+            // Ungated on purpose: it shows only the caller's own requests, scoped server-side, so
+            // gating it would hide the page from exactly the people it exists for.
+            new HostNavItem { Id = Guid.NewGuid(), Key = "host.my-requests", Label = "My Requests", IconKey = "Clock", RoutePath = "/my-requests", SectionKey = "system", SortOrder = 20, RequiredFeatureKey = null, RequiredCapability = null },
+            new HostNavItem { Id = Guid.NewGuid(), Key = "host.system.audit-logs", Label = "Audit Logs", IconKey = "FileText", RoutePath = "/system/audit-logs", SectionKey = "system", SortOrder = 30, RequiredFeatureKey = HostFeatureKeys.SystemAuditLogs, RequiredCapability = "View" },
+        };
 
-        await db.SaveChangesAsync(ct);
-        logger.LogInformation("Seeded {Count} default (Licensed) module entitlements.", unlicensedFeatureIds.Count);
+        var existingItems = await db.HostNavItems.Select(h => h.Key).ToListAsync(ct);
+        var newItems = seedItems.Where(h => !existingItems.Contains(h.Key)).ToList();
+        if (newItems.Count > 0)
+        {
+            db.HostNavItems.AddRange(newItems);
+            await db.SaveChangesAsync(ct);
+            logger.LogInformation("Seeded {Sections} navigation section(s) and {Items} host nav row(s).", newSections.Count, newItems.Count);
+        }
     }
+
+
 
     private static async Task RenameLegacyFeatureKeyAsync(AuthDbContext db, string oldKey, string newKey, string newDisplayName, CancellationToken ct)
     {
@@ -209,7 +219,6 @@ public static class AuthDbSeeder
             new { Key = HostFeatureKeys.SystemAuditLogs, DisplayName = "System — Audit Logs", SortOrder = 40, Capabilities = AuditLogsCapabilities },
             new { Key = HostFeatureKeys.SystemApprovals, DisplayName = "System — Approval Center", SortOrder = 50, Capabilities = ApprovalsCapabilities },
             new { Key = HostFeatureKeys.SystemCheckerAssignment, DisplayName = "System — Checker Assignment", SortOrder = 60, Capabilities = CheckerAssignmentCapabilities },
-            new { Key = HostFeatureKeys.SettingsLicensing, DisplayName = "Setup — Licensing", SortOrder = 35, Capabilities = LicensingCapabilities },
         };
 
         var existing = await db.PermissionFeatures.Include(f => f.Capabilities).ToDictionaryAsync(f => f.Key, ct);
@@ -302,9 +311,6 @@ public static class AuthDbSeeder
                 // Manage stays Super-Admin-only, per "only users with Manage Checker Assignment
                 // permission" — Admin can see who's assigned but not reassign checkers.
                 [HostFeatureKeys.SystemCheckerAssignment] = ["View"],
-                // Same split as Checker Assignment: Admin can see what the plan covers, but changing
-                // what the customer is licensed for stays with Super Admin.
-                [HostFeatureKeys.SettingsLicensing] = ["View"],
             }),
             ("Manager", "Runs campaigns, contacts and boards day to day.", false, new()
             {
@@ -327,7 +333,6 @@ public static class AuthDbSeeder
                 [HostFeatureKeys.SystemAuditLogs] = ["View"],
                 [HostFeatureKeys.SystemApprovals] = ["View"],
                 [HostFeatureKeys.SystemCheckerAssignment] = ["View"],
-                [HostFeatureKeys.SettingsLicensing] = ["View"],
             }),
         };
 

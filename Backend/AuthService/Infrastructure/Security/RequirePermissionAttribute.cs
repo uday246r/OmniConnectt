@@ -1,5 +1,3 @@
-using AuthService.Application.Entitlements;
-using AuthService.Application.Services;
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
@@ -30,7 +28,7 @@ namespace AuthService.Infrastructure.Security;
 [AttributeUsage(AttributeTargets.Method | AttributeTargets.Class)]
 public class RequirePermissionAttribute(string featureKey, string capability) : Attribute, IAsyncAuthorizationFilter
 {
-    public async Task OnAuthorizationAsync(AuthorizationFilterContext context)
+    public Task OnAuthorizationAsync(AuthorizationFilterContext context)
     {
         var user = context.HttpContext.User;
 
@@ -40,26 +38,13 @@ public class RequirePermissionAttribute(string featureKey, string capability) : 
         if (user.Identity?.IsAuthenticated != true)
         {
             context.Result = new UnauthorizedResult();
-            return;
-        }
-
-        // Entitlement runs BEFORE the administrator bypass, and that is intentional despite
-        // contradicting the invariant asserted in PermissionClaimsBuilder that an administrator holds
-        // every capability forever. Permission and licensing answer different questions: a Super Admin
-        // is the most privileged USER, which says nothing about whether the deployment bought the
-        // module. A licence a Super Admin can switch off by being a Super Admin is not a licence.
-        //
-        // Entitlements:Enforce exists so a developer running locally, or an operator recovering from a
-        // bad licensing state, can turn the whole gate off deliberately rather than by editing rows.
-        if (!await IsEntitledAsync(context, featureKey))
-        {
-            return;
+            return Task.CompletedTask;
         }
 
         var isAdministrator = user.FindFirst(JwtTokenService.AdministratorClaimType)?.Value == "true";
         if (isAdministrator)
         {
-            return;
+            return Task.CompletedTask;
         }
 
         string[] permissions;
@@ -87,40 +72,7 @@ public class RequirePermissionAttribute(string featureKey, string capability) : 
             })
             { StatusCode = StatusCodes.Status403Forbidden };
         }
-    }
 
-    /// <summary>
-    /// True when the feature is licensed, or when enforcement is switched off. Sets the refusal on
-    /// <paramref name="context"/> and returns false otherwise, so the caller can simply return.
-    /// </summary>
-    private static async Task<bool> IsEntitledAsync(AuthorizationFilterContext context, string featureKey)
-    {
-        var services = context.HttpContext.RequestServices;
-
-        if (EntitlementResolver.IsUngateable(featureKey))
-        {
-            return true;
-        }
-
-        var config = services.GetRequiredService<IConfiguration>();
-        if (!config.GetValue("Entitlements:Enforce", true))
-        {
-            return true;
-        }
-
-        var snapshot = services.GetRequiredService<EntitlementSnapshotProvider>();
-        var map = await snapshot.GetAsync(context.HttpContext.RequestAborted);
-        var entry = EntitlementResolver.Resolve(featureKey, map, DateTimeOffset.UtcNow);
-
-        // Hidden is refused exactly like Locked. Hiding a module from the navigation tree is
-        // presentation; it is not what stops a request, and a caller who types the URL anyway must
-        // still be turned away.
-        if (EntitlementResolver.Outcome(entry) == EntitlementOutcome.Available)
-        {
-            return true;
-        }
-
-        context.Result = EntitlementRefusal.Result(featureKey, entry.LockReason);
-        return false;
+        return Task.CompletedTask;
     }
 }

@@ -31,36 +31,16 @@ public class RequiresCapabilityAttribute : Attribute, IAsyncAuthorizationFilter
     /// </summary>
     public string RequiredPermission => $"{FeatureKey}.{Module.ToLowerInvariant()}:{Capability}";
 
-    public async Task OnAuthorizationAsync(AuthorizationFilterContext context)
+    public Task OnAuthorizationAsync(AuthorizationFilterContext context)
     {
         var user = context.HttpContext.User;
 
         if (user.Identity?.IsAuthenticated != true)
         {
             context.Result = new UnauthorizedResult();
-            return;
+            return Task.CompletedTask;
         }
 
-        // Licensing, checked BEFORE the administrator bypass below.
-        //
-        // Permission and entitlement answer different questions: a Super Admin is the most privileged
-        // USER, which says nothing about whether the deployment bought this module. A licence a Super
-        // Admin can switch off by being a Super Admin is not a licence.
-        //
-        // Asking about the submodule alone is enough: the gate walks ancestors, so an unlicensed
-        // remote.lead blocks remote.lead.dashboard without the app key being passed separately. A
-        // submodule that holds its own row wins over its parent, which is deliberate — it is how one
-        // page can be sold apart from the module containing it.
-        var gate = context.HttpContext.RequestServices.GetRequiredService<EntitlementGate>();
-        var ct = context.HttpContext.RequestAborted;
-
-        var submoduleKey = $"{FeatureKey}.{Module.ToLowerInvariant()}";
-        var (allowed, lockReason) = await gate.IsAllowedAsync(submoduleKey, ct);
-        if (!allowed)
-        {
-            context.Result = NotEntitled(submoduleKey, lockReason);
-            return;
-        }
 
         /*
          * Administrator bypass — ONE claim, checked exactly, matching EmployeeService, AuthService and
@@ -76,7 +56,7 @@ public class RequiresCapabilityAttribute : Attribute, IAsyncAuthorizationFilter
          */
         if (user.FindFirst(JwtClaimTypes.Administrator)?.Value == "true")
         {
-            return;
+            return Task.CompletedTask;
         }
 
         string[] permissions;
@@ -126,24 +106,7 @@ public class RequiresCapabilityAttribute : Attribute, IAsyncAuthorizationFilter
             })
             { StatusCode = StatusCodes.Status403Forbidden };
         }
-    }
 
-    /// <summary>
-    /// The refusal for an unlicensed module. A distinct problem <c>type</c> is what lets the host tell
-    /// "your plan does not include this" from "your role does not allow this" and render an upsell
-    /// rather than a permission error — on the wire the two are otherwise identical.
-    /// </summary>
-    private static ObjectResult NotEntitled(string featureKey, string? lockReason)
-    {
-        var problem = new ProblemDetails
-        {
-            Title = "This module is not included in your plan.",
-            Type = "https://omniremit.dev/errors/not-entitled",
-            Status = StatusCodes.Status403Forbidden,
-        };
-        problem.Extensions["featureKey"] = featureKey;
-        problem.Extensions["reason"] = lockReason;
-
-        return new ObjectResult(problem) { StatusCode = StatusCodes.Status403Forbidden };
+        return Task.CompletedTask;
     }
 }

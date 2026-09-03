@@ -26,8 +26,7 @@ export interface NavNodeDto {
    * There is deliberately no "hidden" or "forbidden": a row the caller must not see is absent from
    * the response entirely, because sending it would ship the product's module list to every browser.
    */
-  state: 'visible' | 'locked' | 'maintenance'
-  lockReason: string | null
+  state: 'visible' | 'maintenance'
   maintenanceMessage: string | null
   remote: RemoteMountDto | null
   /** Always present, never null, so nothing here has to branch on it. */
@@ -46,6 +45,8 @@ export interface NavSectionDto {
   key: string
   label: string
   order: number
+  /** Pins the section to the bottom. A flag, so the browser never has to know a section by name. */
+  pinToBottom: boolean
   items: NavNodeDto[]
 }
 

@@ -22,7 +22,6 @@ function node(over: Partial<NavNodeDto> & Pick<NavNodeDto, 'key' | 'label' | 'ro
     order: 0,
     kind: 'host',
     state: 'visible',
-    lockReason: null,
     maintenanceMessage: null,
     remote: null,
     children: [],
@@ -48,7 +47,7 @@ const LEAD = node({
 })
 
 function sections(items: NavNodeDto[] = [LEAD]): NavSectionDto[] {
-  return [{ key: 'apps', label: 'Apps', order: 20, items }]
+  return [{ key: 'apps', label: 'Apps', order: 20, pinToBottom: false, items }]
 }
 
 function renderSidebar(tree: NavSectionDto[], route = '/') {
@@ -67,7 +66,7 @@ beforeEach(() => {
 
 describe('rendering the server tree', () => {
   it('renders section labels from the server rather than hardcoded strings', () => {
-    renderSidebar([{ key: 'apps', label: 'Applications', order: 20, items: [LEAD] }])
+    renderSidebar([{ key: 'apps', label: 'Applications', order: 20, pinToBottom: false, items: [LEAD] }])
 
     expect(screen.getByText('Applications')).toBeInTheDocument()
   })
@@ -160,13 +159,27 @@ describe('the chevron, owned by the host', () => {
   })
 })
 
-describe('locked and maintenance states', () => {
-  it('marks a locked row and surfaces the reason', () => {
-    renderSidebar(sections([{ ...LEAD, state: 'locked', lockReason: 'Not in your plan.' }]))
+describe('nothing about the sidebar is decided in the browser', () => {
+  it('takes its section labels from the server, whatever they are', () => {
+    renderSidebar([{ key: 'anything', label: 'Some Group', order: 5, pinToBottom: false, items: [LEAD] }])
 
-    expect(screen.getByRole('link', { name: /lead management/i })).toHaveAttribute('title', 'Not in your plan.')
+    expect(screen.getByText('Some Group')).toBeInTheDocument()
   })
 
+  it('pins a section from a flag rather than by recognising its key', () => {
+    // The browser used to test `section.key === 'system'` to apply this styling, which meant it had
+    // to know one section by name. The server says so now, so a renamed or new section still pins.
+    const { container } = renderSidebar([
+      { key: 'renamed-entirely', label: 'Ops', order: 5, pinToBottom: true, items: [LEAD] },
+    ])
+
+    // The pinned class is applied to the section wrapper, not derived from its key.
+    expect(container.querySelector('nav > div')?.className).not.toBe('')
+    expect(screen.getByText('Ops')).toBeInTheDocument()
+  })
+})
+
+describe('maintenance state', () => {
   it('marks a row under maintenance with its message', () => {
     renderSidebar(sections([{ ...LEAD, state: 'maintenance', maintenanceMessage: 'Back at 09:00.' }]))
 

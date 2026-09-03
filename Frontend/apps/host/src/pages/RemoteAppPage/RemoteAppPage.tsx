@@ -8,7 +8,6 @@ import { FederationErrorBoundary } from '../../shared/components/ErrorBoundary/F
 import { SkeletonBlock } from '../../shared/components/Skeleton'
 import { MaintenancePage } from '../MaintenancePage/MaintenancePage'
 import { NotFoundPage } from '../NotFoundPage/NotFoundPage'
-import { LockedPage } from '../LockedPage/LockedPage'
 import styles from './RemoteAppPage.module.css'
 
 /** The props every remote's exported App accepts. The host is the only caller. */
@@ -49,7 +48,7 @@ function LoadingFrame() {
  * Mounts a remote app, but only after the host has decided the caller may reach it.
  *
  * The order matters and is the whole point of this component: every gate runs BEFORE
- * loadRemoteAppModule is called, so an unlicensed or forbidden app is never fetched over the network
+ * loadRemoteAppModule is called, so an app the caller may not reach is never fetched over the network
  * at all. Previously this checked only the registry's status and mounted for any authenticated user,
  * which meant a remote's bundle was downloadable by typing its URL.
  *
@@ -73,9 +72,6 @@ export function RemoteAppPage() {
     return <NotFoundPage />
   }
 
-  if (node.state === 'locked') {
-    return <LockedPage appDisplayName={node.label} reason={node.lockReason} />
-  }
 
   if (node.state === 'maintenance') {
     return <MaintenancePage appDisplayName={node.label} message={node.maintenanceMessage} />
@@ -92,12 +88,7 @@ export function RemoteAppPage() {
     return <NotFoundPage />
   }
 
-  const child = page ? node.children.find((c) => c.page === page) : undefined
 
-  // A child can be locked while its app is not — a sub-module sold separately.
-  if (child && child.state === 'locked') {
-    return <LockedPage appDisplayName={child.label} reason={child.lockReason} />
-  }
 
   return (
     <ActiveRemoteApp
