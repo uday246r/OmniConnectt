@@ -27,6 +27,7 @@ public static class AuthDbSeeder
         public const string SystemAuditLogs = "host.system.audit-logs";
         public const string SystemApprovals = "host.system.approvals";
         public const string SystemCheckerAssignment = "host.system.checker-assignment";
+        public const string SettingsLicensing = "host.settings.licensing";
     }
 
     private static readonly string[] StandardCrud = ["View", "Create", "Edit", "Delete"];
@@ -50,6 +51,7 @@ public static class AuthDbSeeder
     // checkers are.
     private static readonly string[] ApprovalsCapabilities = ["View", "Approve"];
     private static readonly string[] CheckerAssignmentCapabilities = ["View", "Manage"];
+    private static readonly string[] LicensingCapabilities = ["View", "Manage"];
 
     /// <summary>Pre-rename feature key. Its absence is the marker that legacy data migrations are already done.</summary>
     private const string LegacyMaintenanceFeatureKey = "host.settings.maintenance";
@@ -81,6 +83,50 @@ public static class AuthDbSeeder
         var features = await SeedHostFeaturesAsync(db, ct);
         var roles = await SeedRolesAsync(db, features, ct);
         await SeedSuperAdminUserAsync(db, roles, logger, ct);
+        await SeedDefaultEntitlementsAsync(db, logger, ct);
+    }
+
+    /// <summary>
+    /// Gives every feature an explicit Licensed entitlement row if it has none.
+    /// <para>
+    /// The resolver already treats a missing row as licensed, so this is not what keeps the product
+    /// working — it is what gives the Licensing admin screen something to edit. Without it the screen
+    /// would open on an empty list for an installation that predates the table, and switching a module
+    /// off would mean creating a row through a UI that had nothing to show.
+    /// </para>
+    /// <para>
+    /// Anti-join rather than load-all-then-filter, and it only ever inserts, so the cost on a warm
+    /// boot is one query returning nothing. Features registered later by the Module Registry get
+    /// their row at creation time in PermissionCatalogAppService instead of waiting for a restart.
+    /// </para>
+    /// </summary>
+    private static async Task SeedDefaultEntitlementsAsync(AuthDbContext db, ILogger logger, CancellationToken ct)
+    {
+        var unlicensedFeatureIds = await db.PermissionFeatures
+            .Where(f => !db.ModuleEntitlements.Any(e => e.FeatureId == f.Id && e.CompanyId == null))
+            .Select(f => f.Id)
+            .ToListAsync(ct);
+
+        if (unlicensedFeatureIds.Count == 0)
+        {
+            return;
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        db.ModuleEntitlements.AddRange(unlicensedFeatureIds.Select(featureId => new ModuleEntitlement
+        {
+            Id = Guid.NewGuid(),
+            FeatureId = featureId,
+            CompanyId = null,
+            Status = EntitlementStatus.Licensed,
+            Visibility = EntitlementVisibility.Normal,
+            PlanTier = "Included",
+            CreatedAt = now,
+            UpdatedAt = now,
+        }));
+
+        await db.SaveChangesAsync(ct);
+        logger.LogInformation("Seeded {Count} default (Licensed) module entitlements.", unlicensedFeatureIds.Count);
     }
 
     private static async Task RenameLegacyFeatureKeyAsync(AuthDbContext db, string oldKey, string newKey, string newDisplayName, CancellationToken ct)
@@ -163,6 +209,7 @@ public static class AuthDbSeeder
             new { Key = HostFeatureKeys.SystemAuditLogs, DisplayName = "System — Audit Logs", SortOrder = 40, Capabilities = AuditLogsCapabilities },
             new { Key = HostFeatureKeys.SystemApprovals, DisplayName = "System — Approval Center", SortOrder = 50, Capabilities = ApprovalsCapabilities },
             new { Key = HostFeatureKeys.SystemCheckerAssignment, DisplayName = "System — Checker Assignment", SortOrder = 60, Capabilities = CheckerAssignmentCapabilities },
+            new { Key = HostFeatureKeys.SettingsLicensing, DisplayName = "Setup — Licensing", SortOrder = 35, Capabilities = LicensingCapabilities },
         };
 
         var existing = await db.PermissionFeatures.Include(f => f.Capabilities).ToDictionaryAsync(f => f.Key, ct);
@@ -255,6 +302,9 @@ public static class AuthDbSeeder
                 // Manage stays Super-Admin-only, per "only users with Manage Checker Assignment
                 // permission" — Admin can see who's assigned but not reassign checkers.
                 [HostFeatureKeys.SystemCheckerAssignment] = ["View"],
+                // Same split as Checker Assignment: Admin can see what the plan covers, but changing
+                // what the customer is licensed for stays with Super Admin.
+                [HostFeatureKeys.SettingsLicensing] = ["View"],
             }),
             ("Manager", "Runs campaigns, contacts and boards day to day.", false, new()
             {
@@ -277,6 +327,7 @@ public static class AuthDbSeeder
                 [HostFeatureKeys.SystemAuditLogs] = ["View"],
                 [HostFeatureKeys.SystemApprovals] = ["View"],
                 [HostFeatureKeys.SystemCheckerAssignment] = ["View"],
+                [HostFeatureKeys.SettingsLicensing] = ["View"],
             }),
         };
 

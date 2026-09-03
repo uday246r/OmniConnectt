@@ -104,6 +104,9 @@ builder.Services.AddScoped<SetPasswordInviteService>();
 builder.Services.AddScoped<PermissionCatalogAppService>();
 builder.Services.AddScoped<DashboardAppService>();
 builder.Services.AddScoped<SearchAppService>();
+builder.Services.AddScoped<EntitlementAppService>();
+// Singleton: it caches the entitlement map across requests, which is the whole point of it.
+builder.Services.AddSingleton<EntitlementSnapshotProvider>();
 
 // Phase 2: replaying an approved mutation that originated in a remote service means POSTing to THAT
 // service's own callback URL — a short timeout keeps one unreachable/slow remote from hanging a

@@ -35,3 +35,7 @@ pnpm-debug.log*
 # Code-analysis tool output and local scratch builds — regenerable, never committed.
 graphify-out/
 scratch/
+
+# .NET test output
+Backend/*.Tests/bin/
+Backend/*.Tests/obj/

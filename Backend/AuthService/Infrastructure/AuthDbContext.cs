@@ -16,6 +16,7 @@ public class AuthDbContext(DbContextOptions<AuthDbContext> options) : DbContext(
     public DbSet<ApprovalRequest> ApprovalRequests => Set<ApprovalRequest>();
     public DbSet<CheckerAssignment> CheckerAssignments => Set<CheckerAssignment>();
     public DbSet<SetPasswordInvite> SetPasswordInvites => Set<SetPasswordInvite>();
+    public DbSet<ModuleEntitlement> ModuleEntitlements => Set<ModuleEntitlement>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -78,6 +79,34 @@ public class AuthDbContext(DbContextOptions<AuthDbContext> options) : DbContext(
 
             entity.HasIndex(f => f.ParentFeatureId);
             entity.Property(f => f.Source).HasConversion<string>().HasMaxLength(20);
+        });
+
+        modelBuilder.Entity<ModuleEntitlement>(entity =>
+        {
+            // One platform-default row per feature, and later one row per (feature, company).
+            //
+            // SQL Server allows only a single NULL per unique index, so this one index enforces
+            // "exactly one default row per feature" on its own. Under Postgres — which this schema
+            // was originally written for — NULLs compare distinct and this would have needed a
+            // filtered index instead, the way User.Email and the approval indexes still do.
+            // HasFilter(null) is load-bearing, not tidying. EF's SQL Server convention adds
+            // "WHERE [CompanyId] IS NOT NULL" to any unique index over a nullable column, which would
+            // exempt exactly the rows this index exists to constrain and allow two platform-default
+            // rows for one feature. Unfiltered, SQL Server treats NULLs as equal for uniqueness and
+            // permits only one — which is the invariant we want.
+            entity.HasIndex(e => new { e.FeatureId, e.CompanyId }).IsUnique().HasFilter(null);
+
+            // Restrict, matching RolePermission: features are soft-deactivated via IsActive and
+            // never deleted, so a cascade here would only ever fire on a mistake.
+            entity.HasOne(e => e.Feature)
+                .WithMany()
+                .HasForeignKey(e => e.FeatureId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.Property(e => e.Status).HasConversion<string>().HasMaxLength(20);
+            entity.Property(e => e.Visibility).HasConversion<string>().HasMaxLength(20);
+            entity.Property(e => e.PlanTier).HasMaxLength(50);
+            entity.Property(e => e.LockReason).HasMaxLength(500);
         });
 
         modelBuilder.Entity<PermissionFeatureCapability>(entity =>
