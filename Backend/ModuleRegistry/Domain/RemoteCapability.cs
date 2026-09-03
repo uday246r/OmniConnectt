@@ -12,4 +12,20 @@ namespace ModuleRegistry.Domain;
 /// capability belongs directly to the app rather than to a sub-module.
 /// </para>
 /// </summary>
-public record RemoteCapability(string ModuleKey, string ModuleDisplayName, string Key, string DisplayName);
+/// <param name="Type">
+/// What the capability guards, which decides how AuthService delivers it: "Api" capabilities are
+/// carried in the JWT for the authorization filters to read, everything else is fetched separately.
+/// Defaults to "Api" because every remote that predates the capability manifest declares only
+/// endpoint guards, and that is exactly what they have always meant.
+/// </param>
+/// <param name="GroupKey">
+/// Not carried across the wire. AuthService derives it from the key's dotted prefix, so there is one
+/// place that decides what grouping means rather than three hops that could disagree.
+/// </param>
+public record RemoteCapability(
+    string ModuleKey,
+    string ModuleDisplayName,
+    string Key,
+    string DisplayName,
+    string? Description = null,
+    string Type = "Api");

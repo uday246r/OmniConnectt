@@ -508,6 +508,8 @@ public partial class RemoteAppAppService(
                 ModuleDisplayName = cap.ModuleDisplayName,
                 Key = cap.Key,
                 DisplayName = cap.DisplayName,
+                Description = cap.Description,
+                Type = cap.Type,
                 SortOrder = i * 10,
             })
             .ToList();
@@ -545,7 +547,7 @@ public partial class RemoteAppAppService(
     private static IReadOnlyList<RemoteCapability> ToCapabilityTuples(RemoteApp app) =>
         app.Capabilities
             .OrderBy(c => c.ModuleKey).ThenBy(c => c.SortOrder)
-            .Select(c => new RemoteCapability(c.ModuleKey, c.ModuleDisplayName, c.Key, c.DisplayName))
+            .Select(c => new RemoteCapability(c.ModuleKey, c.ModuleDisplayName, c.Key, c.DisplayName, c.Description, c.Type))
             .ToList();
 
     /// <summary>

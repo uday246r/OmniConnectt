@@ -28,7 +28,12 @@ public class AuthServiceClient(HttpClient httpClient, IOptions<AuthIntegrationOp
 {
     private readonly AuthIntegrationOptions _options = options.Value;
 
-    private record UpsertCapabilityRequest(string Key, string DisplayName, int SortOrder = 100);
+    private record UpsertCapabilityRequest(
+        string Key,
+        string DisplayName,
+        int SortOrder = 100,
+        string? Description = null,
+        string Type = "Api");
 
     /// <summary>One sidebar row. Nullable everywhere so an older AuthService simply ignores it.</summary>
     private record UpsertNavItemRequest(
@@ -204,7 +209,17 @@ public class AuthServiceClient(HttpClient httpClient, IOptions<AuthIntegrationOp
         [property: JsonPropertyName("sortOrder")] int SortOrder,
         [property: JsonPropertyName("requiredCapability")] string? RequiredCapability);
 
-    private record RemoteCapabilityEntry([property: JsonPropertyName("key")] string Key, [property: JsonPropertyName("displayName")] string DisplayName);
+    /// <param name="Type">
+    /// Absent from every remote that predates the capability manifest, and absent means "Api" — an
+    /// endpoint guard, which is all those remotes ever declared. Relayed verbatim rather than parsed:
+    /// a value this service does not recognise is AuthService's to interpret, and dropping it here
+    /// would turn a forward-compatible payload into a lossy one.
+    /// </param>
+    private record RemoteCapabilityEntry(
+        [property: JsonPropertyName("key")] string Key,
+        [property: JsonPropertyName("displayName")] string DisplayName,
+        [property: JsonPropertyName("description")] string? Description = null,
+        [property: JsonPropertyName("type")] string? Type = null);
 
     /// <summary>
     /// GETs a remote app's own PermissionsSourceUrl.
@@ -237,7 +252,7 @@ public class AuthServiceClient(HttpClient httpClient, IOptions<AuthIntegrationOp
             {
                 var capabilities = body.Modules
                     .SelectMany(m => (m.Capabilities ?? [])
-                        .Select(c => new RemoteCapability(m.Key, m.DisplayName, c.Key, c.DisplayName)))
+                        .Select(c => new RemoteCapability(m.Key, m.DisplayName, c.Key, c.DisplayName, c.Description, c.Type ?? "Api")))
                     .ToList();
 
                 // v3 — the remote declares its own sidebar rows.
@@ -314,7 +329,7 @@ public class AuthServiceClient(HttpClient httpClient, IOptions<AuthIntegrationOp
         // Capabilities with no module hang directly off the feature; the rest become child features.
         var rootCapabilities = capabilities
             .Where(c => string.IsNullOrEmpty(c.ModuleKey))
-            .Select((c, i) => new UpsertCapabilityRequest(c.Key, c.DisplayName, i * 10))
+            .Select((c, i) => new UpsertCapabilityRequest(c.Key, c.DisplayName, i * 10, c.Description, c.Type))
             .ToList();
 
         // Grouped once rather than per module, so the whole projection stays O(n).
@@ -329,7 +344,7 @@ public class AuthServiceClient(HttpClient httpClient, IOptions<AuthIntegrationOp
                 g.Key.ModuleKey,
                 g.Key.ModuleDisplayName,
                 moduleIndex * 10,
-                g.Select((c, i) => new UpsertCapabilityRequest(c.Key, c.DisplayName, i * 10)).ToList(),
+                g.Select((c, i) => new UpsertCapabilityRequest(c.Key, c.DisplayName, i * 10, c.Description, c.Type)).ToList(),
                 // Null when the remote reported no navigation at all, so AuthService keeps what it
                 // has. An empty list for a module the remote DID describe is a real answer: that
                 // module is grantable but has no sidebar row.
