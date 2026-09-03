@@ -63,7 +63,7 @@ public static class HostNavigationCatalog
         new("host.settings.applications", "Applications", "Grid", "/settings/applications", "setup", 30,
             HostFeatureKeys.SettingsApplications, "View"),
 
-        new("host.system.checker-assignment", "Checker Assignment", "GitBranch", "/settings/checker-assignment", "setup", 40,
+        new("host.system.checker-assignment", "Checker Assignment", "ShieldCheck", "/settings/checker-assignment", "setup", 40,
             HostFeatureKeys.SystemCheckerAssignment, "View"),
 
         new("host.settings.licensing", "Licensing", "Key", "/settings/licensing", "setup", 50,
