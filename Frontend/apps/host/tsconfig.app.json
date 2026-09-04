@@ -9,5 +9,21 @@
     "noEmit": true,
     "erasableSyntaxOnly": true
   },
-  "include": ["src"]
+  "include": ["src"],
+
+  /*
+   * Test files are excluded from the APPLICATION build, not from type-checking generally.
+   *
+   * `types: ["vite/client"]` above is an explicit allow-list, so the matcher augmentation that
+   * `@testing-library/jest-dom` adds to `expect` is not loaded here — and with tests inside
+   * `include`, `tsc -b` failed on every `toBeInTheDocument` in the suite. The `typecheck` script
+   * (`tsc --noEmit`) resolves a different config and passed, which is why the build could break
+   * without anyone noticing.
+   *
+   * Excluding them is the right fix rather than widening `types`: test files have no business being
+   * compiled into a production bundle, and pulling test-only type packages into the app's compilation
+   * would let a test import leak into shipped code without complaint. The tests are still fully
+   * type-checked — vitest resolves them through its own config, which does load jest-dom.
+   */
+  "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx", "src/test"]
 }
