@@ -1,4 +1,4 @@
-import type { PermissionFeatureDto } from '../api/permissionsApi'
+import type { CapabilityDto, PermissionFeatureDto } from '../api/permissionsApi'
 
 /**
  * Turning the permission catalog into something a grid can render, in ONE place.
@@ -34,15 +34,57 @@ export interface PermissionRow {
   label: string
   /** True for a parent feature that also declares capabilities of its own. */
   isParent: boolean
-  capabilities: { key: string; displayName: string }[]
+  capabilities: CapabilityDto[]
 }
 
 export interface PermissionGroup {
   /** The top-level feature this group represents. */
   feature: PermissionFeatureDto
   rows: PermissionRow[]
-  /** Union of every capability any row declares, in the order the server listed them. */
+  /**
+   * Union of every VERB capability any row declares, in the order the server listed them.
+   *
+   * Verbs only — see {@link isBusinessCapability}. A business capability belongs to exactly one row
+   * and gets a column nothing else can fill, so including them would grow the matrix by one nearly
+   * empty column each: Lead's dashboard alone would add ten.
+   */
   columns: { key: string; displayName: string }[]
+}
+
+/**
+ * Whether a capability is a business capability rather than a CRUD-style verb.
+ *
+ * The distinction is the dotted key — `kpi.total-leads` against `View` — and it decides only how the
+ * capability is PRESENTED. Verbs are the same handful repeated across every feature, so a matrix
+ * with one column per verb is the compact way to show them. Business capabilities are unique to the
+ * feature that declares them, carry a description worth reading, and there can be dozens, so they get
+ * a searchable grouped list instead.
+ *
+ * Nothing about enforcement or grant format depends on this. Both kinds are stored the same way,
+ * granted the same way, and produce the same `{featureKey}:{capability}` string.
+ */
+export function isBusinessCapability(capability: { key: string }): boolean {
+  return capability.key.includes('.')
+}
+
+/** Splits one row's capabilities into the two presentations. */
+export function splitCapabilities(capabilities: CapabilityDto[]): {
+  verbs: CapabilityDto[]
+  business: CapabilityDto[]
+} {
+  return {
+    verbs: capabilities.filter((c) => !isBusinessCapability(c)),
+    business: capabilities.filter(isBusinessCapability),
+  }
+}
+
+/**
+ * A capability key containing the separator itself would produce an ambiguous permission string —
+ * `feature:a:b` cannot be split back into a feature and a capability. Nothing emits one, but a
+ * malformed sync payload could, and silently granting it would be worse than silently dropping it.
+ */
+function isWellFormed(capability: { key: string }): boolean {
+  return !capability.key.includes(':')
 }
 
 /** Standard preferred order for CRUD and common action verbs */
@@ -67,14 +109,11 @@ export function rowsForFeature(feature: PermissionFeatureDto): PermissionRow[] {
   // If there are sub-modules (children), render each sub-module as its own row (skip redundant parent base access)
   if (feature.children && feature.children.length > 0) {
     for (const child of feature.children) {
-      const cleanCapabilities = (child.capabilities || []).filter(
-        (c) => !c.key.includes(':') && !c.key.includes('.'),
-      )
       rows.push({
         key: child.key,
         label: child.displayName,
         isParent: false,
-        capabilities: cleanCapabilities.length > 0 ? cleanCapabilities : child.capabilities,
+        capabilities: (child.capabilities || []).filter(isWellFormed),
       })
       // Recurse: the model is self-referencing, so a sub-module may itself have sub-modules.
       for (const grandchild of rowsForFeature(child)) {
@@ -82,14 +121,11 @@ export function rowsForFeature(feature: PermissionFeatureDto): PermissionRow[] {
       }
     }
   } else if (feature.capabilities && feature.capabilities.length > 0) {
-    const cleanCapabilities = feature.capabilities.filter(
-      (c) => !c.key.includes(':') && !c.key.includes('.'),
-    )
     rows.push({
       key: feature.key,
       label: feature.displayName,
       isParent: true,
-      capabilities: cleanCapabilities.length > 0 ? cleanCapabilities : feature.capabilities,
+      capabilities: feature.capabilities.filter(isWellFormed),
     })
   }
 
@@ -100,7 +136,10 @@ export function rowsForFeature(feature: PermissionFeatureDto): PermissionRow[] {
 export function columnsForRows(rows: PermissionRow[]): { key: string; displayName: string }[] {
   const columns: { key: string; displayName: string }[] = []
   for (const row of rows) {
-    for (const cap of row.capabilities) {
+    // Verbs only. A business capability is declared by exactly one row, so giving it a column would
+    // add one that every other row renders as "—": Lead's dashboard alone would widen this by ten.
+    // They are rendered as a searchable list instead — see CapabilityPicker.
+    for (const cap of row.capabilities.filter((c) => !isBusinessCapability(c))) {
       if (!columns.some((c) => c.key.toLowerCase() === cap.key.toLowerCase())) {
         columns.push({ key: cap.key, displayName: cap.displayName })
       }
@@ -149,7 +188,11 @@ export function allGrantablePairs(
         walk(f.children)
       } else {
         for (const cap of f.capabilities) {
-          if (cap.key.includes(':') || cap.key.includes('.')) continue
+          // Dotted business capabilities belong here too. They used to be skipped alongside
+          // malformed ones, which meant "grant everything" quietly granted only the verbs — and in
+          // the user editor, which diffs against this list, a business capability could never be
+          // represented as an override at all.
+          if (!isWellFormed(cap)) continue
           const id = `${f.key}:${cap.key}`
           if (!seen.has(id)) {
             seen.add(id)

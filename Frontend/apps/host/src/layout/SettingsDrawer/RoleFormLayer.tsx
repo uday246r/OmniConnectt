@@ -11,6 +11,7 @@ import { Icon } from '../../shared/components/Icon/Icon'
 import { SkeletonBlock } from '../../shared/components/Skeleton'
 import { resolveIcon } from '../../shared/components/Icon/resolveIcon'
 import { groupsFromCatalog, columnsForRows } from '../../shared/permissions/catalog'
+import { CapabilityPicker } from '../../shared/permissions/CapabilityPicker'
 import { toast } from '../../shared/stores/toastStore'
 import { LIMITS, required, maxLength, firstError, isValid, type FieldErrors } from '../../shared/validation/rules'
 import styles from './RoleFormLayer.module.css'
@@ -817,6 +818,17 @@ export function RoleFormLayer({ roleId, initialTab }: RoleFormLayerProps) {
                     </table>
                   )}
                 </div>
+
+                {/* Host features declare none of these today, so this renders its empty state — but
+                    it is here rather than app-only because nothing about the model stops a host
+                    feature declaring one, and finding out the day it does is too late. */}
+                <CapabilityPicker
+                  rows={hostGroups.flatMap((g) => g.rows)}
+                  isGranted={isGranted}
+                  onToggle={togglePermission}
+                  disabled={isAdministrator}
+                  emptyMessage="No host feature declares dashboard, export or panel capabilities."
+                />
               </div>
             </div>
           )}
@@ -1014,6 +1026,21 @@ export function RoleFormLayer({ roleId, initialTab }: RoleFormLayerProps) {
                             </tbody>
                           </table>
                           </div>
+
+                          {/*
+                           * The capabilities this app declares that are not CRUD verbs — its KPI
+                           * cards, charts, exports and panels. They are grants exactly like the ones
+                           * in the table above and produce the same permission string; they are
+                           * shown separately only because one column each would leave the matrix
+                           * mostly dashes.
+                           */}
+                          <CapabilityPicker
+                            rows={rows}
+                            isGranted={isGranted}
+                            onToggle={togglePermission}
+                            disabled={isAdministrator}
+                            emptyMessage="This application declares no dashboard, export or panel capabilities."
+                          />
                         </div>
                       )}
                     </div>

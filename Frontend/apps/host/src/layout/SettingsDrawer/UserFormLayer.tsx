@@ -37,6 +37,7 @@ import {
   allGrantablePairs,
   pairId,
 } from '../../shared/permissions/catalog'
+import { CapabilityPicker } from '../../shared/permissions/CapabilityPicker'
 import styles from './UserFormLayer.module.css'
 import { TOPICS, invalidate } from '../../shared/stores/invalidationStore'
 import { Switch } from '@omniremit/ui'
@@ -1198,6 +1199,13 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
                             </tbody>
                           </table>
                           </div>
+
+                          <CapabilityPicker
+                            rows={hostGroups.flatMap((g) => g.rows)}
+                            isGranted={isOverrideGranted}
+                            onToggle={toggleOverride}
+                            emptyMessage="No host feature declares dashboard, export or panel capabilities."
+                          />
                         </div>
                       )}
                     </div>
@@ -1275,11 +1283,17 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
 
                           {isExpanded && (
                             <div className={styles.accordionBody}>
-                              {columns.length === 0 ? (
+                              {/*
+                               * No columns no longer means no capabilities. An app can declare only
+                               * business capabilities — a dashboard-only module with KPIs and charts
+                               * and no CRUD verb at all — and those have no columns by design. The
+                               * "declared nothing" message would have hidden every one of them.
+                               */}
+                              {columns.length === 0 && rows.every((r) => r.capabilities.length === 0) ? (
                                 <p className={styles.sectionHint}>
                                   This application hasn&rsquo;t declared any capabilities yet.
                                 </p>
-                              ) : (
+                              ) : columns.length === 0 ? null : (
                                 <div className={styles.matrixTableWrap}>
                                 <table className={styles.matrixTable}>
                                   <thead>
@@ -1329,6 +1343,13 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
                                 </table>
                                 </div>
                               )}
+
+                              <CapabilityPicker
+                                rows={rows}
+                                isGranted={isOverrideGranted}
+                                onToggle={toggleOverride}
+                                emptyMessage="This application declares no dashboard, export or panel capabilities."
+                              />
                             </div>
                           )}
                         </div>
