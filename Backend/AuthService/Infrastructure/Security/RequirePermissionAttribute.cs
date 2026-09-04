@@ -63,7 +63,19 @@ public class RequirePermissionAttribute(string featureKey, string capability) : 
         }
 
         var required = $"{featureKey}:{capability}";
-        if (!permissions.Contains(required))
+        /*
+         * Case-insensitive, matching LeadService and Customer360Service.
+         *
+         * These two compared ordinally while the two remote services did not, so the same grant could
+         * authorise in one service and be refused in another. Nothing exercised the difference —
+         * PermissionClaimsBuilder emits one casing and the attributes are written to match — but a
+         * capability key is hand-authored in two places, and an authorization answer that depends on
+         * which service you happen to ask is a bug waiting for the first mismatched letter.
+         *
+         * Still a full-string comparison, so this grants nothing a differently-cased exact match
+         * would not already have granted.
+         */
+        if (!permissions.Contains(required, StringComparer.OrdinalIgnoreCase))
         {
             context.Result = new ObjectResult(new ProblemDetails
             {

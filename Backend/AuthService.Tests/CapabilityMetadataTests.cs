@@ -360,6 +360,37 @@ public class CapabilityMetadataTests : IDisposable
         Assert.Empty(await fine.GetForUserAsync(user.Id));
     }
 
+    // ------------------------------------------------- the size the split exists to protect
+
+    [Fact]
+    public async Task A_thousand_business_capabilities_add_nothing_to_the_permission_claim()
+    {
+        /*
+         * The reason for the whole delivery split, asserted as a number.
+         *
+         * The perms claim is a JSON array serialised into the token. At roughly 40 bytes per entry,
+         * a thousand business capabilities would add ~40KB — past Kestrel's 32KB default header limit
+         * and well past the 8-16KB most proxies allow, so the user would simply stop being able to
+         * sign in. The budget below is generous on purpose: it is not measuring how tight the claim
+         * is, it is catching the day someone routes a non-Api capability back into it.
+         */
+        var declared = new List<UpsertCapabilityRequest> { Cap("View"), Cap("Create") };
+        declared.AddRange(Enumerable.Range(0, 1000).Select(i => Cap($"kpi.metric-{i}", type: "Widget")));
+
+        var feature = await SyncAsync([.. declared]);
+        var user = await GrantAsync(feature, [.. declared.Select(d => d.Key)]);
+
+        var result = await new PermissionClaimsBuilder(db).BuildAsync(user);
+
+        Assert.Equal(["remote.lead:Create", "remote.lead:View"], result.Permissions);
+
+        var claimBytes = System.Text.Json.JsonSerializer.Serialize(result.Permissions).Length;
+        Assert.True(claimBytes < 2048, $"The permission claim grew to {claimBytes} bytes.");
+
+        // And all thousand are still held — delivered by the other path, in full.
+        Assert.Equal(1000, (await fine.GetForUserAsync(user.Id)).Count);
+    }
+
     private async Task<User> GrantAsync(PermissionFeature feature, params string[] capabilities) =>
         await GrantAsync(feature, administrator: false, capabilities);
 
