@@ -12,7 +12,9 @@
     "dev": "concurrently --kill-others \"vite build --watch\" \"vite preview\"",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@omniremit/federation-config": "workspace:*",
@@ -20,18 +22,22 @@
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "recharts": "^3.10.1",
-    "zustand": "^5.0.3",
-    "@omniremit/ui": "workspace:*"
+    "zustand": "^5.0.3"
   },
   "devDependencies": {
     "@module-federation/vite": "^1.20.7",
     "@types/node": "^22.10.0",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
-    "@vitejs/plugin-react": "^4.3.4",
+    "@vitejs/plugin-react": "^6.0.4",
     "concurrently": "^10.0.3",
     "postcss-prefix-selector": "^2.1.1",
     "typescript": "^5.7.2",
-    "vite": "^6.0.0"
+    "vite": "^8.2.0",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.7",
+    "jsdom": "^30.0.1",
+    "vitest": "^5.0.0"
   }
 }

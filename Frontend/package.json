@@ -18,6 +18,7 @@
     "build:customer360": "pnpm --filter customer360-mf build",
     "build:all": "pnpm -r build",
     "lint": "pnpm -r lint",
-    "typecheck": "pnpm -r typecheck"
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test"
   }
 }
