@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useAuthStore } from '../../auth/store/authStore'
-import { Badge, DataTable, EMPTY_VALUE, PageHeader, Pagination, ResponsiveRows, RowAction, RowsPerPage, readStoredPageSize, type BadgeTone } from '@omniremit/ui'
+import { Badge, DataTable, EMPTY_VALUE, PageHeader, Pagination, ResponsiveRows, RowAction, RowsPerPage, readStoredPageSize, sanitizeFilterInput, filterTypeBlockedMessage, type BadgeTone } from '@omniremit/ui'
 import { SkeletonBlock } from '../../../shared/components/Skeleton'
 import { ApiError } from '../../../shared/api/httpClient'
 import { useDebouncedValue } from '../../../shared/hooks/useDebouncedValue'
@@ -11,7 +11,6 @@ import {
   type ApprovalSummaryDto,
   type ApprovalStatus,
 } from '../api/approvalsApi'
-import { checkerAssignmentsApi, type AssignableModuleDto } from '../api/checkerAssignmentsApi'
 import { useApprovalRequests } from '../hooks/useApprovalRequests'
 import { Icon } from '../../../shared/components/Icon/Icon'
 // Same drawer shell Audit Logs / Settings use — the whole point of "keep the design language" is
@@ -108,7 +107,7 @@ const SHORT_MODULE_MAP: Record<string, string> = {
   'checker': 'Checker',
 }
 
-function formatModuleName(rawModule: string | null | undefined, _customMap?: Map<string, string>): string {
+function formatModuleName(rawModule: string | null | undefined): string {
   if (!rawModule) return '—'
   const normalized = rawModule.toLowerCase().trim()
   if (SHORT_MODULE_MAP[normalized]) return SHORT_MODULE_MAP[normalized]
@@ -505,10 +504,9 @@ export function ApprovalCenterPage() {
   const [decidedDraftFrom, setDecidedDraftFrom] = useState('')
   const [decidedDraftTo, setDecidedDraftTo] = useState('')
 
-  // Module filter with live search
+  // Module filter with live search. Its options come from the loaded rows — see availableModules.
   const [module, setModule] = useState('')
   const [moduleSearch, setModuleSearch] = useState('')
-  const [modules, setModules] = useState<AssignableModuleDto[]>([])
 
   // Action filter
   const [actionFilter, setActionFilter] = useState('')
@@ -516,11 +514,23 @@ export function ApprovalCenterPage() {
   // Entity search
   const [entitySearch, setEntitySearch] = useState('')
 
-  // Maker search & user selection
+  // Maker search & user selection — a person's name, letters only.
   const [makerSearch, setMakerSearch] = useState('')
+  const [makerSearchBlocked, setMakerSearchBlocked] = useState(false)
+  function handleMakerSearchChange(raw: string) {
+    const clean = sanitizeFilterInput(raw, 'alpha')
+    setMakerSearch(clean)
+    setMakerSearchBlocked(clean !== raw)
+  }
 
-  // Checker search & user selection & assigned to me
+  // Checker search & user selection & assigned to me — same as maker, letters only.
   const [checkerSearch, setCheckerSearch] = useState('')
+  const [checkerSearchBlocked, setCheckerSearchBlocked] = useState(false)
+  function handleCheckerSearchChange(raw: string) {
+    const clean = sanitizeFilterInput(raw, 'alpha')
+    setCheckerSearch(clean)
+    setCheckerSearchBlocked(clean !== raw)
+  }
   const [assignedToMeOnly, setAssignedToMeOnly] = useState(false)
 
   // Status filter ('Pending' | 'Approved' | 'Rejected' | '')
@@ -534,7 +544,6 @@ export function ApprovalCenterPage() {
   const debouncedChecker = useDebouncedValue(checkerSearch, 200)
 
   const range = useMemo(() => computeRangeWithCustom(dateRange, customFrom, customTo), [dateRange, customFrom, customTo])
-  const moduleLabelsByKey = useMemo(() => new Map(modules.map((m) => [m.key, m.label])), [modules])
 
   // Zero extra API call: extract unique makers from all loaded items
   const availableMakers = useMemo(() => {
@@ -554,20 +563,30 @@ export function ApprovalCenterPage() {
     return Array.from(map.values())
   }, [cachedPool])
 
-  // Zero extra API call: combine API modules + modules found in data
+  /*
+   * Module filter options, derived from the rows on this page and nothing else.
+   *
+   * This used to seed the list from GET /api/checker-assignments/modules — the platform's ENTIRE
+   * permission catalog — and then merge in whatever the data contained. That cost a request (and a
+   * catalog query server-side) on every visit purely to fill a dropdown, and it listed every module
+   * in the host whether or not a single approval request had ever been raised against it, so most
+   * options returned nothing. Filtering a column should only ever offer values that column actually
+   * holds.
+   */
   const availableModules = useMemo(() => {
     const map = new Map<string, string>()
-    for (const m of modules) map.set(m.key, formatModuleName(m.key || m.label))
     for (const r of cachedPool) {
       if (r.module && !map.has(r.module)) {
         map.set(r.module, formatModuleName(r.module))
       }
     }
-    const list = Array.from(map.entries()).map(([key, label]) => ({ key, label }))
+    const list = Array.from(map.entries())
+      .map(([key, label]) => ({ key, label }))
+      .sort((a, b) => a.label.localeCompare(b.label))
     if (!moduleSearch.trim()) return list
     const q = moduleSearch.toLowerCase()
     return list.filter((m) => m.label.toLowerCase().includes(q) || m.key.toLowerCase().includes(q))
-  }, [modules, cachedPool, moduleSearch])
+  }, [cachedPool, moduleSearch])
 
   const [summary, setSummary] = useState<ApprovalSummaryDto | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
@@ -614,21 +633,7 @@ export function ApprovalCenterPage() {
 
   useEffect(() => {
     void loadSummary()
-  }, [loadSummary])
-
-  useEffect(() => {
-    if (!accessToken) return
-    let cancelled = false
-    checkerAssignmentsApi
-      .listModules(accessToken)
-      .then((res) => {
-        if (!cancelled) setModules(res)
-      })
-      .catch(() => {})
-    return () => {
-      cancelled = true
-    }
-  }, [accessToken])
+  }, [loadSummary, dataRevision])
 
   const fetcher = useCallback(
     async (token: string, signal?: AbortSignal) => {
@@ -714,11 +719,16 @@ export function ApprovalCenterPage() {
       range.from, range.to, decidedRange, decidedCustomFrom, decidedCustomTo, currentUserId,
     ],
   )
-  const { items, total, error } = useApprovalRequests(accessToken, fetcher, [
-    activeTab, page, pageSize, module, actionFilter, assignedToMeOnly,
-    debouncedMaker, debouncedEntity, debouncedChecker, statusFilter,
-    refreshKey, range.from, range.to, decidedRange, decidedCustomFrom, decidedCustomTo, dataRevision,
-  ])
+  const { items, total, error } = useApprovalRequests(
+    accessToken,
+    fetcher,
+    [
+      activeTab, page, pageSize, module, actionFilter, assignedToMeOnly,
+      debouncedMaker, debouncedEntity, debouncedChecker, statusFilter,
+      refreshKey, range.from, range.to, decidedRange, decidedCustomFrom, decidedCustomTo,
+    ],
+    [dataRevision],
+  )
 
   // Handler for the page-size preset or custom selection
   useEffect(() => {
@@ -810,8 +820,10 @@ export function ApprovalCenterPage() {
     setModuleSearch('')
     setActionFilter('')
     setMakerSearch('')
+    setMakerSearchBlocked(false)
     setEntitySearch('')
     setCheckerSearch('')
+    setCheckerSearchBlocked(false)
     setAssignedToMeOnly(false)
     setStatusFilter('')
     setDateRange('all')
@@ -1000,7 +1012,7 @@ export function ApprovalCenterPage() {
           )}
           {module && (
             <span className={styles.filterChip}>
-              <span>Module: {formatModuleName(module, moduleLabelsByKey)}</span>
+              <span>Module: {formatModuleName(module)}</span>
               <button type="button" className={styles.filterChipRemove} onClick={() => setModule('')} aria-label="Remove module filter">
                 <Icon.X width={12} height={12} />
               </button>
@@ -1025,7 +1037,7 @@ export function ApprovalCenterPage() {
           {makerSearch && (
             <span className={styles.filterChip}>
               <span>Maker: "{makerSearch}"</span>
-              <button type="button" className={styles.filterChipRemove} onClick={() => setMakerSearch('')} aria-label="Remove maker filter">
+              <button type="button" className={styles.filterChipRemove} onClick={() => { setMakerSearch(''); setMakerSearchBlocked(false) }} aria-label="Remove maker filter">
                 <Icon.X width={12} height={12} />
               </button>
             </span>
@@ -1033,7 +1045,7 @@ export function ApprovalCenterPage() {
           {checkerSearch && (
             <span className={styles.filterChip}>
               <span>Checker: "{checkerSearch}"</span>
-              <button type="button" className={styles.filterChipRemove} onClick={() => setCheckerSearch('')} aria-label="Remove checker filter">
+              <button type="button" className={styles.filterChipRemove} onClick={() => { setCheckerSearch(''); setCheckerSearchBlocked(false) }} aria-label="Remove checker filter">
                 <Icon.X width={12} height={12} />
               </button>
             </span>
@@ -1061,7 +1073,7 @@ export function ApprovalCenterPage() {
       {/* Table — shared chrome. This page's own `.tableContainer`/`.logTable` were a byte-for-byte
           copy of the Audit Logs pair (only min-width differed), which is exactly the duplication
           @omniremit/ui's DataTable exists to remove. */}
-      <DataTable reserveHeight>
+      <DataTable reserveHeight footer={<Pagination page={page} pageSize={pageSize} total={total ?? 0} itemLabel="request" onPageChange={setPage} />}>
           <ResponsiveRows
             rows={items ?? []}
             rowKey={(r) => String(r.id)}
@@ -1199,7 +1211,7 @@ export function ApprovalCenterPage() {
                       )}
                     </th>
                   ),
-                  render: (r) => <Badge tone="info">{formatModuleName(r.module, moduleLabelsByKey)}</Badge>,
+                  render: (r) => <Badge tone="info">{formatModuleName(r.module)}</Badge>,
                 },
                 {
                   key: 'action',
@@ -1320,16 +1332,20 @@ export function ApprovalCenterPage() {
                         <div className={styles.filterPopover}>
                           <div className={styles.popoverHeader}>
                             <span className={styles.popoverTitle}>Filter Maker</span>
-                            {makerSearch && <button type="button" className={styles.popoverClearBtn} onClick={() => setMakerSearch('')}>Reset</button>}
+                            {makerSearch && <button type="button" className={styles.popoverClearBtn} onClick={() => { setMakerSearch(''); setMakerSearchBlocked(false) }}>Reset</button>}
                           </div>
                           <input
                             type="text"
-                            className={styles.popoverInput}
+                            inputMode="text"
+                            className={`${styles.popoverInput} ${makerSearchBlocked ? styles.popoverInputBlocked : ''}`}
                             placeholder="Search maker name..."
                             value={makerSearch}
-                            onChange={(e) => setMakerSearch(e.target.value)}
+                            onChange={(e) => handleMakerSearchChange(e.target.value)}
                             autoFocus
                           />
+                          {makerSearchBlocked && (
+                            <p className={styles.blockedHint} role="alert">{filterTypeBlockedMessage('alpha')}</p>
+                          )}
                           {availableMakers.length > 0 && (
                             <>
                               <div className={styles.popoverDivider} />
@@ -1404,11 +1420,15 @@ export function ApprovalCenterPage() {
                           </label>
                           <input
                             type="text"
-                            className={styles.popoverInput}
+                            inputMode="text"
+                            className={`${styles.popoverInput} ${checkerSearchBlocked ? styles.popoverInputBlocked : ''}`}
                             placeholder="Search checker name..."
                             value={checkerSearch}
-                            onChange={(e) => setCheckerSearch(e.target.value)}
+                            onChange={(e) => handleCheckerSearchChange(e.target.value)}
                           />
+                          {checkerSearchBlocked && (
+                            <p className={styles.blockedHint} role="alert">{filterTypeBlockedMessage('alpha')}</p>
+                          )}
                           {availableCheckers.length > 0 && (
                             <>
                               <div className={styles.popoverDivider} />
@@ -1605,14 +1625,6 @@ export function ApprovalCenterPage() {
           />
       </DataTable>
 
-      <Pagination
-        page={page}
-        pageSize={pageSize}
-        total={total ?? 0}
-        itemLabel="request"
-        onPageChange={setPage}
-      />
-
       {/* Detail drawer */}
       {viewingId && (
         <div className={drawerStyles.overlayRoot}>
@@ -1652,7 +1664,7 @@ export function ApprovalCenterPage() {
                               <span className={styles.detailIcon}><Icon.Grid width={15} height={15} /></span>
                               <div className={styles.detailRowBody}>
                                 <dt>Module</dt>
-                                <dd><Badge tone="info">{formatModuleName(detail.module, moduleLabelsByKey)}</Badge></dd>
+                                <dd><Badge tone="info">{formatModuleName(detail.module)}</Badge></dd>
                               </div>
                             </div>
                             <div className={styles.detailRow}>
@@ -1783,36 +1795,36 @@ export function ApprovalCenterPage() {
 
               {/*
                 Sticky action footer — outside the scrollable tabBody so Approve/Reject are
-                always visible at the bottom of the drawer regardless of scroll position.
-                Layout mirrors the screenshot: "Edit" chip on the left, Reject + Approve on the right.
+                always visible at the bottom of the drawer regardless of scroll position. The two
+                decisions fill the row edge-to-edge as equal, deliberate targets — this is the one
+                thing a checker is here to do, not a toolbar sharing space with an unrelated action.
+                ("Edit" previously sat here as an inert label with no handler — a maker-checker
+                approval is reviewed and decided, not edited from inside the review itself.)
                 Row-level check (isMyDecisionToMake) instead of PermissionGate — an admin who isn't
                 the specific assigned checker must not see actionable buttons on someone else's request.
               */}
               {isMyDecisionToMake && detail && (
                 <div className={styles.detailFooter}>
                   {!rejecting ? (
-                    <div className={styles.footerActions}>
-                      <span className={styles.footerEditLabel}>Edit</span>
-                      <div className={styles.footerBtns}>
-                        <button
-                          type="button"
-                          className={styles.rejectBtn}
-                          onClick={() => setRejecting(true)}
-                          disabled={deciding}
-                        >
-                          <Icon.X width={15} height={15} />
-                          <span>Reject</span>
-                        </button>
-                        <button
-                          type="button"
-                          className={styles.approveBtn}
-                          onClick={() => void handleApprove()}
-                          disabled={deciding}
-                        >
-                          <Icon.CheckCircle width={15} height={15} />
-                          <span>{deciding ? 'Approving…' : 'Approve'}</span>
-                        </button>
-                      </div>
+                    <div className={styles.footerBtns}>
+                      <button
+                        type="button"
+                        className={styles.rejectBtn}
+                        onClick={() => setRejecting(true)}
+                        disabled={deciding}
+                      >
+                        <Icon.X width={15} height={15} />
+                        <span>Reject</span>
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.approveBtn}
+                        onClick={() => void handleApprove()}
+                        disabled={deciding}
+                      >
+                        <Icon.CheckCircle width={15} height={15} />
+                        <span>{deciding ? 'Approving…' : 'Approve'}</span>
+                      </button>
                     </div>
                   ) : (
                     <div className={styles.rejectFormFooter}>

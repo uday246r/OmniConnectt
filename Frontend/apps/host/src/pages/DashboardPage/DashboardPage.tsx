@@ -9,7 +9,7 @@ import { SkeletonStatCard, SkeletonDashboardWidget, SkeletonAuditRow, SkeletonDo
 import { Icon } from '../../shared/components/Icon/Icon'
 import styles from './DashboardPage.module.css'
 import { APP_NAME, COPYRIGHT_YEAR } from '../../shared/config/branding'
-import { useDataRevision } from '../../shared/stores/invalidationStore'
+import { TOPICS, useDataRevision } from '../../shared/stores/invalidationStore'
 import { useAbortableEffect } from '../../shared/hooks/useAbortableEffect'
 
 interface RoleDistribution {
@@ -82,7 +82,17 @@ export function DashboardPage() {
   const user = useAuthStore((s) => s.user)
   const accessToken = useAuthStore((s) => s.accessToken)
   const navigate = useNavigate()
-  const dataRevision = useDataRevision()
+  /*
+   * Scoped to `kpis`, NOT the global revision counter.
+   *
+   * This page's load re-probes every registered remote app over HTTP (dashboardApi.refreshHealth),
+   * so subscribing to every invalidation meant a single audit row — one login, by anyone — fired a
+   * full health sweep plus nine dashboard queries for every viewer with the page open. Under
+   * server push that is a self-inflicted stampede. The `kpis` topic is coalesced server-side by
+   * KpiCoalescerService, and the Settings mutations that should still refresh these cards name it
+   * explicitly in their invalidate(...) calls.
+   */
+  const dataRevision = useDataRevision(TOPICS.kpis)
 
   const [loading, setLoading] = useState(true)
   const [totalUsers, setTotalUsers] = useState(0)

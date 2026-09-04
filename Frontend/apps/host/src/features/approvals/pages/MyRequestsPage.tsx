@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { useAuthStore } from '../../auth/store/authStore'
-import { Badge, Button, ColumnFilter, DataTable, EMPTY_VALUE, FilterBar, Icon, PageHeader, Pagination, ResponsiveRows, RowsPerPage, SearchField, readStoredPageSize, type ActiveFilter, type BadgeTone } from '@omniremit/ui'
+import { Badge, Button, ColumnFilter, DataTable, EMPTY_VALUE, FilterBar, Icon, PageHeader, Pagination, ResponsiveRows, RowsPerPage, readStoredPageSize, type ActiveFilter, type BadgeTone } from '@omniremit/ui'
 import { approvalsApi, type ApprovalRequestListItemDto, type ApprovalStatus, type RevealTempPasswordResponse } from '../api/approvalsApi'
 import { useApprovalRequests } from '../hooks/useApprovalRequests'
 import { ApiError } from '../../../shared/api/httpClient'
@@ -172,12 +172,6 @@ export function MyRequestsPage() {
 
   const [statusFilter, setStatusFilter] = useState<ApprovalStatus | 'all'>('all')
   /*
-   * One box, every column. This page was the only table in the platform with no search at all —
-   * you could filter by status and page through, and that was it. It spans the same fields the
-   * table renders, so what you type is what you can see.
-   */
-  const [search, setSearch] = useState('')
-  /*
    * Per-column filters, matching Approval Center. Status stays SERVER-side (the endpoint takes it);
    * the rest narrow the fetched page, and each offers the values actually present rather than an
    * empty box.
@@ -196,7 +190,7 @@ export function MyRequestsPage() {
       approvalsApi.listMine(token, { page, pageSize, status: statusFilter === 'all' ? undefined : statusFilter }, signal),
     [page, pageSize, statusFilter],
   )
-  const { items, total, error } = useApprovalRequests(accessToken, fetcher, [page, pageSize, statusFilter, refreshKey, dataRevision])
+  const { items, total, error } = useApprovalRequests(accessToken, fetcher, [page, pageSize, statusFilter, refreshKey], [dataRevision])
 
   useEffect(() => {
     setPage(1)
@@ -264,17 +258,7 @@ export function MyRequestsPage() {
           if (moduleFilter && formatModuleName(r.module) !== moduleFilter) return false
           if (actionFilter && r.action !== actionFilter) return false
           if (checkerFilter && (r.checkerName ?? '') !== checkerFilter) return false
-          const q = search.trim().toLowerCase()
-          if (!q) return true
-          return [
-            formatModuleName(r.module),
-            r.action,
-            r.entityLabel,
-            r.checkerName,
-            r.rejectionReason,
-            r.status,
-          ]
-            .some((v) => (v ?? '').toString().toLowerCase().includes(q))
+          return true
         })
 
 
@@ -324,14 +308,25 @@ export function MyRequestsPage() {
         ))}
       </div>
 
-      <div className={styles.toolbar}>
-        <SearchField
-          className={styles.search}
-          placeholder="Search module, action, record, checker, reason…"
-          value={search}
-          onValueChange={setSearch}
-        />
-        <div className={styles.toolbarActions}>
+      {/* Status tab bar — All / Pending / Approved / Rejected — same navBar pattern as
+          Approval Center and Audit Logs so the three sibling pages feel identical. */}
+      <div className={styles.navBar}>
+        <div className={styles.tabsList} role="tablist" aria-label="Request status">
+          {FILTERS.map((f) => (
+            <button
+              key={f.key}
+              type="button"
+              role="tab"
+              aria-selected={statusFilter === f.key}
+              className={`${styles.tabBtn} ${statusFilter === f.key ? styles.tabActive : ''}`}
+              onClick={() => { setStatusFilter(f.key); setPage(1) }}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0' }}>
           <RowsPerPage
             storageKey="host.myRequests"
             value={pageSize}
@@ -345,23 +340,14 @@ export function MyRequestsPage() {
 
       <FilterBar
         filters={[
-          statusFilter !== 'all' && {
-            key: 'status',
-            label: 'Status',
-            value: statusFilter,
-            onRemove: () => setStatusFilter('all'),
-          },
           moduleFilter && { key: 'module', label: 'Module', value: moduleFilter, onRemove: () => setModuleFilter('') },
           actionFilter && { key: 'action', label: 'Action', value: actionFilter, onRemove: () => setActionFilter('') },
           checkerFilter && { key: 'checker', label: 'Checker', value: checkerFilter, onRemove: () => setCheckerFilter('') },
-          search && { key: 'search', label: 'Search', value: `"${search}"`, onRemove: () => setSearch('') },
         ].filter(Boolean) as ActiveFilter[]}
         onClearAll={() => {
-          setStatusFilter('all')
           setModuleFilter('')
           setActionFilter('')
           setCheckerFilter('')
-          setSearch('')
         }}
       />
 
@@ -372,7 +358,7 @@ export function MyRequestsPage() {
       {/* Shared chrome. This page had a THIRD variant of the same table — 11px header padding and a
           1px #eaecf0 rule against the 12px / 1.5px #e2e8f0 used by Audit Logs and Approval Center —
           so it now renders from the same source as its sibling pages. */}
-      <DataTable>
+      <DataTable footer={<Pagination page={page} pageSize={pageSize} total={total} itemLabel="request" onPageChange={setPage} />}>
         <ResponsiveRows
           rows={visibleItems ?? []}
           rowKey={(r) => String(r.id)}
@@ -456,6 +442,7 @@ export function MyRequestsPage() {
                   options={checkerOptions}
                   allLabel="Everyone"
                   searchable={checkerOptions.length > 6}
+                  filterType="alpha"
                 />
               ),
               render: (r) =>
@@ -474,16 +461,6 @@ export function MyRequestsPage() {
               key: 'status',
               label: 'Status',
               priority: 'always',
-              header: (
-                <ColumnFilter
-                  key="status"
-                  label="Status"
-                  value={statusFilter === 'all' ? '' : statusFilter}
-                  onChange={(v) => setStatusFilter((v || 'all') as ApprovalStatus | 'all')}
-                  options={FILTERS.filter((f) => f.key !== 'all').map((f) => ({ value: f.key, label: f.label }))}
-                  allLabel="All Statuses"
-                />
-              ),
               render: (r) => <Badge tone={STATUS_TONES[r.status]} dot>{r.status}</Badge>,
             },
             {
@@ -519,14 +496,6 @@ export function MyRequestsPage() {
           ]}
         />
       </DataTable>
-
-      <Pagination
-        page={page}
-        pageSize={pageSize}
-        total={total}
-        itemLabel="request"
-        onPageChange={setPage}
-      />
 
       {revealed && (
         <div className={styles.modalBackdrop} onClick={closeRevealModal}>

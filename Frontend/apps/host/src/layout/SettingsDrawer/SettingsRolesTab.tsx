@@ -99,7 +99,7 @@ export function SettingsRolesTab() {
       toast.success(`Role '${roleName}' deleted successfully.`)
       // If the last row on the final page just went, step back rather than showing an empty page.
       if (roles.length === 1 && page > 1) setPage((p) => p - 1)
-      else invalidate(TOPICS.roles, TOPICS.approvals)
+      else invalidate(TOPICS.roles, TOPICS.approvals, TOPICS.kpis)
     } catch (err) {
       setPendingDelete(null)
       const conflict = asPendingApprovalConflict(err)

@@ -166,6 +166,21 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
   )
 
   /**
+   * Friendly label for a raw feature key — "Setup — User", not "host.settings.users". Feature keys
+   * are internal permission-catalog identifiers with no reason to ever reach an operator; the review
+   * step's Grant/Revoke override list previously rendered them verbatim.
+   */
+  const featureLabelsByKey = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const group of [...hostGroups, ...appGroups]) {
+      for (const row of group.rows) {
+        map.set(row.key, row.isParent ? row.label : `${group.feature.displayName} — ${row.label}`)
+      }
+    }
+    return map
+  }, [hostGroups, appGroups])
+
+  /**
    * Every grantable pair for one application, sub-modules included.
    *
    * Keyed by FEATURE key now, not app key. It previously rebuilt `remote.${appKey}` and read only the
@@ -482,7 +497,7 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
         // the drawer is now stale — without these the drawer closed onto old rows and only a full page
         // reload would show the change.
         void refreshSession()
-        invalidate(TOPICS.users, TOPICS.approvals)
+        invalidate(TOPICS.users, TOPICS.approvals, TOPICS.kpis)
         toast.success(`User '${name}' updated successfully.`)
         useSettingsDrawerStore.getState().resetToRoot('users')
       } else {
@@ -506,7 +521,7 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
           return
         }
 
-        invalidate(TOPICS.users, TOPICS.approvals)
+        invalidate(TOPICS.users, TOPICS.approvals, TOPICS.kpis)
         toast.success(`User '${res.user.name}' created successfully.`)
         setCreatedResult(res)
       }
@@ -1022,13 +1037,18 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
                     </div>
 
                     <div className={styles.statusToggleCard}>
+                      {/* Icon tile rather than a bare 5px bullet — same treatment as the role
+                          editor's Platform Administrator card, carrying the on/off state in tint. */}
+                      <div
+                        className={`${styles.statusToggleIcon} ${isActive ? styles.statusToggleIconOn : ''}`}
+                        aria-hidden="true"
+                      >
+                        <Icon.UserCheck width={17} height={17} />
+                      </div>
                       <div className={styles.statusToggleInfo}>
-                        <div className={styles.statusToggleHeader}>
-                          <span className={isActive ? styles.badgeDotGreen : styles.badgeDotGray} />
-                          <span className={styles.statusToggleTitle}>
-                            {isActive ? 'Account is Active' : 'Account is Suspended'}
-                          </span>
-                        </div>
+                        <span className={styles.statusToggleTitle}>
+                          {isActive ? 'Account is Active' : 'Account is Suspended'}
+                        </span>
                         <span className={styles.statusToggleDesc}>
                           {isActive
                             ? 'User is permitted to sign in and interact with all granted applications.'
@@ -1147,9 +1167,9 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
                           <table className={styles.matrixTable}>
                             <thead>
                               <tr>
-                                <th>FEATURE / MODULE</th>
+                                <th className={styles.thFeature}>FEATURE / MODULE</th>
                                 {hostColumns.map((col) => (
-                                  <th key={col.key} title={col.displayName}>
+                                  <th key={col.key} className={styles.thCap} title={col.displayName}>
                                     {col.displayName.toUpperCase()}
                                   </th>
                                 ))}
@@ -1166,7 +1186,7 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
                                 )
                                 .map((row) => (
                                   <tr key={row.key}>
-                                    <td>
+                                    <td className={styles.tdFeature}>
                                       <span className={styles.featureName}>{row.label}</span>
                                     </td>
                                     {hostColumns.map((col) => {
@@ -1174,7 +1194,7 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
                                         (c) => c.key.toLowerCase() === col.key.toLowerCase(),
                                       )
                                       return (
-                                        <td key={col.key}>
+                                        <td key={col.key} className={styles.tdCap}>
                                           {declaredCap ? (
                                             <input
                                               type="checkbox"
@@ -1251,7 +1271,6 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
                               </div>
                               <div>
                                 <span className={styles.accordionAppName}>{feature.displayName}</span>
-                                <span className={styles.accordionAppKey}>{feature.key}</span>
                               </div>
                             </div>
                             <div className={styles.accordionRightMeta}>
@@ -1298,9 +1317,9 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
                                 <table className={styles.matrixTable}>
                                   <thead>
                                     <tr>
-                                      <th>SUB-MODULE / CAPABILITY</th>
+                                      <th className={styles.thFeature}>SUB-MODULE / CAPABILITY</th>
                                       {columns.map((col) => (
-                                        <th key={col.key} title={col.displayName}>
+                                        <th key={col.key} className={styles.thCap} title={col.displayName}>
                                           {col.displayName.toUpperCase()}
                                         </th>
                                       ))}
@@ -1309,7 +1328,7 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
                                   <tbody>
                                     {rows.map((row) => (
                                       <tr key={row.key}>
-                                        <td>
+                                        <td className={styles.tdFeature}>
                                           <span className={styles.featureName}>{row.label}</span>
                                         </td>
                                         {columns.map((col) => {
@@ -1317,7 +1336,7 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
                                             (c) => c.key.toLowerCase() === col.key.toLowerCase(),
                                           )
                                           return (
-                                            <td key={col.key}>
+                                            <td key={col.key} className={styles.tdCap}>
                                               {declaredCap ? (
                                                 <input
                                                   type="checkbox"
@@ -1420,7 +1439,7 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
                           <div className={styles.overridesList}>
                             {grantsList.map((o, idx) => (
                               <div key={idx} className={styles.overrideTagGrant}>
-                                <span className={styles.overrideKey}>{o.featureKey}</span>
+                                <span className={styles.overrideKey}>{featureLabelsByKey.get(o.featureKey) ?? o.featureKey}</span>
                                 <span className={styles.overrideDivider}>•</span>
                                 <span className={styles.overrideCap}>+{o.capability}</span>
                               </div>
@@ -1437,7 +1456,7 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
                           <div className={styles.overridesList}>
                             {revokesList.map((o, idx) => (
                               <div key={idx} className={styles.overrideTagRevoke}>
-                                <span className={styles.overrideKey}>{o.featureKey}</span>
+                                <span className={styles.overrideKey}>{featureLabelsByKey.get(o.featureKey) ?? o.featureKey}</span>
                                 <span className={styles.overrideDivider}>•</span>
                                 <span className={styles.overrideCap}>-{o.capability}</span>
                               </div>

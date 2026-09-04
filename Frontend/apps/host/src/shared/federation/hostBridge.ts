@@ -52,6 +52,15 @@ export interface OmniRemitHostBridge {
     /** One token's computed value, e.g. token('--omni-color-danger-600') → '#dc2626'. Returns '' if undefined. */
     token: (name: string) => string
   }
+  /*
+   * Deliberately NO navigation member.
+   *
+   * A remote's current page is passed down as the `page` prop by RemoteAppPage, and a remote asks to
+   * move with the `onNavigate` callback it is handed alongside it — see
+   * `pages/RemoteAppPage/RemoteAppPage.tsx` and each remote's `navigation/HostNavigation.tsx`.
+   * Routing therefore stays inside React, where the router already is, rather than travelling
+   * through a global mutable object that has no way to participate in rendering.
+   */
 }
 
 declare global {

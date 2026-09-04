@@ -19,21 +19,15 @@
 }
 .card {
   background: var(--omni-color-surface);
-  border-radius: var(--omni-radius-xl);
-  border: 1px solid #eaecf0;
-  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.04);
-  /* Must NOT be hidden — that would clip the DataTable's own horizontal scroll container. */
-  overflow: visible;
+  border-radius: 18px;
+  border: 1.5px solid #e8edf5;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+  overflow: hidden;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  /*
-   * Horizontal inset, so a table inside this card is not flush against its edge — the host's audit
-   * table sits in from the card border and these did not. Vertical padding stays off: the toolbar
-   * and the table manage their own.
-   */
-  padding-left: var(--omni-space-4);
-  padding-right: var(--omni-space-4);
+  padding-left: 0;
+  padding-right: 0;
 }
 .toolbar {
   display: flex;
@@ -41,8 +35,8 @@
   justify-content: space-between;
   align-items: center;
   gap: var(--omni-space-3);
-  padding: var(--omni-space-4) var(--omni-space-5);
-  border-bottom: 1px solid #eaecf0;
+  padding: var(--omni-space-4) 18px;
+  border-bottom: 1.5px solid #eaeff7;
   background: var(--omni-color-surface);
 }
 .toolbarLeft {

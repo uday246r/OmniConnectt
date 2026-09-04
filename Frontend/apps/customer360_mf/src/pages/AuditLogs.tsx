@@ -106,6 +106,7 @@ export default function AuditLogs() {
   // page already fetched rather than the query.
   const [actorFilter, setActorFilter] = useState('');
   const [customerFilter, setCustomerFilter] = useState('');
+  const [descFilter, setDescFilter] = useState('');
 
   /*
    * Actor and Customer offer the values that ACTUALLY appear in the loaded audit rows, so the list
@@ -129,6 +130,7 @@ export default function AuditLogs() {
    */
   const visibleLogs = logs.filter((log) => {
     if (statusFilter && (isSuccessStatus(log.status) ? 'SUCCESS' : 'FAILED') !== statusFilter) return false;
+    if (descFilter && !(log.description || '').toLowerCase().includes(descFilter.toLowerCase())) return false;
     if (actorFilter) {
       const actor = resolveActor(log.user);
       const hay = `${actor.name ?? ''} ${actor.id ?? ''} ${log.user ?? ''}`.toLowerCase();
@@ -140,7 +142,7 @@ export default function AuditLogs() {
     }
     return true;
   });
-  const clientFiltered = Boolean(statusFilter || actorFilter || customerFilter);
+  const clientFiltered = Boolean(statusFilter || actorFilter || customerFilter || descFilter);
 
   const actorOptions = React.useMemo(
     () => distinct((l) => resolveActor(l.user).name ?? l.user),
@@ -296,12 +298,14 @@ export default function AuditLogs() {
             value: STATUS_FILTER_OPTIONS.find((o) => o.value === statusFilter)?.label ?? statusFilter,
             onRemove: () => setStatusFilter(''),
           },
+          descFilter && { key: 'desc', label: 'Description', value: `"${descFilter}"`, onRemove: () => setDescFilter('') },
           searchQuery && { key: 'search', label: 'Search', value: `"${searchQuery}"`, onRemove: () => setSearchQuery('') },
         ].filter(Boolean) as ActiveFilter[]}
         onClearAll={() => {
           setActionFilter('');
           setActorFilter('');
           setCustomerFilter('');
+          setDescFilter('');
           setStatusFilter('');
           setSearchQuery('');
         }}
@@ -356,22 +360,17 @@ export default function AuditLogs() {
           * underneath, rather than the table scrolling sideways with half its columns off screen.
           * `minWidth` is deliberately gone — the point is that it no longer needs a scroller.
           */}
-        {logs.length === 0 && !loading ? (
-          <div className={styles.text3}>
-            <ShieldCheck size={36} className={styles.muted} />
-            <h3 className={styles.text4}>No audit logs found</h3>
-            <p className={styles.text5}>
-              {searchQuery || actionFilter ? 'Try clearing filters or search queries.' : 'No customer audit events recorded yet.'}
-            </p>
-          </div>
-        ) : (
-          <DataTable>
+        <DataTable footer={<Pagination page={clientFiltered ? 1 : pageNumber} pageSize={clientFiltered ? Math.max(visibleLogs.length, 1) : pageSize} total={clientFiltered ? visibleLogs.length : totalCount} itemLabel="event" onPageChange={setPageNumber} />}>
             <ResponsiveRows
               loading={loading && logs.length === 0}
               loadingRows={pageSize}
               rows={visibleLogs}
               rowKey={(log, i) => String(log.id ?? i)}
-              empty="No audit records found matching the selected filters."
+              empty={
+                searchQuery || actionFilter || actorFilter || customerFilter || descFilter || statusFilter
+                  ? 'No audit logs match the selected filters. Try clearing filters or adjusting your search query.'
+                  : 'No customer audit events recorded yet.'
+              }
               columns={[
                 {
                   key: 'timestamp',
@@ -394,7 +393,7 @@ export default function AuditLogs() {
                       onChange={setActorFilter}
                       options={actorOptions}
                       allLabel="Everyone"
-                      searchable={actorOptions.length > 6}
+                      filterType="alpha"
                       searchPlaceholder="Type a name to narrow…"
                       emptyHint="Nobody in this log matches that."
                     />
@@ -402,11 +401,6 @@ export default function AuditLogs() {
                   render: (log) => {
                     const actor = resolveActor(log.user);
                     return (
-                      /*
-                       * No raw identifier here. The fallback used to be shortId(actor.id) — a
-                       * truncated database GUID, meaningless to the people who read this log. When
-                       * the name cannot be resolved, saying so plainly is more useful.
-                       */
                       <ActorCell
                         name={actor.name ?? (actor.id ? null : 'System')}
                         fallback="Unknown user"
@@ -422,10 +416,12 @@ export default function AuditLogs() {
                     <ColumnFilter
                       key="action"
                       label="What Happened"
+                      title="Filter Action"
                       value={actionFilter}
                       onChange={setActionFilter}
                       options={ACTION_FILTER_OPTIONS}
                       allLabel="All Actions"
+                      searchPlaceholder="Type to filter actions…"
                     />
                   ),
                   render: (log) => (
@@ -447,7 +443,7 @@ export default function AuditLogs() {
                       onChange={setCustomerFilter}
                       options={customerOptions}
                       allLabel="All Customers"
-                      searchable={customerOptions.length > 6}
+                      filterType="alpha"
                       searchPlaceholder="Type to narrow customers…"
                       emptyHint="No customer in this log matches that."
                     />
@@ -468,6 +464,20 @@ export default function AuditLogs() {
                   key: 'description',
                   label: 'Description',
                   priority: 'low',
+                  header: (
+                    <ColumnFilter
+                      key="description"
+                      label="Description"
+                      title="Filter Description"
+                      value={descFilter}
+                      onChange={setDescFilter}
+                      options={[]}
+                      allLabel={undefined}
+                      freeText
+                      searchPlaceholder="Type to filter description…"
+                      emptyHint="Press Enter to filter."
+                    />
+                  ),
                   render: (log) => <span className={styles.text8}>{log.description || EMPTY_VALUE}</span>,
                 },
                 {
@@ -478,10 +488,12 @@ export default function AuditLogs() {
                     <ColumnFilter
                       key="status"
                       label="Outcome"
+                      title="Filter Outcome"
                       value={statusFilter}
                       onChange={setStatusFilter}
                       options={STATUS_FILTER_OPTIONS}
                       allLabel="All Outcomes"
+                      searchPlaceholder="Type to filter outcome…"
                     />
                   ),
                   render: (log) => (
@@ -508,16 +520,7 @@ export default function AuditLogs() {
               ]}
             />
           </DataTable>
-        )}
       </div>
-
-      <Pagination
-        page={clientFiltered ? 1 : pageNumber}
-        pageSize={clientFiltered ? Math.max(visibleLogs.length, 1) : pageSize}
-        total={clientFiltered ? visibleLogs.length : totalCount}
-        itemLabel="event"
-        onPageChange={setPageNumber}
-      />
 
 
       {/* Details Drawer — Host & Lead Standard Structured Inspect Drawer */}
@@ -527,12 +530,8 @@ export default function AuditLogs() {
           onClose={() => setDetailsOpen(false)}
           title="Activity Details"
           subtitle="What happened, who did it, and when"
-          icon={<Shield size={22} />}
-          footer={
-            <Button type="button" variant="secondary" onClick={() => setDetailsOpen(false)}>
-              Close Details
-            </Button>
-          }
+          icon={<Shield size={20} />}
+          closeLabel="Close details"
         >
             <DetailSections>
               {/* Summary + timeline, side by side */}
@@ -569,9 +568,7 @@ export default function AuditLogs() {
                         <div className="audit-detail-row-body">
                           <dt className="audit-detail-row-label">What Happened</dt>
                           <dd className="audit-detail-row-value">
-                            <span className="audit-action-badge">
-                              {formatActionLabel(selectedLog.action)}
-                            </span>
+                            <Badge tone="primary">{formatActionLabel(selectedLog.action)}</Badge>
                           </dd>
                         </div>
                       </div>
@@ -588,7 +585,7 @@ export default function AuditLogs() {
                           <dt className="audit-detail-row-label">Outcome</dt>
                           <dd className="audit-detail-row-value">
                             <Badge tone={isSuccess ? 'success' : 'danger'} dot>
-                              {isSuccess ? 'Successful' : selectedLog.status || 'Failed'}
+                              {isSuccess ? 'Success' : 'Failure'}
                             </Badge>
                           </dd>
                         </div>
@@ -670,7 +667,7 @@ export default function AuditLogs() {
               </DetailSection>
 
               <DetailSection
-                title="Customer & Record"
+                title="Affected Record"
                 icon={<Box size={12} />}
                 hidden={
                   !selectedLog.customerName &&

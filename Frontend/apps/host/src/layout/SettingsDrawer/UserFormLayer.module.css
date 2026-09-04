@@ -551,28 +551,44 @@
   align-items: center;
   justify-content: space-between;
   gap: 14px;
-  background: var(--omni-color-surface-alt);
-  border: 1.5px solid #e2e8f0;
-  border-radius: var(--omni-radius-lg-minus);
-  padding: 10px 14px;
-  transition: border-color 0.15s ease, background 0.15s ease;
+  background: var(--omni-color-surface);
+  border: 1px solid #eaecf0;
+  border-radius: var(--omni-radius-lg);
+  padding: 14px 16px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.03), 0 3px 8px rgba(15, 23, 42, 0.02);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .statusToggleCard:hover {
-  background: var(--omni-color-surface);
   border-color: var(--omni-color-border-strong);
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.05), 0 4px 12px rgba(15, 23, 42, 0.04);
+}
+
+.statusToggleIcon {
+  width: 34px;
+  height: 34px;
+  border-radius: var(--omni-radius-md-plus);
+  background: var(--omni-color-surface-alt);
+  color: var(--omni-color-text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background 150ms ease, color 150ms ease;
+}
+
+/* Tinted while the account is active — the state the old bullet dot was carrying. */
+.statusToggleIconOn {
+  background: var(--omni-color-success-50);
+  color: var(--omni-color-success-600);
 }
 
 .statusToggleInfo {
   display: flex;
   flex-direction: column;
   gap: 2px;
-}
-
-.statusToggleHeader {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+  flex: 1;
+  min-width: 0;
 }
 
 .statusToggleTitle {
@@ -832,10 +848,13 @@
 .matrixTableWrap {
   width: 100%;
   overflow-x: auto;
+  border: 1px solid #eaecf0;
+  border-radius: var(--omni-radius-md);
 }
 
 .matrixTable {
   width: 100%;
+  min-width: max-content;
   border-collapse: collapse;
   text-align: left;
 }
@@ -849,6 +868,7 @@
   text-transform: uppercase;
   background: var(--omni-color-surface-alt);
   border-bottom: 2px solid #eaecf0;
+  white-space: nowrap;
 }
 
 .matrixTable td {
@@ -862,9 +882,42 @@
   background: var(--omni-color-surface-alt);
 }
 
+/*
+ * The feature-name column stays pinned while the capability columns (View/Create/Edit/Delete/
+ * Disable/Register/Export/Approve/Manage) scroll — nine columns do not fit a 700px drawer, and
+ * losing sight of which row a checkbox belongs to mid-scroll made the matrix unreadable.
+ */
+.thFeature,
+.tdFeature {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  min-width: 190px;
+  width: 190px;
+  box-shadow: 2px 0 4px -2px rgba(15, 23, 42, 0.08);
+}
+
+.tdFeature {
+  background: var(--omni-color-surface);
+}
+
+.matrixTable tbody tr:hover .tdFeature {
+  background: var(--omni-color-surface-alt);
+}
+
+.thCap,
+.tdCap {
+  text-align: center;
+  min-width: 80px;
+}
+
 .featureName {
   font-weight: var(--omni-font-weight-semibold);
   color: #1e293b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
 }
 
 .checkbox {

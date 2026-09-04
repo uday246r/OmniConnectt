@@ -58,8 +58,10 @@ public record CreateRemoteAppRequest(
     string? PermissionsSourceUrl = null,
 
     // Bounded so the sidebar cannot be handed an int that overflows a client-side sort or renders as
-    // a nonsense position. Negative values are legitimate (pin an app to the top).
-    [Range(-1000, 100000, ErrorMessage = "Display order must be between -1000 and 100000.")]
+    // a nonsense position. 1-based: position 1 is the top of the Apps list, which is what the field
+    // says it does. Negatives and 0 used to be accepted (as an undocumented "pin to top" trick) and
+    // only ever produced positions an admin could not reason about against a 1-based list.
+    [Range(1, 100000, ErrorMessage = "Display order must be 1 or higher.")]
     int SidebarOrder = 100);
 
 public record UpdateRemoteAppRequest(
@@ -79,7 +81,7 @@ public record UpdateRemoteAppRequest(
     [Url(ErrorMessage = "Permissions source URL must be a full absolute URL.")]
     string? PermissionsSourceUrl,
 
-    [Range(-1000, 100000, ErrorMessage = "Display order must be between -1000 and 100000.")]
+    [Range(1, 100000, ErrorMessage = "Display order must be 1 or higher.")]
     int SidebarOrder);
 
 public record UpdateRemoteAppStatusRequest(

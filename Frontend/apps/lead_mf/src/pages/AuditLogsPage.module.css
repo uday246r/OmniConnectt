@@ -17,9 +17,11 @@
 
 /* ── Row cells ───────────────────────────────────────────────── */
 .timestampCell {
-  color: var(--omni-color-text-primary);
+  color: var(--omni-color-text-secondary);
   font-weight: var(--omni-font-weight-medium);
+  font-size: var(--omni-font-size-xs);
   white-space: nowrap;
+  letter-spacing: -0.01em;
 }
 
 /*
@@ -27,15 +29,18 @@
  * custom properties; the declarations live here.
  */
 .actionChip {
-  display: inline-block;
-  font-family: var(--omni-font-mono);
-  padding: 2px var(--omni-space-2);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: inherit;
+  padding: 3px 9px;
   border-radius: var(--omni-radius-sm);
   background: var(--audit-chip-bg);
   color: var(--audit-chip-text);
   border: 1px solid var(--audit-chip-border);
   font-size: var(--omni-font-size-xs-plus);
-  font-weight: var(--omni-font-weight-semibold);
+  font-weight: var(--omni-font-weight-bold);
+  white-space: nowrap;
 }
 
 .descriptionCell {

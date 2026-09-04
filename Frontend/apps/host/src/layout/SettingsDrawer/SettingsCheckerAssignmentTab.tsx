@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useAuthStore } from '../../features/auth/store/authStore'
 import { checkerAssignmentsApi, type AssignableModuleDto, type CheckerAssignmentDto } from '../../features/approvals/api/checkerAssignmentsApi'
+import { groupModulesByApp, type ModuleAppGroup } from '../../features/approvals/utils/moduleAppGrouping'
 import { remoteAppsApi, type RemoteAppDto } from '../../features/settings-applications/api/remoteAppsApi'
 import { useSettingsDrawerStore } from '../../shared/stores/settingsDrawerStore'
 import { useDebouncedValue } from '../../shared/hooks/useDebouncedValue'
@@ -26,13 +27,7 @@ function getModuleIcon(key: string, label: string) {
   return <Icon.Layers width={14} height={14} />
 }
 
-interface AppGroup {
-  id: string
-  key: string
-  name: string
-  isHost: boolean
-  iconKey?: string | null
-  modules: AssignableModuleDto[]
+interface AppGroup extends ModuleAppGroup {
   gatedCount: number
   totalCheckers: number
 }
@@ -62,7 +57,7 @@ export function SettingsCheckerAssignmentTab() {
   const appDropdownRef = useRef<HTMLDivElement>(null)
   useClickOutside([appDropdownRef], () => setAppDropdownOpen(false), appDropdownOpen)
 
-  // Collapsible sections state (all expanded by default)
+  // Collapsible sections state (all collapsed by default — the operator opens what they need)
   const [expandedApps, setExpandedApps] = useState<Record<string, boolean>>({})
 
   const debouncedSearch = useDebouncedValue(search, 250)
@@ -98,84 +93,25 @@ export function SettingsCheckerAssignmentTab() {
     }
   }, [accessToken, dataRevision])
 
-  // Group modules by Application (Host Platform + Remote Apps)
+  // Group modules by Application (Host Platform + Remote Apps), then layer in this page's own
+  // gated/checker counts — the grouping itself is shared with the assignment form's "whole
+  // application" bulk-assign scope so both stay in sync.
   const appGroups = useMemo<AppGroup[]>(() => {
-    const groups: AppGroup[] = []
-
-    // 1. Host Platform
-    const hostModules = modules.filter((m) => m.key.startsWith('host.') || !m.key.startsWith('remote.'))
-    const hostGated = hostModules.filter((m) => assignments.some((a) => a.module === m.key)).length
-    const hostCheckers = assignments.filter((a) => hostModules.some((m) => m.key === a.module)).length
-
-    if (hostModules.length > 0 || remoteApps.length === 0) {
-      groups.push({
-        id: 'host',
-        key: 'host.platform',
-        name: 'Host Platform (Core)',
-        isHost: true,
-        iconKey: 'Shield',
-        modules: hostModules,
-        gatedCount: hostGated,
-        totalCheckers: hostCheckers,
-      })
-    }
-
-    // 2. Remote Applications
-    const assignedModuleKeys = new Set(hostModules.map((m) => m.key))
-
-    for (const app of remoteApps) {
-      const appModules = modules.filter((m) => {
-        const key = m.key.toLowerCase()
-        const appKey = app.key.toLowerCase()
-        return key === `remote.${appKey}` || key.startsWith(`remote.${appKey}.`) || key.includes(appKey)
-      })
-
-      appModules.forEach((m) => assignedModuleKeys.add(m.key))
-
-      const appGated = appModules.filter((m) => assignments.some((a) => a.module === m.key)).length
-      const appCheckers = assignments.filter((a) => appModules.some((m) => m.key === a.module)).length
-
-      groups.push({
-        id: app.id,
-        key: app.key,
-        name: app.displayName,
-        isHost: false,
-        iconKey: app.iconKey,
-        modules: appModules,
-        gatedCount: appGated,
-        totalCheckers: appCheckers,
-      })
-    }
-
-    // 3. Fallback for any unmapped remote modules
-    const remainingRemoteModules = modules.filter((m) => !assignedModuleKeys.has(m.key) && m.key.startsWith('remote.'))
-    if (remainingRemoteModules.length > 0) {
-      const remGated = remainingRemoteModules.filter((m) => assignments.some((a) => a.module === m.key)).length
-      const remCheckers = assignments.filter((a) => remainingRemoteModules.some((m) => m.key === a.module)).length
-
-      groups.push({
-        id: 'other-remotes',
-        key: 'remote.extensions',
-        name: 'Other Remote Microfrontends',
-        isHost: false,
-        iconKey: 'Layers',
-        modules: remainingRemoteModules,
-        gatedCount: remGated,
-        totalCheckers: remCheckers,
-      })
-    }
-
-    return groups
+    return groupModulesByApp(modules, remoteApps).map((group) => ({
+      ...group,
+      gatedCount: group.modules.filter((m) => assignments.some((a) => a.module === m.key)).length,
+      totalCheckers: assignments.filter((a) => group.modules.some((m) => m.key === a.module)).length,
+    }))
   }, [modules, remoteApps, assignments])
 
-  // Initialize expanded apps state when apps load
+  // Initialize expanded apps state when apps load — collapsed until the operator opts in
   useEffect(() => {
     if (appGroups.length > 0) {
       setExpandedApps((prev) => {
         const next = { ...prev }
         appGroups.forEach((g) => {
           if (next[g.id] === undefined) {
-            next[g.id] = true
+            next[g.id] = false
           }
         })
         return next
@@ -337,9 +273,6 @@ export function SettingsCheckerAssignmentTab() {
                     <div className={styles.triggerDetails}>
                       <span className={styles.triggerLabel}>Application:</span>
                       <span className={styles.triggerAppName}>{selectedAppObj.name}</span>
-                      <span className={styles.triggerGatedBadge}>
-                        {selectedAppObj.gatedCount} of {selectedAppObj.modules.length} Gated
-                      </span>
                     </div>
                   </>
                 ) : (
@@ -350,9 +283,6 @@ export function SettingsCheckerAssignmentTab() {
                     <div className={styles.triggerDetails}>
                       <span className={styles.triggerLabel}>Application:</span>
                       <span className={styles.triggerAppName}>All Applications</span>
-                      <span className={styles.triggerGatedBadge}>
-                        {totalGatedModules} of {modules.length} Gated
-                      </span>
                     </div>
                   </>
                 )}
@@ -369,7 +299,7 @@ export function SettingsCheckerAssignmentTab() {
                   <input
                     type="text"
                     className={styles.appSelectorSearchInput}
-                    placeholder="Search application name or key..."
+                    placeholder="Search application name..."
                     value={appSearch}
                     onChange={(e) => setAppSearch(e.target.value)}
                     autoFocus
@@ -466,7 +396,7 @@ export function SettingsCheckerAssignmentTab() {
             <input
               type="text"
               className={styles.searchInput}
-              placeholder="Search by module name, key, or checker user..."
+              placeholder="Search by module or checker name..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -591,7 +521,6 @@ export function SettingsCheckerAssignmentTab() {
                       <AppHeaderIcon width={14} height={14} />
                     </div>
                     <span className={styles.appSectionTitle}>{app.name}</span>
-                    <span className={styles.appSectionKey}>{app.key}</span>
                     <span
                       className={`${styles.appSectionSummaryBadge} ${
                         app.gatedCount > 0 ? styles.badgeGatedApp : styles.badgeUngatedApp
@@ -601,23 +530,19 @@ export function SettingsCheckerAssignmentTab() {
                     </span>
                   </div>
 
-                  <div className={styles.appSectionRight} onClick={(e) => e.stopPropagation()}>
-                    {canManage && (
+                  {canManage && app.modules.length > 0 && (
+                    <div className={styles.appSectionRight} onClick={(e) => e.stopPropagation()}>
                       <button
                         type="button"
                         className={styles.appSectionAddBtn}
-                        onClick={() =>
-                          pushLayer({
-                            type: 'checker-assignment-form',
-                            module: app.modules.length > 0 ? app.modules[0].key : undefined,
-                          })
-                        }
+                        title={`Assign one checker to all ${app.modules.length} module${app.modules.length === 1 ? '' : 's'} in ${app.name} at once`}
+                        onClick={() => pushLayer({ type: 'checker-assignment-form', appId: app.id })}
                       >
-                        <Icon.Plus width={11} height={11} />
-                        <span>Assign Checker</span>
+                        <Icon.Users width={11} height={11} />
+                        <span>Assign to Whole App</span>
                       </button>
-                    )}
-                  </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Collapsible Modules Container under this Application */}
@@ -636,7 +561,6 @@ export function SettingsCheckerAssignmentTab() {
                               </div>
                               <div className={styles.moduleTitleBlock}>
                                 <span className={styles.moduleName}>{mod.label}</span>
-                                <span className={styles.moduleKeyTag}>{mod.key}</span>
                                 {isGated ? (
                                   <span className={styles.badgeGated}>
                                     <span className={styles.badgeDotGreen} />

@@ -1,7 +1,9 @@
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Threading.RateLimiting;
+using AuthService.Application.Events;
 using AuthService.Application.Services;
+using AuthService.Hubs;
 using AuthService.Infrastructure;
 using AuthService.Infrastructure.Email;
 using AuthService.Infrastructure.Security;
@@ -108,6 +110,11 @@ builder.Services.AddScoped<SearchAppService>();
 builder.Services.AddMemoryCache();
 builder.Services.AddScoped<NavigationAppService>();
 
+builder.Services.AddSignalR();
+builder.Services.AddSingleton<KpiCoalescerService>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<KpiCoalescerService>());
+builder.Services.AddSingleton<IPlatformEventPublisher, SignalRPlatformEventPublisher>();
+
 // Phase 2: replaying an approved mutation that originated in a remote service means POSTing to THAT
 // service's own callback URL — a short timeout keeps one unreachable/slow remote from hanging a
 // checker's Approve click indefinitely (the same class of bug RemoteAppAppService.ResyncPermissionsAsync
@@ -168,6 +175,19 @@ builder.Services
         // null even though the token clearly has a "sub" claim. "name" happens not to be in that
         // remap table, which is why actor *names* came through fine while actor *ids* silently didn't.
         options.MapInboundClaims = false;
+        options.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = context =>
+            {
+                var accessToken = context.Request.Query["access_token"];
+                var path = context.HttpContext.Request.Path;
+                if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs"))
+                {
+                    context.Token = accessToken;
+                }
+                return Task.CompletedTask;
+            }
+        };
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
@@ -357,13 +377,24 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
+var instanceCountStr = builder.Configuration["INSTANCE_COUNT"] ?? Environment.GetEnvironmentVariable("INSTANCE_COUNT") ?? Environment.GetEnvironmentVariable("WEB_CONCURRENCY");
+if (int.TryParse(instanceCountStr, out var instanceCount) && instanceCount > 1)
+{
+    app.Logger.LogWarning(
+        "Instance count is {InstanceCount} but no SignalR Redis backplane is configured. Group broadcasts (approvals/audit) will only reach connections on the sending instance.",
+        instanceCount);
+}
+
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
 }
 
 // Compression before CORS/auth so it wraps every response the pipeline produces.
-app.UseResponseCompression();
+// Exempt /hubs from response compression because compression buffers and breaks SSE/long-polling fallbacks.
+app.UseWhen(
+    ctx => !ctx.Request.Path.StartsWithSegments("/hubs"),
+    appBuilder => appBuilder.UseResponseCompression());
 app.UseCors("Frontend");
 // No UseHttpsRedirection(): this runs behind a TLS-terminating proxy that already enforces HTTPS at
 // the edge. Redirecting in-app would 307 every call (preflight included) — see UseForwardedHeaders
@@ -375,6 +406,10 @@ app.UseAuthorization();
 // before MapControllers so a throttled request is rejected without reaching a handler.
 app.UseRateLimiter();
 app.MapControllers();
+app.MapHub<PlatformHub>("/hubs/platform", options =>
+{
+    options.CloseOnAuthenticationExpiration = true;
+});
 
 // Real check — reports Unhealthy (503) when the database is unreachable, instead of the previous
 // hardcoded "ok" that could never fail.

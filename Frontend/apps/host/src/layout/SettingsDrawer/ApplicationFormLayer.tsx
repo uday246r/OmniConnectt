@@ -1,6 +1,6 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { useAuthStore } from '../../features/auth/store/authStore'
-import { remoteAppsApi } from '../../features/settings-applications/api/remoteAppsApi'
+import { remoteAppsApi, type RemoteAppDto } from '../../features/settings-applications/api/remoteAppsApi'
 import { isApprovalPending, type ApprovalPendingDto } from '../../features/approvals/api/approvalsApi'
 import { useSettingsDrawerStore } from '../../shared/stores/settingsDrawerStore'
 import { Icon } from '../../shared/components/Icon/Icon'
@@ -13,6 +13,28 @@ import { TOPICS, invalidate } from '../../shared/stores/invalidationStore'
 interface ApplicationFormLayerProps {
   appId?: string
 }
+
+/**
+ * Curated icon choices for a registered application. This is the field's ONLY editor — `iconKey`
+ * was already loaded, submitted and rendered everywhere an app appears (sidebar, Checker
+ * Assignment, the Role editor's application accordions, via `resolveIcon`), but nothing in this
+ * form let an operator actually set or change it, so every newly registered app fell back to the
+ * generic Box icon with no way to pick something more identifying.
+ */
+const APP_ICON_OPTIONS: { key: string; Comp: typeof Icon.Box }[] = [
+  { key: 'Box', Comp: Icon.Box },
+  { key: 'Layers', Comp: Icon.Layers },
+  { key: 'Grid', Comp: Icon.Grid },
+  { key: 'Users', Comp: Icon.Users },
+  { key: 'Briefcase', Comp: Icon.Briefcase },
+  { key: 'Building', Comp: Icon.Building },
+  { key: 'Package', Comp: Icon.Package },
+  { key: 'Globe', Comp: Icon.Globe },
+  { key: 'PieChart', Comp: Icon.PieChart },
+  { key: 'Headset', Comp: Icon.Headset },
+  { key: 'Shield', Comp: Icon.Shield },
+  { key: 'FileText', Comp: Icon.FileText },
+]
 
 /** Returns a human-readable field label from an ASP.NET ProblemDetails field name. */
 function humanise(field: string): string {
@@ -72,7 +94,11 @@ export function ApplicationFormLayer({ appId }: ApplicationFormLayerProps) {
   const [iconKey, setIconKey] = useState('')
   const [manifestUrl, setManifestUrl] = useState('')
   const [permissionsSourceUrl, setPermissionsSourceUrl] = useState('')
-  const [sidebarOrder, setSidebarOrder] = useState<number>(10)
+  const [sidebarOrder, setSidebarOrder] = useState<number>(1)
+  /** Every other registered app, so the position field can say what each number currently means. */
+  const [otherApps, setOtherApps] = useState<RemoteAppDto[]>([])
+  /** This app's saved position — the slot a swapped-with app moves into. Null for a new app. */
+  const [originalOrder, setOriginalOrder] = useState<number | null>(null)
 
   useEffect(() => {
     if (!accessToken || !appId) return
@@ -88,6 +114,7 @@ export function ApplicationFormLayer({ appId }: ApplicationFormLayerProps) {
           setManifestUrl(app.manifestUrl)
           setPermissionsSourceUrl(app.permissionsSourceUrl ?? '')
           setSidebarOrder(app.sidebarOrder)
+          setOriginalOrder(app.sidebarOrder)
         }
       } catch (err: any) {
         if (!cancelled) setError(err?.message || 'Could not load application details.')
@@ -101,6 +128,43 @@ export function ApplicationFormLayer({ appId }: ApplicationFormLayerProps) {
       cancelled = true
     }
   }, [accessToken, appId])
+
+  /*
+   * The other registered apps, so the position field can say what a number actually means rather
+   * than asking an admin to guess. On a NEW app it also supplies the default: the next free slot,
+   * instead of a hardcoded number that was usually already taken.
+   */
+  useEffect(() => {
+    if (!accessToken) return
+    let cancelled = false
+
+    remoteAppsApi
+      .list(accessToken, { pageSize: 100 })
+      .then((res) => {
+        if (cancelled) return
+        const others = res.items.filter((a) => a.id !== appId)
+        setOtherApps(others)
+        if (!appId) {
+          const taken = new Set(others.map((a) => a.sidebarOrder))
+          let next = 1
+          while (taken.has(next)) next += 1
+          setSidebarOrder(next)
+        }
+      })
+      .catch(() => {
+        // Non-fatal: the field still works, it just cannot show which positions are taken.
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [accessToken, appId])
+
+  /** The app currently sitting on the chosen position, if any. */
+  const positionOccupant = useMemo(
+    () => otherApps.find((a) => a.sidebarOrder === sidebarOrder) ?? null,
+    [otherApps, sidebarOrder],
+  )
 
   /** Client-side validation before submit */
   function validate(): boolean {
@@ -175,7 +239,7 @@ export function ApplicationFormLayer({ appId }: ApplicationFormLayerProps) {
       }
       const { useModuleRegistryStore } = await import('../../shared/stores/moduleRegistryStore')
       void useModuleRegistryStore.getState().fetchForSidebar(token)
-      invalidate(TOPICS.applications, TOPICS.approvals)
+      invalidate(TOPICS.applications, TOPICS.approvals, TOPICS.kpis)
       useSettingsDrawerStore.getState().resetToRoot('applications')
     } catch (err: any) {
       if (err instanceof ApiError && err.errors) {
@@ -393,14 +457,67 @@ export function ApplicationFormLayer({ appId }: ApplicationFormLayerProps) {
               </div>
 
               <div className={styles.inputGroupFull}>
-                <label className={styles.label}>Sidebar Sort Order</label>
+                <label className={styles.label}>App Icon</label>
+                <div className={styles.iconPicker} role="radiogroup" aria-label="Application icon">
+                  {APP_ICON_OPTIONS.map(({ key, Comp }) => {
+                    const isSelected = (iconKey || 'Box') === key
+                    return (
+                      <button
+                        key={key}
+                        type="button"
+                        role="radio"
+                        aria-checked={isSelected}
+                        aria-label={`${key} icon`}
+                        title={key}
+                        className={`${styles.iconSwatch} ${isSelected ? styles.iconSwatchActive : ''}`}
+                        onClick={() => setIconKey(key)}
+                      >
+                        <Comp width={17} height={17} />
+                      </button>
+                    )
+                  })}
+                </div>
+                <span className={styles.fieldHint}>Shown in the sidebar and wherever this application appears.</span>
+              </div>
+
+              <div className={styles.inputGroupFull}>
+                <label className={styles.label}>Sidebar Position</label>
                 <input
                   type="number"
+                  min={1}
+                  step={1}
                   className={styles.input}
                   value={sidebarOrder}
-                  onChange={(e) => setSidebarOrder(Number(e.target.value) || 0)}
+                  /* Clamped rather than merely `min`-attributed: the spinner respects min, but typing
+                     or pasting "-3" does not, and the old `Number(value) || 0` turned an emptied
+                     field into position 0. Position 1 is the top of the Apps list. */
+                  onChange={(e) => {
+                    const parsed = Math.floor(Number(e.target.value))
+                    setSidebarOrder(Number.isFinite(parsed) && parsed >= 1 ? parsed : 1)
+                  }}
                 />
-                <span className={styles.fieldHint}>Lower numbers appear first in the sidebar.</span>
+                {positionOccupant ? (
+                  <span className={styles.fieldHint}>
+                    {isEdit && originalOrder !== null ? (
+                      <>
+                        <strong>{positionOccupant.displayName}</strong> is at position {sidebarOrder} — saving swaps
+                        the two, so it moves to {originalOrder} and this app takes {sidebarOrder}.
+                      </>
+                    ) : (
+                      <>
+                        Position {sidebarOrder} is already used by <strong>{positionOccupant.displayName}</strong>. Both
+                        would sit at {sidebarOrder} and be listed by name — pick a free number to avoid that.
+                      </>
+                    )}
+                  </span>
+                ) : (
+                  <span className={styles.fieldHint}>
+                    Position 1 is the top of the Apps list.
+                    {otherApps.length > 0 && (
+                      <> Currently: {[...otherApps].sort((a, b) => a.sidebarOrder - b.sidebarOrder).map((a) => `${a.sidebarOrder}. ${a.displayName}`).join(', ')}.</>
+                    )}
+                  </span>
+                )}
               </div>
 
             </div>

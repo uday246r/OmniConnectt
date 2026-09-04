@@ -5,7 +5,7 @@
 .container {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 18px;
 }
 
 /* ── Section Header ───────────────────────────────────────── */
@@ -78,9 +78,9 @@
 }
 
 .subtitle {
-  font-size: var(--omni-font-size-xs-plus);
-  color: rgba(255, 255, 255, 0.82);
-  margin: 2px 0 0;
+  font-size: var(--omni-font-size-xs);
+  color: rgba(255, 255, 255, 0.78);
+  margin: 3px 0 0;
   line-height: 1.4;
 }
 
@@ -88,16 +88,18 @@
 .createButton {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 7px;
   background: var(--omni-color-on-header-surface);
   color: #ffffff;
-  border: 1px solid rgba(255, 255, 255, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.32);
   border-radius: var(--omni-radius-md-plus);
-  padding: 8px 14px;
-  font-size: var(--omni-font-size-sm-minus);
+  padding: 9px 16px;
+  font-size: var(--omni-font-size-sm);
   font-weight: var(--omni-font-weight-semibold);
   cursor: pointer;
   white-space: nowrap;
+  letter-spacing: -0.01em;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
   backdrop-filter: blur(4px);
   transition: all 140ms ease;
   position: relative;
@@ -202,20 +204,9 @@
 }
 
 .triggerAppName {
-  font-size: var(--omni-font-size-sm-minus);
+  font-size: var(--omni-font-size-sm);
   font-weight: var(--omni-font-weight-bold);
   color: var(--omni-color-text-primary);
-  white-space: nowrap;
-}
-
-.triggerGatedBadge {
-  font-size: var(--omni-font-size-2xs-plus);
-  font-weight: var(--omni-font-weight-bold);
-  padding: 1.5px 7px;
-  border-radius: var(--omni-radius-pill);
-  background: var(--omni-color-success-50);
-  color: var(--omni-color-success-600);
-  border: 1px solid #a7f3d0;
   white-space: nowrap;
 }
 
@@ -404,11 +395,11 @@
 
 .searchInput {
   width: 100%;
-  padding: 7px 12px 7px 32px;
+  padding: 8px 12px 8px 34px;
   background: var(--omni-color-surface);
   border: 1.5px solid #e2e8f0;
-  border-radius: var(--omni-radius-md);
-  font-size: var(--omni-font-size-xs);
+  border-radius: var(--omni-radius-md-plus);
+  font-size: var(--omni-font-size-sm-minus);
   color: var(--omni-color-text-primary);
   outline: none;
   font-family: inherit;
@@ -507,13 +498,13 @@
 .appSectionsList {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
 }
 
 .appSection {
   background: var(--omni-color-surface);
   border: 1.5px solid #e2e8f0;
-  border-radius: 11px;
+  border-radius: var(--omni-radius-lg-plus);
   overflow: hidden;
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.02);
   transition: border-color 0.15s ease;
@@ -527,7 +518,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 14px;
+  padding: 12px 18px;
   background: var(--omni-color-surface-alt);
   border-bottom: 1px solid #e2e8f0;
   gap: 10px;
@@ -584,19 +575,10 @@
 }
 
 .appSectionTitle {
-  font-size: var(--omni-font-size-sm);
+  font-size: var(--omni-font-size-sm-plus);
   font-weight: var(--omni-font-weight-bold);
   color: var(--omni-color-text-primary);
   letter-spacing: -0.01em;
-}
-
-.appSectionKey {
-  font-size: var(--omni-font-size-2xs);
-  color: #64748b;
-  font-family: var(--omni-font-mono);
-  background: rgba(0, 0, 0, 0.04);
-  padding: 1px 5px;
-  border-radius: var(--omni-radius-xs);
 }
 
 .appSectionSummaryBadge {
@@ -622,20 +604,22 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-shrink: 0;
 }
 
 .appSectionAddBtn {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
   background: var(--omni-color-surface);
   color: var(--omni-color-primary-600);
   border: 1px solid #bfdbfe;
   border-radius: var(--omni-radius-sm);
-  padding: 3px 8px;
+  padding: 5px 10px;
   font-size: var(--omni-font-size-xs-minus);
   font-weight: var(--omni-font-weight-semibold);
   cursor: pointer;
+  white-space: nowrap;
   transition: all 0.15s ease;
   font-family: inherit;
 }
@@ -651,14 +635,14 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 10px 14px;
+  padding: 12px 18px;
 }
 
 .moduleCard {
   background: var(--omni-color-surface);
   border: 1px solid #eaecf0;
-  border-radius: var(--omni-radius-md);
-  padding: 10px 12px;
+  border-radius: var(--omni-radius-md-plus);
+  padding: 12px 14px;
   display: flex;
   flex-direction: column;
   gap: 7px;
@@ -703,19 +687,9 @@
 }
 
 .moduleName {
-  font-size: var(--omni-font-size-xs);
+  font-size: var(--omni-font-size-sm);
   font-weight: var(--omni-font-weight-bold);
   color: var(--omni-color-text-primary);
-}
-
-.moduleKeyTag {
-  font-size: var(--omni-font-size-3xs);
-  color: #64748b;
-  font-family: var(--omni-font-mono);
-  background: var(--omni-color-surface-alt);
-  padding: 1px 5px;
-  border-radius: var(--omni-radius-xs);
-  border: 1px solid #e2e8f0;
 }
 
 .badgeGated {

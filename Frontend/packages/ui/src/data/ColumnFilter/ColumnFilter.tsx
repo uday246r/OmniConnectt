@@ -1,6 +1,7 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { classNames } from '../../utils/classNames'
+import { sanitizeFilterInput, filterInputMode, filterTypeBlockedMessage, type FilterInputType } from '../../utils/filterInput'
 import styles from './ColumnFilter.module.css'
 
 export interface ColumnFilterOption {
@@ -32,6 +33,12 @@ export interface ColumnFilterProps {
    * columns filtered as-you-type against an already-loaded page, which is not what these do.
    */
   freeText?: boolean
+  /**
+   * Restricts what the free-text box accepts to match the column's own data type — 'numeric' for an
+   * IC number, phone, or account number; 'alpha' for a person's name. Defaults to 'text' (no
+   * restriction), same as before this existed. Ignored when `freeText` is not set.
+   */
+  filterType?: FilterInputType
   searchPlaceholder?: string
   /** Shown when a search matches nothing. */
   emptyHint?: ReactNode
@@ -61,14 +68,19 @@ export function ColumnFilter({
   options,
   title,
   allLabel = 'All',
-  searchable,
+  searchable = true,
   freeText,
+  filterType = 'text',
   searchPlaceholder = 'Type to search…',
   emptyHint,
   className,
 }: ColumnFilterProps) {
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
+  // True right after a keystroke that sanitizeFilterInput actually had to strip something from —
+  // cleared as soon as a keystroke doesn't, so the hint tracks "was that last character rejected"
+  // rather than lingering once the operator has corrected course.
+  const [blocked, setBlocked] = useState(false)
   const rootRef = useRef<HTMLTableCellElement>(null)
   const popoverRef = useRef<HTMLDivElement>(null)
   const popoverId = useId()
@@ -135,7 +147,21 @@ export function ColumnFilter({
     } else {
       setSearch('')
     }
+    setBlocked(false)
   }, [open, freeText, value])
+
+  /** Sanitizes a keystroke against `filterType` (freeText or narrowing an options list alike) and
+   *  flags `blocked` when the raw input actually had something stripped from it. */
+  function handleSearchChange(raw: string) {
+    if (filterType === 'text') {
+      setSearch(raw)
+      setBlocked(false)
+      return
+    }
+    const clean = sanitizeFilterInput(raw, filterType)
+    setSearch(clean)
+    setBlocked(clean !== raw)
+  }
 
   const isFiltered = value !== ''
   const needle = search.trim().toLowerCase()
@@ -210,24 +236,31 @@ export function ColumnFilter({
           {(searchable || freeText) && (
             <input
               type="text"
-              className={styles.input}
+              inputMode={filterInputMode(filterType)}
+              className={classNames(styles.input, blocked && styles.inputBlocked)}
               placeholder={searchPlaceholder}
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              onKeyDown={
-                freeText
-                  ? (e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault()
-                        commitFreeText()
-                        setOpen(false)
-                      }
-                    }
-                  : undefined
-              }
+              onChange={(e) => handleSearchChange(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  if (freeText) {
+                    commitFreeText()
+                    setOpen(false)
+                  } else if (visible.length > 0) {
+                    pick(visible[0].value)
+                  }
+                }
+              }}
               onBlur={freeText ? commitFreeText : undefined}
               autoFocus
             />
+          )}
+
+          {blocked && (
+            <p className={styles.blockedHint} role="alert">
+              {filterTypeBlockedMessage(filterType)}
+            </p>
           )}
 
           {freeText ? (

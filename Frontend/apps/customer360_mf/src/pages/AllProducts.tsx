@@ -44,9 +44,9 @@ export default function AllProducts() {
 
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
-  // Client-side, like the category filter above it — this table renders a page the API already
-  // returned rather than re-querying.
   const [statusFilter, setStatusFilter] = useState('');
+  const [nameFilter, setNameFilter] = useState('');
+  const [accountFilter, setAccountFilter] = useState('');
 
   const customerName =
     customerType === 'individual'
@@ -77,6 +77,8 @@ export default function AllProducts() {
 
   // Local filtering based on query
   const filteredProducts = products.filter((item) => {
+    if (accountFilter && !(item.accountNumber || '').toLowerCase().includes(accountFilter.toLowerCase())) return false;
+    if (nameFilter && !(item.productName || '').toLowerCase().includes(nameFilter.toLowerCase())) return false;
     if (statusFilter) {
       const st = (item.derivedAccountStatus || item.financingStatus || '').toLowerCase();
       if (statusFilter === 'ACTIVE' ? !st.includes('active') : st.includes('active')) return false;
@@ -106,6 +108,8 @@ export default function AllProducts() {
 
       <FilterBar
         filters={[
+          accountFilter && { key: 'account', label: 'Account #', value: `"${accountFilter}"`, onRemove: () => setAccountFilter('') },
+          nameFilter && { key: 'name', label: 'Product Name', value: `"${nameFilter}"`, onRemove: () => setNameFilter('') },
           typeFilter && {
             key: 'category',
             label: 'Category',
@@ -121,6 +125,8 @@ export default function AllProducts() {
           searchTerm && { key: 'search', label: 'Search', value: `"${searchTerm}"`, onRemove: () => setSearchTerm('') },
         ].filter(Boolean) as ActiveFilter[]}
         onClearAll={() => {
+          setAccountFilter('');
+          setNameFilter('');
           setTypeFilter('');
           setStatusFilter('');
           setSearchTerm('');
@@ -169,26 +175,18 @@ export default function AllProducts() {
               Retry
               </Button>
           </div>
-        ) : !loading && filteredProducts.length === 0 ? (
-          <div className={styles.text2}>
-            <div className={styles.heading}>💳</div>
-            <div className={styles.strong}>
-              No product accounts found
-            </div>
-            <div className={styles.text3}>
-              {searchTerm || typeFilter
-                ? 'Try adjusting your search query or category filter.'
-                : 'No active banking products found for this customer record.'}
-            </div>
-          </div>
         ) : (
-          <DataTable>
+          <DataTable footer={<Pagination page={pageNumber} pageSize={pageSize} total={totalCount} itemLabel="product" onPageChange={setPageNumber} />}>
             <ResponsiveRows
               rows={filteredProducts}
               loading={loading}
               loadingRows={pageSize}
               rowKey={(prod, i) => prod.accountNumber || String(i)}
-              empty="No products found."
+              empty={
+                searchTerm || typeFilter || statusFilter || nameFilter || accountFilter
+                  ? 'No products found matching the selected filters. Try adjusting your search query or filters.'
+                  : 'No active banking products found for this customer record.'
+              }
               columns={[
                 {
                   key: 'category',
@@ -198,10 +196,12 @@ export default function AllProducts() {
                     <ColumnFilter
                       key="category"
                       label="Product Category"
+                      title="Filter Category"
                       value={typeFilter}
                       onChange={setTypeFilter}
                       options={PRODUCT_CATEGORY_OPTIONS}
                       allLabel="All Categories"
+                      searchPlaceholder="Type to filter categories…"
                     />
                   ),
                   render: (prod) => (
@@ -214,12 +214,41 @@ export default function AllProducts() {
                   key: 'name',
                   label: 'Product Name',
                   priority: 'always',
+                  header: (
+                    <ColumnFilter
+                      key="name"
+                      label="Product Name"
+                      title="Filter Product Name"
+                      value={nameFilter}
+                      onChange={setNameFilter}
+                      options={[]}
+                      allLabel={undefined}
+                      freeText
+                      searchPlaceholder="Type to filter name…"
+                      emptyHint="Press Enter to filter."
+                    />
+                  ),
                   render: (prod) => <span className={styles.text4}>{prod.productName}</span>,
                 },
                 {
                   key: 'account',
                   label: 'Account Number',
                   priority: 'high',
+                  header: (
+                    <ColumnFilter
+                      key="account"
+                      label="Account Number"
+                      title="Filter Account #"
+                      value={accountFilter}
+                      onChange={setAccountFilter}
+                      options={[]}
+                      allLabel={undefined}
+                      freeText
+                      filterType="numeric"
+                      searchPlaceholder="Type to filter account #…"
+                      emptyHint="Press Enter to filter."
+                    />
+                  ),
                   render: (prod) => <span className={cc.monoValue}>{prod.accountNumber}</span>,
                 },
                 {
@@ -284,17 +313,6 @@ export default function AllProducts() {
               ]}
             />
           </DataTable>
-        )}
-
-        {/* Pagination Toolbar */}
-        {totalCount > 0 && (
-          <Pagination
-            page={pageNumber}
-            pageSize={pageSize}
-            total={totalCount}
-            itemLabel="product"
-            onPageChange={setPageNumber}
-          />
         )}
       </div>
 

@@ -35,7 +35,8 @@ export interface DrawerProps {
  * `#lead-mf-scope` / `#customer360-mf-scope`; anything portalled to document.body lands outside that
  * scope and silently loses all of its styling. The host's own Modal and all five lead drawers
  * already render in-tree for this reason. If a portal ever becomes necessary here, the portal target
- * must itself be wrapped in the consuming app's scope id — see HostSidebarLeadNav for that pattern.
+ * must itself be wrapped in an element carrying the consuming app's scope id, so the prefixed
+ * selectors can still match inside it.
  *
  * The consumer owns everything behind the chrome: content, data fetching, validation, actions and
  * business rules. This component only knows how a drawer should look and how it closes.

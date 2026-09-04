@@ -5,6 +5,7 @@ import { RequireAuth } from './features/auth/components/RequireAuth'
 import { RequireCapability } from './features/auth/components/RequireCapability'
 import { RequirePasswordChange } from './features/auth/components/RequirePasswordChange'
 import { useSilentRefresh } from './features/auth/hooks/useSilentRefresh'
+import { usePlatformConnection } from './shared/realtime/usePlatformConnection'
 import { useAuthStore } from './features/auth/store/authStore'
 import { useModuleRegistryStore } from './shared/stores/moduleRegistryStore'
 import { useNavigationStore } from './shared/stores/navigationStore'
@@ -125,6 +126,30 @@ function SettingsRoute({ tab }: { tab: SettingsTab }) {
  * exactly as configured. The navigation tree already knows what they CAN reach, so the first row in
  * it is a far better destination — and it is the server's answer, not a guess made here.
  */
+/**
+ * `/settings` with no tab — send the operator to the first tab they can actually open.
+ *
+ * It used to resolve straight to the Users tab, so anyone without `Users:View` (a role that manages
+ * only applications, say) was bounced from `/settings` to `/404` by that tab's own guard. The drawer
+ * already picks its visible tabs this way; this makes the bare URL agree with it.
+ */
+function SettingsIndexRedirect() {
+  const isAdministrator = Boolean(useAuthStore((s) => s.user)?.isAdministrator)
+  const hasCapability = useAuthStore((s) => s.hasCapability)
+
+  const firstAllowed = (
+    [
+      ['users', FEATURE_KEYS.users],
+      ['roles', FEATURE_KEYS.roles],
+      ['applications', FEATURE_KEYS.applications],
+      ['checker-assignment', FEATURE_KEYS.checkerAssignment],
+    ] as const
+  ).find(([, featureKey]) => isAdministrator || hasCapability(featureKey, 'View'))
+
+  // No settings access at all: 404 rather than an empty drawer that can do nothing.
+  return <Navigate to={firstAllowed ? `/settings/${firstAllowed[0]}` : '/404'} replace />
+}
+
 function DashboardRoute() {
   const isAdministrator = useAuthStore((s) => Boolean(s.user?.isAdministrator))
   const hasCapability = useAuthStore((s) => s.hasCapability)
@@ -338,6 +363,10 @@ function AuthenticatedPagesLayout() {
 function AppRoutes() {
   const hydrate = useAuthStore((s) => s.hydrate)
   useSilentRefresh()
+  // Opens the SignalR connection once authenticated and tears it down on logout, so the approval
+  // tables, the notification badges and the dashboard KPIs update on a server event rather than a
+  // timer. Self-disables when VITE_REALTIME_ENABLED is "false".
+  usePlatformConnection()
 
   useEffect(() => {
     void hydrate()
@@ -447,7 +476,7 @@ function AppRoutes() {
             Deleting them is what fixes those, not patching them twice.
           */}
           <Route path="settings">
-            <Route index element={<SettingsRoute tab="users" />} />
+            <Route index element={<SettingsIndexRedirect />} />
             {(
               [
                 ['users', FEATURE_KEYS.users, 'Create'],

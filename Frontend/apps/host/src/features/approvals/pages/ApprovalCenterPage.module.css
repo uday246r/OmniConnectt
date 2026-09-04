@@ -636,6 +636,24 @@
   background: var(--omni-color-surface);
 }
 
+/* Briefly flags the box red right after a keystroke the field's type didn't accept — not a
+   persistent error state, just enough to say "that character was rejected" at the moment it is. */
+.popoverInputBlocked {
+  border-color: var(--omni-color-danger-400);
+}
+.popoverInputBlocked:focus {
+  border-color: var(--omni-color-danger-500);
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.12);
+}
+
+.blockedHint {
+  margin: 0;
+  padding: 0 2px;
+  font-size: var(--omni-font-size-2xs-plus);
+  font-weight: var(--omni-font-weight-medium);
+  color: var(--omni-color-danger-600);
+}
+
 .popoverCheckboxLabel {
   display: inline-flex;
   align-items: center;
@@ -1241,27 +1259,26 @@
   box-shadow: 0 -4px 16px rgba(15, 23, 42, 0.04);
 }
 
-.footerActions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 12px;
-}
-
+/*
+ * Reject and Approve fill the footer as two equal, deliberate targets — the one decision this
+ * drawer exists for, not a pair of small buttons floating at one edge of otherwise-empty space.
+ */
 .footerBtns {
   display: flex;
-  align-items: center;
+  align-items: stretch;
   gap: 12px;
 }
 
 .approveBtn {
+  flex: 1;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
   background: linear-gradient(135deg, var(--omni-color-success-600), var(--omni-color-success-700));
   border: none;
   border-radius: var(--omni-radius-lg-minus);
-  padding: 10px 24px;
+  padding: 12px 24px;
   font-size: var(--omni-font-size-sm);
   font-weight: var(--omni-font-weight-bold);
   color: var(--omni-color-surface);
@@ -1278,13 +1295,15 @@
 .approveBtn:disabled { opacity: 0.55; cursor: not-allowed; }
 
 .rejectBtn {
+  flex: 1;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
   background: var(--omni-color-surface);
   border: 1.5px solid var(--omni-color-danger-300);
   border-radius: var(--omni-radius-lg-minus);
-  padding: 10px 24px;
+  padding: 12px 24px;
   font-size: var(--omni-font-size-sm);
   font-weight: var(--omni-font-weight-bold);
   color: var(--omni-color-danger-600);

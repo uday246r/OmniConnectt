@@ -127,6 +127,19 @@ public record UpsertCheckerAssignmentRequest(
     Guid? CheckerUserId,
     Guid? CheckerRoleId);
 
+/// <summary>
+/// Assigns one checker to every module in <paramref name="Modules"/> in a single call — "assign one
+/// checker for a whole application at once" instead of repeating the single-module Upsert per module.
+/// Same "exactly one of CheckerUserId/CheckerRoleId" rule as the single form, checked once for the
+/// whole batch rather than per module.
+/// </summary>
+public record BulkUpsertCheckerAssignmentRequest(
+    [Required(ErrorMessage = "Select at least one module.")]
+    [MinLength(1, ErrorMessage = "Select at least one module.")]
+    IReadOnlyList<string> Modules,
+    Guid? CheckerUserId,
+    Guid? CheckerRoleId);
+
 /// <summary>One module the Checker Assignment UI may offer a checker for — either <see cref="ApprovalModuleKeys.Users"/>/
 /// <see cref="ApprovalModuleKeys.Roles"/>, or a live PermissionFeature.Key from any registered remote app.</summary>
 public record AssignableModuleDto(string Key, string Label);

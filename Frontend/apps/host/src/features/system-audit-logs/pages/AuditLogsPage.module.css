@@ -409,6 +409,13 @@
   padding: 0 !important;
 }
 
+/* Forces a column to shrink-wrap its content instead of absorbing remaining table width.
+   Applied to the RECORD column so the DETAILS column sits flush right. */
+.thNarrow {
+  width: 1%;
+  white-space: nowrap;
+}
+
 .thFilterBtn {
   display: inline-flex;
   align-items: center;
@@ -574,6 +581,24 @@
   border-color: var(--omni-color-primary-600);
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
   background: var(--omni-color-surface);
+}
+
+/* Briefly flags the box red right after a keystroke the field's type didn't accept — not a
+   persistent error state, just enough to say "that character was rejected" at the moment it is. */
+.popoverInputBlocked {
+  border-color: var(--omni-color-danger-400);
+}
+.popoverInputBlocked:focus {
+  border-color: var(--omni-color-danger-500);
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.12);
+}
+
+.blockedHint {
+  margin: 0;
+  padding: 0 2px;
+  font-size: var(--omni-font-size-2xs-plus);
+  font-weight: var(--omni-font-weight-medium);
+  color: var(--omni-color-danger-600);
 }
 
 .popoverCheckboxLabel {
@@ -838,19 +863,26 @@
 }
 
 .actionCell {
-  font-family: var(--omni-font-mono);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: inherit;
   font-size: var(--omni-font-size-xs-plus);
-  font-weight: var(--omni-font-weight-semibold);
+  font-weight: var(--omni-font-weight-bold);
   color: var(--omni-color-primary-700);
   background: var(--omni-color-primary-50);
-  border: 1px solid #dbeafe;
+  border: 1px solid var(--omni-color-primary-100);
   border-radius: var(--omni-radius-sm);
-  padding: 2.5px 8px;
+  padding: 3px 9px;
   white-space: nowrap;
-  display: inline-block;
-  letter-spacing: -0.01em;
-  box-shadow: 0 1px 2px rgba(37, 99, 235, 0.04);
 }
+
+/* Per-verb colour overrides — mirrors the MyRequests action chip pattern */
+.actionLogin   { background: var(--omni-color-primary-50);  color: var(--omni-color-primary-600);  border-color: var(--omni-color-primary-200); }
+.actionSuccess { background: var(--omni-color-success-50);  color: var(--omni-color-success-600);  border-color: var(--omni-color-success-200); }
+.actionDanger  { background: var(--omni-color-danger-50);   color: var(--omni-color-danger-600);   border-color: var(--omni-color-danger-200); }
+.actionWarning { background: var(--omni-color-warning-50);  color: var(--omni-color-warning-600);  border-color: var(--omni-color-warning-200); }
+.actionNeutral { background: var(--omni-color-surface-alt); color: var(--omni-color-text-secondary); border-color: #e2e8f0; }
 
 .monoText {
   font-family: var(--omni-font-mono);
@@ -888,11 +920,13 @@
   align-items: center;
   gap: 6px;
   font-size: var(--omni-font-size-xs);
+  white-space: nowrap; /* prevents "ApprovalRequest" from breaking mid-word */
 }
 
 .entityType {
   font-weight: var(--omni-font-weight-semibold);
   color: #334155;
+  white-space: nowrap;
 }
 
 .entityId {

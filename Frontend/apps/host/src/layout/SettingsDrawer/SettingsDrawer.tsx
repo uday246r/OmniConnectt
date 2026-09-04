@@ -79,7 +79,7 @@ export function SettingsDrawer() {
               <ApplicationFormLayer appId={currentLayer.appId} />
             )}
             {currentLayer.type === 'checker-assignment-form' && (
-              <CheckerAssignmentFormLayer module={currentLayer.module} />
+              <CheckerAssignmentFormLayer module={currentLayer.module} appId={currentLayer.appId} />
             )}
           </div>
         ) : (

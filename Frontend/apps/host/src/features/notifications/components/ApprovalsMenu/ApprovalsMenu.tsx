@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useAuthStore } from '../../../auth/store/authStore'
@@ -11,6 +11,24 @@ import styles from './ApprovalsMenu.module.css'
 import { TOPICS, useDataRevision } from '../../../../shared/stores/invalidationStore'
 
 const ITEM_LIMIT = 8
+const DISMISSED_APPROVALS_KEY = 'omniremit:dismissed-approvals'
+
+function readDismissed(userId: string): Set<string> {
+  try {
+    const raw = localStorage.getItem(`${DISMISSED_APPROVALS_KEY}:${userId}`)
+    return raw ? new Set(JSON.parse(raw)) : new Set()
+  } catch {
+    return new Set()
+  }
+}
+
+function writeDismissed(userId: string, ids: Set<string>) {
+  try {
+    localStorage.setItem(`${DISMISSED_APPROVALS_KEY}:${userId}`, JSON.stringify(Array.from(ids)))
+  } catch {
+    // Storage can be unavailable
+  }
+}
 
 function formatRelativeTime(iso: string): string {
   const date = new Date(iso)
@@ -27,32 +45,34 @@ function formatRelativeTime(iso: string): string {
 }
 
 /**
- * Approval notifications in the topbar. Unlike SecurityAlertsMenu (informational alerts, badge count
- * derived from a locally-stored "last seen" heuristic), every row here is something genuinely
- * ACTIONABLE — a request sitting in this specific user's queue as the assigned checker — so the badge
- * is a real server-computed count with nothing to "mark seen": it only ever reads zero once the
- * request has actually been decided.
+ * Approval notifications in the topbar. Dismissing an approval notification removes it
+ * from the local UI state without modifying database records.
  */
 export function ApprovalsMenu() {
   const accessToken = useAuthStore((s) => s.accessToken)
-  // Bumped by ApprovalCenterPage on approve/reject and by SettingsCheckerAssignmentTab on
-  // assign/remove — the same cross-component "something changed elsewhere, refetch" signal
-  // DashboardPage already relies on for unrelated Settings mutations. Included in the query keys
-  // below so React Query treats a bump as an immediate refetch trigger, not just the 60s poll.
+  const userId = useAuthStore((s) => s.user?.id)
   const dataRevision = useDataRevision(TOPICS.approvals)
 
   const [open, setOpen] = useState(false)
+  const [dismissedIds, setDismissedIds] = useState<Set<string>>(() =>
+    userId ? readDismissed(userId) : new Set()
+  )
   const wrapperRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
 
   useClickOutside([wrapperRef], () => setOpen(false), open)
   const handleKeyDown = useMenuKeyboardNav(wrapperRef, () => setOpen(false), triggerRef)
 
+  useEffect(() => {
+    if (userId) {
+      setDismissedIds(readDismissed(userId))
+    }
+  }, [userId])
+
   const listQuery = useQuery({
     queryKey: ['assignedApprovals', ITEM_LIMIT, dataRevision],
     queryFn: () => approvalsApi.list(accessToken!, { page: 1, pageSize: ITEM_LIMIT, assignedToMe: true, status: 'Pending' }),
-    enabled: Boolean(accessToken) && open,
-    refetchInterval: 60_000,
+    enabled: Boolean(accessToken),
     staleTime: 30_000,
   })
 
@@ -60,12 +80,36 @@ export function ApprovalsMenu() {
     queryKey: ['approvalSummaryBadge', dataRevision],
     queryFn: () => approvalsApi.summary(accessToken!),
     enabled: Boolean(accessToken),
-    refetchInterval: 60_000,
     staleTime: 30_000,
   })
 
+  const rawItems = listQuery.data?.items ?? []
+  const visibleItems = rawItems.filter((req) => !dismissedIds.has(String(req.id)))
   const pendingCount = summaryQuery.data?.assignedToMePending ?? 0
-  const items = listQuery.data?.items ?? []
+  const dismissedCount = rawItems.filter((req) => dismissedIds.has(String(req.id))).length
+  const effectiveBadgeCount = Math.max(0, pendingCount - dismissedCount)
+
+  function dismissSingle(reqId: string | number, e: React.MouseEvent) {
+    e.preventDefault()
+    e.stopPropagation()
+    setDismissedIds((prev) => {
+      const next = new Set(prev)
+      next.add(String(reqId))
+      if (userId) writeDismissed(userId, next)
+      return next
+    })
+  }
+
+  function dismissAll(e: React.MouseEvent) {
+    e.preventDefault()
+    e.stopPropagation()
+    setDismissedIds((prev) => {
+      const next = new Set(prev)
+      for (const req of rawItems) next.add(String(req.id))
+      if (userId) writeDismissed(userId, next)
+      return next
+    })
+  }
 
   return (
     <div className={styles.wrapper} ref={wrapperRef} onKeyDown={handleKeyDown}>
@@ -73,15 +117,15 @@ export function ApprovalsMenu() {
         ref={triggerRef}
         type="button"
         className={styles.iconButton}
-        aria-label={pendingCount > 0 ? `Approvals awaiting you, ${pendingCount} pending` : 'Approvals'}
+        aria-label={effectiveBadgeCount > 0 ? `Approvals awaiting you, ${effectiveBadgeCount} pending` : 'Approvals'}
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
       >
         <Icon.UserCheck width={18} height={18} />
-        {pendingCount > 0 && (
+        {effectiveBadgeCount > 0 && (
           <span className={styles.badge} aria-hidden="true">
-            {pendingCount > 9 ? '9+' : pendingCount}
+            {effectiveBadgeCount > 9 ? '9+' : effectiveBadgeCount}
           </span>
         )}
       </button>
@@ -95,13 +139,25 @@ export function ApprovalsMenu() {
               </div>
               <div className={styles.menuHeaderText}>
                 <span className={styles.menuTitle}>Approvals</span>
-                {items.length > 0 && <span className={styles.menuSubtitle}>{pendingCount} awaiting you</span>}
+                {visibleItems.length > 0 && <span className={styles.menuSubtitle}>{visibleItems.length} awaiting you</span>}
               </div>
             </div>
-            <Link to="/system/approvals" role="menuitem" className={styles.viewAll} onClick={() => setOpen(false)}>
-              <Icon.ArrowRight width={12} height={12} />
-              View all
-            </Link>
+            <div className={styles.menuHeaderActions}>
+              {visibleItems.length > 0 && (
+                <button
+                  type="button"
+                  className={styles.clearAllBtn}
+                  onClick={dismissAll}
+                  title="Clear all approvals from notification list"
+                >
+                  Clear all
+                </button>
+              )}
+              <Link to="/system/approvals" role="menuitem" className={styles.viewAll} onClick={() => setOpen(false)}>
+                <Icon.ArrowRight width={12} height={12} />
+                View all
+              </Link>
+            </div>
           </div>
 
           <div className={styles.menuInner}>
@@ -127,7 +183,7 @@ export function ApprovalsMenu() {
                 <p className={styles.emptyTitle}>Could not load approvals</p>
                 <p className={styles.emptyDesc}>Check your connection and try again.</p>
               </div>
-            ) : items.length === 0 ? (
+            ) : visibleItems.length === 0 ? (
               <div className={styles.emptyState}>
                 <div className={`${styles.emptyIconBox} ${styles.emptyIconSuccess}`}>
                   <Icon.CheckCircle width={20} height={20} />
@@ -137,7 +193,7 @@ export function ApprovalsMenu() {
               </div>
             ) : (
               <ul className={styles.list}>
-                {items.map((req) => (
+                {visibleItems.map((req) => (
                   <li key={req.id} className={styles.item}>
                     <Link to="/system/approvals" className={styles.itemLink} onClick={() => setOpen(false)}>
                       <div className={styles.alertIconBox}>
@@ -153,13 +209,22 @@ export function ApprovalsMenu() {
                         </span>
                       </div>
                     </Link>
+                    <button
+                      type="button"
+                      className={styles.dismissBtn}
+                      onClick={(e) => dismissSingle(req.id, e)}
+                      title="Dismiss notification"
+                      aria-label="Dismiss notification"
+                    >
+                      <Icon.X width={13} height={13} />
+                    </button>
                   </li>
                 ))}
               </ul>
             )}
           </div>
 
-          {items.length > 0 && !listQuery.isPending && !listQuery.isError && (
+          {visibleItems.length > 0 && !listQuery.isPending && !listQuery.isError && (
             <div className={styles.menuFooter}>
               <Link to="/system/approvals" className={styles.footerLink} onClick={() => setOpen(false)}>
                 Open Approval Center

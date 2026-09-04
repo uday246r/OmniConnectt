@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Button, DetailField, DetailGrid, DetailSection, Drawer } from '@omniremit/ui';
+import { DetailField, DetailGrid, DetailSection, Drawer } from '@omniremit/ui';
 import { LeadDiffTable } from '../../shared/LeadDiffTable';
 import {
   Shield,
@@ -182,15 +182,10 @@ export const AuditDetailsDrawer: React.FC = () => {
     <Drawer
       open
       onClose={closeAuditDetails}
-      closeLabel="Close details drawer"
+      closeLabel="Close details"
       title="Activity Details"
       subtitle="What happened, who did it, and when"
-      icon={<Shield size={22} />}
-      footer={
-        <Button type="button" variant="secondary" onClick={closeAuditDetails}>
-          Close Details
-        </Button>
-      }
+      icon={<Shield size={20} />}
     >
           {/* 1. Overview & Event Timeline (Two-Column Layout) */}
           <section className="audit-drawer-section">
@@ -245,7 +240,7 @@ export const AuditDetailsDrawer: React.FC = () => {
                       <dt className="audit-detail-row-label">Outcome</dt>
                       <dd className="audit-detail-row-value">
                         <Badge tone={isSuccess ? 'success' : 'danger'} dot>
-                          {isSuccess ? 'Success' : selectedAuditLog.status || 'Failed'}
+                          {isSuccess ? 'Success' : 'Failure'}
                         </Badge>
                       </dd>
                     </div>
@@ -298,7 +293,7 @@ export const AuditDetailsDrawer: React.FC = () => {
                       </span>
                       <span className="audit-timeline-time">
                         <ShieldCheck size={12} />
-                        Lead Management
+                        LeadService
                       </span>
                     </div>
                   </div>
@@ -380,10 +375,12 @@ export const AuditDetailsDrawer: React.FC = () => {
           )}
 
       {/*
-        The footer's raw JSON payload dump, the "Copy JSON"/"Copy ID" controls and the truncated
-        record GUID were removed: this drawer is read by business users reviewing who did what, and
-        internal identifiers are noise they cannot act on. Everything meaningful is already
-        presented as labelled fields above. What remains is passed to the Drawer's `footer` slot.
+        The raw JSON payload dump, the "Copy JSON"/"Copy ID" controls, the truncated record GUID,
+        and the footer close button were all removed: this drawer is read by business users
+        reviewing who did what, and internal identifiers (or a redundant second close button, on
+        top of the header's) are noise they cannot act on. Everything meaningful is already
+        presented as labelled fields above — matches the host's own Activity Details drawer, which
+        has no footer either.
       */}
     </Drawer>
   );

@@ -17,4 +17,6 @@ export const env = {
   moduleRegistryUrl: required('VITE_MODULE_REGISTRY_URL', import.meta.env.VITE_MODULE_REGISTRY_URL),
   /** Deliberately optional — Google SSO stays off (LoginPage shows an honest "not configured" state) until this is set. */
   googleClientId: import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined,
+  /** Kill-switch for real-time WebSocket connection. Enabled by default unless explicitly 'false'. */
+  realtimeEnabled: import.meta.env.VITE_REALTIME_ENABLED !== 'false',
 }

@@ -373,28 +373,44 @@
   align-items: center;
   justify-content: space-between;
   gap: 14px;
-  background: var(--omni-color-surface-alt);
-  border: 1.5px solid #e2e8f0;
-  border-radius: var(--omni-radius-lg-minus);
-  padding: 10px 14px;
-  transition: border-color 0.15s ease, background 0.15s ease;
+  background: var(--omni-color-surface);
+  border: 1px solid #eaecf0;
+  border-radius: var(--omni-radius-lg);
+  padding: 14px 16px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.03), 0 3px 8px rgba(15, 23, 42, 0.02);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .adminToggleCard:hover {
-  background: var(--omni-color-surface);
   border-color: var(--omni-color-border-strong);
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.05), 0 4px 12px rgba(15, 23, 42, 0.04);
+}
+
+.adminToggleIcon {
+  width: 34px;
+  height: 34px;
+  border-radius: var(--omni-radius-md-plus);
+  background: var(--omni-color-surface-alt);
+  color: var(--omni-color-text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background 150ms ease, color 150ms ease;
+}
+
+/* Tinted while the flag is on — the state signal the old bullet dot was carrying. */
+.adminToggleIconOn {
+  background: var(--omni-color-primary-50);
+  color: var(--omni-color-primary-600);
 }
 
 .adminToggleText {
   display: flex;
   flex-direction: column;
   gap: 2px;
-}
-
-.adminTitleRow {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+  flex: 1;
+  min-width: 0;
 }
 
 .toggleTitle {
@@ -407,20 +423,6 @@
   font-size: var(--omni-font-size-2xs-plus);
   color: #64748b;
   line-height: 1.35;
-}
-
-.badgeDotGreen {
-  width: 5px;
-  height: 5px;
-  border-radius: var(--omni-radius-circle);
-  background: var(--omni-color-success-500);
-}
-
-.badgeDotGray {
-  width: 5px;
-  height: 5px;
-  border-radius: var(--omni-radius-circle);
-  background: var(--omni-color-text-muted);
 }
 
 /* Permission Matrix Card & Table */
@@ -455,10 +457,13 @@
 .matrixTableWrap {
   width: 100%;
   overflow-x: auto;
+  border: 1px solid #eaecf0;
+  border-radius: var(--omni-radius-md);
 }
 
 .matrixTable {
   width: 100%;
+  min-width: max-content;
   border-collapse: collapse;
   text-align: left;
 }
@@ -475,19 +480,45 @@
   color: #64748b;
   letter-spacing: 0.06em;
   text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .matrixTable tbody tr:hover {
   background: var(--omni-color-surface-alt);
 }
 
+/*
+ * The feature-name column stays pinned while the capability columns scroll — a matrix with 8-9
+ * capability columns (View/Create/Edit/Delete/Disable/Register/Export/Approve/Manage) does not fit
+ * a 700px drawer, and losing sight of which row a checkbox belongs to mid-scroll made the whole
+ * table unreadable. Fixed widths (not the old 40%/15% split, which summed past 100% and forced an
+ * arbitrary overflow) keep both the sticky column and the scroll area predictable.
+ */
+.thFeature,
+.tdFeature {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  min-width: 190px;
+  width: 190px;
+  box-shadow: 2px 0 4px -2px rgba(15, 23, 42, 0.08);
+}
+
 .thFeature {
-  width: 40%;
+  background: var(--omni-color-surface-alt);
+}
+
+.tdFeature {
+  background: var(--omni-color-surface);
+}
+
+.matrixTable tbody tr:hover .tdFeature {
+  background: var(--omni-color-surface-alt);
 }
 
 .thCap {
   text-align: center;
-  width: 15%;
+  min-width: 80px;
 }
 
 .matrixTable td {
@@ -496,22 +527,14 @@
   font-size: var(--omni-font-size-xs-plus);
 }
 
-.tdFeature {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-
 .featureName {
   font-weight: var(--omni-font-weight-semibold);
   color: #1e293b;
   font-size: var(--omni-font-size-xs-plus);
-}
-
-.featureKey {
-  font-size: var(--omni-font-size-3xs);
-  color: var(--omni-color-text-muted);
-  font-family: var(--omni-font-mono);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
 }
 
 .tdCap {
@@ -527,33 +550,56 @@
 }
 
 /* Application Access Tab */
-.appsHeaderRow {
+/*
+ * Shared step header band.
+ *
+ * Host Permissions opened with a titled card band while Application Access and Assigned Users
+ * opened with a bare paragraph sitting loose on the drawer background — three steps of the same
+ * wizard that looked like three different screens. This is that band, reused by all of them.
+ */
+.stepHeaderCard {
+  background: var(--omni-color-surface);
+  border: 1px solid #eaecf0;
+  border-radius: var(--omni-radius-lg);
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.03), 0 3px 8px rgba(15, 23, 42, 0.02);
+}
+
+.stepHeaderRow {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 14px;
+  /* Extra bottom padding so the heading is not flush against the column headers of the table
+     directly beneath it — they read as one crowded block otherwise. */
+  padding: 14px 16px 16px;
+  background: var(--omni-color-surface-alt);
+  border-bottom: 1px solid #eaecf0;
+}
+
+.stepHeaderText {
+  min-width: 0;
 }
 
 .sectionHint {
   font-size: var(--omni-font-size-xs-plus);
   color: #64748b;
-  margin: 0;
-}
-
-.appsHeaderActions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
+  margin: 2px 0 0;
 }
 
 .textActionBtn {
   background: none;
   border: none;
+  padding: 0;
   color: var(--omni-color-primary-600);
   font-size: var(--omni-font-size-xs-plus);
   font-weight: var(--omni-font-weight-semibold);
   cursor: pointer;
   transition: color 130ms ease;
+  /* Wrapped to two lines ("Collapse" / "all") against the description text before this. */
+  white-space: nowrap;
+  flex-shrink: 0;
+  font-family: inherit;
 }
 
 .textActionBtn:hover {
@@ -711,13 +757,6 @@
   letter-spacing: -0.01em;
 }
 
-.accordionAppKey {
-  font-size: var(--omni-font-size-2xs);
-  color: var(--omni-color-text-muted);
-  display: block;
-  font-family: var(--omni-font-mono);
-}
-
 .accordionRightMeta {
   display: flex;
   align-items: center;
@@ -787,21 +826,6 @@
 }
 
 /* Assigned Users Tab */
-.usersTabHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.subHeading {
-  font-size: var(--omni-font-size-sm-minus);
-  font-weight: var(--omni-font-weight-bold);
-  color: var(--omni-color-text-primary);
-  margin: 0;
-  letter-spacing: -0.01em;
-}
-
 .searchWrapSmall {
   position: relative;
   width: 190px;
@@ -914,9 +938,34 @@
 
 .emptyUsersCell {
   text-align: center;
-  padding: 20px 14px;
+  padding: 32px 20px;
+}
+
+.emptyUsersIconBox {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--omni-radius-lg-minus);
+  background: var(--omni-color-surface-alt);
   color: var(--omni-color-text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 10px;
+}
+
+.emptyUsersTitle {
+  font-size: var(--omni-font-size-sm);
+  font-weight: var(--omni-font-weight-bold);
+  color: var(--omni-color-text-primary);
+  margin: 0 0 3px;
+}
+
+.emptyUsersDesc {
   font-size: var(--omni-font-size-xs-plus);
+  color: #64748b;
+  margin: 0 auto;
+  max-width: 320px;
+  line-height: 1.4;
 }
 
 /* Bottom Action Bar */

@@ -1,9 +1,8 @@
 /*
- * Chrome follows the host's Audit Logs `.pageBtn` / `.pageIndicator`, which is the reference.
+ * Pagination bar — designed to render inside DataTable's `footer` prop slot.
+ * The DataTable container's overflow:hidden clips it to the card's 18px radius automatically.
  *
- * Laid out as summary-left / controls-right rather than the host's centred row: at 1300px a centred
- * pager floats in the middle of the card with nothing either side, and the record count — the thing
- * you actually read after scanning a table — had nowhere to live.
+ * Padding matches the table's 18px cell inset so the summary text aligns precisely with column 1.
  */
 .bar {
   display: flex;
@@ -11,17 +10,37 @@
   justify-content: space-between;
   flex-wrap: wrap;
   gap: var(--omni-space-3) var(--omni-space-5);
-  padding: 14px var(--omni-space-5);
-  border-top: 1px solid var(--omni-color-border);
+  padding: 12px 18px;
+  background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
 }
 
+/* ── Summary line: "● Showing 1 to 10 of 29 events" ───────────── */
 .summary {
   margin: 0;
-  font-size: var(--omni-font-size-sm-minus);
-  color: var(--omni-color-text-secondary);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  line-height: 1.5;
 }
 
-.summary strong {
+.summaryDot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--omni-color-primary-500);
+  box-shadow: 0 0 0 3px var(--omni-color-primary-100);
+  flex-shrink: 0;
+}
+
+.summaryText {
+  font-size: var(--omni-font-size-sm-minus);
+  color: var(--omni-color-text-secondary);
+  font-weight: var(--omni-font-weight-medium);
+  white-space: nowrap;
+}
+
+.summaryNum {
   font-weight: var(--omni-font-weight-bold);
   color: var(--omni-color-text-primary);
 }
@@ -29,7 +48,7 @@
 .controls {
   display: flex;
   align-items: center;
-  gap: var(--omni-space-5);
+  gap: var(--omni-space-3);
   flex-wrap: wrap;
 }
 
@@ -49,66 +68,80 @@
   width: 72px;
 }
 
+/* ── Pager pill group: [ ‹ Previous ] | [ 1 ] | [ Next › ] ─────── */
 .pager {
   display: inline-flex;
   align-items: center;
-  gap: var(--omni-space-3);
+  gap: 3px;
+  background: #ffffff;
+  border: 1.5px solid #e2e8f0;
+  border-radius: var(--omni-radius-lg);
+  padding: 3px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
 }
 
+/* Prev / Next buttons */
 .pageBtn {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  background: var(--omni-color-surface);
-  border: 1.5px solid var(--omni-color-border);
-  border-radius: var(--omni-radius-lg-minus);
-  padding: 7px 14px;
+  justify-content: center;
+  gap: 5px;
+  background: transparent;
+  border: none;
+  border-radius: calc(var(--omni-radius-lg) - 3px);
+  padding: 5px 12px;
   font-size: var(--omni-font-size-sm-minus);
   font-weight: var(--omni-font-weight-semibold);
   color: var(--omni-color-text-secondary);
   cursor: pointer;
   font-family: inherit;
   white-space: nowrap;
-  transition: background 150ms ease, border-color 150ms ease, color 150ms ease, box-shadow 150ms ease;
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+  transition: background 140ms ease, color 140ms ease;
+  min-width: 32px;
+  line-height: 1;
 }
 
 .pageBtn:hover:not(:disabled) {
   background: var(--omni-color-primary-50);
-  border-color: var(--omni-color-primary-300); /* not in scale — the host's exact hover border */
-  color: var(--omni-color-primary-600);
-  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.15);
+  color: var(--omni-color-primary-700);
 }
 
 .pageBtn:focus-visible {
-  outline: 2px solid var(--omni-color-primary-600);
-  outline-offset: 2px;
+  outline: 2px solid var(--omni-color-primary-400);
+  outline-offset: -1px;
 }
 
-/*
- * A disabled pager button stays legible rather than dropping to 0.5 opacity. At the ends of a list
- * this is the normal state, and a control that looks broken there is worse than one that simply
- * looks inert.
- */
 .pageBtn:disabled {
-  background: var(--omni-color-surface-alt);
   color: var(--omni-color-text-muted);
-  border-color: var(--omni-color-border);
-  box-shadow: none;
   cursor: not-allowed;
+  opacity: 0.6;
 }
 
-.indicator {
-  font-size: var(--omni-font-size-sm-minus);
-  color: var(--omni-color-text-secondary);
-  min-width: 92px;
-  text-align: center;
-  white-space: nowrap;
-}
-
-.indicator strong {
+/* Single active page pill — vibrant primary blue badge */
+.pageNumActive {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--omni-color-primary-600);
+  color: #ffffff;
   font-weight: var(--omni-font-weight-bold);
-  color: var(--omni-color-text-primary);
+  font-size: var(--omni-font-size-sm-minus);
+  border-radius: calc(var(--omni-radius-lg) - 3px);
+  padding: 5px 12px;
+  min-width: 32px;
+  height: 26px;
+  line-height: 1;
+  user-select: none;
+  box-shadow: 0 1px 2px rgba(37, 99, 235, 0.2);
+}
+
+/* Thin vertical separator between Prev / active page / Next */
+.pageDivider {
+  width: 1px;
+  height: 16px;
+  background: #e2e8f0;
+  margin: 0 1px;
+  flex-shrink: 0;
 }
 
 @media (max-width: 720px) {

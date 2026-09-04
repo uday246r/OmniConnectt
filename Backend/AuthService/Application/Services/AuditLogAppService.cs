@@ -1,5 +1,6 @@
 using System.Text;
 using AuthService.Application.DTOs;
+using AuthService.Application.Events;
 using AuthService.Domain.Entities;
 using AuthService.Infrastructure;
 using Microsoft.EntityFrameworkCore;
@@ -13,7 +14,7 @@ namespace AuthService.Application.Services;
 /// backend) posts here via the internal API-key-protected endpoint. One table, one query, whether
 /// the action happened in the host or a remote app.
 /// </summary>
-public class AuditLogAppService(AuthDbContext db)
+public class AuditLogAppService(AuthDbContext db, IPlatformEventPublisher events)
 {
     public async Task WriteAsync(
         string serviceName, Guid? actorUserId, string? actorName, string action,
@@ -42,6 +43,9 @@ public class AuditLogAppService(AuthDbContext db)
             CorrelationId = correlationId ?? Guid.NewGuid().ToString(),
         });
         await db.SaveChangesAsync(ct);
+
+        await events.PublishToAuditViewersAsync(new PlatformEvent("audit-logs", action), ct);
+        events.RequestKpiRefresh();
     }
 
     public async Task<PagedResult<AuditLogDto>> ListAsync(

@@ -27,13 +27,26 @@ interface MainLayoutProps {
 export const MainLayout: React.FC<MainLayoutProps> = ({ page }) => {
   const { fetchDashboardData, fetchMasterData, fetchLeads, products } = useLeadStore();
 
+  /*
+   * App-level boot data, once per mount.
+   *
+   * `products.length` used to be a dependency of this effect, so the arrival of master data re-ran
+   * the whole thing and re-fetched the dashboard AND the leads — the second half of the
+   * skeleton → rows → skeleton → rows flicker on the Lead Directory. Splitting the master-data
+   * fetch into its own mount-only effect removes the feedback loop: the thing that changes
+   * `products` is no longer in the dependency list of the thing that reads it.
+   */
   useEffect(() => {
     fetchDashboardData();
+    fetchLeads();
+  }, [fetchDashboardData, fetchLeads]);
+
+  useEffect(() => {
     if (products.length === 0) {
       fetchMasterData();
     }
-    fetchLeads();
-  }, [fetchDashboardData, fetchMasterData, fetchLeads, products.length]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const activePage = (page ?? 'dashboard') as LeadPage;
 

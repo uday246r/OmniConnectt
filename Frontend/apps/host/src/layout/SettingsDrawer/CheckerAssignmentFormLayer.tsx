@@ -3,9 +3,12 @@ import { useAuthStore } from '../../features/auth/store/authStore'
 import { usersApi } from '../../features/settings-users/api/usersApi'
 import { rolesApi } from '../../features/settings-roles/api/rolesApi'
 import { checkerAssignmentsApi, type AssignableModuleDto } from '../../features/approvals/api/checkerAssignmentsApi'
+import { remoteAppsApi, type RemoteAppDto } from '../../features/settings-applications/api/remoteAppsApi'
+import { groupModulesByApp } from '../../features/approvals/utils/moduleAppGrouping'
 import { useSettingsDrawerStore } from '../../shared/stores/settingsDrawerStore'
 import { useClickOutside } from '../../shared/hooks/useClickOutside'
 import { Icon } from '../../shared/components/Icon/Icon'
+import { resolveIcon } from '../../shared/components/Icon/resolveIcon'
 import {
   AsyncSearchSelect,
   type AsyncSearchOption,
@@ -17,21 +20,35 @@ import styles from './CheckerAssignmentFormLayer.module.css'
 import { TOPICS, invalidate } from '../../shared/stores/invalidationStore'
 
 interface CheckerAssignmentFormLayerProps {
-  /** Pre-selected module, when opened via a specific module card's "Add Checker" button. */
+  /** Pre-selected module, when opened via a specific module card's "Add" button. */
   module?: string
+  /** Pre-selected application, when opened via an app section's "Assign to Whole App" button —
+   *  opens straight into the bulk "entire application" scope instead of the single-module one. */
+  appId?: string
 }
 /**
- * Assigns one checker to one module. Deliberately a single simple form, not a wizard — there's only
- * two fields — but follows the same header/popLayer/invalidate shape every other form layer here
- * uses (UserFormLayer, RoleFormLayer, ApplicationFormLayer) so it reads as the same system.
+ * Assigns one checker either to a single module, or in bulk to every module belonging to one
+ * application — "assign one checker for a whole remote app at once" instead of repeating this form
+ * once per module. Follows the same header/popLayer/invalidate shape every other form layer here uses
+ * (UserFormLayer, RoleFormLayer, ApplicationFormLayer) so it reads as the same system.
  */
-export function CheckerAssignmentFormLayer({ module: initialModule }: CheckerAssignmentFormLayerProps) {
+export function CheckerAssignmentFormLayer({ module: initialModule, appId: initialAppId }: CheckerAssignmentFormLayerProps) {
   const accessToken = useAuthStore((s) => s.accessToken)
   const popLayer = useSettingsDrawerStore((s) => s.popLayer)
+
+  // Scope: one module, or every module in one application at once. Opening from an app's "Assign to
+  // Whole App" button starts in 'app' scope with that app pre-picked; every other entry point starts
+  // in the single-module scope, as before.
+  const [scope, setScope] = useState<'module' | 'app'>(initialAppId ? 'app' : 'module')
   const [module, setModule] = useState(initialModule ?? '')
   const [modules, setModules] = useState<AssignableModuleDto[]>([])
   const [moduleDropdownOpen, setModuleDropdownOpen] = useState(false)
   const [moduleSearch, setModuleSearch] = useState('')
+
+  const [remoteApps, setRemoteApps] = useState<RemoteAppDto[]>([])
+  const [selectedAppId, setSelectedAppId] = useState(initialAppId ?? '')
+  const [appDropdownOpen, setAppDropdownOpen] = useState(false)
+  const [appSearch, setAppSearch] = useState('')
 
   /*
    * An assignment names a user OR a role. A role is usually the better choice — "any Manager can
@@ -57,6 +74,9 @@ export function CheckerAssignmentFormLayer({ module: initialModule }: CheckerAss
 
   const moduleDropdownRef = useRef<HTMLDivElement>(null)
   useClickOutside([moduleDropdownRef], () => setModuleDropdownOpen(false), moduleDropdownOpen)
+
+  const appDropdownRef = useRef<HTMLDivElement>(null)
+  useClickOutside([appDropdownRef], () => setAppDropdownOpen(false), appDropdownOpen)
 
   const searchUsers = useCallback(
     async (term: string): Promise<AsyncSearchResult> => {
@@ -97,6 +117,15 @@ export function CheckerAssignmentFormLayer({ module: initialModule }: CheckerAss
         if (!cancelled) console.error('Failed to load assignable modules:', err)
       })
 
+    remoteAppsApi
+      .list(accessToken, { pageSize: 100 })
+      .then((res) => {
+        if (!cancelled) setRemoteApps(res.items)
+      })
+      .catch((err) => {
+        if (!cancelled) console.error('Failed to load applications for the bulk checker picker:', err)
+      })
+
     return () => {
       cancelled = true
     }
@@ -113,27 +142,70 @@ export function CheckerAssignmentFormLayer({ module: initialModule }: CheckerAss
     return modules.filter((m) => m.label.toLowerCase().includes(q) || m.key.toLowerCase().includes(q))
   }, [modules, moduleSearch])
 
+  // Application groups for the bulk scope — same grouping the Checker Assignment list uses, so
+  // "Entire Application" here means exactly the same set of modules as that app's section there.
+  const appGroups = useMemo(() => groupModulesByApp(modules, remoteApps), [modules, remoteApps])
+  const appGroupsWithModules = useMemo(() => appGroups.filter((g) => g.modules.length > 0), [appGroups])
+
+  const selectedAppGroup = useMemo(
+    () => appGroupsWithModules.find((g) => g.id === selectedAppId),
+    [appGroupsWithModules, selectedAppId],
+  )
+
+  const filteredAppGroups = useMemo(() => {
+    if (!appSearch.trim()) return appGroupsWithModules
+    const q = appSearch.toLowerCase().trim()
+    return appGroupsWithModules.filter((g) => g.name.toLowerCase().includes(q))
+  }, [appGroupsWithModules, appSearch])
+
+  // The module keys this submission will actually touch — one, or every module in the picked app.
+  const targetModuleKeys = useMemo(() => {
+    if (scope === 'app') return selectedAppGroup?.modules.map((m) => m.key) ?? []
+    return module ? [module] : []
+  }, [scope, selectedAppGroup, module])
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     const targetId = targetKind === 'user' ? checkerUserId : checkerRoleId
     if (!accessToken || !targetId) return
+    if (scope === 'module' && !module) return
+    if (scope === 'app' && targetModuleKeys.length === 0) return
+
     setSaving(true)
     setError(null)
     try {
-      const result = await checkerAssignmentsApi.upsert(
-        accessToken,
-        targetKind === 'user' ? { module, checkerUserId } : { module, checkerRoleId },
-      )
-      // The server reports an idempotent no-op distinctly, so a second attempt says so rather than
-      // implying something changed.
-      if (result.alreadyAssigned) {
-        toast.success(`${result.checkerName} is already a checker for '${module}'.`)
-      } else {
-        toast.success(
-          result.isRole
-            ? `Anyone with the '${result.checkerName}' role (${result.memberCount ?? 0} active) is now a checker for '${module}'.`
-            : `${result.checkerName} is now a checker for '${module}'.`,
+      if (scope === 'app') {
+        const results = await checkerAssignmentsApi.bulkUpsert(
+          accessToken,
+          targetKind === 'user'
+            ? { modules: targetModuleKeys, checkerUserId }
+            : { modules: targetModuleKeys, checkerRoleId },
         )
+        const checkerName = results[0]?.checkerName ?? ''
+        const appName = selectedAppGroup?.name ?? 'this application'
+        const count = targetModuleKeys.length
+        toast.success(
+          results[0]?.isRole
+            ? `Anyone with the '${checkerName}' role (${results[0]?.memberCount ?? 0} active) is now a checker for all ${count} module${count === 1 ? '' : 's'} in '${appName}'.`
+            : `${checkerName} is now a checker for all ${count} module${count === 1 ? '' : 's'} in '${appName}'.`,
+        )
+      } else {
+        const result = await checkerAssignmentsApi.upsert(
+          accessToken,
+          targetKind === 'user' ? { module, checkerUserId } : { module, checkerRoleId },
+        )
+        const moduleLabel = selectedModule?.label ?? module
+        // The server reports an idempotent no-op distinctly, so a second attempt says so rather than
+        // implying something changed.
+        if (result.alreadyAssigned) {
+          toast.success(`${result.checkerName} is already a checker for '${moduleLabel}'.`)
+        } else {
+          toast.success(
+            result.isRole
+              ? `Anyone with the '${result.checkerName}' role (${result.memberCount ?? 0} active) is now a checker for '${moduleLabel}'.`
+              : `${result.checkerName} is now a checker for '${moduleLabel}'.`,
+          )
+        }
       }
       invalidate(TOPICS.checkerAssignments)
       popLayer()
@@ -153,7 +225,7 @@ export function CheckerAssignmentFormLayer({ module: initialModule }: CheckerAss
           </div>
           <div>
             <h2 className={styles.title}>Assign Checker</h2>
-            <p className={styles.subtitle}>Map a module to an eligible approver</p>
+            <p className={styles.subtitle}>Map a module — or a whole application — to an eligible approver</p>
           </div>
         </div>
         <button type="button" className={styles.closeBtn} onClick={popLayer} aria-label="Close">
@@ -168,88 +240,213 @@ export function CheckerAssignmentFormLayer({ module: initialModule }: CheckerAss
           <div className={styles.formCard}>
             <h4 className={styles.formCardTitle}>Assignment Configuration</h4>
 
-            {/* Target Module Dropdown */}
+            {/*
+              Scope: one module, or every module belonging to one application at once. Bulk-picking
+              an app is the "assign one checker for a whole remote app in one go" path — it resolves
+              to the same module list the Checker Assignment list groups under that app's section, so
+              the two never disagree about which modules "the app" means.
+            */}
             <div className={styles.inputGroup}>
               <label className={styles.label}>
-                <span>Target Module <span className={styles.req}>*</span></span>
+                <span>Assignment Scope <span className={styles.req}>*</span></span>
               </label>
-
-              <div className={styles.dropdownWrap} ref={moduleDropdownRef}>
+              <div className={styles.kindToggle} role="radiogroup" aria-label="Assignment scope">
                 <button
                   type="button"
-                  className={`${styles.dropdownTrigger} ${moduleDropdownOpen ? styles.dropdownTriggerOpen : ''}`}
-                  onClick={() => {
-                    setModuleDropdownOpen(!moduleDropdownOpen)
-                    if (!moduleDropdownOpen) setModuleSearch('')
-                  }}
-                  aria-haspopup="listbox"
-                  aria-expanded={moduleDropdownOpen}
+                  role="radio"
+                  aria-checked={scope === 'module'}
+                  className={scope === 'module' ? styles.kindOptionActive : styles.kindOption}
+                  onClick={() => setScope('module')}
                 >
-                  <div className={styles.triggerLeft}>
-                    {selectedModule ? (
-                      <>
-                        <span className={styles.triggerModuleName}>{selectedModule.label}</span>
-                        <span className={styles.triggerModuleKey}>{selectedModule.key}</span>
-                      </>
-                    ) : (
-                      <span className={styles.triggerPlaceholder}>-- Select a module --</span>
-                    )}
-                  </div>
-                  <Icon.ChevronDown
-                    width={13}
-                    height={13}
-                    className={`${styles.triggerChevron} ${moduleDropdownOpen ? styles.triggerChevronOpen : ''}`}
-                  />
+                  <Icon.Layers width={15} height={15} />
+                  <span>Single module</span>
                 </button>
-
-                {moduleDropdownOpen && (
-                  <div className={styles.dropdownMenu} role="listbox">
-                    <div className={styles.dropdownSearchWrap}>
-                      <input
-                        type="text"
-                        className={styles.dropdownSearchInput}
-                        placeholder="Type to search module..."
-                        value={moduleSearch}
-                        onChange={(e) => setModuleSearch(e.target.value)}
-                        autoFocus
-                      />
-                      <Icon.Search width={12} height={12} className={styles.dropdownSearchIcon} />
-                    </div>
-
-                    <div className={styles.dropdownList}>
-                      {filteredModules.length === 0 ? (
-                        <div className={styles.dropdownEmpty}>No modules match &quot;{moduleSearch}&quot;</div>
-                      ) : (
-                        filteredModules.map((m) => {
-                          const isSelected = m.key === module
-                          return (
-                            <div
-                              key={m.key}
-                              className={`${styles.dropdownItem} ${isSelected ? styles.dropdownItemSelected : ''}`}
-                              role="option"
-                              aria-selected={isSelected}
-                              onClick={() => {
-                                setModule(m.key)
-                                setModuleDropdownOpen(false)
-                                setModuleSearch('')
-                              }}
-                            >
-                              <div className={styles.dropdownItemLeft}>
-                                <span className={styles.dropdownName}>{m.label}</span>
-                                <span className={styles.triggerModuleKey}>{m.key}</span>
-                              </div>
-                              {isSelected && (
-                                <Icon.CheckCircle width={14} height={14} className={styles.dropdownCheckIcon} />
-                              )}
-                            </div>
-                          )
-                        })
-                      )}
-                    </div>
-                  </div>
-                )}
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={scope === 'app'}
+                  className={scope === 'app' ? styles.kindOptionActive : styles.kindOption}
+                  onClick={() => setScope('app')}
+                >
+                  <Icon.Box width={15} height={15} />
+                  <span>Entire application</span>
+                </button>
               </div>
             </div>
+
+            {/* Target Module Dropdown */}
+            {scope === 'module' && (
+              <div className={styles.inputGroup}>
+                <label className={styles.label}>
+                  <span>Target Module <span className={styles.req}>*</span></span>
+                </label>
+
+                <div className={styles.dropdownWrap} ref={moduleDropdownRef}>
+                  <button
+                    type="button"
+                    className={`${styles.dropdownTrigger} ${moduleDropdownOpen ? styles.dropdownTriggerOpen : ''}`}
+                    onClick={() => {
+                      setModuleDropdownOpen(!moduleDropdownOpen)
+                      if (!moduleDropdownOpen) setModuleSearch('')
+                    }}
+                    aria-haspopup="listbox"
+                    aria-expanded={moduleDropdownOpen}
+                  >
+                    <div className={styles.triggerLeft}>
+                      {selectedModule ? (
+                        <span className={styles.triggerModuleName}>{selectedModule.label}</span>
+                      ) : (
+                        <span className={styles.triggerPlaceholder}>-- Select a module --</span>
+                      )}
+                    </div>
+                    <Icon.ChevronDown
+                      width={13}
+                      height={13}
+                      className={`${styles.triggerChevron} ${moduleDropdownOpen ? styles.triggerChevronOpen : ''}`}
+                    />
+                  </button>
+
+                  {moduleDropdownOpen && (
+                    <div className={styles.dropdownMenu} role="listbox">
+                      <div className={styles.dropdownSearchWrap}>
+                        <input
+                          type="text"
+                          className={styles.dropdownSearchInput}
+                          placeholder="Type to search module..."
+                          value={moduleSearch}
+                          onChange={(e) => setModuleSearch(e.target.value)}
+                          autoFocus
+                        />
+                        <Icon.Search width={12} height={12} className={styles.dropdownSearchIcon} />
+                      </div>
+
+                      <div className={styles.dropdownList}>
+                        {filteredModules.length === 0 ? (
+                          <div className={styles.dropdownEmpty}>No modules match &quot;{moduleSearch}&quot;</div>
+                        ) : (
+                          filteredModules.map((m) => {
+                            const isSelected = m.key === module
+                            return (
+                              <div
+                                key={m.key}
+                                className={`${styles.dropdownItem} ${isSelected ? styles.dropdownItemSelected : ''}`}
+                                role="option"
+                                aria-selected={isSelected}
+                                onClick={() => {
+                                  setModule(m.key)
+                                  setModuleDropdownOpen(false)
+                                  setModuleSearch('')
+                                }}
+                              >
+                                <div className={styles.dropdownItemLeft}>
+                                  <span className={styles.dropdownName}>{m.label}</span>
+                                </div>
+                                {isSelected && (
+                                  <Icon.CheckCircle width={14} height={14} className={styles.dropdownCheckIcon} />
+                                )}
+                              </div>
+                            )
+                          })
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Target Application Dropdown (bulk scope) */}
+            {scope === 'app' && (
+              <div className={styles.inputGroup}>
+                <label className={styles.label}>
+                  <span>Target Application <span className={styles.req}>*</span></span>
+                </label>
+
+                <div className={styles.dropdownWrap} ref={appDropdownRef}>
+                  <button
+                    type="button"
+                    className={`${styles.dropdownTrigger} ${appDropdownOpen ? styles.dropdownTriggerOpen : ''}`}
+                    onClick={() => {
+                      setAppDropdownOpen(!appDropdownOpen)
+                      if (!appDropdownOpen) setAppSearch('')
+                    }}
+                    aria-haspopup="listbox"
+                    aria-expanded={appDropdownOpen}
+                  >
+                    <div className={styles.triggerLeft}>
+                      {selectedAppGroup ? (
+                        <span className={styles.triggerModuleName}>{selectedAppGroup.name}</span>
+                      ) : (
+                        <span className={styles.triggerPlaceholder}>-- Select an application --</span>
+                      )}
+                    </div>
+                    <Icon.ChevronDown
+                      width={13}
+                      height={13}
+                      className={`${styles.triggerChevron} ${appDropdownOpen ? styles.triggerChevronOpen : ''}`}
+                    />
+                  </button>
+
+                  {appDropdownOpen && (
+                    <div className={styles.dropdownMenu} role="listbox">
+                      <div className={styles.dropdownSearchWrap}>
+                        <input
+                          type="text"
+                          className={styles.dropdownSearchInput}
+                          placeholder="Type to search application..."
+                          value={appSearch}
+                          onChange={(e) => setAppSearch(e.target.value)}
+                          autoFocus
+                        />
+                        <Icon.Search width={12} height={12} className={styles.dropdownSearchIcon} />
+                      </div>
+
+                      <div className={styles.dropdownList}>
+                        {filteredAppGroups.length === 0 ? (
+                          <div className={styles.dropdownEmpty}>No applications match &quot;{appSearch}&quot;</div>
+                        ) : (
+                          filteredAppGroups.map((g) => {
+                            const isSelected = g.id === selectedAppId
+                            const AppIcon = resolveIcon(g.iconKey, g.isHost ? Icon.Shield : Icon.Box)
+                            return (
+                              <div
+                                key={g.id}
+                                className={`${styles.dropdownItem} ${isSelected ? styles.dropdownItemSelected : ''}`}
+                                role="option"
+                                aria-selected={isSelected}
+                                onClick={() => {
+                                  setSelectedAppId(g.id)
+                                  setAppDropdownOpen(false)
+                                  setAppSearch('')
+                                }}
+                              >
+                                <div className={styles.dropdownItemLeft}>
+                                  <div className={styles.dropdownAvatar}>
+                                    <AppIcon width={13} height={13} />
+                                  </div>
+                                  <span className={styles.dropdownName}>{g.name}</span>
+                                </div>
+                                {isSelected && (
+                                  <Icon.CheckCircle width={14} height={14} className={styles.dropdownCheckIcon} />
+                                )}
+                              </div>
+                            )
+                          })
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {selectedAppGroup && (
+                  <p className={styles.hint}>
+                    Assigns this checker to all {selectedAppGroup.modules.length} module
+                    {selectedAppGroup.modules.length === 1 ? '' : 's'} in &lsquo;{selectedAppGroup.name}&rsquo; —
+                    including ones already gated by another checker.
+                  </p>
+                )}
+              </div>
+            )}
 
             {/*
               Who approves: one named person, or anyone holding a role.
@@ -341,13 +538,17 @@ export function CheckerAssignmentFormLayer({ module: initialModule }: CheckerAss
           <button type="button" className={styles.cancelBtn} onClick={popLayer}>
             Cancel
           </button>
-          <button type="submit" className={styles.saveBtn} disabled={saving || !(targetKind === 'user' ? checkerUserId : checkerRoleId)}>
+          <button
+            type="submit"
+            className={styles.saveBtn}
+            disabled={saving || !(targetKind === 'user' ? checkerUserId : checkerRoleId) || targetModuleKeys.length === 0}
+          >
             {saving ? (
               <span>Saving...</span>
             ) : (
               <>
                 <Icon.CheckCircle width={14} height={14} />
-                <span>Assign Checker</span>
+                <span>{scope === 'app' && targetModuleKeys.length > 1 ? `Assign to ${targetModuleKeys.length} Modules` : 'Assign Checker'}</span>
               </>
             )}
           </button>

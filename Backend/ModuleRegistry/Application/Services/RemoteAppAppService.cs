@@ -208,6 +208,43 @@ public partial class RemoteAppAppService(
 
         var newSourceUrl = request.PermissionsSourceUrl?.Trim();
 
+        /*
+         * Moving an app to a position another app already holds SWAPS the two.
+         *
+         * Sidebar order is a plain int with no unique constraint, so two apps could sit on the same
+         * number; the list queries then fell back to ThenBy(DisplayName), which is deterministic but
+         * means the position an admin typed did not decide anything. Worse, there was no way to
+         * reorder in one action — putting Lead Management first meant editing it AND editing whatever
+         * already held position 1.
+         *
+         * Swapping makes a single edit express the whole intent ("put this one first, the other takes
+         * this one's old slot"), touches exactly two rows, and keeps positions unique as long as they
+         * started unique. If several apps already share a number (data from before this rule), only
+         * the first is moved — the rest are left alone rather than silently renumbered.
+         */
+        var previousOrder = app.SidebarOrder;
+        RemoteApp? displacedOccupant = null;
+        if (request.SidebarOrder != previousOrder)
+        {
+            // Capabilities are included deliberately: the occupant is pushed to AuthService below,
+            // and ToCapabilityTuples reads this collection. Without the Include it would serialise as
+            // empty and the push would clear that app's capabilities in the permission catalog — a
+            // display-order edit silently revoking another app's permissions.
+            var occupant = await db.RemoteApps
+                .Include(a => a.Capabilities)
+                .Where(a => a.Id != app.Id && a.SidebarOrder == request.SidebarOrder)
+                .OrderBy(a => a.DisplayName)
+                .FirstOrDefaultAsync(ct);
+
+            if (occupant is not null)
+            {
+                occupant.SidebarOrder = previousOrder;
+                occupant.UpdatedAt = DateTimeOffset.UtcNow;
+                occupant.UpdatedBy = actingUserId;
+                displacedOccupant = occupant;
+            }
+        }
+
         app.DisplayName = request.DisplayName.Trim();
         app.IconKey = request.IconKey?.Trim();
         app.ManifestUrl = request.ManifestUrl.Trim();
@@ -242,6 +279,26 @@ public partial class RemoteAppAppService(
         {
             await authServiceClient.UpsertAsync(
                 app.PermissionFeatureKey, app.DisplayName, app.SidebarOrder, ToCapabilityTuples(app), ct, nav, ToRenderMetadata(app));
+        }
+
+        /*
+         * The swap moved TWO rows, so both have to reach AuthService.
+         *
+         * AuthService — not this service — is what the sidebar is rendered from: GET /api/navigation
+         * reads the order that was pushed here. Saving the occupant's new position only to
+         * ModuleRegistry's own table left the two services disagreeing, and the sidebar kept showing
+         * the old arrangement (or two apps at the same position) until that other app happened to be
+         * edited or resynced for some unrelated reason.
+         *
+         * `nav: null` means "leave the existing navigation rows alone" — only this app's position
+         * changed, and re-fetching its manifest here would be a second network round trip for
+         * something the swap did not touch.
+         */
+        if (displacedOccupant is not null && displacedOccupant.Status != RemoteAppStatus.Disabled)
+        {
+            await authServiceClient.UpsertAsync(
+                displacedOccupant.PermissionFeatureKey, displacedOccupant.DisplayName, displacedOccupant.SidebarOrder,
+                ToCapabilityTuples(displacedOccupant), ct, nav: null, render: ToRenderMetadata(displacedOccupant));
         }
 
         await authServiceClient.PushAuditLogAsync("remoteapp.updated", "RemoteApp", app.Id.ToString(), $"Updated remote app '{app.DisplayName}' ({app.Key}).", actingUserId, actorName, app.DisplayName, ct);
