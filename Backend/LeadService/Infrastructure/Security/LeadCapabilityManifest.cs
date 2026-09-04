@@ -73,7 +73,6 @@ public static class LeadCapabilityManifest
             new("chart.leads-by-branch", "Chart: Leads by Branch", "Show the distribution of leads by branch.", "Chart", 230),
 
             new("widget.recent-leads", "Widget: Recent Leads", "Show the most recently created leads.", "Widget", 310),
-            new("widget.top-sales-executives", "Widget: Top Sales Executives", "Show the top-performing sales executives.", "Widget", 320),
         ]),
 
         new("AuditLog",

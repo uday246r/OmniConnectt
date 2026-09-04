@@ -11,6 +11,7 @@ import {
   DashboardFilterParams,
 } from '../api/apiClient';
 import { isFieldRequired, type LeadFieldConfig } from '../config/fieldControlRegistry';
+import { canSeeDashboardCapability } from '../api/hostBridge';
 import { readStoredPageSize } from '@omniremit/ui';
 
 /** LeadFormData's field names match the backend's apiField catalog 1:1 with exactly one exception —
@@ -971,21 +972,46 @@ export const useLeadStore = create<LeadStoreState>((set, get) => ({
         granularity: s.dashboardGranularity,
       };
 
+      /*
+       * Each panel is fetched only if this user was granted it, and independently of the others.
+       *
+       * Both halves of that matter now that charts are granted individually. Asking for a panel the
+       * user does not hold earns a 403 the page has no use for; and under the previous Promise.all,
+       * that single rejection discarded every other response with it — so a user granted one chart
+       * saw a completely blank dashboard rather than their one chart. allSettled keeps what
+       * succeeded, which is the only sensible reading of a partially-permitted page.
+       *
+       * Skipping is an optimisation, not the control. The endpoints refuse these requests themselves.
+       */
       const [kpiSummary, leadsOverTime, leadsByProduct, leadsByBranch, recentLeads] =
-        await Promise.all([
+        await Promise.allSettled([
           apiClient.getDashboardKpis(params),
-          apiClient.getLeadsOverTime(params),
-          apiClient.getLeadsByProduct(params),
-          apiClient.getLeadsByBranch(params),
-          apiClient.getRecentLeads(params, 5),
+          canSeeDashboardCapability('chart.leads-over-time')
+            ? apiClient.getLeadsOverTime(params)
+            : Promise.resolve([]),
+          canSeeDashboardCapability('chart.leads-by-product')
+            ? apiClient.getLeadsByProduct(params)
+            : Promise.resolve([]),
+          canSeeDashboardCapability('chart.leads-by-branch')
+            ? apiClient.getLeadsByBranch(params)
+            : Promise.resolve([]),
+          canSeeDashboardCapability('widget.recent-leads')
+            ? apiClient.getRecentLeads(params, 5)
+            : Promise.resolve([]),
         ]);
 
+      const settled = <T,>(result: PromiseSettledResult<T>, fallback: T): T => {
+        if (result.status === 'fulfilled') return result.value;
+        console.error('A dashboard panel could not be loaded:', result.reason);
+        return fallback;
+      };
+
       set({
-        kpiSummary,
-        leadsOverTime,
-        leadsByProduct,
-        leadsByBranch,
-        recentLeads,
+        kpiSummary: settled(kpiSummary, initialKpiSummary),
+        leadsOverTime: settled(leadsOverTime, []),
+        leadsByProduct: settled(leadsByProduct, []),
+        leadsByBranch: settled(leadsByBranch, []),
+        recentLeads: settled(recentLeads, []),
         isLoadingDashboard: false,
       });
     } catch (err) {

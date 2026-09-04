@@ -116,7 +116,6 @@ namespace LeadManagement.Api.Controllers
 
         [HttpGet("top-sales-executives")]
         [RequiresCapability("Dashboard", "View")]
-        [RequiresFineCapability("Dashboard", "widget.top-sales-executives")]
         public async Task<ActionResult<ApiResponseDto<List<TopSalesExecutiveDto>>>> GetTopSalesExecutives([FromQuery] DashboardFilterDto filters, [FromQuery] int limit = 5)
         {
             var data = await _dashboardService.GetTopSalesExecutivesAsync(filters, limit);

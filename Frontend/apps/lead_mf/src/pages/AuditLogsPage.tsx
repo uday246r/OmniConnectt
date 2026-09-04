@@ -1,3 +1,4 @@
+import { canExportAuditLogs } from '../api/hostBridge';
 import React, { useEffect, useState } from 'react';
 import { ShieldCheck, Search, RefreshCw, Eye, Download, X, ChevronLeft, ChevronRight } from '@omniremit/ui/icons';
 import { ActorCell, Badge, Button, ColumnFilter, DataTable, EmptyState, FilterBar, PageHeader, Pagination, ResponsiveRows, RowAction, RowsPerPage, SearchField, formatAuditTimestamp, type ActiveFilter } from '@omniremit/ui';
@@ -168,15 +169,26 @@ const getActionBadge = (action: string) => {
         pill={`${auditLogs.length} Events Logged`}
         subtitle="Immutable compliance record of all lead creation, update, view, and deletion events"
         actions={
-          <Button
-            type="button"
-            variant="onHeader"
-            onClick={handleExportCSV}
-            disabled={auditLogs.length === 0}
-            leadingIcon={<Download size={15} />}
-          >
-            Export CSV
-          </Button>
+          /*
+           * The one capability on this page that is a UI gate and nothing more.
+           *
+           * The CSV is assembled here from rows already fetched under AuditLog:View, so hiding this
+           * button withholds the convenience of one click, not the data — anyone who can read the
+           * page can copy what is on it. It is still worth granting separately, because an export is
+           * a distinct act that leaves the platform, but it must not be relied on as a control over
+           * who can obtain the rows. The manifest says the same thing next to the declaration.
+           */
+          canExportAuditLogs() ? (
+            <Button
+              type="button"
+              variant="onHeader"
+              onClick={handleExportCSV}
+              disabled={auditLogs.length === 0}
+              leadingIcon={<Download size={15} />}
+            >
+              Export CSV
+            </Button>
+          ) : null
         }
       />
 

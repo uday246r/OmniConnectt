@@ -97,3 +97,23 @@ export const canViewAuditLogs = (): boolean =>
 
 export const canManageFieldSettings = (): boolean =>
   hasCapability(LEAD_SUBMODULE_FIELD_SETTINGS, 'Manage') || hasCapability(LEAD_FEATURE_KEY, 'View');
+
+/*
+ * Business capabilities — the dashboard's individual cards and charts, and the audit export.
+ *
+ * They go through the same bridge call as everything above and cost no more to ask about: the host
+ * merges what the token carries with what it fetched separately, so this side never learns which of
+ * the two answered.
+ *
+ * The difference from the helpers above is the missing fallback. Those accept the parent
+ * `remote.lead:View` as sufficient, which is right for a module-level read. It would be wrong here:
+ * being allowed into the app at all must not imply every KPI card inside it, or the per-card grant
+ * would exist and mean nothing.
+ */
+
+/** One dashboard card or chart, e.g. `kpi.total-leads`. Named by the manifest, never invented here. */
+export const canSeeDashboardCapability = (capabilityKey: string): boolean =>
+  hasCapability(LEAD_SUBMODULE_DASHBOARD, capabilityKey);
+
+export const canExportAuditLogs = (): boolean =>
+  hasCapability(LEAD_SUBMODULE_AUDIT, 'export.csv');

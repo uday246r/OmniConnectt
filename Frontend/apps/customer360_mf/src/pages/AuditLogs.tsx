@@ -1,3 +1,4 @@
+import { canExportAuditLogs } from '../api/hostBridge';
 import React, { useEffect, useState } from 'react';
 import {
   Search,
@@ -260,14 +261,22 @@ export default function AuditLogs() {
         pill={`${totalCount || logs.length} Events Logged`}
         subtitle="Immutable compliance and security logs of all customer profile lookups, views, and data access events"
         actions={
-          <Button
-            variant="onHeader"
-            onClick={handleExportCSV}
-            disabled={logs.length === 0}
-            leadingIcon={<Download size={15} />}
-          >
-            Export CSV
-          </Button>
+          /*
+           * A UI gate, not a data boundary — the CSV is built here from rows already fetched under
+           * audit:View, so withholding the button withholds one click's convenience, not the rows.
+           * Worth granting separately because an export leaves the platform; not something to rely
+           * on for who can read the log. The manifest says the same beside the declaration.
+           */
+          canExportAuditLogs() ? (
+            <Button
+              variant="onHeader"
+              onClick={handleExportCSV}
+              disabled={logs.length === 0}
+              leadingIcon={<Download size={15} />}
+            >
+              Export CSV
+            </Button>
+          ) : null
         }
       />
 
