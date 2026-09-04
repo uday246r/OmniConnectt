@@ -283,7 +283,7 @@ public class CheckerAssignmentAppService(
             ServiceName, actingUserId, actorName, "checker_assignment.created", "CheckerAssignment", assignment.Id.ToString(),
             $"Assigned {(checkerRoleId.HasValue ? "role " : string.Empty)}{checkerName} as a checker for '{module}'.", entityLabel: module, ct: ct);
 
-        await events.PublishToApprovalViewersAsync(new PlatformEvent("checker-assignments", "created"), ct);
+        await events.PublishToCheckerAssignmentViewersAsync(new PlatformEvent("checker-assignments", "created"), ct);
 
         return new CheckerAssignmentDto(
             assignment.Id, module, checkerUserId, checkerRoleId, checkerName,
@@ -302,6 +302,20 @@ public class CheckerAssignmentAppService(
     public async Task<IReadOnlyList<CheckerAssignmentDto>> BulkUpsertAsync(
         IReadOnlyList<string> modules, Guid? checkerUserId, Guid? checkerRoleId, Guid? actingUserId, CancellationToken ct = default)
     {
+        /*
+         * Null and blank elements are rejected here, before anything touches them.
+         *
+         * `assignableKeys` below is a HashSet with StringComparer.Ordinal, and
+         * StringComparer.Ordinal.GetHashCode(null) throws — so a payload of {"modules":[null]} came out
+         * of Contains() as an unhandled ArgumentNullException and a 500. The request DTO validates the
+         * list is non-empty but says nothing about its elements, so a malformed body reached this far.
+         * A bad request is the caller's mistake and must read as 400, not as the server falling over.
+         */
+        if (modules.Any(string.IsNullOrWhiteSpace))
+        {
+            throw new ValidationAppException("Module keys cannot be empty.");
+        }
+
         var distinctModules = modules.Distinct(StringComparer.Ordinal).ToList();
         if (distinctModules.Count == 0)
         {
@@ -420,22 +434,70 @@ public class CheckerAssignmentAppService(
 
         if (newlyCreated.Count > 0)
         {
-            await db.SaveChangesAsync(ct);
+            /*
+             * The assignments and every audit row for them commit together, or not at all.
+             *
+             * Without this the assignments went in on one SaveChangesAsync and each audit row on its
+             * own (AuditLogAppService.WriteAsync saves internally), so a failure part-way through a
+             * twenty-module assign left twenty committed assignments described by three audit rows —
+             * a maker-checker configuration change with no complete record of who made it.
+             *
+             * The transaction is conditional because the InMemory provider used by the tests has no
+             * transaction support and throws rather than no-opping. Wrapping only when the provider
+             * is relational keeps the production guarantee without making the code untestable.
+             */
+            var useTransaction = db.Database.IsRelational();
+            await using var tx = useTransaction ? await db.Database.BeginTransactionAsync(ct) : null;
 
-            var actorName = actingUserId is null ? null : await db.Users.AsNoTracking().Where(u => u.Id == actingUserId).Select(u => u.Name).FirstOrDefaultAsync(ct);
-            foreach (var assignment in newlyCreated)
+            try
             {
-                await auditLog.WriteAsync(
-                    ServiceName, actingUserId, actorName, "checker_assignment.created", "CheckerAssignment", assignment.Id.ToString(),
-                    $"Assigned {(checkerRoleId.HasValue ? "role " : string.Empty)}{checkerName} as a checker for '{assignment.Module}' (bulk application assignment).",
-                    entityLabel: assignment.Module, ct: ct);
+                await db.SaveChangesAsync(ct);
+
+                var actorName = actingUserId is null ? null : await db.Users.AsNoTracking().Where(u => u.Id == actingUserId).Select(u => u.Name).FirstOrDefaultAsync(ct);
+                foreach (var assignment in newlyCreated)
+                {
+                    await auditLog.WriteAsync(
+                        ServiceName, actingUserId, actorName, "checker_assignment.created", "CheckerAssignment", assignment.Id.ToString(),
+                        $"Assigned {(checkerRoleId.HasValue ? "role " : string.Empty)}{checkerName} as a checker for '{assignment.Module}' (bulk application assignment).",
+                        entityLabel: assignment.Module, ct: ct);
+                }
+
+                if (tx is not null)
+                {
+                    await tx.CommitAsync(ct);
+                }
+            }
+            catch (DbUpdateException ex) when (IsUniqueViolation(ex))
+            {
+                /*
+                 * Someone else assigned one of these modules between the existence check above and
+                 * this insert. The unique index on (Module, CheckerUserId) is what caught it — which
+                 * is correct, but surfacing the raw DbUpdateException made a routine race look like a
+                 * server fault and invited a retry that would fail identically.
+                 */
+                throw new ConflictAppException(
+                    "One or more of these modules was assigned a checker by someone else while this request was in flight. Reload and try again.");
             }
 
-            await events.PublishToApprovalViewersAsync(new PlatformEvent("checker-assignments", "created"), ct);
+            // Published after the commit: telling clients to refetch before the data is durable would
+            // have them read a state that may yet be rolled back.
+            await events.PublishToCheckerAssignmentViewersAsync(new PlatformEvent("checker-assignments", "created"), ct);
         }
 
         return results;
     }
+
+    /// <summary>
+    /// Whether a save failed on a unique index rather than for some other reason.
+    /// </summary>
+    /// <remarks>
+    /// SQL Server reports 2601 (duplicate key in a unique index) and 2627 (unique constraint). Checked
+    /// by number rather than by message so this does not depend on the server's language, and narrowed
+    /// deliberately — catching every DbUpdateException here would turn unrelated write failures into a
+    /// misleading 409.
+    /// </remarks>
+    private static bool IsUniqueViolation(DbUpdateException ex) =>
+        ex.InnerException is Microsoft.Data.SqlClient.SqlException { Number: 2601 or 2627 };
 
     /// <summary>
     /// Removing a checker must never strand an already-Pending request with nobody able to act on it —
@@ -547,7 +609,7 @@ public class CheckerAssignmentAppService(
             .ToList();
 
         await events.PublishToApprovalViewersAsync(new PlatformEvent("approvals", "checker-unassigned"), ct);
-        await events.PublishToApprovalViewersAsync(new PlatformEvent("checker-assignments", "deleted"), ct);
+        await events.PublishToCheckerAssignmentViewersAsync(new PlatformEvent("checker-assignments", "deleted"), ct);
         if (affectedCheckerIds.Count > 0)
         {
             await events.PublishToUsersAsync(affectedCheckerIds, new PlatformEvent("approvals", "reassigned"), ct);

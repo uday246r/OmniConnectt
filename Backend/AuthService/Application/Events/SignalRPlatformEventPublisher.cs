@@ -17,7 +17,7 @@ public class SignalRPlatformEventPublisher(
     {
         try
         {
-            await hubContext.Clients.Group("approvals.viewers").SendAsync("platformEvent", @event, ct);
+            await hubContext.Clients.Group(PlatformHub.GroupNames.ApprovalViewers).SendAsync("platformEvent", @event, ct);
         }
         catch (Exception ex)
         {
@@ -29,11 +29,23 @@ public class SignalRPlatformEventPublisher(
     {
         try
         {
-            await hubContext.Clients.Group("audit.viewers").SendAsync("platformEvent", @event, ct);
+            await hubContext.Clients.Group(PlatformHub.GroupNames.AuditViewers).SendAsync("platformEvent", @event, ct);
         }
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Failed to publish platformEvent to audit.viewers (Topic={Topic}, Action={Action})", @event.Topic, @event.Action);
+        }
+    }
+
+    public async Task PublishToCheckerAssignmentViewersAsync(PlatformEvent @event, CancellationToken ct = default)
+    {
+        try
+        {
+            await hubContext.Clients.Group(PlatformHub.GroupNames.CheckerAssignmentViewers).SendAsync("platformEvent", @event, ct);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to publish platformEvent to {Group} (Topic={Topic}, Action={Action})", PlatformHub.GroupNames.CheckerAssignmentViewers, @event.Topic, @event.Action);
         }
     }
 
@@ -43,7 +55,7 @@ public class SignalRPlatformEventPublisher(
         {
             try
             {
-                await hubContext.Clients.Group($"user:{userId}").SendAsync("platformEvent", @event, ct);
+                await hubContext.Clients.Group(PlatformHub.GroupNames.ForUser(userId)).SendAsync("platformEvent", @event, ct);
             }
             catch (Exception ex)
             {
@@ -57,7 +69,7 @@ public class SignalRPlatformEventPublisher(
         try
         {
             var badgeEvent = new PlatformEvent("approvals", "badge", new { assignedToMePending = pendingCount });
-            await hubContext.Clients.Group($"user:{userId}").SendAsync("platformEvent", badgeEvent, ct);
+            await hubContext.Clients.Group(PlatformHub.GroupNames.ForUser(userId)).SendAsync("platformEvent", badgeEvent, ct);
         }
         catch (Exception ex)
         {

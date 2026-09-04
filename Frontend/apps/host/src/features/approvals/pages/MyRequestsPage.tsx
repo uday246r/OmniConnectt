@@ -5,7 +5,8 @@ import { approvalsApi, type ApprovalRequestListItemDto, type ApprovalStatus, typ
 import { useApprovalRequests } from '../hooks/useApprovalRequests'
 import { ApiError } from '../../../shared/api/httpClient'
 import styles from './MyRequestsPage.module.css'
-import { TOPICS, useDataRevision } from '../../../shared/stores/invalidationStore'
+import { TOPICS } from '../../../shared/stores/invalidationStore'
+import { useLiveRevision } from '../../../shared/hooks/useLiveRevision'
 
 const DEFAULT_PAGE_SIZE = 10
 
@@ -183,7 +184,7 @@ export function MyRequestsPage() {
   // Opens at whatever size this user last chose here — see RowsPerPage's storageKey.
   const [pageSize, setPageSize] = useState(() => readStoredPageSize('host.myRequests', DEFAULT_PAGE_SIZE))
   const [refreshKey, setRefreshKey] = useState(0)
-  const dataRevision = useDataRevision(TOPICS.approvals)
+  const dataRevision = useLiveRevision(TOPICS.approvals)
 
   const fetcher = useCallback(
     (token: string, signal?: AbortSignal) =>

@@ -8,7 +8,8 @@ import { Icon } from '../../../../shared/components/Icon/Icon'
 import { SkeletonBlock } from '../../../../shared/components/Skeleton'
 import { approvalsApi } from '../../../approvals/api/approvalsApi'
 import styles from './ApprovalsMenu.module.css'
-import { TOPICS, useDataRevision } from '../../../../shared/stores/invalidationStore'
+import { TOPICS } from '../../../../shared/stores/invalidationStore'
+import { useLiveRevision } from '../../../../shared/hooks/useLiveRevision'
 
 const ITEM_LIMIT = 8
 const DISMISSED_APPROVALS_KEY = 'omniremit:dismissed-approvals'
@@ -51,7 +52,8 @@ function formatRelativeTime(iso: string): string {
 export function ApprovalsMenu() {
   const accessToken = useAuthStore((s) => s.accessToken)
   const userId = useAuthStore((s) => s.user?.id)
-  const dataRevision = useDataRevision(TOPICS.approvals)
+  // Push when the socket is up, a timed fallback when it is not — see useLiveRevision.
+  const dataRevision = useLiveRevision(TOPICS.approvals)
 
   const [open, setOpen] = useState(false)
   const [dismissedIds, setDismissedIds] = useState<Set<string>>(() =>

@@ -30,6 +30,21 @@ namespace AuthService.Hubs;
 [Authorize]
 public class PlatformHub : Hub
 {
+    /// <summary>
+    /// The group names, named once so the hub that joins them and the publisher that broadcasts to
+    /// them cannot drift apart. They previously agreed only by two matching string literals in
+    /// different files, and that is exactly how checker-assignment events ended up being published to
+    /// a group whose members were a different set of people.
+    /// </summary>
+    public static class GroupNames
+    {
+        public const string ApprovalViewers = "approvals.viewers";
+        public const string AuditViewers = "audit.viewers";
+        public const string CheckerAssignmentViewers = "checker-assignments.viewers";
+
+        public static string ForUser(Guid userId) => $"user:{userId}";
+    }
+
     public override async Task OnConnectedAsync()
     {
         var user = Context.User;
@@ -47,12 +62,13 @@ public class PlatformHub : Hub
         }
 
         // 1. Personal group for maker/checker notifications and badge count updates
-        await Groups.AddToGroupAsync(Context.ConnectionId, $"user:{userId}");
+        await Groups.AddToGroupAsync(Context.ConnectionId, GroupNames.ForUser(userId));
 
         // 2. Evaluate administrative and permission claims (failing closed)
         var isAdministrator = user.FindFirst(JwtTokenService.AdministratorClaimType)?.Value == "true";
         var canViewApprovals = isAdministrator;
         var canViewAuditLogs = isAdministrator;
+        var canViewCheckerAssignments = isAdministrator;
 
         if (!isAdministrator)
         {
@@ -77,6 +93,21 @@ public class PlatformHub : Hub
                     {
                         canViewAuditLogs = true;
                     }
+
+                    /*
+                     * Checker assignments have their own group, keyed on their own capability.
+                     *
+                     * They were being published to approvals.viewers, which is a different and
+                     * deliberately wider audience: CheckerAssignmentsController gates on
+                     * SystemCheckerAssignment so an ordinary checker can see who else is assigned
+                     * without being able to reassign. Someone holding that capability but not
+                     * approvals:View was therefore never in the group carrying their own changes, and
+                     * the tab sat stale until they reloaded it by hand.
+                     */
+                    if (permissions.Contains($"{AuthDbSeeder.HostFeatureKeys.SystemCheckerAssignment}:View"))
+                    {
+                        canViewCheckerAssignments = true;
+                    }
                 }
                 catch (JsonException)
                 {
@@ -87,12 +118,17 @@ public class PlatformHub : Hub
 
         if (canViewApprovals)
         {
-            await Groups.AddToGroupAsync(Context.ConnectionId, "approvals.viewers");
+            await Groups.AddToGroupAsync(Context.ConnectionId, GroupNames.ApprovalViewers);
         }
 
         if (canViewAuditLogs)
         {
-            await Groups.AddToGroupAsync(Context.ConnectionId, "audit.viewers");
+            await Groups.AddToGroupAsync(Context.ConnectionId, GroupNames.AuditViewers);
+        }
+
+        if (canViewCheckerAssignments)
+        {
+            await Groups.AddToGroupAsync(Context.ConnectionId, GroupNames.CheckerAssignmentViewers);
         }
 
         await base.OnConnectedAsync();

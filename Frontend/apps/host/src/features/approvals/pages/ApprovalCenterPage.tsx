@@ -17,7 +17,8 @@ import { Icon } from '../../../shared/components/Icon/Icon'
 // not building a fourth right-side-panel implementation.
 import drawerStyles from '../../../layout/SettingsDrawer/SettingsDrawer.module.css'
 import styles from './ApprovalCenterPage.module.css'
-import { TOPICS, invalidate, useDataRevision } from '../../../shared/stores/invalidationStore'
+import { TOPICS, invalidate } from '../../../shared/stores/invalidationStore'
+import { useLiveRevision } from '../../../shared/hooks/useLiveRevision'
 
 const DEFAULT_PAGE_SIZE = 10
 
@@ -593,7 +594,7 @@ export function ApprovalCenterPage() {
   // Invalidated whenever a Settings-drawer mutation (users/roles/applications/checker
   // assignments) happens elsewhere, so this list doesn't go stale without a manual reload —
   // mirrors MyRequestsPage's identical use of the same signal.
-  const dataRevision = useDataRevision(TOPICS.approvals)
+  const dataRevision = useLiveRevision(TOPICS.approvals)
 
   const [viewingId, setViewingId] = useState<string | null>(null)
   const [detail, setDetail] = useState<ApprovalRequestDetailDto | null>(null)

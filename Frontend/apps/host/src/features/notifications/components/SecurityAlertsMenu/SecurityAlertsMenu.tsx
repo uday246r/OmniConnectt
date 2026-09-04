@@ -7,7 +7,8 @@ import { useMenuKeyboardNav } from '../../../../shared/hooks/useMenuKeyboardNav'
 import { Icon } from '../../../../shared/components/Icon/Icon'
 import { SkeletonBlock } from '../../../../shared/components/Skeleton'
 import { auditLogsApi } from '../../../system-audit-logs/api/auditLogsApi'
-import { TOPICS, useDataRevision } from '../../../../shared/stores/invalidationStore'
+import { TOPICS } from '../../../../shared/stores/invalidationStore'
+import { useLiveRevision } from '../../../../shared/hooks/useLiveRevision'
 import styles from './SecurityAlertsMenu.module.css'
 
 const ALERT_LIMIT = 8
@@ -78,7 +79,8 @@ function formatFullTime(iso: string): string {
 export function SecurityAlertsMenu() {
   const accessToken = useAuthStore((s) => s.accessToken)
   const userId = useAuthStore((s) => s.user?.id)
-  const dataRevision = useDataRevision(TOPICS.auditLogs)
+  // Push when the socket is up, a timed fallback when it is not — see useLiveRevision.
+  const dataRevision = useLiveRevision(TOPICS.auditLogs)
 
   const [open, setOpen] = useState(false)
   const [lastSeen, setLastSeen] = useState(0)

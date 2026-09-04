@@ -9,7 +9,8 @@ import { SkeletonStatCard, SkeletonDashboardWidget, SkeletonAuditRow, SkeletonDo
 import { Icon } from '../../shared/components/Icon/Icon'
 import styles from './DashboardPage.module.css'
 import { APP_NAME, COPYRIGHT_YEAR } from '../../shared/config/branding'
-import { TOPICS, useDataRevision } from '../../shared/stores/invalidationStore'
+import { TOPICS } from '../../shared/stores/invalidationStore'
+import { useLiveRevision } from '../../shared/hooks/useLiveRevision'
 import { useAbortableEffect } from '../../shared/hooks/useAbortableEffect'
 
 interface RoleDistribution {
@@ -92,7 +93,7 @@ export function DashboardPage() {
    * KpiCoalescerService, and the Settings mutations that should still refresh these cards name it
    * explicitly in their invalidate(...) calls.
    */
-  const dataRevision = useDataRevision(TOPICS.kpis)
+  const dataRevision = useLiveRevision(TOPICS.kpis)
 
   const [loading, setLoading] = useState(true)
   const [totalUsers, setTotalUsers] = useState(0)
