@@ -4,4 +4,7 @@
   <Project Path="Customer360Service/backend.csproj" />
   <Project Path="LeadService/LeadManagement.Api.csproj" />
   <Project Path="AuthService.Tests/AuthService.Tests.csproj" />
+  <Project Path="LeadService.Tests/LeadService.Tests.csproj" />
+  <Project Path="Customer360Service.Tests/Customer360Service.Tests.csproj" />
+  <Project Path="ModuleRegistry.Tests/ModuleRegistry.Tests.csproj" />
 </Solution>
