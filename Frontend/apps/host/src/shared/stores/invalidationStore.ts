@@ -26,6 +26,10 @@ export const TOPICS = {
   checkerAssignments: 'checker-assignments',
   /** Approval requests, the pending-count badge, and the approvals menu. */
   approvals: 'approvals',
+  /** Centralized audit logs and security alerts. Wire contract with backend PlatformHub. */
+  auditLogs: 'audit-logs',
+  /** Dashboard metrics and KPIs. Wire contract with backend PlatformHub. */
+  kpis: 'kpis',
 } as const
 
 export type InvalidationTopic = (typeof TOPICS)[keyof typeof TOPICS]

@@ -172,6 +172,38 @@
   font-weight: var(--omni-font-weight-medium);
 }
 
+.menuHeaderActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  position: relative;
+  z-index: 1;
+  flex-shrink: 0;
+}
+
+.clearAllBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--omni-font-size-xs);
+  color: rgba(255, 255, 255, 0.88);
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: var(--omni-radius-md);
+  padding: 5px 10px;
+  cursor: pointer;
+  font-family: inherit;
+  font-weight: var(--omni-font-weight-semibold);
+  transition: background 130ms ease, color 130ms ease, border-color 130ms ease;
+  white-space: nowrap;
+}
+
+.clearAllBtn:hover {
+  background: rgba(239, 68, 68, 0.35);
+  color: #ffffff;
+  border-color: rgba(239, 68, 68, 0.55);
+}
+
 .viewAll {
   display: inline-flex;
   align-items: center;
@@ -216,6 +248,7 @@
 }
 
 .item {
+  position: relative;
   display: flex;
   align-items: flex-start;
   gap: 12px;
@@ -294,6 +327,7 @@
   align-items: baseline;
   justify-content: space-between;
   gap: 8px;
+  padding-right: 22px;
 }
 
 .itemTitle {
@@ -309,6 +343,32 @@
   font-weight: var(--omni-font-weight-medium);
   white-space: nowrap;
   flex-shrink: 0;
+}
+
+.dismissBtn {
+  position: absolute;
+  top: 9px;
+  right: 12px;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--omni-radius-sm, 6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #94a3b8;
+  cursor: pointer;
+  transition: all 120ms ease;
+  z-index: 2;
+  padding: 0;
+}
+
+.dismissBtn:hover {
+  background: #fee2e2;
+  color: #ef4444;
+  border-color: #fca5a5;
+  transform: scale(1.08);
 }
 
 /* Actor name */

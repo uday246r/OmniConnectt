@@ -206,6 +206,36 @@ public partial class RemoteAppAppService(
 
         var newSourceUrl = request.PermissionsSourceUrl?.Trim();
 
+        /*
+         * Moving an app to a position another app already holds SWAPS the two.
+         *
+         * Sidebar order is a plain int with no unique constraint, so two apps could sit on the same
+         * number; the list queries then fell back to ThenBy(DisplayName), which is deterministic but
+         * means the position an admin typed did not decide anything. Worse, there was no way to
+         * reorder in one action — putting Lead Management first meant editing it AND editing whatever
+         * already held position 1.
+         *
+         * Swapping makes a single edit express the whole intent ("put this one first, the other takes
+         * this one's old slot"), touches exactly two rows, and keeps positions unique as long as they
+         * started unique. If several apps already share a number (data from before this rule), only
+         * the first is moved — the rest are left alone rather than silently renumbered.
+         */
+        var previousOrder = app.SidebarOrder;
+        if (request.SidebarOrder != previousOrder)
+        {
+            var occupant = await db.RemoteApps
+                .Where(a => a.Id != app.Id && a.SidebarOrder == request.SidebarOrder)
+                .OrderBy(a => a.DisplayName)
+                .FirstOrDefaultAsync(ct);
+
+            if (occupant is not null)
+            {
+                occupant.SidebarOrder = previousOrder;
+                occupant.UpdatedAt = DateTimeOffset.UtcNow;
+                occupant.UpdatedBy = actingUserId;
+            }
+        }
+
         app.DisplayName = request.DisplayName.Trim();
         app.IconKey = request.IconKey?.Trim();
         app.ManifestUrl = request.ManifestUrl.Trim();

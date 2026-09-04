@@ -12,7 +12,7 @@ import {
   FolderKanban,
   X,
 } from '@omniremit/ui/icons';
-import { Button, ColumnFilter, DataTable, EmptyState, FilterBar, PageHeader, Pagination, ResponsiveRows, RowsPerPage, SearchField, getInitials, type ActiveFilter } from '@omniremit/ui';
+import { Button, ColumnFilter, DataTable, FilterBar, PageHeader, Pagination, ResponsiveRows, RowsPerPage, SearchField, getInitials, type ActiveFilter } from '@omniremit/ui';
 import { useLeadStore } from '../store/useLeadStore';
 import styles from './ViewLeadPage.module.css';
 import shell from '../shared/leadPage.module.css';
@@ -92,15 +92,33 @@ export const ViewLeadPage: React.FC = () => {
   const filterAnchorRef = useRef<HTMLDivElement>(null);
   const [localSearch, setLocalSearch] = useState(searchQuery);
 
+  /*
+   * Leads load once on arrival. Filter, search and pagination changes call fetchLeads() themselves.
+   *
+   * This used to sit in one effect together with the reference-data loads below, and that effect
+   * listed products.length / states.length / commonFieldConfig.length as dependencies. Those lengths
+   * go 0 → N the moment fetchMasterData() resolves, so the effect re-ran and fetched the leads a
+   * SECOND time — and because fetchLeads() flips isLoadingLeads on the way in and out, the table
+   * visibly went skeleton → rows → skeleton → rows on every refresh.
+   */
   useEffect(() => {
     fetchLeads();
+  }, [fetchLeads]);
+
+  /*
+   * Reference data, fetched once if this session does not have it yet. The length checks are a
+   * "do we already have it" guard, NOT an input — keeping them out of the dependency array is what
+   * stops the fetch from re-triggering itself as its own result arrives.
+   */
+  useEffect(() => {
     if (products.length === 0 || states.length === 0) {
       fetchMasterData();
     }
     if (commonFieldConfig.length === 0) {
       void fetchCommonFieldConfig();
     }
-  }, [fetchLeads, fetchMasterData, fetchCommonFieldConfig, products.length, states.length, commonFieldConfig.length]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -224,25 +242,19 @@ export const ViewLeadPage: React.FC = () => {
         </div>
 
         {/* Table Content */}
-        {!isLoadingLeads && leads.length === 0 ? (
-          <EmptyState
-            icon={<FolderKanban size={32} />}
-            title="No leads found"
-            description={
-              activeFilterCount > 0 || localSearch
-                ? 'Try adjusting your search query or filter criteria.'
-                : 'Get started by creating your first lead application.'
+        <DataTable bare footer={<Pagination page={currentPage} pageSize={pageSize} total={totalRecords} itemLabel="lead" onPageChange={setPage} />}>
+          <ResponsiveRows
+            rows={leads}
+            rowKey={(lead) => String(lead.id)}
+            rowId={(lead) => `lead-row-${lead.id}`}
+            loading={isLoadingLeads}
+            loadingRows={pageSize}
+            empty={
+              activeFilterCount > 0 || localSearch || searchQuery
+                ? 'No leads found matching the selected filters. Try adjusting your search query or filter criteria.'
+                : 'No leads found. Get started by creating your first lead application.'
             }
-          />
-        ) : (
-          <DataTable bare>
-            <ResponsiveRows
-              rows={leads}
-              rowKey={(lead) => String(lead.id)}
-              rowId={(lead) => `lead-row-${lead.id}`}
-              loading={isLoadingLeads}
-              loadingRows={pageSize}
-              columns={[
+            columns={[
                 {
                   key: 'name',
                   label: 'Customer Details',
@@ -257,6 +269,7 @@ export const ViewLeadPage: React.FC = () => {
                       options={[]}
                       allLabel={undefined}
                       freeText
+                      filterType="alpha"
                       searchPlaceholder="Type a customer name…"
                       emptyHint="Press Enter to filter by name."
                     />
@@ -299,6 +312,7 @@ export const ViewLeadPage: React.FC = () => {
                       options={[]}
                       allLabel={undefined}
                       freeText
+                      filterType="numeric"
                       searchPlaceholder="Type an IC number…"
                       emptyHint="Press Enter to filter by IC number."
                     />
@@ -325,6 +339,7 @@ export const ViewLeadPage: React.FC = () => {
                       options={[]}
                       allLabel={undefined}
                       freeText
+                      filterType="numeric"
                       searchPlaceholder="Type a phone number…"
                       emptyHint="Press Enter to filter by phone."
                     />
@@ -385,6 +400,7 @@ export const ViewLeadPage: React.FC = () => {
                       options={[]}
                       allLabel={undefined}
                       freeText
+                      filterType="numeric"
                       searchPlaceholder="YYYY-MM-DD"
                       emptyHint="Enter a date, then press Enter."
                     />
@@ -448,15 +464,6 @@ export const ViewLeadPage: React.FC = () => {
               ]}
             />
           </DataTable>
-        )}
-
-        <Pagination
-          page={currentPage}
-          pageSize={pageSize}
-          total={totalRecords}
-          itemLabel="lead"
-          onPageChange={setPage}
-        />
       </div>
 
       {/* Drawers */}

@@ -18,7 +18,19 @@ export interface OmniRemitHostBridge {
   ensureFreshAccessToken: () => Promise<string>;
   hasCapability: (featureKey: string, capability: string) => boolean;
   getUser: () => HostBridgeUser | null;
-  navigate: (to: string) => void;
+  /**
+   * The host owns the router, so this is how this remote's own page reaches the URL
+   * (`/apps/lead/audit-logs`). Consumed through `useHostSubRoute` — see MainLayout. Optional
+   * because a standalone run has no host at all.
+   *
+   * Replaces a `navigate: (to: string) => void` declared here that the host never implemented:
+   * anything that had called it would have thrown.
+   */
+  navigation?: {
+    getSubRoute: () => string;
+    setSubRoute: (subRoute: string, options?: { replace?: boolean }) => void;
+    onSubRouteChange: (listener: (subRoute: string) => void) => () => void;
+  };
   apiBaseUrls?: {
     authService: string;
     moduleRegistry: string;

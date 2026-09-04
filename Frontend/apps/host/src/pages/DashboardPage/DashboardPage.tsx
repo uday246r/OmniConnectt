@@ -10,7 +10,7 @@ import { SkeletonStatCard, SkeletonDashboardWidget, SkeletonAuditRow, SkeletonDo
 import { Icon } from '../../shared/components/Icon/Icon'
 import styles from './DashboardPage.module.css'
 import { APP_NAME, COPYRIGHT_YEAR } from '../../shared/config/branding'
-import { useDataRevision } from '../../shared/stores/invalidationStore'
+import { TOPICS, useDataRevision } from '../../shared/stores/invalidationStore'
 
 interface RoleDistribution {
   name: string
@@ -83,7 +83,7 @@ export function DashboardPage() {
   const accessToken = useAuthStore((s) => s.accessToken)
   const openDrawer = useSettingsDrawerStore((s) => s.open)
   const pushLayer = useSettingsDrawerStore((s) => s.pushLayer)
-  const dataRevision = useDataRevision()
+  const dataRevision = useDataRevision(TOPICS.kpis)
 
   const [loading, setLoading] = useState(true)
   const [totalUsers, setTotalUsers] = useState(0)

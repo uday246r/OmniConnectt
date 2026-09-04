@@ -23,15 +23,20 @@
   border: 1.5px solid #e8edf5; /* not in scale: --omni-color-border is #e2e8f0 */
   border-radius: 18px; /* not in scale: --omni-radius-xl is 16px */
   box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04); /* not --omni-shadow-sm (0 1px 2px /.06) */
+  /* overflow-x moved to .scrollArea so the footer stays pinned within the card */
+  overflow: hidden; /* clips children to the card's border-radius */
+}
+
+/* Inner scroll wrapper — owns the horizontal scrollbar so the footer never scrolls away */
+.scrollArea {
   overflow-x: auto;
-  /* Momentum scrolling on iOS. AuditLogsPage set this in a max-width:768px media query; it is
-     harmless at any width and belongs with the scroll container itself. */
   -webkit-overflow-scrolling: touch;
+  min-width: var(--omni-data-table-min-width, 0);
 }
 
 /* Opt-in: the audit/approval tables reserve height so the page does not jump between pages of
    results. Short tables (a 3-row settings list) must not inherit that. */
-.minHeight {
+.minHeight .scrollArea {
   min-height: 420px;
 }
 
@@ -47,27 +52,35 @@
   background: transparent;
 }
 
+/* Footer slot — Pagination renders here, visually fused with the card bottom */
+.footer {
+  border-top: 1.5px solid #eaeff7;
+  background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+}
+
+/* When footer is present the card's overflow:hidden already clips the footer to the radius. */
+.hasFooter {
+  /* No extra styles needed — overflow:hidden on .container clips footer to card's border-radius */
+}
+
 .table {
   width: 100%;
-  /* Set by the `minWidth` prop as a custom-property hand-off — the value is runtime data, so it
-     cannot live in a static stylesheet, but the declaration itself still does. Defaults to 0 so an
-     unset prop simply means "no minimum". */
-  min-width: var(--omni-data-table-min-width, 0);
+  /* min-width is now on .scrollArea (runtime custom property hand-off); left here as 0 fallback */
   border-collapse: collapse;
   text-align: left;
 }
 
 .table thead {
-  background: linear-gradient(180deg, var(--omni-color-surface-alt) 0%, #f1f5f9 100%);
-  border-bottom: 1.5px solid var(--omni-color-border);
+  background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+  border-bottom: 1.5px solid #dde3ef;
 }
 
 .table th {
   padding: var(--omni-space-3) var(--omni-space-4);
   font-size: var(--omni-font-size-xs-minus); /* below the scale's smallest step (xs = 12px) */
   font-weight: var(--omni-font-weight-bold);
-  color: var(--omni-color-text-secondary);
-  letter-spacing: 0.06em;
+  color: #475569; /* slightly stronger than text-secondary for header legibility */
+  letter-spacing: 0.07em;
   text-transform: uppercase;
   white-space: nowrap;
 }
@@ -88,11 +101,12 @@
  * pattern. The row expander (priority columns) is the fuller answer and is tracked separately.
  */
 .table td {
-  padding: 13px 18px; /* off-scale by design; matches the host reference exactly */
+  padding: 12px 18px; /* slightly tighter than 13px — crisp, not cramped */
   border-bottom: 1px solid #f1f5f9;
   font-size: var(--omni-font-size-sm);
+  font-weight: var(--omni-font-weight-medium); /* medium body weight improves readability */
   vertical-align: middle;
-  color: #334155; /* between --omni-color-text-primary and -secondary; not a token */
+  color: #1e293b; /* stronger than the old #334155 — primary-900-ish, improves contrast */
   max-width: var(--omni-data-table-cell-max, 280px);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -129,8 +143,10 @@
   transition: background 140ms ease;
 }
 
+/* Richer hover: soft primary tint + left accent bar */
 .table tbody tr:hover {
-  background: var(--omni-color-surface-alt);
+  background: #f5f8ff;
+  box-shadow: inset 3px 0 0 var(--omni-color-primary-300);
 }
 
 .table tbody tr:last-child td {

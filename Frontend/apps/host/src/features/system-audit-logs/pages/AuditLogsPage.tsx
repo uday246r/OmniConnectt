@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAuthStore } from '../../auth/store/authStore'
-import { ActorCell, Badge, DataTable, DetailField, DetailGrid, DetailSection, EMPTY_VALUE, FilterBar, PageHeader, Pagination, ResponsiveRows, RowAction, RowsPerPage, formatAuditTimestamp, readStoredPageSize, type ActiveFilter, type BadgeTone } from '@omniremit/ui'
+import { TOPICS, useDataRevision } from '../../../shared/stores/invalidationStore'
+import { ActorCell, Badge, DataTable, DetailField, DetailGrid, DetailSection, EMPTY_VALUE, FilterBar, PageHeader, Pagination, ResponsiveRows, RowAction, RowsPerPage, formatAuditTimestamp, readStoredPageSize, sanitizeFilterInput, filterTypeBlockedMessage, type ActiveFilter, type BadgeTone } from '@omniremit/ui'
 import { PermissionGate } from '../../../shared/components/PermissionGate/PermissionGate'
 import { ApiError } from '../../../shared/api/httpClient'
 import { useDebouncedValue } from '../../../shared/hooks/useDebouncedValue'
@@ -14,7 +15,6 @@ import styles from './AuditLogsPage.module.css'
 
 const FEATURE = 'host.system.audit-logs'
 const DEFAULT_PAGE_SIZE = 10
-const PAGE_SIZE_OPTIONS = [5, 10, 15, 20] as const
 
 const SERVICE_TONES: Record<string, BadgeTone> = {
   AuthService: 'primary',
@@ -59,8 +59,21 @@ function formatActionLabel(action: string): string {
     .join(' ')
 }
 
+/** Maps a raw backend action key to one of the actionCell colour-variant CSS classes. */
+function actionChipClass(action: string): 'actionSuccess' | 'actionDanger' | 'actionWarning' | 'actionLogin' | 'actionNeutral' {
+  const a = action.toLowerCase()
+  if (a.includes('login_succeeded') || a.includes('login_success')) return 'actionSuccess'
+  if (a.includes('login_failed') || a.includes('login_fail')) return 'actionDanger'
+  if (a.includes('created') || a.includes('registered')) return 'actionSuccess'
+  if (a.includes('deleted') || a.includes('removed') || a.includes('unregistered')) return 'actionDanger'
+  if (a.includes('status_changed') || a.includes('maintenance')) return 'actionWarning'
+  if (a.includes('updated') || a.includes('changed') || a.includes('modified')) return 'actionLogin'
+  return 'actionNeutral'
+}
+
 /* Audit timestamps come from @omniremit/ui so the two remotes render the same shape. */
 const formatTimestamp = formatAuditTimestamp
+
 
 interface ParsedUserAgent {
   browser: string
@@ -209,8 +222,6 @@ const TAB_ACTION_FILTER: Record<TabId, string | undefined> = {
   [TAB_IDS.auditEvents]: undefined,
 }
 
-const KNOWN_SERVICES = ['AuthService', 'ModuleRegistry', 'EmployeeService', 'Customer360Service', 'LeadService']
-
 export function AuditLogsPage() {
   const accessToken = useAuthStore((s) => s.accessToken)
 
@@ -233,8 +244,15 @@ export function AuditLogsPage() {
   const [service, setService] = useState('')
   const [serviceSearch, setServiceSearch] = useState('')
 
-  // Actor search
+  // Actor search — a person's name, so only letters are accepted; `actorSearchBlocked` flags the
+  // instant after a keystroke that got stripped, driving a "why won't it let me type that" hint.
   const [actorSearch, setActorSearch] = useState('')
+  const [actorSearchBlocked, setActorSearchBlocked] = useState(false)
+  function handleActorSearchChange(raw: string) {
+    const clean = sanitizeFilterInput(raw, 'alpha')
+    setActorSearch(clean)
+    setActorSearchBlocked(clean !== raw)
+  }
 
   // Action filter & search
   const [actionFilter, setActionFilter] = useState('')
@@ -245,7 +263,14 @@ export function AuditLogsPage() {
 
   // Sign-in specific filters
   const [authMethodFilter, setAuthMethodFilter] = useState('')
+  // An IPv4 address is digits and dots only.
   const [ipSearch, setIpSearch] = useState('')
+  const [ipSearchBlocked, setIpSearchBlocked] = useState(false)
+  function handleIpSearchChange(raw: string) {
+    const clean = sanitizeFilterInput(raw, 'numeric')
+    setIpSearch(clean)
+    setIpSearchBlocked(clean !== raw)
+  }
   const [deviceSearch, setDeviceSearch] = useState('')
   const [resultFilter, setResultFilter] = useState<'' | 'Success' | 'Failure'>('')
 
@@ -265,6 +290,8 @@ export function AuditLogsPage() {
   const [exporting, setExporting] = useState(false)
   const [viewingLog, setViewingLog] = useState<AuditLogDto | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
+  const dataRevision = useDataRevision(TOPICS.auditLogs)
+  const prevDepsRef = useRef<unknown[] | null>(null)
 
   const range = useMemo(() => computeRangeWithCustom(dateRange, customFrom, customTo), [dateRange, customFrom, customTo])
 
@@ -278,37 +305,72 @@ export function AuditLogsPage() {
     return Array.from(map.values())
   }, [cachedPool])
 
-  // Zero extra API call: extract unique services
+  /*
+   * Services, actions and sign-in methods actually present in the loaded rows — nothing else.
+   *
+   * These three used to seed themselves from hardcoded lists (a KNOWN_SERVICES array, every key in
+   * ACTION_LABELS, six auth methods) and then add whatever the data contained. That offered options
+   * no row could ever match: picking "EmployeeService" — a service with no frontend in this repo at
+   * all — filtered the table to nothing and read as a broken filter rather than an empty service.
+   * A column filter should only offer values that column holds.
+   *
+   * ACTION_LABELS is still the raw→friendly mapping used by formatActionLabel; it is just no longer
+   * treated as a list of things to offer.
+   */
   const availableServices = useMemo(() => {
-    const set = new Set<string>(KNOWN_SERVICES)
+    const set = new Set<string>()
     for (const r of cachedPool) {
       if (r.serviceName) set.add(r.serviceName)
     }
-    const list = Array.from(set)
+    const list = Array.from(set).sort((a, b) => a.localeCompare(b))
     if (!serviceSearch.trim()) return list
     const q = serviceSearch.toLowerCase()
     return list.filter((s) => s.toLowerCase().includes(q))
   }, [cachedPool, serviceSearch])
 
-  // Zero extra API call: extract unique actions
   const availableActions = useMemo(() => {
-    const set = new Set<string>(Object.keys(ACTION_LABELS))
+    const set = new Set<string>()
     for (const r of cachedPool) {
       if (r.action) set.add(r.action)
     }
-    const list = Array.from(set).map((a) => ({ raw: a, label: formatActionLabel(a) }))
+
+    const entries = Array.from(set).map((a) => ({ raw: a, label: formatActionLabel(a) }))
+
+    /*
+     * Several distinct actions share one friendly label: formatActionLabel falls back to the last
+     * segment, so user.created, role.created and checker_assignment.created all read "Created".
+     * Each still filters to a different action, so the list showed three identical options that did
+     * three different things. Qualify only the colliding ones with the record they act on —
+     * "Created (User)" — rather than exposing the raw dotted key.
+     */
+    const labelCounts = new Map<string, number>()
+    for (const entry of entries) labelCounts.set(entry.label, (labelCounts.get(entry.label) ?? 0) + 1)
+
+    const list = entries
+      .map((entry) => {
+        if ((labelCounts.get(entry.label) ?? 0) < 2 || !entry.raw.includes('.')) return entry
+        const entity = entry.raw
+          .slice(0, entry.raw.lastIndexOf('.'))
+          .replace(/[._-]/g, ' ')
+          .trim()
+          .split(/\s+/)
+          .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+          .join(' ')
+        return { raw: entry.raw, label: entity ? `${entry.label} (${entity})` : entry.label }
+      })
+      .sort((a, b) => a.label.localeCompare(b.label))
+
     if (!actionSearch.trim()) return list
     const q = actionSearch.toLowerCase()
     return list.filter((a) => a.label.toLowerCase().includes(q) || a.raw.toLowerCase().includes(q))
   }, [cachedPool, actionSearch])
 
-  // Zero extra API call: extract unique auth methods
   const availableAuthMethods = useMemo(() => {
-    const set = new Set<string>(['Local', 'Google', 'AzureAD', 'OAuth', 'ApiKey', 'Bearer'])
+    const set = new Set<string>()
     for (const r of cachedPool) {
       if (r.authMethod) set.add(r.authMethod)
     }
-    return Array.from(set)
+    return Array.from(set).sort((a, b) => a.localeCompare(b))
   }, [cachedPool])
 
   // Zero extra API call: extract unique IPv4 addresses
@@ -401,13 +463,28 @@ export function AuditLogsPage() {
 
   useEffect(() => {
     void loadSummary()
-  }, [loadSummary])
+  }, [loadSummary, dataRevision])
 
   useEffect(() => {
     if (!accessToken) return
     let cancelled = false
 
-    setLogs(null)
+    const activeDeps = [
+      page, pageSize, debouncedService, activeTab, actionFilter,
+      resultFilter, authMethodFilter, debouncedActor, debouncedEntity,
+      debouncedIp, debouncedDevice, range, dateRange, customFrom, customTo, refreshKey,
+    ]
+
+    const activeDepsChanged =
+      prevDepsRef.current === null ||
+      prevDepsRef.current.length !== activeDeps.length ||
+      activeDeps.some((dep, i) => dep !== prevDepsRef.current![i])
+
+    prevDepsRef.current = activeDeps
+
+    if (activeDepsChanged) {
+      setLogs(null)
+    }
     setError(null)
 
     async function load() {
@@ -427,12 +504,13 @@ export function AuditLogsPage() {
 
         let allItems = result.items
 
-        // Update cached pool
+        // Update cached pool (capped at 2000 entries to bound memory growth)
         setCachedPool((prev) => {
           const map = new Map<string, AuditLogDto>()
           for (const item of prev) map.set(item.id, item)
           for (const item of allItems) map.set(item.id, item)
-          return Array.from(map.values())
+          const list = Array.from(map.values())
+          return list.length > 2000 ? list.slice(-2000) : list
         })
 
         // Client-side precision filtering
@@ -500,6 +578,7 @@ export function AuditLogsPage() {
     accessToken, page, pageSize, debouncedService, activeTab, actionFilter,
     resultFilter, authMethodFilter, debouncedActor, debouncedEntity,
     debouncedIp, debouncedDevice, range, dateRange, customFrom, customTo, refreshKey,
+    dataRevision,
   ])
 
   // Changing the filter or page size invalidates the page number.
@@ -548,12 +627,6 @@ export function AuditLogsPage() {
     setCustomDraftTo('')
   }
 
-  const hasActiveFilters = Boolean(
-    service || actorSearch || actionFilter || entitySearch || authMethodFilter ||
-    ipSearch || deviceSearch || resultFilter || dateRange !== 'all'
-  )
-
-  const totalPages = Math.max(1, Math.ceil(total / pageSize))
   const isLoginTab = activeTab === TAB_IDS.loginErrors || activeTab === TAB_IDS.loginSuccesses
 
   return (
@@ -744,7 +817,7 @@ export function AuditLogsPage() {
       {/* Logs Table — chrome from @omniremit/ui so the host, Approval Center and both remotes all
           render the same table. This page's own `.tableContainer`/`.logTable` were the origin of
           that shared style; the duplicate copy in ApprovalCenterPage.module.css is now gone too. */}
-      <DataTable reserveHeight>
+      <DataTable reserveHeight footer={<Pagination page={page} pageSize={pageSize} total={total} itemLabel="event" onPageChange={setPage} />}>
           <ResponsiveRows
             rows={logs ?? []}
             rowKey={(log) => String(log.id)}
@@ -953,16 +1026,20 @@ export function AuditLogsPage() {
                           <div className={styles.filterPopover}>
                             <div className={styles.popoverHeader}>
                               <span className={styles.popoverTitle}>Filter IP Address</span>
-                              {ipSearch && <button type="button" className={styles.popoverClearBtn} onClick={() => setIpSearch('')}>Reset</button>}
+                              {ipSearch && <button type="button" className={styles.popoverClearBtn} onClick={() => { setIpSearch(''); setIpSearchBlocked(false) }}>Reset</button>}
                             </div>
                             <input
                               type="text"
-                              className={styles.popoverInput}
+                              inputMode="numeric"
+                              className={`${styles.popoverInput} ${ipSearchBlocked ? styles.popoverInputBlocked : ''}`}
                               placeholder="Search IP address..."
                               value={ipSearch}
-                              onChange={(e) => setIpSearch(e.target.value)}
+                              onChange={(e) => handleIpSearchChange(e.target.value)}
                               autoFocus
                             />
+                            {ipSearchBlocked && (
+                              <p className={styles.blockedHint} role="alert">{filterTypeBlockedMessage('numeric')}</p>
+                            )}
                             {availableIps.length > 0 && (
                               <>
                                 <div className={styles.popoverDivider} />
@@ -1298,16 +1375,20 @@ export function AuditLogsPage() {
                           <div className={styles.filterPopover}>
                             <div className={styles.popoverHeader}>
                               <span className={styles.popoverTitle}>Filter Performed By</span>
-                              {actorSearch && <button type="button" className={styles.popoverClearBtn} onClick={() => setActorSearch('')}>Reset</button>}
+                              {actorSearch && <button type="button" className={styles.popoverClearBtn} onClick={() => { setActorSearch(''); setActorSearchBlocked(false) }}>Reset</button>}
                             </div>
                             <input
                               type="text"
-                              className={styles.popoverInput}
+                              inputMode="text"
+                              className={`${styles.popoverInput} ${actorSearchBlocked ? styles.popoverInputBlocked : ''}`}
                               placeholder="Search by name..."
                               value={actorSearch}
-                              onChange={(e) => setActorSearch(e.target.value)}
+                              onChange={(e) => handleActorSearchChange(e.target.value)}
                               autoFocus
                             />
+                            {actorSearchBlocked && (
+                              <p className={styles.blockedHint} role="alert">{filterTypeBlockedMessage('alpha')}</p>
+                            )}
                             {availableActors.length > 0 && (
                               <>
                                 <div className={styles.popoverDivider} />
@@ -1397,7 +1478,7 @@ export function AuditLogsPage() {
                       </th>
                     ),
                     render: (log) => (
-                      <span className={styles.actionCell} title={log.action}>
+                      <span className={`${styles.actionCell} ${styles[actionChipClass(log.action)]}`} title={log.action}>
                         {formatActionLabel(log.action)}
                       </span>
                     ),
@@ -1408,7 +1489,7 @@ export function AuditLogsPage() {
                     label: 'RECORD',
                     priority: 'low',
                     header: (
-                      <th className={styles.thFilterable}>
+                      <th className={`${styles.thFilterable} ${styles.thNarrow}`}>
                         <button
                           type="button"
                           className={`${styles.thFilterBtn} ${entitySearch ? styles.thFilterBtnActive : ''}`}
@@ -1457,18 +1538,9 @@ export function AuditLogsPage() {
                     align: 'right',
                     render: (log) => <RowAction onClick={() => setViewingLog(log)} title="View full details" />,
                   },
-                  ]
-            }
-          />
-      </DataTable>
-
-      <Pagination
-        page={page}
-        pageSize={pageSize}
-        total={total}
-        itemLabel="event"
-        onPageChange={setPage}
-      />
+                ]}
+              />
+            </DataTable>
 
       {/* Record details drawer — opened per row by its "View" button (or, on the Sign-ins tabs, the
           device cell). The SAME right-side drawer shell Settings and the System Audit Trail deep-link

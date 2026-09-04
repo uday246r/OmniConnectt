@@ -181,6 +181,41 @@
 
 .req { color: var(--omni-color-danger-500); }
 
+/* ── App icon picker ──────────────────────────────────────── */
+.iconPicker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.iconSwatch {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--omni-color-surface-alt);
+  border: 1.5px solid #e2e8f0;
+  border-radius: var(--omni-radius-md-plus);
+  color: #64748b;
+  cursor: pointer;
+  transition: all 130ms ease;
+  font-family: inherit;
+}
+
+.iconSwatch:hover {
+  border-color: var(--omni-color-border-strong);
+  color: var(--omni-color-text-primary);
+  background: var(--omni-color-surface);
+}
+
+.iconSwatchActive {
+  background: var(--omni-color-primary-50);
+  border-color: var(--omni-color-primary-600);
+  color: var(--omni-color-primary-600);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
 /* ── Inputs ───────────────────────────────────────────────── */
 .inputIconWrap {
   position: relative;

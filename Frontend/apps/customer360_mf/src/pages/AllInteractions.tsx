@@ -56,6 +56,7 @@ export default function AllInteractions() {
   // Client-side, matching the status filter: this table narrows a page the API already returned.
   const [channelFilter, setChannelFilter] = useState('');
   const [officerFilter, setOfficerFilter] = useState('');
+  const [caseIdFilter, setCaseIdFilter] = useState('');
 
   /* Channel and Officer offer the values present in the loaded cases rather than an empty box. */
   const distinctOf = (pick: (i: typeof interactions[number]) => string | null | undefined) => {
@@ -96,17 +97,8 @@ export default function AllInteractions() {
   };
 
   // Filter local data based on search term & status.
-  //
-  // These field names previously didn't exist on Interaction at all (caseNumber, title, assignedTo,
-  // source, status) — every one of them was `undefined` at runtime, every time, for every real
-  // interaction. That didn't crash (JS doesn't throw on reading a missing optional property), it
-  // silently filtered against empty strings and, worse, the table below rendered its hardcoded
-  // fallback text ("Customer Inquiry", "Unassigned", "Branch Walk-in", a fabricated "CAS-100N" case
-  // number) as if it were real CRM data for every single case. Mapped to the fields the backend
-  // (Backend/Customer360Service/Models/Models.cs: Interaction) actually returns; see the table render
-  // below for which mappings are exact vs. best-effort against a schema with no literal "title" or
-  // "assigned to" column.
   const filteredInteractions = interactions.filter((item) => {
+    if (caseIdFilter && !(item.caseId || '').toLowerCase().includes(caseIdFilter.toLowerCase())) return false;
     if (channelFilter && !(item.sourceName || '').toLowerCase().includes(channelFilter.toLowerCase())) return false;
     if (officerFilter && !(item.subRoleName || '').toLowerCase().includes(officerFilter.toLowerCase())) return false;
     const matchesSearch =
@@ -135,12 +127,14 @@ export default function AllInteractions() {
 
       <FilterBar
         filters={[
+          caseIdFilter && { key: 'caseId', label: 'Case #', value: `"${caseIdFilter}"`, onRemove: () => setCaseIdFilter('') },
           channelFilter && { key: 'channel', label: 'Channel', value: channelFilter, onRemove: () => setChannelFilter('') },
           officerFilter && { key: 'officer', label: 'Performed By', value: officerFilter, onRemove: () => setOfficerFilter('') },
           statusFilter && { key: 'status', label: 'Status', value: statusFilter, onRemove: () => setStatusFilter('') },
           searchTerm && { key: 'search', label: 'Search', value: `"${searchTerm}"`, onRemove: () => setSearchTerm('') },
         ].filter(Boolean) as ActiveFilter[]}
         onClearAll={() => {
+          setCaseIdFilter('');
           setChannelFilter('');
           setOfficerFilter('');
           setStatusFilter('');
@@ -189,31 +183,37 @@ export default function AllInteractions() {
               Retry
               </Button>
           </div>
-        ) : !loading && filteredInteractions.length === 0 ? (
-          <div className={styles.text2}>
-            <div className={styles.heading}>💬</div>
-            <div className={styles.strong}>
-              No interaction logs found
-            </div>
-            <div className={styles.text3}>
-              {searchTerm || statusFilter
-                ? 'Try adjusting your search query or status filter.'
-                : 'No recorded interactions or support tickets for this customer.'}
-            </div>
-          </div>
         ) : (
-          <DataTable>
+          <DataTable footer={<Pagination page={pageNumber} pageSize={pageSize} total={totalCount} itemLabel="case" onPageChange={setPageNumber} />}>
             <ResponsiveRows
               rows={filteredInteractions}
               loading={loading}
               loadingRows={pageSize}
               rowKey={(item, i) => item.caseId || String(i)}
-              empty="No interactions or cases found."
+              empty={
+                searchTerm || statusFilter || channelFilter || officerFilter || caseIdFilter
+                  ? 'No interactions found matching the selected filters. Try adjusting your search query or filters.'
+                  : 'No recorded interactions or support tickets for this customer.'
+              }
               columns={[
                 {
                   key: 'caseId',
                   label: 'Case #',
                   priority: 'always',
+                  header: (
+                    <ColumnFilter
+                      key="caseId"
+                      label="Case #"
+                      title="Filter Case #"
+                      value={caseIdFilter}
+                      onChange={setCaseIdFilter}
+                      options={[]}
+                      allLabel={undefined}
+                      freeText
+                      searchPlaceholder="Type to filter case #…"
+                      emptyHint="Press Enter to filter."
+                    />
+                  ),
                   /* caseId is the real case identifier — no fabricated "CAS-100N" placeholder */
                   render: (item) => <span className={cc.monoAccent}>{item.caseId || EMPTY_VALUE}</span>,
                 },
@@ -265,6 +265,7 @@ export default function AllInteractions() {
                       options={officerOptions}
                       allLabel="Everyone"
                       searchable={officerOptions.length > 6}
+                      filterType="alpha"
                       searchPlaceholder="Type a name to narrow…"
                       emptyHint="No officer here matches that."
                     />
@@ -319,17 +320,6 @@ export default function AllInteractions() {
               ]}
             />
           </DataTable>
-        )}
-
-        {/* Pagination Toolbar */}
-        {totalCount > 0 && (
-          <Pagination
-            page={pageNumber}
-            pageSize={pageSize}
-            total={totalCount}
-            itemLabel="case"
-            onPageChange={setPageNumber}
-          />
         )}
       </div>
 

@@ -1,6 +1,8 @@
 using AuthService.Application.DTOs;
+using AuthService.Application.Events;
 using AuthService.Application.Exceptions;
 using AuthService.Domain.Entities;
+using AuthService.Domain.Enums;
 using AuthService.Infrastructure;
 using AuthService.Infrastructure.Seed;
 using Microsoft.EntityFrameworkCore;
@@ -12,7 +14,8 @@ namespace AuthService.Application.Services;
 /// (Maker-Checker required) if and only if it has at least one row here — see
 /// ApprovalGatingService.IsGatedAsync.
 /// </summary>
-public class CheckerAssignmentAppService(AuthDbContext db, AuditLogAppService auditLog, PermissionCatalogAppService catalog, ApprovalGatingService gating)
+public class CheckerAssignmentAppService(
+    AuthDbContext db, AuditLogAppService auditLog, PermissionCatalogAppService catalog, ApprovalGatingService gating, IPlatformEventPublisher events)
 {
     private const string ServiceName = "AuthService";
 
@@ -213,9 +216,127 @@ public class CheckerAssignmentAppService(AuthDbContext db, AuditLogAppService au
             ServiceName, actingUserId, actorName, "checker_assignment.created", "CheckerAssignment", assignment.Id.ToString(),
             $"Assigned {(checkerRoleId.HasValue ? "role " : string.Empty)}{checkerName} as a checker for '{module}'.", entityLabel: module, ct: ct);
 
+        await events.PublishToApprovalViewersAsync(new PlatformEvent("checker-assignments", "created"), ct);
+
         return new CheckerAssignmentDto(
             assignment.Id, module, checkerUserId, checkerRoleId, checkerName,
             checkerRoleId.HasValue, memberCount, assignment.CreatedAt);
+    }
+
+    /// <summary>
+    /// Assigns one checker to every module in <paramref name="modules"/> in one call — "assign one
+    /// checker for an entire application" instead of the operator repeating <see cref="UpsertAsync"/>
+    /// once per module. The checker (user-active / role-has-active-members) is validated once for the
+    /// whole batch rather than re-validated per module; module existence is checked all-or-nothing up
+    /// front so a typo'd key fails the whole call instead of silently skipping one module. Per-module
+    /// idempotency still holds — a module already assigned to this exact checker is left untouched and
+    /// returned as-is, same as the single-module path.
+    /// </summary>
+    public async Task<IReadOnlyList<CheckerAssignmentDto>> BulkUpsertAsync(
+        IReadOnlyList<string> modules, Guid? checkerUserId, Guid? checkerRoleId, Guid? actingUserId, CancellationToken ct = default)
+    {
+        var distinctModules = modules.Distinct(StringComparer.Ordinal).ToList();
+        if (distinctModules.Count == 0)
+        {
+            throw new ValidationAppException("Select at least one module to assign a checker to.");
+        }
+
+        if (checkerUserId.HasValue == checkerRoleId.HasValue)
+        {
+            throw new ValidationAppException(
+                "Assign either a specific user or a role as checker — not both, and not neither.");
+        }
+
+        var assignable = await GetAssignableModulesAsync(ct);
+        var assignableKeys = assignable.Select(m => m.Key).ToHashSet(StringComparer.Ordinal);
+        var unknown = distinctModules.Where(m => !assignableKeys.Contains(m)).ToList();
+        if (unknown.Count > 0)
+        {
+            throw new ValidationAppException(
+                $"{(unknown.Count == 1 ? "'" + unknown[0] + "' is" : $"'{string.Join("', '", unknown)}' are")} not (a) known, assignable module(s).");
+        }
+
+        string checkerName;
+        int? memberCount = null;
+
+        if (checkerUserId.HasValue)
+        {
+            var checkerUser = await db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == checkerUserId.Value, ct)
+                ?? throw new NotFoundAppException($"User '{checkerUserId}' was not found.");
+
+            if (checkerUser.Status != Domain.Enums.UserStatus.Active)
+            {
+                throw new ValidationAppException(
+                    $"{checkerUser.Name} is not an active user and cannot be assigned as a checker.");
+            }
+
+            checkerName = checkerUser.Name;
+        }
+        else
+        {
+            var role = await db.Roles.AsNoTracking().FirstOrDefaultAsync(r => r.Id == checkerRoleId!.Value, ct)
+                ?? throw new NotFoundAppException($"Role '{checkerRoleId}' was not found.");
+
+            memberCount = await db.Users.AsNoTracking()
+                .CountAsync(u => u.RoleId == checkerRoleId!.Value && u.Status == Domain.Enums.UserStatus.Active, ct);
+
+            if (memberCount == 0)
+            {
+                throw new ValidationAppException(
+                    $"'{role.Name}' has no active members, so assigning it as checker would leave these modules with nobody able to approve.");
+            }
+
+            checkerName = role.Name;
+        }
+
+        var existingForModules = await db.CheckerAssignments
+            .Where(c => distinctModules.Contains(c.Module) && c.CheckerUserId == checkerUserId && c.CheckerRoleId == checkerRoleId)
+            .ToListAsync(ct);
+        var existingModuleSet = existingForModules.Select(e => e.Module).ToHashSet(StringComparer.Ordinal);
+
+        var results = existingForModules
+            .Select(existing => new CheckerAssignmentDto(
+                existing.Id, existing.Module, existing.CheckerUserId, existing.CheckerRoleId,
+                checkerName, existing.CheckerRoleId.HasValue, memberCount, existing.CreatedAt))
+            .ToList();
+
+        var now = DateTimeOffset.UtcNow;
+        var newlyCreated = new List<CheckerAssignment>();
+        foreach (var module in distinctModules.Where(m => !existingModuleSet.Contains(m)))
+        {
+            var assignment = new CheckerAssignment
+            {
+                Id = Guid.NewGuid(),
+                Module = module,
+                CheckerUserId = checkerUserId,
+                CheckerRoleId = checkerRoleId,
+                CreatedAt = now,
+                CreatedBy = actingUserId,
+            };
+            db.CheckerAssignments.Add(assignment);
+            newlyCreated.Add(assignment);
+            results.Add(new CheckerAssignmentDto(
+                assignment.Id, module, checkerUserId, checkerRoleId, checkerName,
+                checkerRoleId.HasValue, memberCount, assignment.CreatedAt));
+        }
+
+        if (newlyCreated.Count > 0)
+        {
+            await db.SaveChangesAsync(ct);
+
+            var actorName = actingUserId is null ? null : await db.Users.AsNoTracking().Where(u => u.Id == actingUserId).Select(u => u.Name).FirstOrDefaultAsync(ct);
+            foreach (var assignment in newlyCreated)
+            {
+                await auditLog.WriteAsync(
+                    ServiceName, actingUserId, actorName, "checker_assignment.created", "CheckerAssignment", assignment.Id.ToString(),
+                    $"Assigned {(checkerRoleId.HasValue ? "role " : string.Empty)}{checkerName} as a checker for '{assignment.Module}' (bulk application assignment).",
+                    entityLabel: assignment.Module, ct: ct);
+            }
+
+            await events.PublishToApprovalViewersAsync(new PlatformEvent("checker-assignments", "created"), ct);
+        }
+
+        return results;
     }
 
     /// <summary>
@@ -297,5 +418,23 @@ public class CheckerAssignmentAppService(AuthDbContext db, AuditLogAppService au
         await auditLog.WriteAsync(
             ServiceName, actingUserId, actorName, "checker_assignment.deleted", "CheckerAssignment", id.ToString(),
             $"Removed {(assignment.CheckerRoleId.HasValue ? "role " : string.Empty)}{checkerName} as a checker for '{module}'.", entityLabel: module, ct: ct);
+
+        var affectedCheckerIds = reassignments
+            .Select(r => r.NewCheckerId)
+            .Concat(assignment.CheckerUserId.HasValue ? [assignment.CheckerUserId.Value] : [])
+            .Distinct()
+            .ToList();
+
+        await events.PublishToApprovalViewersAsync(new PlatformEvent("approvals", "checker-unassigned"), ct);
+        await events.PublishToApprovalViewersAsync(new PlatformEvent("checker-assignments", "deleted"), ct);
+        if (affectedCheckerIds.Count > 0)
+        {
+            await events.PublishToUsersAsync(affectedCheckerIds, new PlatformEvent("approvals", "reassigned"), ct);
+            foreach (var cId in affectedCheckerIds)
+            {
+                var count = await db.ApprovalRequests.CountAsync(r => r.CheckerId == cId && r.Status == ApprovalStatus.Pending, ct);
+                await events.PublishBadgeAsync(cId, count, ct);
+            }
+        }
     }
 }

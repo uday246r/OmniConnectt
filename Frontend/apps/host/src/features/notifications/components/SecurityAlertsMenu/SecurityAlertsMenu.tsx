@@ -7,11 +7,13 @@ import { useMenuKeyboardNav } from '../../../../shared/hooks/useMenuKeyboardNav'
 import { Icon } from '../../../../shared/components/Icon/Icon'
 import { SkeletonBlock } from '../../../../shared/components/Skeleton'
 import { auditLogsApi } from '../../../system-audit-logs/api/auditLogsApi'
+import { TOPICS, useDataRevision } from '../../../../shared/stores/invalidationStore'
 import styles from './SecurityAlertsMenu.module.css'
 
 const ALERT_LIMIT = 8
 /** Persisted per user so the unread count survives reloads without needing a server-side read model. */
 const LAST_SEEN_KEY = 'omniremit:alerts-last-seen'
+const DISMISSED_ALERTS_KEY = 'omniremit:dismissed-alerts'
 
 function readLastSeen(userId: string): number {
   try {
@@ -28,6 +30,23 @@ function writeLastSeen(userId: string, at: number) {
   } catch {
     // Storage can be unavailable (private mode, quota). The menu still works; only the unread
     // count resets on reload, which is a cosmetic degradation rather than a failure.
+  }
+}
+
+function readDismissed(userId: string): Set<string> {
+  try {
+    const raw = localStorage.getItem(`${DISMISSED_ALERTS_KEY}:${userId}`)
+    return raw ? new Set(JSON.parse(raw)) : new Set()
+  } catch {
+    return new Set()
+  }
+}
+
+function writeDismissed(userId: string, ids: Set<string>) {
+  try {
+    localStorage.setItem(`${DISMISSED_ALERTS_KEY}:${userId}`, JSON.stringify(Array.from(ids)))
+  } catch {
+    // Storage can be unavailable
   }
 }
 
@@ -53,20 +72,19 @@ function formatFullTime(iso: string): string {
 /**
  * Security alerts in the topbar.
  *
- * Replaces a bell button that had no click handler at all — but did have a hover state, so it
- * advertised itself as interactive and then did nothing.
- *
- * Every alert is a real failed sign-in row from the audit API. There is no notifications table and
- * nothing is synthesised: if there have been no failed sign-ins, the menu says exactly that. The
- * unread count is derived from a locally stored "last seen" timestamp compared against real row
- * timestamps.
+ * Every alert is a real failed sign-in row from the audit API. Dismissing an alert removes it
+ * from the local UI state without modifying database records.
  */
 export function SecurityAlertsMenu() {
   const accessToken = useAuthStore((s) => s.accessToken)
   const userId = useAuthStore((s) => s.user?.id)
+  const dataRevision = useDataRevision(TOPICS.auditLogs)
 
   const [open, setOpen] = useState(false)
   const [lastSeen, setLastSeen] = useState(0)
+  const [dismissedIds, setDismissedIds] = useState<Set<string>>(() =>
+    userId ? readDismissed(userId) : new Set()
+  )
   const wrapperRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
 
@@ -74,22 +92,45 @@ export function SecurityAlertsMenu() {
   const handleKeyDown = useMenuKeyboardNav(wrapperRef, () => setOpen(false), triggerRef)
 
   useEffect(() => {
-    if (userId) setLastSeen(readLastSeen(userId))
+    if (userId) {
+      setLastSeen(readLastSeen(userId))
+      setDismissedIds(readDismissed(userId))
+    }
   }, [userId])
 
   const alertsQuery = useQuery({
-    queryKey: ['securityAlerts', ALERT_LIMIT],
+    queryKey: ['securityAlerts', ALERT_LIMIT, dataRevision],
     queryFn: () =>
       auditLogsApi.list(accessToken!, { page: 1, pageSize: ALERT_LIMIT, action: 'auth.login_failed' }),
     enabled: Boolean(accessToken),
-    // Security alerts are the one thing worth polling in the chrome — but slowly, since this runs on
-    // every page in the app.
-    refetchInterval: 60_000,
     staleTime: 30_000,
   })
 
-  const alerts = alertsQuery.data?.items ?? []
-  const unreadCount = alerts.filter((a) => new Date(a.occurredAt).getTime() > lastSeen).length
+  const rawAlerts = alertsQuery.data?.items ?? []
+  const visibleAlerts = rawAlerts.filter((a) => !dismissedIds.has(String(a.id)))
+  const unreadCount = visibleAlerts.filter((a) => new Date(a.occurredAt).getTime() > lastSeen).length
+
+  function dismissSingle(alertId: string | number, e: React.MouseEvent) {
+    e.preventDefault()
+    e.stopPropagation()
+    setDismissedIds((prev) => {
+      const next = new Set(prev)
+      next.add(String(alertId))
+      if (userId) writeDismissed(userId, next)
+      return next
+    })
+  }
+
+  function dismissAll(e: React.MouseEvent) {
+    e.preventDefault()
+    e.stopPropagation()
+    setDismissedIds((prev) => {
+      const next = new Set(prev)
+      for (const a of rawAlerts) next.add(String(a.id))
+      if (userId) writeDismissed(userId, next)
+      return next
+    })
+  }
 
   function toggle() {
     const next = !open
@@ -132,22 +173,34 @@ export function SecurityAlertsMenu() {
               </div>
               <div className={styles.menuHeaderText}>
                 <span className={styles.menuTitle}>Security Alerts</span>
-                {alerts.length > 0 && (
+                {visibleAlerts.length > 0 && (
                   <span className={styles.menuSubtitle}>
-                    {unreadCount > 0 ? `${unreadCount} new` : `${alerts.length} recent`}
+                    {unreadCount > 0 ? `${unreadCount} new` : `${visibleAlerts.length} recent`}
                   </span>
                 )}
               </div>
             </div>
-            <Link
-              to="/system/audit-logs"
-              role="menuitem"
-              className={styles.viewAll}
-              onClick={() => setOpen(false)}
-            >
-              <Icon.ArrowRight width={12} height={12} />
-              View all
-            </Link>
+            <div className={styles.menuHeaderActions}>
+              {visibleAlerts.length > 0 && (
+                <button
+                  type="button"
+                  className={styles.clearAllBtn}
+                  onClick={dismissAll}
+                  title="Clear all alerts from notification list"
+                >
+                  Clear all
+                </button>
+              )}
+              <Link
+                to="/system/audit-logs"
+                role="menuitem"
+                className={styles.viewAll}
+                onClick={() => setOpen(false)}
+              >
+                <Icon.ArrowRight width={12} height={12} />
+                View all
+              </Link>
+            </div>
           </div>
 
           {/* ── Scrollable content ── */}
@@ -176,7 +229,7 @@ export function SecurityAlertsMenu() {
                 <p className={styles.emptyTitle}>Could not load alerts</p>
                 <p className={styles.emptyDesc}>Check your connection and try again.</p>
               </div>
-            ) : alerts.length === 0 ? (
+            ) : visibleAlerts.length === 0 ? (
               <div className={styles.emptyState}>
                 <div className={`${styles.emptyIconBox} ${styles.emptyIconSuccess}`}>
                   <Icon.CheckCircle width={20} height={20} />
@@ -186,7 +239,7 @@ export function SecurityAlertsMenu() {
               </div>
             ) : (
               <ul className={styles.list}>
-                {alerts.map((alert) => {
+                {visibleAlerts.map((alert) => {
                   const isUnread = new Date(alert.occurredAt).getTime() > lastSeen
                   return (
                     <li key={alert.id} className={`${styles.item} ${isUnread ? styles.itemUnread : ''}`}>
@@ -218,6 +271,16 @@ export function SecurityAlertsMenu() {
                           )}
                         </div>
                       </div>
+
+                      <button
+                        type="button"
+                        className={styles.dismissBtn}
+                        onClick={(e) => dismissSingle(alert.id, e)}
+                        title="Dismiss notification"
+                        aria-label="Dismiss notification"
+                      >
+                        <Icon.X width={13} height={13} />
+                      </button>
                     </li>
                   )
                 })}
@@ -226,7 +289,7 @@ export function SecurityAlertsMenu() {
           </div>
 
           {/* ── Footer ── */}
-          {alerts.length > 0 && !alertsQuery.isPending && !alertsQuery.isError && (
+          {visibleAlerts.length > 0 && !alertsQuery.isPending && !alertsQuery.isError && (
             <div className={styles.menuFooter}>
               <Link
                 to="/system/audit-logs"

@@ -153,10 +153,10 @@ export function ResponsiveRows<Row>({
               ))}
             </tr>
           ))
-        ) : rows.length === 0 && empty ? (
+        ) : rows.length === 0 ? (
           <tr>
             <td colSpan={colSpan} className={styles.emptyCell}>
-              {empty}
+              {empty ?? 'No records found.'}
             </td>
           </tr>
         ) : (

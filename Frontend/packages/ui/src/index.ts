@@ -121,5 +121,11 @@ export type { GetInitialsOptions } from './utils/getInitials'
 export type { ClassValue } from './utils/classNames'
 
 export { formatDate, formatDateTime, formatTime, formatRelativeTime, formatAuditTimestamp, EMPTY_VALUE } from './utils/formatDate'
+
+export { sanitizeFilterInput, filterInputMode, filterTypeBlockedMessage } from './utils/filterInput'
+export type { FilterInputType } from './utils/filterInput'
+
+export { useHostSubRoute } from './utils/useHostSubRoute'
+export type { UseHostSubRouteOptions } from './utils/useHostSubRoute'
 export { DetailSection, DetailSections, DetailGrid, DetailField, isEmptyDetailValue } from './data/DetailPanel/DetailPanel'
 export type { DetailSectionProps, DetailFieldProps } from './data/DetailPanel/DetailPanel'

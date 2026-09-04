@@ -1,5 +1,6 @@
 using System.Text.Json;
 using AuthService.Application.DTOs;
+using AuthService.Application.Events;
 using AuthService.Application.Exceptions;
 using AuthService.Domain.Entities;
 using AuthService.Infrastructure;
@@ -18,7 +19,7 @@ namespace AuthService.Application.Services;
 /// </summary>
 public class ApprovalAppService(
     AuthDbContext db, AuditLogAppService auditLog, UserAppService userAppService, RoleAppService roleAppService,
-    RemoteApprovalCallbackClient callbackClient, SecretProtector secretProtector)
+    RemoteApprovalCallbackClient callbackClient, SecretProtector secretProtector, IPlatformEventPublisher events)
 {
     private const string ServiceName = "AuthService";
 
@@ -168,6 +169,12 @@ public class ApprovalAppService(
                 entityLabel: request.EntityLabel, ct: ct);
         }
 
+        var interestedUsers = new List<Guid> { request.MakerId, request.CheckerId };
+        await events.PublishToApprovalViewersAsync(new PlatformEvent("approvals", "approved"), ct);
+        await events.PublishToUsersAsync(interestedUsers, new PlatformEvent("approvals", "approved"), ct);
+        var count = await db.ApprovalRequests.CountAsync(r => r.CheckerId == request.CheckerId && r.Status == ApprovalStatus.Pending, ct);
+        await events.PublishBadgeAsync(request.CheckerId, count, ct);
+
         return ToDetailDto(request);
     }
 
@@ -198,6 +205,12 @@ public class ApprovalAppService(
             ServiceName, checkerUserId, checkerName, "approval.rejected", "ApprovalRequest", request.Id.ToString(),
             $"Rejected {request.Action} on {request.Module}" + (request.EntityLabel is not null ? $" ({request.EntityLabel})" : "") + $" — requested by {request.MakerName}. Reason: {reason}",
             entityLabel: request.EntityLabel, ct: ct);
+
+        var interestedUsers = new List<Guid> { request.MakerId, request.CheckerId };
+        await events.PublishToApprovalViewersAsync(new PlatformEvent("approvals", "rejected"), ct);
+        await events.PublishToUsersAsync(interestedUsers, new PlatformEvent("approvals", "rejected"), ct);
+        var count = await db.ApprovalRequests.CountAsync(r => r.CheckerId == request.CheckerId && r.Status == ApprovalStatus.Pending, ct);
+        await events.PublishBadgeAsync(request.CheckerId, count, ct);
 
         return ToDetailDto(request);
     }
@@ -256,6 +269,8 @@ public class ApprovalAppService(
             ServiceName, callerUserId, makerName, "user.temp_password_revealed", "ApprovalRequest", request.Id.ToString(),
             $"Collected the one-time temporary password for {request.EntityLabel ?? "a new account"}. It is no longer retrievable.",
             entityLabel: request.EntityLabel, ct: ct);
+
+        await events.PublishToUsersAsync([callerUserId], new PlatformEvent("approvals", "temp-password-collected"), ct);
 
         // EntityId is null on a Create request, so the snapshot's email is the only link back to the
         // account actually created by the replay.

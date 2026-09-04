@@ -1,4 +1,5 @@
 using AuthService.Application.DTOs;
+using AuthService.Application.Events;
 using AuthService.Application.Exceptions;
 using AuthService.Domain.Entities;
 using AuthService.Domain.Enums;
@@ -22,7 +23,7 @@ namespace AuthService.Application.Services;
 /// method after that method's own validation has already run. A client can never fabricate an approval
 /// request unconnected to a real gated attempt.
 /// </summary>
-public class ApprovalGatingService(AuthDbContext db, AuditLogAppService auditLog)
+public class ApprovalGatingService(AuthDbContext db, AuditLogAppService auditLog, IPlatformEventPublisher events)
 {
     private const string ServiceName = "AuthService";
 
@@ -121,6 +122,12 @@ public class ApprovalGatingService(AuthDbContext db, AuditLogAppService auditLog
             ServiceName, makerId, makerName, "approval.requested", "ApprovalRequest", request.Id.ToString(),
             $"Requested {action} on {module}" + (entityLabel is not null ? $" ({entityLabel})" : "") + $" — assigned to {checkerName ?? "an eligible checker"}.",
             entityLabel: entityLabel, ct: ct);
+
+        var interestedUsers = new List<Guid> { makerId, checkerId };
+        await events.PublishToApprovalViewersAsync(new PlatformEvent("approvals", "requested"), ct);
+        await events.PublishToUsersAsync(interestedUsers, new PlatformEvent("approvals", "requested"), ct);
+        var count = await db.ApprovalRequests.CountAsync(r => r.CheckerId == checkerId && r.Status == ApprovalStatus.Pending, ct);
+        await events.PublishBadgeAsync(checkerId, count, ct);
 
         return new ApprovalPendingDto(request.Id, module, action, checkerName ?? "Unassigned");
     }
@@ -273,6 +280,23 @@ public class ApprovalGatingService(AuthDbContext db, AuditLogAppService auditLog
                 ServiceName, actingUserId, actorName, "approval.reassigned", "ApprovalRequest", request.Id.ToString(),
                 $"Reassigned from {oldCheckerName ?? "Unknown"} to {newCheckerName ?? "Unknown"} on '{request.Module}' — {reason}.",
                 entityLabel: request.EntityLabel, ct: ct);
+        }
+
+        if (reassignments.Count > 0)
+        {
+            var affectedCheckerIds = reassignments
+                .Select(r => r.NewCheckerId)
+                .Append(departingCheckerId)
+                .Distinct()
+                .ToList();
+
+            await events.PublishToApprovalViewersAsync(new PlatformEvent("approvals", "reassigned"), ct);
+            await events.PublishToUsersAsync(affectedCheckerIds, new PlatformEvent("approvals", "reassigned"), ct);
+            foreach (var cId in affectedCheckerIds)
+            {
+                var count = await db.ApprovalRequests.CountAsync(r => r.CheckerId == cId && r.Status == ApprovalStatus.Pending, ct);
+                await events.PublishBadgeAsync(cId, count, ct);
+            }
         }
     }
 

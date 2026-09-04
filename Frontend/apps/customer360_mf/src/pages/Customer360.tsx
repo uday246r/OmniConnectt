@@ -25,7 +25,7 @@ import type {
 
 import { DEFAULT_INDIVIDUAL_FIELD_CONFIGS, DEFAULT_CORPORATE_FIELD_CONFIGS } from '../constants/defaultFieldConfigs';
 import styles from './Customer360.module.css';
-import { Button, DataTable, EMPTY_VALUE, PageHeader, ResponsiveRows, getInitials } from '@omniremit/ui';
+import { Button, DataTable, EMPTY_VALUE, PageHeader, ResponsiveRows, getInitials, sanitizeFilterInput, type FilterInputType } from '@omniremit/ui';
 import { StatusBadge } from '../shared/StatusBadge';
 import { formatValue, formatCurrency as formatMoney } from '../shared/formatValue';
 
@@ -844,7 +844,13 @@ export default function Customer360() {
                   }
                   value={searchVal}
                   onChange={(e) => {
-                    setSearchVal(e.target.value);
+                    // Restrict keystrokes to what the chosen ID type can actually hold — NRIC and
+                    // Phone are digits-only, Name is letters-only. Secondary ID formats vary by
+                    // subtype (passport numbers mix letters and digits), so it stays unrestricted.
+                    const filterType: FilterInputType =
+                      searchIdType === 'Phone' || searchIdType === 'NRIC' ? 'numeric' :
+                      searchIdType === 'Name' ? 'alpha' : 'text';
+                    setSearchVal(sanitizeFilterInput(e.target.value, filterType));
                     setSearchError('');
                   }}
                   className="c360-input"
@@ -1052,10 +1058,17 @@ export default function Customer360() {
         <div>
           <div className="customer-layout-container">
 
-          {/* Left Column: Summary Card */}
-          <div className={`customer-left-column ${styles.avatar}`}>
+          {/*
+            Left Column: Summary Card.
+
+            `styles.avatar` belongs on the initials bubble INSIDE this column, not on the column
+            itself — it is an 80x80 circle, so applying it here collapsed the whole summary card to
+            80px wide inside its 280px grid track and the name, job title and status badges spilled
+            out of it. The profile did load; it was just unreadable.
+          */}
+          <div className="customer-left-column">
             {/* Purple circle avatar */}
-            <div>
+            <div className={styles.avatar}>
               {getInitials(individualProfile.fullName)}
             </div>
 
@@ -1764,10 +1777,11 @@ export default function Customer360() {
       ) : (
         <div>
           <div className="customer-layout-container">
-          {/* Left Column: Summary Card */}
-          <div className={`customer-left-column ${styles.avatar}`}>
+          {/* Left Column: Summary Card — see the individual card above for why `styles.avatar`
+              goes on the initials bubble rather than on the column. */}
+          <div className="customer-left-column">
             {/* Blue circle avatar for company */}
-            <div>
+            <div className={styles.avatar}>
                {getInitials(corporateProfile.organizationName)}
              </div>
 

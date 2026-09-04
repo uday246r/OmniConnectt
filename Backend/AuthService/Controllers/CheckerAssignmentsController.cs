@@ -40,6 +40,13 @@ public class CheckerAssignmentsController(CheckerAssignmentAppService assignment
     public async Task<ActionResult<CheckerAssignmentDto>> Upsert([FromBody] UpsertCheckerAssignmentRequest request, CancellationToken ct)
         => Ok(await assignments.UpsertAsync(request.Module, request.CheckerUserId, request.CheckerRoleId, CurrentUserId(), ct));
 
+    /// <summary>Assigns one checker to every module named in the request in a single call — "assign one
+    /// checker for a whole application at once" instead of repeating the single-module Upsert per module.</summary>
+    [HttpPost("bulk")]
+    [RequirePermission(Feature, "Manage")]
+    public async Task<ActionResult<IReadOnlyList<CheckerAssignmentDto>>> BulkUpsert([FromBody] BulkUpsertCheckerAssignmentRequest request, CancellationToken ct)
+        => Ok(await assignments.BulkUpsertAsync(request.Modules, request.CheckerUserId, request.CheckerRoleId, CurrentUserId(), ct));
+
     [HttpDelete("{id:guid}")]
     [RequirePermission(Feature, "Manage")]
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct)

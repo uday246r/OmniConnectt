@@ -1,16 +1,17 @@
 import { lazy, Suspense, useEffect } from 'react'
-import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation, useNavigate, useParams, type Location } from 'react-router-dom'
+import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation, useNavigate, type Location } from 'react-router-dom'
 import { AppShell } from './layout/AppShell/AppShell'
 import { RequireAuth } from './features/auth/components/RequireAuth'
 import { RequireCapability } from './features/auth/components/RequireCapability'
 import { RequirePasswordChange } from './features/auth/components/RequirePasswordChange'
 import { useSilentRefresh } from './features/auth/hooks/useSilentRefresh'
+import { usePlatformConnection } from './shared/realtime/usePlatformConnection'
 import { useAuthStore } from './features/auth/store/authStore'
 import { useModuleRegistryStore } from './shared/stores/moduleRegistryStore'
-import { useSettingsDrawerStore, type SettingsTab } from './shared/stores/settingsDrawerStore'
+import { connectHostRouter, publishLocation } from './shared/federation/hostNavigation'
+import { SettingsUrlSync } from './layout/SettingsDrawer/SettingsUrlSync'
 import { RouteFallback } from './shared/components/RouteFallback/RouteFallback'
 import { LoginPage } from './pages/LoginPage/LoginPage'
-import { AppShellSkeleton } from './shared/components/AppShellSkeleton/AppShellSkeleton'
 import { PageSkeleton } from './shared/components/PageSkeleton/PageSkeleton'
 import { lazyWithPreload, preloadWhenIdle } from './shared/utils/lazyWithPreload'
 
@@ -57,46 +58,69 @@ const FEATURE_KEYS = {
   applications: 'host.settings.applications',
   auditLogs: 'host.system.audit-logs',
   approvals: 'host.system.approvals',
+  checkerAssignment: 'host.system.checker-assignment',
 } as const
 
 /**
- * Opens the settings drawer for a `/settings/...` URL, then returns to the dashboard.
+ * Hands React Router's navigate to the federation bridge, and republishes every location change to
+ * whichever remote is mounted.
  *
- * Users, Roles and Applications used to exist twice over: once as routed full pages behind SetupPanel,
- * and once as tabs inside the gear drawer. Both were live, so the same CRUD was maintained in two
- * places and they had drifted badly — the routed forms never received the validation or the
- * catalog-driven permission grid, which is why every bug reported against those screens reproduced
- * there and not in the drawer.
- *
- * The URLs are kept rather than deleted so bookmarks keep working AND so global search keeps working:
- * SearchAppService builds routes like "/settings/users/{id}" server-side, and this is what turns one
- * into an open drawer. `replace` is used so the redirect leaves no dead history entry for Back to
- * bounce off.
+ * A remote renders at `/apps/:appKey/*` and cannot reach the host's router itself, so this is how
+ * its own page ends up in the URL (and how it hears about Back/Forward). Renders nothing.
  */
-function SettingsDeepLink({ tab }: { tab: SettingsTab }) {
-  const { id } = useParams<{ id: string }>()
-  const openTab = useSettingsDrawerStore((s) => s.open)
-  const pushLayer = useSettingsDrawerStore((s) => s.pushLayer)
+function HostRouterBridge() {
   const navigate = useNavigate()
   const location = useLocation()
 
   useEffect(() => {
-    openTab(tab)
+    connectHostRouter((to, options) => navigate(to, options))
+  }, [navigate])
 
-    // A trailing /new or /:id opens the matching form layer straight away, which is what the routed
-    // form pages used to do.
-    const isNew = location.pathname.endsWith('/new')
-    if (isNew || id) {
-      const entityId = isNew ? undefined : id
-      if (tab === 'users') pushLayer({ type: 'user-form', userId: entityId })
-      else if (tab === 'roles') pushLayer({ type: 'role-form', roleId: entityId })
-      else if (tab === 'applications') pushLayer({ type: 'app-form', appId: entityId })
-    }
+  useEffect(() => {
+    publishLocation(location.pathname)
+  }, [location.pathname])
 
-    navigate('/', { replace: true })
-  }, [tab, id, location.pathname, openTab, pushLayer, navigate])
+  return null
+}
 
-  return <RouteFallback />
+/**
+ * The backdrop for a `/settings/...` URL that was entered directly — a pasted link, a bookmark, or a
+ * server-built global-search result (SearchAppService emits `/settings/users/{id}` style routes).
+ *
+ * Settings has no routed pages of its own: it IS the gear drawer, which AppShell renders globally and
+ * SettingsUrlSync opens from the URL. So this route only has to supply the page BEHIND the drawer,
+ * and the dashboard is that page. It no longer redirects to `/`: throwing the URL away was exactly
+ * what made the drawer unlinkable and unrefreshable.
+ *
+ * When the drawer is opened by clicking the gear instead, this component never renders — navigation
+ * carries `state.backgroundLocation` and <Routes> keeps matching the page already on screen.
+ */
+function SettingsBackdrop() {
+  return <DashboardPage />
+}
+
+/**
+ * `/settings` with no tab — send the operator to the first tab they can actually open.
+ *
+ * It used to redirect unconditionally to `/settings/users`, so anyone without Users:View (a role
+ * that manages only applications, say) was bounced straight from `/settings` to `/404` by that
+ * tab's own guard. The drawer already picks its visible tabs this way; this makes the URL agree.
+ */
+function SettingsIndexRedirect() {
+  const isAdministrator = Boolean(useAuthStore((s) => s.user)?.isAdministrator)
+  const hasCapability = useAuthStore((s) => s.hasCapability)
+
+  const firstAllowed = (
+    [
+      ['users', FEATURE_KEYS.users],
+      ['roles', FEATURE_KEYS.roles],
+      ['applications', FEATURE_KEYS.applications],
+      ['checker-assignment', FEATURE_KEYS.checkerAssignment],
+    ] as const
+  ).find(([, featureKey]) => isAdministrator || hasCapability(featureKey, 'View'))
+
+  // No settings access at all: 404 rather than an empty drawer that can do nothing.
+  return <Navigate to={firstAllowed ? `/settings/${firstAllowed[0]}` : '/404'} replace />
 }
 
 function LoginRoute() {
@@ -275,7 +299,22 @@ function AuthenticatedPagesLayout() {
 
 function AppRoutes() {
   const hydrate = useAuthStore((s) => s.hydrate)
+  const location = useLocation()
   useSilentRefresh()
+  usePlatformConnection()
+
+  /*
+   * Modal-route pattern for the settings drawer.
+   *
+   * Opening the drawer navigates to `/settings/...` but carries the page it opened over in
+   * `state.backgroundLocation`. Matching <Routes> against that instead of the live location keeps
+   * that page mounted underneath — open settings from Audit Logs and the audit table stays exactly
+   * as it was, rather than being torn down and replaced by a dashboard behind the panel.
+   *
+   * A `/settings/...` URL entered cold has no such state, so it matches normally and SettingsBackdrop
+   * supplies the page behind the drawer.
+   */
+  const backgroundLocation = (location.state as { backgroundLocation?: Location } | null)?.backgroundLocation
 
   useEffect(() => {
     void hydrate()
@@ -295,7 +334,17 @@ function AppRoutes() {
 
   return (
     <Suspense fallback={<RouteFallback />}>
-      <Routes>
+      <HostRouterBridge />
+      {/*
+        Deliberately a SIBLING of <Routes>, not a child of AppShell.
+
+        `<Routes location={...}>` overrides the location context for its whole subtree, so anything
+        rendered inside it reads the BACKGROUND location — which for this component is precisely the
+        one location it must not see. Mounted here it reads the real URL, which is what lets it tell
+        `/settings/users` from the page underneath.
+      */}
+      <SettingsUrlSync />
+      <Routes location={backgroundLocation ?? location}>
         <Route path="/login" element={<LoginRoute />} />
         {/*
           Public by necessity — the recipient of an invite has no credentials yet, which is the whole
@@ -338,7 +387,11 @@ function AppRoutes() {
         <Route element={<AuthenticatedPagesLayout />}>
           <Route index element={<DashboardPage />} />
           <Route path="profile" element={<ProfilePage />} />
-          <Route path="apps/:appKey" element={<RemoteAppPage />} />
+          {/* Wildcard tail: a remote's own page lives in the URL (`/apps/lead/audit-logs`), and the
+              remote reads and writes it through the host bridge's navigation API. One route for the
+              whole app means changing the tail re-renders nothing above the remote — no remount, no
+              refetch, no lost form state. */}
+          <Route path="apps/:appKey/*" element={<RemoteAppPage />} />
 
           <Route
             path="system/audit-logs"
@@ -379,12 +432,13 @@ function AppRoutes() {
             Deleting them is what fixes those, not patching them twice.
           */}
           <Route path="settings">
-            <Route index element={<SettingsDeepLink tab="users" />} />
+            <Route index element={<SettingsIndexRedirect />} />
             {(
               [
                 ['users', FEATURE_KEYS.users, 'Create'],
                 ['roles', FEATURE_KEYS.roles, 'Create'],
                 ['applications', FEATURE_KEYS.applications, 'Register'],
+                ['checker-assignment', FEATURE_KEYS.checkerAssignment, 'Manage'],
               ] as const
             ).map(([tab, featureKey, createCapability]) => (
               <Route key={tab} path={tab}>
@@ -392,7 +446,7 @@ function AppRoutes() {
                   index
                   element={
                     <RequireCapability featureKey={featureKey}>
-                      <SettingsDeepLink tab={tab} />
+                      <SettingsBackdrop />
                     </RequireCapability>
                   }
                 />
@@ -400,18 +454,22 @@ function AppRoutes() {
                   path="new"
                   element={
                     <RequireCapability featureKey={featureKey} capability={createCapability}>
-                      <SettingsDeepLink tab={tab} />
+                      <SettingsBackdrop />
                     </RequireCapability>
                   }
                 />
-                <Route
-                  path=":id"
-                  element={
-                    <RequireCapability featureKey={featureKey} capability="Edit">
-                      <SettingsDeepLink tab={tab} />
-                    </RequireCapability>
-                  }
-                />
+                {/* Checker assignments are addressed by module inside the form, never by id in the
+                    URL, so only that tab omits the :id branch. */}
+                {tab !== 'checker-assignment' && (
+                  <Route
+                    path=":id"
+                    element={
+                      <RequireCapability featureKey={featureKey} capability="Edit">
+                        <SettingsBackdrop />
+                      </RequireCapability>
+                    }
+                  />
+                )}
               </Route>
             ))}
           </Route>

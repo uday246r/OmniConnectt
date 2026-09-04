@@ -184,6 +184,24 @@
   background: var(--omni-color-surface);
 }
 
+/* Briefly flags the box red right after a keystroke `filterType` had to strip — not a persistent
+   error state, just enough to say "that character was not accepted" at the moment it happens. */
+.inputBlocked {
+  border-color: var(--omni-color-danger-400);
+}
+.inputBlocked:focus {
+  border-color: var(--omni-color-danger-500);
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.12);
+}
+
+.blockedHint {
+  margin: 0;
+  padding: 0 2px;
+  font-size: var(--omni-font-size-2xs-plus);
+  font-weight: var(--omni-font-weight-medium);
+  color: var(--omni-color-danger-600);
+}
+
 .emptyHint {
   padding: 10px;
   font-size: var(--omni-font-size-xs);

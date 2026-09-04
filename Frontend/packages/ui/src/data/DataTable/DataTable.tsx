@@ -18,6 +18,12 @@ export interface DataTableProps {
    * so the two borders do not double up.
    */
   bare?: boolean
+  /**
+   * Renders a footer (Pagination) inside the card boundary, attached to the table bottom.
+   * When provided, the card's bottom radius is removed from the scroll area and the footer
+   * element renders below the table with the bottom radius instead.
+   */
+  footer?: ReactNode
   className?: string
 }
 
@@ -34,17 +40,28 @@ export interface DataTableProps {
  * `dataTableStyles` is exported for the cells themselves — see the Empty helper below, and use
  * `dataTableStyles.actionsCell` for a right-aligned action cluster.
  */
-export function DataTable({ children, minWidth, reserveHeight, bare, className }: DataTableProps) {
+export function DataTable({ children, minWidth, reserveHeight, bare, footer, className }: DataTableProps) {
   return (
-    <div className={classNames(styles.container, bare && styles.bare, reserveHeight && styles.minHeight, className)}>
-      {/* The only inline style permitted by the repo convention: a custom-property hand-off for a
-          runtime value. The `min-width` declaration itself lives in DataTable.module.css. */}
-      <table
-        className={styles.table}
+    <div
+      className={classNames(
+        styles.container,
+        bare && styles.bare,
+        reserveHeight && styles.minHeight,
+        Boolean(footer) && styles.hasFooter,
+        className,
+      )}
+    >
+      <div
+        className={styles.scrollArea}
         style={minWidth ? ({ '--omni-data-table-min-width': `${minWidth}px` } as CSSProperties) : undefined}
       >
-        {children}
-      </table>
+        <table className={styles.table}>
+          {children}
+        </table>
+      </div>
+      {footer != null && (
+        <div className={styles.footer}>{footer}</div>
+      )}
     </div>
   )
 }
@@ -69,6 +86,5 @@ export function DataTableEmpty({ colSpan, children }: DataTableEmptyProps) {
   )
 }
 
-DataTable.Empty = DataTableEmpty
-
+/** Exports for cells that need to reach into the table's own styles (e.g. action button clusters). */
 export { styles as dataTableStyles }

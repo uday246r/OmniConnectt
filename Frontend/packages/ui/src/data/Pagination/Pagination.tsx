@@ -27,21 +27,10 @@ export interface PaginationProps {
 const DEFAULT_PAGE_SIZES = [10, 20, 50, 100]
 
 /**
- * The pager that sits under every table.
+ * The unified pagination bar that sits under every table in the platform.
  *
- * There were TEN separate implementations of this across the three apps — the host's Audit Logs
- * and Approval Center, My Requests, both remotes' audit logs, the Lead Directory, the two
- * customer360 list pages, the lead diff table and the c360 profile tables — and they disagreed on
- * nearly everything: some showed "Showing 1 to 10 of 42 records", some only "Page 2 of 5", some a
- * rows-per-page select, some bare `<` `>` glyphs, some the words Previous/Next. This carries the
- * union so no caller has to rebuild it:
- *
- *   left    Showing 1 to 10 of 42 leads
- *   right   Per page [10 v]   ‹ Previous   Page 1 of 5   Next ›
- *
- * The arrows are labelled rather than bare chevrons: an icon-only control at the end of a long
- * table gives no hint which direction it moves, and the host's Audit Logs — the reference — spells
- * them out.
+ * Left:  ● Showing 1 to 10 of 42 leads
+ * Right: Per page [10 v]  |  ‹ Previous  |  [ 1 ]  |  Next ›
  */
 export function Pagination({
   page,
@@ -65,11 +54,15 @@ export function Pagination({
 
   return (
     <nav className={classNames(styles.bar, className)} aria-label="Pagination">
-      <p className={styles.summary}>
-        Showing <strong>{first}</strong> to <strong>{last}</strong> of <strong>{total}</strong>{' '}
-        {itemLabel}
-        {plural}
-      </p>
+      <div className={styles.summary}>
+        <span className={styles.summaryDot} aria-hidden="true" />
+        <span className={styles.summaryText}>
+          Showing <strong className={styles.summaryNum}>{first}</strong> to{' '}
+          <strong className={styles.summaryNum}>{last}</strong> of{' '}
+          <strong className={styles.summaryNum}>{total}</strong> {itemLabel}
+          {plural}
+        </span>
+      </div>
 
       <div className={styles.controls}>
         {onPageSizeChange && (
@@ -87,28 +80,41 @@ export function Pagination({
         )}
 
         <div className={styles.pager}>
+          {/* Previous Button */}
           <button
             type="button"
             className={styles.pageBtn}
             disabled={page <= 1}
             onClick={() => onPageChange(page - 1)}
+            aria-label="Go to previous page"
           >
-            <Icon.ChevronLeft width={14} height={14} />
+            <Icon.ChevronLeft width={13} height={13} />
             <span>Previous</span>
           </button>
 
-          <span className={styles.indicator}>
-            Page <strong>{page}</strong> of <strong>{totalPages}</strong>
+          <span className={styles.pageDivider} aria-hidden="true" />
+
+          {/* Single active page indicator */}
+          <span
+            className={styles.pageNumActive}
+            aria-current="page"
+            aria-label={`Page ${page} of ${totalPages}`}
+          >
+            {page}
           </span>
 
+          <span className={styles.pageDivider} aria-hidden="true" />
+
+          {/* Next Button */}
           <button
             type="button"
             className={styles.pageBtn}
             disabled={page >= totalPages}
             onClick={() => onPageChange(page + 1)}
+            aria-label="Go to next page"
           >
             <span>Next</span>
-            <Icon.ChevronRight width={14} height={14} />
+            <Icon.ChevronRight width={13} height={13} />
           </button>
         </div>
       </div>

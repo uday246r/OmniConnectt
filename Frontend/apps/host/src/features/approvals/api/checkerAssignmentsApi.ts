@@ -39,6 +39,13 @@ export interface UpsertCheckerAssignmentRequest {
   checkerRoleId?: string
 }
 
+/** Assigns one checker to every module in `modules` in a single call — supply exactly one of the two ids. */
+export interface BulkUpsertCheckerAssignmentRequest {
+  modules: string[]
+  checkerUserId?: string
+  checkerRoleId?: string
+}
+
 export const checkerAssignmentsApi = {
   list: (accessToken: string, module?: string) =>
     apiFetch<CheckerAssignmentDto[]>(`${base}/api/checker-assignments${module ? `?module=${encodeURIComponent(module)}` : ''}`, { accessToken }),
@@ -48,6 +55,9 @@ export const checkerAssignmentsApi = {
 
   upsert: (accessToken: string, body: UpsertCheckerAssignmentRequest) =>
     apiFetch<CheckerAssignmentDto>(`${base}/api/checker-assignments`, { method: 'POST', accessToken, body }),
+
+  bulkUpsert: (accessToken: string, body: BulkUpsertCheckerAssignmentRequest) =>
+    apiFetch<CheckerAssignmentDto[]>(`${base}/api/checker-assignments/bulk`, { method: 'POST', accessToken, body }),
 
   remove: (accessToken: string, id: string) =>
     apiFetch<void>(`${base}/api/checker-assignments/${id}`, { method: 'DELETE', accessToken }),

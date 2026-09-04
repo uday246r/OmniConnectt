@@ -1,5 +1,6 @@
 import { useAuthStore } from '../../features/auth/store/authStore'
 import { env } from '../../config/env'
+import { readSubRoute, subscribeSubRoute, writeSubRoute } from './hostNavigation'
 
 /**
  * The host's public runtime contract for every remote app. Deliberately NOT passed as React props —
@@ -40,6 +41,25 @@ export interface OmniRemitHostBridge {
     /** One token's computed value, e.g. token('--omni-color-danger-600') → '#dc2626'. Returns '' if undefined. */
     token: (name: string) => string
   }
+  /**
+   * Puts a remote's own page in the URL.
+   *
+   * The host owns the router; a remote renders at `/apps/:appKey/*` and cannot call `navigate()`
+   * itself. Without this a remote's internal page lived only in its own state, so `/apps/lead` was
+   * the URL for every page inside Lead Management — refresh, Back and shared links all dropped the
+   * reader back on the remote's default page.
+   *
+   * A remote calls `setSubRoute` when its page changes and subscribes with `onSubRouteChange` to
+   * follow Back/Forward. Both are safe to call before the host router has finished mounting.
+   */
+  navigation: {
+    /** The path segment after `/apps/:appKey/`, or '' at the app's own root. */
+    getSubRoute: () => string
+    /** Writes the segment into the URL. `replace: true` for the initial sync, so it adds no history entry. */
+    setSubRoute: (subRoute: string, options?: { replace?: boolean }) => void
+    /** Fires when the sub-route changes from outside the remote (Back/Forward, a host link). Returns an unsubscribe. */
+    onSubRouteChange: (listener: (subRoute: string) => void) => () => void
+  }
 }
 
 declare global {
@@ -68,6 +88,11 @@ export function installHostBridge() {
         const property = name.startsWith('--') ? name : `--${name}`
         return getComputedStyle(document.documentElement).getPropertyValue(property).trim()
       },
+    },
+    navigation: {
+      getSubRoute: readSubRoute,
+      setSubRoute: writeSubRoute,
+      onSubRouteChange: subscribeSubRoute,
     },
   }
 }

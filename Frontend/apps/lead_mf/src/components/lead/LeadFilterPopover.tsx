@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Button } from '@omniremit/ui';
+import { Button, sanitizeFilterInput } from '@omniremit/ui';
 import styles from './LeadFilterPopover.module.css';
 import {
   Layers,
@@ -410,9 +410,10 @@ export const LeadFilterPopover: React.FC<LeadFilterPopoverProps> = ({ isOpen, on
               </label>
               <input
                 type="text"
+                inputMode="numeric"
                 placeholder="Enter IC Number (e.g. 123456-98-7890)"
                 value={getRuleValue('icNumber')}
-                onChange={(e) => setRuleValue('icNumber', e.target.value)}
+                onChange={(e) => setRuleValue('icNumber', sanitizeFilterInput(e.target.value, 'numeric'))}
                 className={styles.textInput}
               />
             </div>
@@ -426,9 +427,10 @@ export const LeadFilterPopover: React.FC<LeadFilterPopoverProps> = ({ isOpen, on
               </label>
               <input
                 type="text"
+                inputMode="numeric"
                 placeholder="Enter Phone Number (e.g. 897657863)"
                 value={getRuleValue('phone')}
-                onChange={(e) => setRuleValue('phone', e.target.value)}
+                onChange={(e) => setRuleValue('phone', sanitizeFilterInput(e.target.value, 'numeric'))}
                 className={styles.textInput}
               />
             </div>
@@ -444,7 +446,7 @@ export const LeadFilterPopover: React.FC<LeadFilterPopoverProps> = ({ isOpen, on
                 type="text"
                 placeholder="Enter Customer Name..."
                 value={getRuleValue('name')}
-                onChange={(e) => setRuleValue('name', e.target.value)}
+                onChange={(e) => setRuleValue('name', sanitizeFilterInput(e.target.value, 'alpha'))}
                 className={styles.textInput}
               />
             </div>

@@ -7,7 +7,7 @@ export type DrawerLayer =
   | { type: 'role-form'; roleId?: string; initialTab?: string }
   | { type: 'user-form'; userId?: string }
   | { type: 'app-form'; appId?: string }
-  | { type: 'checker-assignment-form'; module?: string }
+  | { type: 'checker-assignment-form'; module?: string; appId?: string }
 
 interface SettingsDrawerState {
   isOpen: boolean

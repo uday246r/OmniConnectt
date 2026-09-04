@@ -263,15 +263,6 @@
   font-size: var(--omni-font-size-xs);
 }
 
-.triggerModuleKey {
-  font-size: var(--omni-font-size-2xs);
-  color: #64748b;
-  font-family: var(--omni-font-mono);
-  background: #f1f5f9;
-  padding: 1px 5px;
-  border-radius: var(--omni-radius-xs);
-}
-
 .triggerChevron {
   color: #64748b;
   flex-shrink: 0;

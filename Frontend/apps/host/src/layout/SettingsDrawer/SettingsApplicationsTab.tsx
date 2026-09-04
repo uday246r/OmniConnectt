@@ -102,7 +102,7 @@ export function SettingsApplicationsTab() {
       // there until the next full page load.
       void useModuleRegistryStore.getState().fetchForSidebar(accessToken)
       if (apps.length === 1 && page > 1) setPage((p) => p - 1)
-      else invalidate(TOPICS.applications, TOPICS.approvals)
+      else invalidate(TOPICS.applications, TOPICS.approvals, TOPICS.kpis)
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Could not remove this application.')
       setPendingDelete(null)
@@ -120,7 +120,7 @@ export function SettingsApplicationsTab() {
       const res = await remoteAppsApi.resyncPermissions(accessToken)
       setResyncResult(`Resynced permissions for ${res.resyncedCount} application(s).`)
       toast.success(`Resynced permissions for ${res.resyncedCount} application(s).`)
-      invalidate(TOPICS.applications, TOPICS.approvals)
+      invalidate(TOPICS.applications, TOPICS.approvals, TOPICS.kpis)
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Could not resync permissions.')
     } finally {
@@ -157,7 +157,7 @@ export function SettingsApplicationsTab() {
       // The sidebar has to be refreshed too: an app moved to Maintenance must stop being navigable
       // immediately, without waiting for a page reload.
       void useModuleRegistryStore.getState().fetchForSidebar(accessToken)
-      invalidate(TOPICS.applications, TOPICS.approvals)
+      invalidate(TOPICS.applications, TOPICS.approvals, TOPICS.kpis)
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Could not update this application.')
     } finally {

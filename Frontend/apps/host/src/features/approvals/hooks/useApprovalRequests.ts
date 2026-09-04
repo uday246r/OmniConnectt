@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ApiError } from '../../../shared/api/httpClient'
 import type { ApprovalRequestListItemDto } from '../api/approvalsApi'
 
@@ -13,20 +13,35 @@ export interface PagedItems {
  * its own `fetcher` (which may itself be a multi-call composition, like Approval Center's dual
  * Approved+Rejected merge for its "Processed" tab) and its own `deps` array of whatever filters should
  * trigger a refetch.
+ *
+ * `silentDeps` are dependencies (like dataRevision or polling ticks) that trigger a refetch without
+ * flashing the table to a skeleton (`setItems(null)`).
  */
 export function useApprovalRequests(
   accessToken: string | null | undefined,
   fetcher: (token: string) => Promise<PagedItems>,
   deps: unknown[],
+  silentDeps: unknown[] = [],
 ) {
   const [items, setItems] = useState<ApprovalRequestListItemDto[] | null>(null)
   const [total, setTotal] = useState(0)
   const [error, setError] = useState<string | null>(null)
+  const prevDepsRef = useRef<unknown[] | null>(null)
 
   useEffect(() => {
     if (!accessToken) return
     let cancelled = false
-    setItems(null)
+
+    const activeDepsChanged =
+      prevDepsRef.current === null ||
+      prevDepsRef.current.length !== deps.length ||
+      deps.some((dep, i) => dep !== prevDepsRef.current![i])
+
+    prevDepsRef.current = deps
+
+    if (activeDepsChanged) {
+      setItems(null)
+    }
     setError(null)
 
     fetcher(accessToken)
@@ -46,7 +61,7 @@ export function useApprovalRequests(
       cancelled = true
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [accessToken, ...deps])
+  }, [accessToken, ...deps, ...silentDeps])
 
   return { items, total, error }
 }

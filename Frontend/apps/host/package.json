@@ -11,6 +11,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@microsoft/signalr": "^8.0.7",
     "@module-federation/runtime": "^2.8.2",
     "@omniremit/federation-config": "workspace:*",
     "@omniremit/ui": "workspace:*",

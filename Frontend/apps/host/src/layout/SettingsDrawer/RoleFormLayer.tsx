@@ -397,7 +397,7 @@ export function RoleFormLayer({ roleId, initialTab }: RoleFormLayerProps) {
 
       toast.success(`Role '${name}' ${isEdit ? 'updated' : 'created'} successfully.`)
       void refreshSession()
-      invalidate(TOPICS.roles, TOPICS.approvals)
+      invalidate(TOPICS.roles, TOPICS.approvals, TOPICS.kpis)
       useSettingsDrawerStore.getState().resetToRoot('roles')
     } catch (err: any) {
       // Blocked by an in-flight request on this same role — explained in a dialog rather than as a
@@ -681,11 +681,17 @@ export function RoleFormLayer({ roleId, initialTab }: RoleFormLayerProps) {
               </div>
 
               <div className={styles.adminToggleCard}>
+                {/* An icon tile rather than the bare 5px dot this used to lead with, which read as a
+                    stray bullet next to the heading rather than a state indicator. It carries the
+                    same on/off signal in the tint, at a size that looks deliberate. */}
+                <div
+                  className={`${styles.adminToggleIcon} ${isAdministrator ? styles.adminToggleIconOn : ''}`}
+                  aria-hidden="true"
+                >
+                  <Icon.ShieldCheck width={17} height={17} />
+                </div>
                 <div className={styles.adminToggleText}>
-                  <div className={styles.adminTitleRow}>
-                    <span className={isAdministrator ? styles.badgeDotGreen : styles.badgeDotGray} />
-                    <span className={styles.toggleTitle}>Platform Administrator Access</span>
-                  </div>
+                  <span className={styles.toggleTitle}>Platform Administrator Access</span>
                   <span className={styles.toggleDesc}>
                     Grants full unrestricted access to all host features and remote applications, including future micro-frontends.
                   </span>
@@ -783,7 +789,6 @@ export function RoleFormLayer({ roleId, initialTab }: RoleFormLayerProps) {
                             <tr key={row.key}>
                               <td className={styles.tdFeature}>
                                 <span className={styles.featureName}>{row.label}</span>
-                                <span className={styles.featureKey}>{row.key}</span>
                               </td>
                               {hostColumns.map((col) => {
                                 const declaredCap = row.capabilities.find(
@@ -825,13 +830,17 @@ export function RoleFormLayer({ roleId, initialTab }: RoleFormLayerProps) {
           {/* Tab 3: Application Access */}
           {activeTab === 'apps' && (
             <div className={styles.tabSection}>
-              <div className={styles.appsHeaderRow}>
-                <p className={styles.sectionHint}>
-                  Access to registered applications and the sub-modules each one declares. Rows and
-                  columns come from what the application itself reports, so a new module or action
-                  appears here as soon as it is resynced.
-                </p>
-                <div className={styles.appsHeaderActions}>
+              {/* Same titled card band Host Permissions opens with, so both permission steps read as
+                  the same screen rather than one card and one paragraph loose on the background. */}
+              <div className={styles.stepHeaderCard}>
+                <div className={styles.stepHeaderRow}>
+                  <div className={styles.stepHeaderText}>
+                    <h4 className={styles.matrixTitle}>Registered Application Modules</h4>
+                    <p className={styles.matrixSubtitle}>
+                      Rows and columns come from what each application itself reports, so a new
+                      module or action appears here as soon as it is resynced.
+                    </p>
+                  </div>
                   <button type="button" className={styles.textActionBtn} onClick={handleCollapseAll}>
                     Collapse all
                   </button>
@@ -930,7 +939,6 @@ export function RoleFormLayer({ roleId, initialTab }: RoleFormLayerProps) {
                           </div>
                           <div>
                             <span className={styles.accordionAppName}>{feature.displayName}</span>
-                            <span className={styles.accordionAppKey}>{feature.key}</span>
                           </div>
                         </div>
 
@@ -982,7 +990,6 @@ export function RoleFormLayer({ roleId, initialTab }: RoleFormLayerProps) {
                                 <tr key={row.key}>
                                   <td className={styles.tdFeature}>
                                     <span className={styles.featureName}>{row.label}</span>
-                                    <span className={styles.featureKey}>{row.key}</span>
                                   </td>
                                   {columns.map((col) => {
                                     const declaredCap = row.capabilities.find(
@@ -1027,25 +1034,29 @@ export function RoleFormLayer({ roleId, initialTab }: RoleFormLayerProps) {
           {/* Tab 4: Assigned Users */}
           {activeTab === 'users' && (
             <div className={styles.tabSection}>
-              <div className={styles.usersTabHeader}>
-                <div>
-                  <h4 className={styles.subHeading}>Assigned Role Members ({assignedUsersTotal})</h4>
-                  <p className={styles.sectionHint}>These users dynamically inherit all capabilities configured in this role.</p>
-                </div>
-
-                <div className={styles.searchWrapSmall}>
-                  <input
-                    type="text"
-                    className={styles.searchInputSmall}
-                    placeholder="Search users..."
-                    value={userSearch}
-                    onChange={(e) => setUserSearch(e.target.value)}
-                  />
-                  <Icon.Search width={14} height={14} className={styles.searchIconSmall} />
-                </div>
-              </div>
-
+              {/* Header band lives INSIDE the table card, so the title, the search box and the rows
+                  they describe read as one object instead of three stacked strips. */}
               <div className={styles.usersTableWrap}>
+                <div className={styles.stepHeaderRow}>
+                  <div className={styles.stepHeaderText}>
+                    <h4 className={styles.matrixTitle}>Assigned Role Members ({assignedUsersTotal})</h4>
+                    <p className={styles.matrixSubtitle}>
+                      These users dynamically inherit all capabilities configured in this role.
+                    </p>
+                  </div>
+
+                  <div className={styles.searchWrapSmall}>
+                    <input
+                      type="text"
+                      className={styles.searchInputSmall}
+                      placeholder="Search users..."
+                      value={userSearch}
+                      onChange={(e) => setUserSearch(e.target.value)}
+                    />
+                    <Icon.Search width={14} height={14} className={styles.searchIconSmall} />
+                  </div>
+                </div>
+
                 <table className={styles.usersTable}>
                   <thead>
                     <tr>
@@ -1078,7 +1089,17 @@ export function RoleFormLayer({ roleId, initialTab }: RoleFormLayerProps) {
                     ) : (
                       <tr>
                         <td colSpan={3} className={styles.emptyUsersCell}>
-                          {isEdit ? 'No users assigned to this role yet.' : 'Users can be assigned to this role once saved.'}
+                          <div className={styles.emptyUsersIconBox}>
+                            <Icon.Users width={20} height={20} />
+                          </div>
+                          <p className={styles.emptyUsersTitle}>
+                            {isEdit ? 'No users assigned yet' : 'Nobody assigned yet'}
+                          </p>
+                          <p className={styles.emptyUsersDesc}>
+                            {isEdit
+                              ? 'Assign this role to a user from the Users tab and they will appear here.'
+                              : 'Save this role first, then assign it to users from the Users tab.'}
+                          </p>
                         </td>
                       </tr>
                     )}

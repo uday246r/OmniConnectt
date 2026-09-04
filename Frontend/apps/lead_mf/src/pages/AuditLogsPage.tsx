@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { ShieldCheck, Search, RefreshCw, Eye, Download, X, ChevronLeft, ChevronRight } from '@omniremit/ui/icons';
-import { ActorCell, Badge, Button, ColumnFilter, DataTable, EmptyState, FilterBar, PageHeader, Pagination, ResponsiveRows, RowAction, RowsPerPage, SearchField, formatAuditTimestamp, type ActiveFilter } from '@omniremit/ui';
+import { ActorCell, Badge, Button, ColumnFilter, DataTable, FilterBar, Icon, PageHeader, Pagination, ResponsiveRows, RowAction, RowsPerPage, SearchField, formatAuditTimestamp, type ActiveFilter } from '@omniremit/ui';
 import { useLeadStore } from '../store/useLeadStore';
 import styles from './AuditLogsPage.module.css';
 import shell from '../shared/leadPage.module.css';
@@ -156,6 +156,19 @@ const getActionBadge = (action: string) => {
     }
   };
 
+  /* Maps each action verb to an icon — matches host's ACTION_ICONS so all tables use the same
+     icon+text chip shape (Create=Plus, Update=Edit, Delete=Trash, View=Eye). */
+  const getActionIcon = (action: string): typeof Icon.Edit => {
+    switch (action.toLowerCase()) {
+      case 'create': return Icon.Plus;
+      case 'edit':
+      case 'update': return Icon.Edit;
+      case 'delete': return Icon.Trash;
+      case 'view': return Icon.Eye;
+      default: return Icon.Edit;
+    }
+  };
+
   // Shared, so this table matches the host and customer360 exactly.
   const formatTimestamp = formatAuditTimestamp;
 
@@ -245,152 +258,140 @@ const getActionBadge = (action: string) => {
           </Button>
         </div>
 
-        {/* Main Table */}
-        {!isLoadingAuditLogs && visibleLogs.length === 0 ? (
-          <EmptyState
-            icon={<ShieldCheck size={32} />}
-            title="No audit logs found"
-            description={
-              auditSearchQuery || auditActionFilter
-                ? 'Try adjusting your filter or search query.'
-                : 'System events and compliance trails will appear here automatically.'
+        {/* Main Table — always rendered so columns stay visible on empty filter results */}
+        <DataTable bare footer={<Pagination page={clientFiltered ? 1 : auditPage} pageSize={clientFiltered ? Math.max(visibleLogs.length, 1) : auditPageSize} total={clientFiltered ? visibleLogs.length : totalAuditRecords} itemLabel="event" onPageChange={setAuditPage} />}>
+          <ResponsiveRows
+            rows={visibleLogs}
+            rowKey={(log) => String(log.id)}
+            loading={isLoadingAuditLogs}
+            loadingRows={auditPageSize}
+            empty={
+              auditSearchQuery || auditActionFilter || statusFilter || actorFilter
+                ? 'No audit logs match the selected filters. Try adjusting or clearing them.'
+                : 'No audit events have been recorded yet.'
             }
+            columns={[
+              {
+                key: 'timestamp',
+                label: 'Date & Time',
+                priority: 'always',
+                render: (log) => (
+                  <span className={styles.timestampCell}>{formatTimestamp(log.timestamp)}</span>
+                ),
+              },
+              {
+                key: 'actor',
+                label: 'Performed By',
+                priority: 'always',
+                header: (
+                  <ColumnFilter
+                    key="actor"
+                    label="Performed By"
+                    title="Filter Performed By"
+                    value={actorFilter}
+                    onChange={setActorFilter}
+                    options={actorOptions}
+                    allLabel="Everyone"
+                    searchable={actorOptions.length > 6}
+                    filterType="alpha"
+                    searchPlaceholder="Type a name to narrow…"
+                    emptyHint="Nobody in this log matches that."
+                  />
+                ),
+                render: (log) => (
+                  <ActorCell name={log.userName || 'System'} meta={log.userRole || 'User'} />
+                ),
+              },
+              {
+                key: 'action',
+                label: 'What Happened',
+                priority: 'high',
+                header: (
+                  <ColumnFilter
+                    key="action"
+                    label="What Happened"
+                    value={auditActionFilter}
+                    onChange={setAuditActionFilter}
+                    options={ACTION_FILTER_OPTIONS}
+                    allLabel="All Action Types"
+                  />
+                ),
+                render: (log) => {
+                  const badge = getActionBadge(log.actionType);
+                  const ActionIcon = getActionIcon(log.actionType);
+                  return (
+                    <span
+                      className={styles.actionChip}
+                      style={
+                        {
+                          '--audit-chip-bg': badge.bg,
+                          '--audit-chip-text': badge.text,
+                          '--audit-chip-border': badge.border,
+                        } as React.CSSProperties
+                      }
+                    >
+                      <ActionIcon width={11} height={11} />
+                      {getActionLabel(log.actionType)}
+                    </span>
+                  );
+                },
+              },
+              {
+                key: 'description',
+                clamp: true,
+                label: 'Description',
+                priority: 'low',
+                render: (log) => (
+                  <div className={styles.descriptionCell}>
+                    <div>{log.description}</div>
+                    {log.reason && (
+                      <div className={styles.descriptionMeta}>Reason: {log.reason}</div>
+                    )}
+                  </div>
+                ),
+              },
+              {
+                key: 'status',
+                label: 'Outcome & IP Address',
+                priority: 'low',
+                header: (
+                  <ColumnFilter
+                    key="status"
+                    label="Outcome & IP Address"
+                    title="Filter Outcome"
+                    value={statusFilter}
+                    onChange={setStatusFilter}
+                    options={STATUS_FILTER_OPTIONS}
+                    allLabel="All Statuses"
+                  />
+                ),
+                render: (log) => (
+                  <>
+                    <Badge tone={log.status?.toUpperCase() === 'SUCCESS' ? 'success' : 'danger'} dot>
+                      {log.status}
+                    </Badge>
+                    {log.ipAddress ? <div className={styles.ipMeta}>{log.ipAddress}</div> : null}
+                  </>
+                ),
+              },
+              {
+                key: 'details',
+                label: 'Details',
+                priority: 'always',
+                align: 'right',
+                /* The verb is "View" platform-wide — this said "Inspect". */
+                render: (log) => (
+                  <RowAction
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openAuditDetails(log);
+                    }}
+                  />
+                ),
+              },
+            ]}
           />
-        ) : (
-          <DataTable bare>
-            <ResponsiveRows
-              rows={visibleLogs}
-              rowKey={(log) => String(log.id)}
-              loading={isLoadingAuditLogs}
-              loadingRows={auditPageSize}
-              columns={[
-                {
-                  key: 'timestamp',
-                  label: 'Date & Time',
-                  priority: 'always',
-                  render: (log) => (
-                    <span className={styles.timestampCell}>{formatTimestamp(log.timestamp)}</span>
-                  ),
-                },
-                {
-                  key: 'actor',
-                  label: 'Performed By',
-                  priority: 'always',
-                  header: (
-                    <ColumnFilter
-                      key="actor"
-                      label="Performed By"
-                      title="Filter Performed By"
-                      value={actorFilter}
-                      onChange={setActorFilter}
-                      options={actorOptions}
-                      allLabel="Everyone"
-                      searchable={actorOptions.length > 6}
-                      searchPlaceholder="Type a name to narrow…"
-                      emptyHint="Nobody in this log matches that."
-                    />
-                  ),
-                  render: (log) => (
-                    <ActorCell name={log.userName || 'System'} meta={log.userRole || 'User'} />
-                  ),
-                },
-                {
-                  key: 'action',
-                  label: 'What Happened',
-                  priority: 'high',
-                  header: (
-                    <ColumnFilter
-                      key="action"
-                      label="What Happened"
-                      value={auditActionFilter}
-                      onChange={setAuditActionFilter}
-                      options={ACTION_FILTER_OPTIONS}
-                      allLabel="All Action Types"
-                    />
-                  ),
-                  render: (log) => {
-                    const badge = getActionBadge(log.actionType);
-                    return (
-                      <span
-                        className={styles.actionChip}
-                        style={
-                          {
-                            '--audit-chip-bg': badge.bg,
-                            '--audit-chip-text': badge.text,
-                            '--audit-chip-border': badge.border,
-                          } as React.CSSProperties
-                        }
-                      >
-                        {getActionLabel(log.actionType)}
-                      </span>
-                    );
-                  },
-                },
-                {
-                  key: 'description',
-                  clamp: true,
-                  label: 'Description',
-                  priority: 'low',
-                  render: (log) => (
-                    <div className={styles.descriptionCell}>
-                      <div>{log.description}</div>
-                      {log.reason && (
-                        <div className={styles.descriptionMeta}>Reason: {log.reason}</div>
-                      )}
-                    </div>
-                  ),
-                },
-                {
-                  key: 'status',
-                  label: 'Outcome & IP Address',
-                  priority: 'low',
-                  header: (
-                    <ColumnFilter
-                      key="status"
-                      label="Outcome & IP Address"
-                      title="Filter Outcome"
-                      value={statusFilter}
-                      onChange={setStatusFilter}
-                      options={STATUS_FILTER_OPTIONS}
-                      allLabel="All Statuses"
-                    />
-                  ),
-                  render: (log) => (
-                    <>
-                      <Badge tone={log.status?.toUpperCase() === 'SUCCESS' ? 'success' : 'danger'} dot>
-                        {log.status}
-                      </Badge>
-                      {log.ipAddress ? <div className={styles.ipMeta}>{log.ipAddress}</div> : null}
-                    </>
-                  ),
-                },
-                {
-                  key: 'details',
-                  label: 'Details',
-                  priority: 'always',
-                  align: 'right',
-                  /* The verb is "View" platform-wide — this said "Inspect". */
-                  render: (log) => (
-                    <RowAction
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        openAuditDetails(log);
-                      }}
-                    />
-                  ),
-                },
-              ]}
-            />
-          </DataTable>
-        )}
-
-        <Pagination
-          page={clientFiltered ? 1 : auditPage}
-          pageSize={clientFiltered ? Math.max(visibleLogs.length, 1) : auditPageSize}
-          total={clientFiltered ? visibleLogs.length : totalAuditRecords}
-          itemLabel="event"
-          onPageChange={setAuditPage}
-        />
+        </DataTable>
       </div>
 
       <AuditDetailsDrawer />

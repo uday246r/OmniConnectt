@@ -136,7 +136,7 @@ export function SettingsUsersTab() {
       toast.success(
         `User '${userTarget.name || userTarget.email}' ${willBeActive ? 'activated' : 'deactivated'} successfully.`
       )
-      invalidate(TOPICS.users, TOPICS.approvals)
+      invalidate(TOPICS.users, TOPICS.approvals, TOPICS.kpis)
     } catch (err) {
       setPendingStatusToggle(null)
       // "Already awaiting approval" is not a failure the operator caused — it gets an explanatory
@@ -165,7 +165,7 @@ export function SettingsUsersTab() {
       }
       toast.success(`User '${userName}' deleted successfully.`)
       if (users.length === 1 && page > 1) setPage((p) => p - 1)
-      else invalidate(TOPICS.users, TOPICS.approvals)
+      else invalidate(TOPICS.users, TOPICS.approvals, TOPICS.kpis)
     } catch (err) {
       setPendingDelete(null)
       const conflict = asPendingApprovalConflict(err)
