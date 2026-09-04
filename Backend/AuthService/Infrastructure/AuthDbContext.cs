@@ -16,6 +16,10 @@ public class AuthDbContext(DbContextOptions<AuthDbContext> options) : DbContext(
     public DbSet<ApprovalRequest> ApprovalRequests => Set<ApprovalRequest>();
     public DbSet<CheckerAssignment> CheckerAssignments => Set<CheckerAssignment>();
     public DbSet<SetPasswordInvite> SetPasswordInvites => Set<SetPasswordInvite>();
+    public DbSet<FeatureNavItem> FeatureNavItems => Set<FeatureNavItem>();
+    public DbSet<RemoteAppNavMetadata> RemoteAppNavMetadata => Set<RemoteAppNavMetadata>();
+    public DbSet<NavSection> NavSections => Set<NavSection>();
+    public DbSet<HostNavItem> HostNavItems => Set<HostNavItem>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -80,11 +84,89 @@ public class AuthDbContext(DbContextOptions<AuthDbContext> options) : DbContext(
             entity.Property(f => f.Source).HasConversion<string>().HasMaxLength(20);
         });
 
+        modelBuilder.Entity<FeatureNavItem>(entity =>
+        {
+            entity.HasIndex(n => new { n.FeatureId, n.NavKey }).IsUnique();
+
+            // Cascade, unlike RolePermission's Restrict. These rows are replicated presentation data
+            // with no grant history in them — nothing is lost by removing them with their feature,
+            // and leaving orphans would mean a sidebar row pointing at a feature that is gone.
+            entity.HasOne(n => n.Feature)
+                .WithMany()
+                .HasForeignKey(n => n.FeatureId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.Property(n => n.NavKey).HasMaxLength(100);
+            entity.Property(n => n.Label).HasMaxLength(200);
+            entity.Property(n => n.IconKey).HasMaxLength(100);
+            entity.Property(n => n.RouteSegment).HasMaxLength(100);
+            entity.Property(n => n.RequiredCapability).HasMaxLength(50);
+        });
+
+        modelBuilder.Entity<RemoteAppNavMetadata>(entity =>
+        {
+            // Keyed by FeatureId rather than an Id of its own: exactly one metadata row per feature,
+            // enforced by the primary key instead of an index that could be forgotten.
+            entity.HasKey(m => m.FeatureId);
+
+            entity.HasOne(m => m.Feature)
+                .WithMany()
+                .HasForeignKey(m => m.FeatureId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.Property(m => m.IconKey).HasMaxLength(100);
+            entity.Property(m => m.ManifestUrl).HasMaxLength(2048);
+            entity.Property(m => m.ContainerName).HasMaxLength(200);
+            entity.Property(m => m.Status).HasMaxLength(20);
+            entity.Property(m => m.MaintenanceMessage).HasMaxLength(2000);
+        });
+
+        modelBuilder.Entity<NavSection>(entity =>
+        {
+            // The key IS the identity — sections are referenced by name from HostNavItem and from the
+            // tree builder, so a surrogate id would only add a lookup.
+            entity.HasKey(s => s.Key);
+            entity.Property(s => s.Key).HasMaxLength(50);
+            entity.Property(s => s.Label).HasMaxLength(100);
+        });
+
+        modelBuilder.Entity<HostNavItem>(entity =>
+        {
+            entity.HasIndex(h => h.Key).IsUnique();
+
+            entity.HasOne(h => h.Section)
+                .WithMany()
+                .HasForeignKey(h => h.SectionKey)
+                // Restrict: removing a section that still has rows should fail loudly rather than
+                // silently deleting navigation.
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.Property(h => h.Key).HasMaxLength(100);
+            entity.Property(h => h.Label).HasMaxLength(200);
+            entity.Property(h => h.IconKey).HasMaxLength(100);
+            entity.Property(h => h.RoutePath).HasMaxLength(400);
+            entity.Property(h => h.SectionKey).HasMaxLength(50);
+
+            // Deliberately a plain string, not a foreign key to PermissionFeature: it is nullable for
+            // ungated rows, and features are keyed by a string the seeder owns anyway.
+            entity.Property(h => h.RequiredFeatureKey).HasMaxLength(200);
+            entity.Property(h => h.RequiredCapability).HasMaxLength(50);
+        });
+
         modelBuilder.Entity<PermissionFeatureCapability>(entity =>
         {
             entity.HasIndex(c => new { c.FeatureId, c.Key }).IsUnique();
-            entity.Property(c => c.Key).HasMaxLength(50);
-            entity.Property(c => c.DisplayName).HasMaxLength(100);
+
+            // Widened from 50: dotted keys such as "chart.leads-over-time" are longer than the bare
+            // verbs ("Create", "View") this column was sized for.
+            entity.Property(c => c.Key).HasMaxLength(150);
+            entity.Property(c => c.DisplayName).HasMaxLength(200);
+            entity.Property(c => c.Description).HasMaxLength(500);
+            entity.Property(c => c.GroupKey).HasMaxLength(100);
+
+            // Stored as a string, like every other enum here, so inserting a new type in the middle
+            // of the enum can never silently re-map existing rows.
+            entity.Property(c => c.Type).HasConversion<string>().HasMaxLength(20);
 
             entity.HasOne(c => c.Feature)
                 .WithMany(f => f.Capabilities)

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { ApiError } from '../../../shared/api/httpClient'
+import { ApiError, isAbortError } from '../../../shared/api/httpClient'
 import type { ApprovalRequestListItemDto } from '../api/approvalsApi'
 
 export interface PagedItems {
@@ -19,7 +19,11 @@ export interface PagedItems {
  */
 export function useApprovalRequests(
   accessToken: string | null | undefined,
-  fetcher: (token: string) => Promise<PagedItems>,
+  /**
+   * Receives an AbortSignal to forward to its API call. Filters, paging and date ranges all change
+   * this list rapidly, so superseded requests are cancelled rather than left to finish unread.
+   */
+  fetcher: (token: string, signal?: AbortSignal) => Promise<PagedItems>,
   deps: unknown[],
   silentDeps: unknown[] = [],
 ) {
@@ -30,8 +34,17 @@ export function useApprovalRequests(
 
   useEffect(() => {
     if (!accessToken) return
-    let cancelled = false
+    const controller = new AbortController()
 
+    /*
+     * Only a change the USER made blanks the table.
+     *
+     * A server push (or a polling tick) arrives through `silentDeps` and re-runs this effect just
+     * like a filter change would, but it is a background revalidation — blanking to a skeleton
+     * there means a table someone is reading flashes empty at random. Comparing the active `deps`
+     * against their previous values distinguishes the two: only a genuine filter/page/refresh
+     * change clears the rows.
+     */
     const activeDepsChanged =
       prevDepsRef.current === null ||
       prevDepsRef.current.length !== deps.length ||
@@ -44,21 +57,23 @@ export function useApprovalRequests(
     }
     setError(null)
 
-    fetcher(accessToken)
+    fetcher(accessToken, controller.signal)
       .then((res) => {
-        if (cancelled) return
+        if (controller.signal.aborted) return
         setItems(res.items)
         setTotal(res.total)
       })
       .catch((err) => {
-        if (cancelled) return
+        // An abort is this hook's own doing, not a failure — reporting it would flash "could not
+        // load" every time a filter changed.
+        if (controller.signal.aborted || isAbortError(err)) return
         setError(err instanceof ApiError ? err.message : 'Could not load approval requests.')
         setItems([])
         setTotal(0)
       })
 
     return () => {
-      cancelled = true
+      controller.abort()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accessToken, ...deps, ...silentDeps])

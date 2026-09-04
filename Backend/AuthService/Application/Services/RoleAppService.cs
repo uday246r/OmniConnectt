@@ -8,7 +8,8 @@ using Microsoft.EntityFrameworkCore;
 namespace AuthService.Application.Services;
 
 public class RoleAppService(
-    AuthDbContext db, AuditLogAppService auditLog, IHttpContextAccessor httpContextAccessor, ApprovalGatingService gating)
+    AuthDbContext db, AuditLogAppService auditLog, IHttpContextAccessor httpContextAccessor, ApprovalGatingService gating,
+    FineCapabilityService fineCapabilities)
 {
     private const string ServiceName = "AuthService";
 
@@ -127,6 +128,9 @@ public class RoleAppService(
 
         await ApplyPermissionsAsync(role.Id, request.Permissions, ct);
         await db.SaveChangesAsync(ct);
+        // A role's grants just changed, and every user holding it is affected. Their cached
+        // fine-grained sets have to go, and this service cannot enumerate who they are.
+        fineCapabilities.InvalidateAll();
 
         await WriteAuditAsync(actingUserId, "role.created", role.Id, $"Created role '{role.Name}'", role.Name, ct);
 
@@ -209,6 +213,9 @@ public class RoleAppService(
         await SyncPermissionsAsync(id, request.Permissions, ct);
 
         await db.SaveChangesAsync(ct);
+        // A role's grants just changed, and every user holding it is affected. Their cached
+        // fine-grained sets have to go, and this service cannot enumerate who they are.
+        fineCapabilities.InvalidateAll();
 
         await WriteAuditAsync(actingUserId, "role.updated", role.Id, $"Updated role '{role.Name}' — permissions modified", role.Name, ct);
 
@@ -282,8 +289,38 @@ public class RoleAppService(
 
         var grants = await db.RolePermissions.Where(rp => rp.RoleId == id).ToListAsync(ct);
         db.RolePermissions.RemoveRange(grants);
+
+        /*
+         * Detach soft-deleted users from the role before removing it.
+         *
+         * User deletion is soft — the row stays with IsDeleted = true — and a global query filter
+         * hides those rows, so the "still assigned to one or more users" guard above cannot see them.
+         * The foreign key can. The result was that deleting a user and then their role produced a raw
+         * 500 from a REFERENCE constraint, and the role became permanently undeletable through the
+         * API: the blocking row is invisible to every endpoint, so there was no way to reassign it.
+         *
+         * Nulling is the right resolution rather than widening the guard. A deleted user's role
+         * assignment carries no meaning — they cannot sign in, they hold no permissions, and what they
+         * actually did is recorded in AuditLog rows that do not depend on this column. Refusing the
+         * delete instead would protect a reference nothing reads.
+         *
+         * IgnoreQueryFilters is required here specifically because these are the rows the filter hides.
+         */
+        var deletedHolders = await db.Users
+            .IgnoreQueryFilters()
+            .Where(u => u.RoleId == id && u.IsDeleted)
+            .ToListAsync(ct);
+
+        foreach (var holder in deletedHolders)
+        {
+            holder.RoleId = null;
+        }
+
         db.Roles.Remove(role);
         await db.SaveChangesAsync(ct);
+        // A role's grants just changed, and every user holding it is affected. Their cached
+        // fine-grained sets have to go, and this service cannot enumerate who they are.
+        fineCapabilities.InvalidateAll();
 
         await WriteAuditAsync(actingUserId, "role.deleted", id, $"Deleted role '{role.Name}'", role.Name, ct);
         return null;

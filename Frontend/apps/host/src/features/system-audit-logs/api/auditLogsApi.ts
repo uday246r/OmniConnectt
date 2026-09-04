@@ -58,8 +58,8 @@ function buildQuery(params: object) {
 }
 
 export const auditLogsApi = {
-  list: (accessToken: string, params: ListAuditLogsParams = {}) =>
-    apiFetch<PagedResult<AuditLogDto>>(`${base}/api/audit-logs${buildQuery(params)}`, { accessToken }),
+  list: (accessToken: string, params: ListAuditLogsParams = {}, signal?: AbortSignal) =>
+    apiFetch<PagedResult<AuditLogDto>>(`${base}/api/audit-logs${buildQuery(params)}`, { accessToken, signal }),
 
   summary: (accessToken: string, params: DateRangeParams = {}) =>
     apiFetch<AuditLogSummaryDto>(`${base}/api/audit-logs/summary${buildQuery(params)}`, { accessToken }),

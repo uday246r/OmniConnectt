@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using ModuleRegistry.Domain;
 using ModuleRegistry.Domain.Entities;
 using ModuleRegistry.Domain.Enums;
 
@@ -8,8 +9,19 @@ public static class ModuleRegistryDbSeeder
 {
     public static async Task SeedAsync(ModuleRegistryDbContext db, AuthServiceClient authServiceClient, ILogger logger, CancellationToken ct = default)
     {
-        if (await db.RemoteApps.AnyAsync(ct))
+        var existingApps = await db.RemoteApps.ToListAsync(ct);
+        if (existingApps.Count > 0)
         {
+            // The rows are already here, but they may predate navigation metadata — an installation
+            // that was seeded before remotes declared their sidebars has capabilities in AuthDb and
+            // no nav rows at all. Returning here would leave that installation with app entries and
+            // no sub-pages under them until somebody thought to press "Resync Permissions", which
+            // is not a discoverable recovery step for a sidebar that simply looks incomplete.
+            //
+            // Re-pushing is idempotent and cheap: the fetch is one request per remote, and a remote
+            // that cannot be reached contributes null nav, which AuthService treats as "keep what
+            // you have" rather than clearing anything.
+            await BackfillNavigationAsync(existingApps, authServiceClient, logger, ct);
             return;
         }
 
@@ -56,17 +68,66 @@ public static class ModuleRegistryDbSeeder
 
         try
         {
-            // Sync permissions to AuthService
-            var customerCapabilities = await authServiceClient.FetchRemoteCapabilitiesAsync(customer360.PermissionsSourceUrl, ct) ?? [];
-            await authServiceClient.UpsertAsync(customer360.PermissionFeatureKey, customer360.DisplayName, customer360.SidebarOrder, customerCapabilities, ct);
-
-            var leadCapabilities = await authServiceClient.FetchRemoteCapabilitiesAsync(lead.PermissionsSourceUrl, ct) ?? [];
-            await authServiceClient.UpsertAsync(lead.PermissionFeatureKey, lead.DisplayName, lead.SidebarOrder, leadCapabilities, ct);
-            logger.LogInformation("Synced remote app permissions to AuthService.");
+            await PushAsync(customer360, ct);
+            await PushAsync(lead, ct);
+            logger.LogInformation("Synced remote app permissions and navigation to AuthService.");
         }
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Could not push initial remote app permissions to AuthService during seed.");
         }
+
+        Task PushAsync(RemoteApp app, CancellationToken token) => PushOneAsync(app, authServiceClient, token);
+    }
+
+    /// <summary>
+    /// Re-pushes capabilities, navigation and render metadata for apps that already exist.
+    /// <para>
+    /// Skipped once every app has nav rows on the AuthService side — but this service cannot see that
+    /// from here, so the cheap proxy is whether any app declares a permissions source at all. The push
+    /// itself is idempotent, so a redundant run costs one request per remote at startup and changes
+    /// nothing.
+    /// </para>
+    /// </summary>
+    private static async Task BackfillNavigationAsync(
+        List<RemoteApp> apps, AuthServiceClient authServiceClient, ILogger logger, CancellationToken ct)
+    {
+        var withSource = apps
+            .Where(a => a.Status != RemoteAppStatus.Disabled && !string.IsNullOrWhiteSpace(a.PermissionsSourceUrl))
+            .ToList();
+
+        if (withSource.Count == 0)
+        {
+            return;
+        }
+
+        try
+        {
+            foreach (var app in withSource)
+            {
+                await PushOneAsync(app, authServiceClient, ct);
+            }
+            logger.LogInformation("Backfilled navigation metadata for {Count} existing remote app(s).", withSource.Count);
+        }
+        catch (Exception ex)
+        {
+            // Never block startup on this. POST /api/remote-apps/resync-permissions is the manual
+            // recovery path, exactly as it is for the capability sync.
+            logger.LogWarning(ex, "Could not backfill remote app navigation during seed.");
+        }
+    }
+
+    private static async Task PushOneAsync(RemoteApp app, AuthServiceClient authServiceClient, CancellationToken ct)
+    {
+        var discovered = await authServiceClient.FetchRemoteCapabilitiesAsync(app.PermissionsSourceUrl!, ct);
+        await authServiceClient.UpsertAsync(
+            app.PermissionFeatureKey,
+            app.DisplayName,
+            app.SidebarOrder,
+            discovered?.Capabilities ?? [],
+            ct,
+            discovered?.Nav,
+            new RemoteAppRenderMetadata(
+                app.IconKey, app.ManifestUrl, app.ContainerName, app.Status.ToString(), app.MaintenanceMessage));
     }
 }

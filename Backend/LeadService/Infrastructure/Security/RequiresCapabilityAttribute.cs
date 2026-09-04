@@ -41,6 +41,7 @@ public class RequiresCapabilityAttribute : Attribute, IAsyncAuthorizationFilter
             return Task.CompletedTask;
         }
 
+
         /*
          * Administrator bypass — ONE claim, checked exactly, matching EmployeeService, AuthService and
          * ModuleRegistry.

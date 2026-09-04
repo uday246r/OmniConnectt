@@ -1,3 +1,4 @@
+using backend.Infrastructure.Security;
 using System.Security.Cryptography;
 using System.Text;
 using DotNetEnv;
@@ -87,6 +88,8 @@ builder.Services.AddHttpContextAccessor();
 // Explicit timeout: a gating check now sits in the hot path of every Field Settings mutation, so an
 // unbounded default (100s) would hang the request instead of just delaying a best-effort audit push.
 builder.Services.AddHttpClient<AuthServiceClient>(client => client.Timeout = TimeSpan.FromSeconds(10));
+builder.Services.AddMemoryCache();
+builder.Services.AddHttpClient<FineCapabilityClient>(client => client.Timeout = TimeSpan.FromSeconds(10));
 
 // ---------------------------------------------------------------------------
 // CORS Policy

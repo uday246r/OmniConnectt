@@ -5,6 +5,8 @@ import { usersApi } from '../../settings-users/api/usersApi'
 import { isApprovalPending } from '../../approvals/api/approvalsApi'
 import { ChangePasswordForm } from '../components/ChangePasswordForm'
 import { Icon } from '../../../shared/components/Icon/Icon'
+import { required, email as emailRule, firstError } from '../../../shared/validation/rules'
+import { validateFullPhone } from '@omniremit/ui/validation'
 import styles from './ProfilePage.module.css'
 import { Button, Input } from '@omniremit/ui'
 
@@ -80,8 +82,23 @@ export function ProfilePage() {
 
   async function handleSaveProfile(e: FormEvent) {
     e.preventDefault()
-    if (!name.trim()) {
-      setProfileError('Full name is required.')
+
+    /*
+     * Runs the same rules the Users form and the server use, rather than the name-only check this
+     * previously had. Editing your own profile was the one place an invalid email or a malformed
+     * phone number reached the API unchallenged and came back as a raw server error.
+     *
+     * Email is only editable by a Super Admin (see the payload below), so it is only checked when it
+     * is actually being sent.
+     */
+    const problem = firstError(
+      required(name, 'Full name'),
+      isSuperAdmin ? emailRule(email) : undefined,
+      // Optional here — the server accepts a null phone on update — so only validated when present.
+      phoneNumber.trim() ? validateFullPhone(phoneNumber) : undefined,
+    )
+    if (problem) {
+      setProfileError(problem)
       return
     }
 

@@ -186,8 +186,8 @@ export function MyRequestsPage() {
   const dataRevision = useDataRevision(TOPICS.approvals)
 
   const fetcher = useCallback(
-    (token: string) =>
-      approvalsApi.listMine(token, { page, pageSize, status: statusFilter === 'all' ? undefined : statusFilter }),
+    (token: string, signal?: AbortSignal) =>
+      approvalsApi.listMine(token, { page, pageSize, status: statusFilter === 'all' ? undefined : statusFilter }, signal),
     [page, pageSize, statusFilter],
   )
   const { items, total, error } = useApprovalRequests(accessToken, fetcher, [page, pageSize, statusFilter, refreshKey], [dataRevision])
@@ -260,6 +260,7 @@ export function MyRequestsPage() {
           if (checkerFilter && (r.checkerName ?? '') !== checkerFilter) return false
           return true
         })
+
 
   return (
     <div className={styles.page}>

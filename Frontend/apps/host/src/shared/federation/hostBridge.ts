@@ -1,6 +1,5 @@
 import { useAuthStore } from '../../features/auth/store/authStore'
 import { env } from '../../config/env'
-import { readSubRoute, subscribeSubRoute, writeSubRoute } from './hostNavigation'
 
 /**
  * The host's public runtime contract for every remote app. Deliberately NOT passed as React props —
@@ -16,7 +15,19 @@ export interface OmniRemitHostBridge {
   getAccessToken: () => string | null
   /** Same dedup'd refresh-then-return-token flow the host's own pages use before a mutation. Prefer this over getAccessToken() right before an API call, in case the token expired while the remote's UI (e.g. a modal) sat open. */
   ensureFreshAccessToken: () => Promise<string>
-  /** Mirrors authStore's own capability check — administrators always true, everyone else checked against the JWT's cached `perms` claim. No network call. */
+  /**
+   * Mirrors authStore's own capability check. Administrators are always true; everyone else is
+   * checked against the union of the JWT's cached `perms` claim and the fine-grained set the host
+   * fetched at sign-in. No network call either way.
+   *
+   * The two sources are deliberately not distinguished here. A remote asks for
+   * `hasCapability('remote.lead.dashboard', 'kpi.total-leads')` exactly as it asks for
+   * `hasCapability('remote.lead.lead', 'View')`, and the host decides which delivery path answers.
+   * That is what lets a remote declare a hundred widget capabilities without either side changing.
+   *
+   * It resolves what to RENDER. It is not a security boundary — every capability worth withholding
+   * is also enforced by the service that owns the data.
+   */
   hasCapability: (featureKey: string, capability: string) => boolean
   getUser: () => { id: string; name: string; email: string; isAdministrator: boolean } | null
   /** Base URLs so a remote's own API client doesn't have to guess or hardcode the host's environment. */
@@ -41,25 +52,15 @@ export interface OmniRemitHostBridge {
     /** One token's computed value, e.g. token('--omni-color-danger-600') → '#dc2626'. Returns '' if undefined. */
     token: (name: string) => string
   }
-  /**
-   * Puts a remote's own page in the URL.
+  /*
+   * Deliberately NO navigation member.
    *
-   * The host owns the router; a remote renders at `/apps/:appKey/*` and cannot call `navigate()`
-   * itself. Without this a remote's internal page lived only in its own state, so `/apps/lead` was
-   * the URL for every page inside Lead Management — refresh, Back and shared links all dropped the
-   * reader back on the remote's default page.
-   *
-   * A remote calls `setSubRoute` when its page changes and subscribes with `onSubRouteChange` to
-   * follow Back/Forward. Both are safe to call before the host router has finished mounting.
+   * A remote's current page is passed down as the `page` prop by RemoteAppPage, and a remote asks to
+   * move with the `onNavigate` callback it is handed alongside it — see
+   * `pages/RemoteAppPage/RemoteAppPage.tsx` and each remote's `navigation/HostNavigation.tsx`.
+   * Routing therefore stays inside React, where the router already is, rather than travelling
+   * through a global mutable object that has no way to participate in rendering.
    */
-  navigation: {
-    /** The path segment after `/apps/:appKey/`, or '' at the app's own root. */
-    getSubRoute: () => string
-    /** Writes the segment into the URL. `replace: true` for the initial sync, so it adds no history entry. */
-    setSubRoute: (subRoute: string, options?: { replace?: boolean }) => void
-    /** Fires when the sub-route changes from outside the remote (Back/Forward, a host link). Returns an unsubscribe. */
-    onSubRouteChange: (listener: (subRoute: string) => void) => () => void
-  }
 }
 
 declare global {
@@ -88,11 +89,6 @@ export function installHostBridge() {
         const property = name.startsWith('--') ? name : `--${name}`
         return getComputedStyle(document.documentElement).getPropertyValue(property).trim()
       },
-    },
-    navigation: {
-      getSubRoute: readSubRoute,
-      setSubRoute: writeSubRoute,
-      onSubRouteChange: subscribeSubRoute,
     },
   }
 }

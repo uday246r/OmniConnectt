@@ -18,7 +18,12 @@ export interface OmniRemitHostBridge {
   ensureFreshAccessToken: () => Promise<string>;
   hasCapability: (featureKey: string, capability: string) => boolean;
   getUser: () => HostBridgeUser | null;
-  navigate: (to: string) => void;
+  /*
+   * No navigation member: the host hands this remote its current page as the `page` prop and an
+   * `onNavigate` callback to request a move (see `navigation/HostNavigation.tsx` and the host's
+   * RemoteAppPage). A `navigate: (to: string) => void` was declared here for a while that the host
+   * never implemented — anything that had called it would have thrown.
+   */
   apiBaseUrls?: {
     authService: string;
     moduleRegistry: string;
@@ -99,3 +104,21 @@ export const canViewAuditLogs = (): boolean =>
 
 export const canManageFieldSettings = (): boolean =>
   hasCapability(C360_SUBMODULE_FIELD_SETTINGS, 'Manage') || hasCapability(C360_FEATURE_KEY, 'View');
+
+/*
+ * Business capabilities — the panels of the 360 view, and the audit export.
+ *
+ * Same bridge call as everything above; the host merges what the token carries with what it fetched
+ * separately, so this side never learns which answered.
+ *
+ * Deliberately without the `|| hasCapability(C360_FEATURE_KEY, 'View')` fallback the helpers above
+ * use. That fallback is right for a module-level read, and wrong here: being allowed into the app
+ * must not imply every panel inside it, or the per-panel grant would exist and mean nothing.
+ */
+
+/** One panel of the customer 360 view, e.g. `panel.contacts`. Named by the manifest. */
+export const canSeeProfilePanel = (capabilityKey: string): boolean =>
+  hasCapability(C360_SUBMODULE_PROFILE, capabilityKey);
+
+export const canExportAuditLogs = (): boolean =>
+  hasCapability(C360_SUBMODULE_AUDIT, 'export.csv');

@@ -1,8 +1,7 @@
 import { useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useClickOutside } from '../../shared/hooks/useClickOutside'
 import { useMenuKeyboardNav } from '../../shared/hooks/useMenuKeyboardNav'
-import { useSettingsDrawerStore } from '../../shared/stores/settingsDrawerStore'
 import { useAuthStore } from '../../features/auth/store/authStore'
 import { GlobalSearch } from '../../features/search/components/GlobalSearch/GlobalSearch'
 import { SecurityAlertsMenu } from '../../features/notifications/components/SecurityAlertsMenu/SecurityAlertsMenu'
@@ -39,7 +38,9 @@ export function Topbar({ userName, settingsAccess, onLogout, onMobileMenuToggle 
   const menuRef      = useRef<HTMLDivElement>(null)
   const triggerRef   = useRef<HTMLButtonElement>(null)
 
-  const openSettings = useSettingsDrawerStore((s) => s.open)
+  const navigate = useNavigate()
+  // Navigates rather than opening the store directly, so the gear icon produces a real URL.
+  const openSettings = () => navigate('/settings/users')
   // The signed-in user's real role, for the menu header. See the comment on that header below.
   const user = useAuthStore((s) => s.user)
 
@@ -81,7 +82,7 @@ export function Topbar({ userName, settingsAccess, onLogout, onMobileMenuToggle 
             className={styles.iconButton}
             aria-label="Settings"
             title="System Settings"
-            onClick={() => openSettings('users')}
+            onClick={openSettings}
           >
             <Icon.Settings width={17} height={17} />
           </button>

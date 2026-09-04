@@ -1,5 +1,6 @@
 import React, { useEffect, lazy, Suspense } from 'react';
 import { useLeadStore } from '../store/useLeadStore';
+import { canSeeDashboardCapability } from '../api/hostBridge';
 import { DashboardHeader } from '../components/dashboard/DashboardHeader';
 import { KpiCardSection } from '../components/dashboard/KpiCardSection';
 import { LeadsByBranchCard } from '../components/dashboard/LeadsByBranchCard';
@@ -36,6 +37,13 @@ const ChartCardFallback: React.FC = () => (
 export const DashboardPage: React.FC = () => {
   const { fetchDashboardData, fetchMasterData, products } = useLeadStore();
 
+  // Capability keys, not component names — they match LeadCapabilityManifest exactly, which is what
+  // an administrator sees in the Role editor and what the server enforces.
+  const canSeeOverTime = canSeeDashboardCapability('chart.leads-over-time');
+  const canSeeByProduct = canSeeDashboardCapability('chart.leads-by-product');
+  const canSeeByBranch = canSeeDashboardCapability('chart.leads-by-branch');
+  const canSeeRecentLeads = canSeeDashboardCapability('widget.recent-leads');
+
   useEffect(() => {
     fetchDashboardData();
     if (products.length === 0) {
@@ -54,29 +62,44 @@ export const DashboardPage: React.FC = () => {
       {/* 5 KPI Stat Cards */}
       <KpiCardSection />
 
-      {/* Row 1: Charts — 2-column grid */}
-      <div
-        className={styles.chartRow}
-      >
-        {/* One boundary per card so a slow chunk cannot hold the other chart back. */}
-        <Suspense fallback={<ChartCardFallback />}>
-          <LeadsOverTimeCard />
-        </Suspense>
-        <Suspense fallback={<ChartCardFallback />}>
-          <LeadsByProductCard />
-        </Suspense>
-      </div>
+      {/*
+       * Each chart and widget is granted separately, so the page is assembled from whatever this
+       * user actually holds rather than always laid out the same way and selectively blanked.
+       *
+       * A row with nothing in it is dropped entirely — an empty two-column grid leaves a band of
+       * whitespace that reads as a rendering fault, not as a permission. The endpoints behind these
+       * refuse the same requests server-side; hiding the card is what keeps the page coherent.
+       */}
+      {(canSeeOverTime || canSeeByProduct) && (
+        <div
+          className={styles.chartRow}
+        >
+          {/* One boundary per card so a slow chunk cannot hold the other chart back. */}
+          {canSeeOverTime && (
+            <Suspense fallback={<ChartCardFallback />}>
+              <LeadsOverTimeCard />
+            </Suspense>
+          )}
+          {canSeeByProduct && (
+            <Suspense fallback={<ChartCardFallback />}>
+              <LeadsByProductCard />
+            </Suspense>
+          )}
+        </div>
+      )}
 
       {/* Row 2: Branch Distribution — Top Sales Executives removed, so this is a single column now
           rather than leaving an empty gap where it used to sit. */}
-      <div
-        className={styles.section}
-      >
-        <LeadsByBranchCard />
-      </div>
+      {canSeeByBranch && (
+        <div
+          className={styles.section}
+        >
+          <LeadsByBranchCard />
+        </div>
+      )}
 
       {/* Row 3: Recent Leads — full width */}
-      <RecentLeadsCard />
+      {canSeeRecentLeads && <RecentLeadsCard />}
 
       {/* Lead Details Side Drawer */}
       <LeadDetailsDrawer />

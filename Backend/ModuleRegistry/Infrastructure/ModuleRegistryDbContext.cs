@@ -37,8 +37,13 @@ public class ModuleRegistryDbContext(DbContextOptions<ModuleRegistryDbContext> o
             entity.HasIndex(c => new { c.RemoteAppId, c.ModuleKey, c.Key }).IsUnique();
             entity.Property(c => c.ModuleKey).HasMaxLength(100);
             entity.Property(c => c.ModuleDisplayName).HasMaxLength(150);
-            entity.Property(c => c.Key).HasMaxLength(50);
-            entity.Property(c => c.DisplayName).HasMaxLength(100);
+            // Sized to match AuthDb's PermissionFeatureCapability. Truncating here would corrupt a
+            // dotted key on its way through, and a key that arrives shortened than it left is a grant
+            // that silently stops matching.
+            entity.Property(c => c.Key).HasMaxLength(150);
+            entity.Property(c => c.DisplayName).HasMaxLength(200);
+            entity.Property(c => c.Description).HasMaxLength(500);
+            entity.Property(c => c.Type).HasMaxLength(20);
 
             entity.HasOne(c => c.RemoteApp)
                 .WithMany(a => a.Capabilities)

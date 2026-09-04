@@ -101,12 +101,16 @@ function buildQuery(params: object) {
 }
 
 export const approvalsApi = {
-  list: (accessToken: string, params: ListApprovalsParams = {}) =>
-    apiFetch<PagedResult<ApprovalRequestListItemDto>>(`${base}/api/approvals${buildQuery(params)}`, { accessToken }),
+  list: (accessToken: string, params: ListApprovalsParams = {}, signal?: AbortSignal) =>
+    apiFetch<PagedResult<ApprovalRequestListItemDto>>(`${base}/api/approvals${buildQuery(params)}`, { accessToken, signal }),
 
   /** "My Requests" — the maker's own submissions, regardless of whether they hold Approval Center access. */
-  listMine: (accessToken: string, params: { page?: number; pageSize?: number; status?: ApprovalStatus } = {}) =>
-    apiFetch<PagedResult<ApprovalRequestListItemDto>>(`${base}/api/approvals/mine${buildQuery(params)}`, { accessToken }),
+  listMine: (
+    accessToken: string,
+    params: { page?: number; pageSize?: number; status?: ApprovalStatus } = {},
+    signal?: AbortSignal,
+  ) =>
+    apiFetch<PagedResult<ApprovalRequestListItemDto>>(`${base}/api/approvals/mine${buildQuery(params)}`, { accessToken, signal }),
 
   get: (accessToken: string, id: string) =>
     apiFetch<ApprovalRequestDetailDto>(`${base}/api/approvals/${id}`, { accessToken }),

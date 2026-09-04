@@ -42,6 +42,15 @@ export interface HealthEntryDto {
  */
 const REGISTRY_TIMEOUT_MS = 8000
 
+/**
+ * The registry timeout always applies; a caller-supplied signal is layered on top so an effect can
+ * additionally cancel early. Combining rather than replacing keeps the ceiling intact.
+ */
+function withTimeout(signal?: AbortSignal): AbortSignal {
+  const timeout = AbortSignal.timeout(REGISTRY_TIMEOUT_MS)
+  return signal ? AbortSignal.any([signal, timeout]) : timeout
+}
+
 /** Raw calls against ModuleRegistry's public surface. Admin CRUD calls (Setup > Applications) live in features/settings-applications/api. */
 export const moduleRegistryClient = {
   // `signal` needs no change to httpClient: ApiFetchOptions extends RequestInit and spreads ...rest
@@ -52,10 +61,10 @@ export const moduleRegistryClient = {
       accessToken,
       signal: AbortSignal.timeout(REGISTRY_TIMEOUT_MS),
     }),
-  health: (accessToken: string) =>
+  health: (accessToken: string, signal?: AbortSignal) =>
     apiFetch<HealthEntryDto[]>(`${base}/api/remote-apps/health`, {
       accessToken,
-      signal: AbortSignal.timeout(REGISTRY_TIMEOUT_MS),
+      signal: withTimeout(signal),
     }),
   /**
    * Asks the registry to probe the remotes NOW, rather than returning the value its background sweep
@@ -65,10 +74,10 @@ export const moduleRegistryClient = {
    *
    * Server-side throttled, so calling it on every mount is safe.
    */
-  refreshHealth: (accessToken: string) =>
+  refreshHealth: (accessToken: string, signal?: AbortSignal) =>
     apiFetch<HealthEntryDto[]>(`${base}/api/remote-apps/health/refresh`, {
       method: 'POST',
       accessToken,
-      signal: AbortSignal.timeout(REGISTRY_TIMEOUT_MS),
+      signal: withTimeout(signal),
     }),
 }

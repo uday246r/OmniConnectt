@@ -13,6 +13,10 @@ namespace backend.Controllers
     [ApiController]
     [Route("v1/contactinfo")]
     [RequiresCapability("contact", "View")]
+    // The data gate and the panel gate are the same request here, so both are checked at the same
+    // point: contact:View says the caller may read contacts at all, panel.contacts says this profile
+    // view may show them.
+    [RequiresFineCapability("profile", "panel.contacts")]
     public class ContactController : ControllerBase
     {
         private readonly CrmProxyService _crmProxy;

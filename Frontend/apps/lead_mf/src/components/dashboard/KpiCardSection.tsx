@@ -1,6 +1,8 @@
 import React from 'react';
 import { Users, UserPlus, Hourglass, CheckCircle2, TrendingUp } from '@omniremit/ui/icons';
 import { useLeadStore } from '../../store/useLeadStore';
+import { canSeeDashboardCapability } from '../../api/hostBridge';
+import { SkeletonBlock } from '@omniremit/ui';
 import styles from './KpiCardSection.module.css';
 
 const formatKpiValue = (val: number | null | undefined, isPercentage = false): string => {
@@ -18,6 +20,7 @@ const KPI_CONFIG = [
     iconWrapClass: 'iconWrapBlue',
     trend: '↑ All Applications',
     key: 'totalLeads' as const,
+    capability: 'kpi.total-leads',
   },
   {
     title: 'New Leads',
@@ -26,6 +29,7 @@ const KPI_CONFIG = [
     iconWrapClass: 'iconWrapPurple',
     trend: '↑ Incoming leads',
     key: 'newLeads' as const,
+    capability: 'kpi.new-leads',
   },
   {
     title: 'In Progress',
@@ -34,6 +38,7 @@ const KPI_CONFIG = [
     iconWrapClass: 'iconWrapEmerald',
     trend: '↑ Under review',
     key: 'inProgressLeads' as const,
+    capability: 'kpi.in-progress',
   },
   {
     title: 'Converted',
@@ -42,6 +47,7 @@ const KPI_CONFIG = [
     iconWrapClass: 'iconWrapGreen',
     trend: '↑ Successful apps',
     key: 'convertedLeads' as const,
+    capability: 'kpi.converted',
   },
   {
     title: 'Conversion Rate',
@@ -50,6 +56,7 @@ const KPI_CONFIG = [
     iconWrapClass: 'iconWrapTeal',
     trend: '↑ Performance',
     key: 'conversionRate' as const,
+    capability: 'kpi.conversion-rate',
     isPercentage: true,
   },
 ];
@@ -65,6 +72,24 @@ const ICON_WRAP_STYLES: Record<string, React.CSSProperties> = {
 export const KpiCardSection: React.FC = () => {
   const { kpiSummary, isLoadingDashboard } = useLeadStore();
 
+  /*
+   * Each card is a grant of its own.
+   *
+   * Which cards a role should see is a business decision, not a technical one, so it is configured
+   * in the host's Role editor rather than decided here — this component only asks. The card is
+   * removed rather than blanked: an empty card labelled "Total Leads" invites someone to report it
+   * as broken, and the grid reflows cleanly with fewer.
+   *
+   * This is presentation. The numbers themselves are withheld server-side too: the two cards with
+   * their own endpoints answer 403, and the three that share one response come back null. Removing
+   * the card is what makes the page coherent, not what makes it safe.
+   */
+  const visibleKpis = KPI_CONFIG.filter((kpi) => canSeeDashboardCapability(kpi.capability));
+
+  if (visibleKpis.length === 0) {
+    return null;
+  }
+
   return (
     <>
       {/* Inject accent bar CSS once */}
@@ -72,9 +97,9 @@ export const KpiCardSection: React.FC = () => {
       <div
         className={styles.grid}
       >
-        {KPI_CONFIG.map((kpi) => {
+        {visibleKpis.map((kpi) => {
           const rawVal = kpiSummary[kpi.key];
-          const displayVal = isLoadingDashboard ? '...' : formatKpiValue(rawVal as number, kpi.isPercentage);
+          const displayVal = formatKpiValue(rawVal as number, kpi.isPercentage);
 
           return (
             <div key={kpi.key} className={styles.card}>
@@ -100,7 +125,11 @@ export const KpiCardSection: React.FC = () => {
                 <span
                   className={styles.value}
                 >
-                  {displayVal}
+                  {/*
+                    A shimmer the size of the number, not a literal '...' — three dots read as a real
+                    value that happens to be dots, and swapping them for a long figure resized the card.
+                  */}
+                  {isLoadingDashboard ? <SkeletonBlock width={84} height={26} radius="7px" /> : displayVal}
                 </span>
               </div>
 

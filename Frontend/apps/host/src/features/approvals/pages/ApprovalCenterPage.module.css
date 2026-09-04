@@ -906,7 +906,18 @@
   letter-spacing: -0.01em;
 }
 
-/* Action chip — icon + label, colour-coded by verb, matches MyRequests */
+/*
+ * The action pill, matching My Requests exactly.
+ *
+ * The markup in both pages is already identical — `styles[`action_${r.action}`]` — but this file had
+ * NO .action_* classes at all, so that lookup resolved to undefined and Create, Update, Delete,
+ * Enable and Disable all rendered as the same flat blue. It also used `display: inline-block`, so the
+ * icon and label never sat on a shared baseline the way My Requests' inline-flex row does.
+ *
+ * Both pages now take their colours from the --omni-color-action-* tokens, which theme.css defines
+ * for precisely this and describes as existing "so a Delete is the same red everywhere". Duplicating
+ * the literals in two stylesheets is how they came apart in the first place.
+ */
 .actionCell {
   display: inline-flex;
   align-items: center;
@@ -922,10 +933,9 @@
   white-space: nowrap;
 }
 
-/* Per-action colour overrides */
 .action_Create  { background: var(--omni-color-success-50); color: var(--omni-color-success-600); border-color: var(--omni-color-success-200); }
 .action_Update  { background: var(--omni-color-primary-50); color: var(--omni-color-primary-600); border-color: var(--omni-color-primary-200); }
-.action_Delete  { background: var(--omni-color-danger-50);  color: var(--omni-color-danger-600);  border-color: var(--omni-color-danger-200); }
+.action_Delete  { background: var(--omni-color-danger-50); color: var(--omni-color-danger-600); border-color: var(--omni-color-danger-200); }
 .action_Enable  { background: #f0fdfa; color: #0d9488; border-color: #99f6e4; }
 .action_Disable { background: var(--omni-color-warning-50); color: var(--omni-color-warning-600); border-color: var(--omni-color-warning-200); }
 

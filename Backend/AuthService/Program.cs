@@ -104,8 +104,11 @@ builder.Services.AddScoped<CheckerAssignmentAppService>();
 builder.Services.AddScoped<IEmailSender, EmailSender>();
 builder.Services.AddScoped<SetPasswordInviteService>();
 builder.Services.AddScoped<PermissionCatalogAppService>();
+builder.Services.AddScoped<FineCapabilityService>();
 builder.Services.AddScoped<DashboardAppService>();
 builder.Services.AddScoped<SearchAppService>();
+builder.Services.AddMemoryCache();
+builder.Services.AddScoped<NavigationAppService>();
 
 builder.Services.AddSignalR();
 builder.Services.AddSingleton<KpiCoalescerService>();

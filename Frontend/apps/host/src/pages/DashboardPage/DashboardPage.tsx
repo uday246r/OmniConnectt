@@ -1,16 +1,16 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useMemo, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../features/auth/store/authStore'
 import { remoteAppsApi, type RemoteAppDto } from '../../features/settings-applications/api/remoteAppsApi'
 import { auditLogsApi, type AuditLogDto } from '../../features/system-audit-logs/api/auditLogsApi'
 import { dashboardApi, type DashboardStatsDto, type HealthEntryDto } from '../../features/dashboard/api/dashboardApi'
-import { ApiError } from '../../shared/api/httpClient'
-import { useSettingsDrawerStore } from '../../shared/stores/settingsDrawerStore'
+import { ApiError, isAbortError } from '../../shared/api/httpClient'
 import { SkeletonStatCard, SkeletonDashboardWidget, SkeletonAuditRow, SkeletonDonutChart } from '../../shared/components/Skeleton'
 import { Icon } from '../../shared/components/Icon/Icon'
 import styles from './DashboardPage.module.css'
 import { APP_NAME, COPYRIGHT_YEAR } from '../../shared/config/branding'
 import { TOPICS, useDataRevision } from '../../shared/stores/invalidationStore'
+import { useAbortableEffect } from '../../shared/hooks/useAbortableEffect'
 
 interface RoleDistribution {
   name: string
@@ -81,8 +81,17 @@ function getUserInitials(name?: string | null): string {
 export function DashboardPage() {
   const user = useAuthStore((s) => s.user)
   const accessToken = useAuthStore((s) => s.accessToken)
-  const openDrawer = useSettingsDrawerStore((s) => s.open)
-  const pushLayer = useSettingsDrawerStore((s) => s.pushLayer)
+  const navigate = useNavigate()
+  /*
+   * Scoped to `kpis`, NOT the global revision counter.
+   *
+   * This page's load re-probes every registered remote app over HTTP (dashboardApi.refreshHealth),
+   * so subscribing to every invalidation meant a single audit row — one login, by anyone — fired a
+   * full health sweep plus nine dashboard queries for every viewer with the page open. Under
+   * server push that is a self-inflicted stampede. The `kpis` topic is coalesced server-side by
+   * KpiCoalescerService, and the Settings mutations that should still refresh these cards name it
+   * explicitly in their invalidate(...) calls.
+   */
   const dataRevision = useDataRevision(TOPICS.kpis)
 
   const [loading, setLoading] = useState(true)
@@ -101,9 +110,8 @@ export function DashboardPage() {
   const [health, setHealth] = useState<HealthEntryDto[] | null>(null)
   const [recentLogs, setRecentLogs] = useState<AuditLogDto[]>([])
 
-  useEffect(() => {
+  useAbortableEffect(async (signal) => {
     if (!accessToken) return
-    let cancelled = false
 
     async function loadDashboardData() {
       try {
@@ -121,7 +129,7 @@ export function DashboardPage() {
          * individually; they are genuinely row-level data, not aggregates.
          */
         const [statsRes, appsRes, logsRes, healthRes] = await Promise.all([
-          dashboardApi.stats(accessToken!),
+          dashboardApi.stats(accessToken!, signal),
           /*
            * Guarded like its neighbours, because it talks to a DIFFERENT service.
            *
@@ -134,15 +142,15 @@ export function DashboardPage() {
            * `null` (not an empty list) marks unreachable, so the card can distinguish "the registry is
            * down" from "no applications are registered".
            */
-          remoteAppsApi.list(accessToken!, { pageSize: 12 }).catch(() => null),
-          auditLogsApi.list(accessToken!, { pageSize: 6 }).catch(() => ({ items: [], total: 0 })),
+          remoteAppsApi.list(accessToken!, { pageSize: 12 }, signal).catch(() => null),
+          auditLogsApi.list(accessToken!, { pageSize: 6 }, signal).catch(() => ({ items: [], total: 0 })),
           // Re-probed on arrival rather than read from the registry's last sweep, so what the System
           // Status card shows is what is true now. A failing probe must not blank the whole dashboard
           // — the card falls back to "Unknown", which renders as a neutral "Checking".
-          dashboardApi.refreshHealth(accessToken!).catch(() => [] as HealthEntryDto[]),
+          dashboardApi.refreshHealth(accessToken!, signal).catch(() => [] as HealthEntryDto[]),
         ])
 
-        if (!cancelled) {
+        {
           setStats(statsRes)
           setTotalUsers(statsRes.users ?? 0)
           setTotalRoles(statsRes.roles ?? 0)
@@ -154,19 +162,30 @@ export function DashboardPage() {
           setError(null)
         }
       } catch (err) {
-        if (cancelled) return
+        /*
+         * An aborted request is not a failed one, and must leave every piece of state alone.
+         *
+         * This effect cancels its request whenever it is superseded — StrictMode's double-invoke in
+         * development, and any change of token or dataRevision in production. Treating that
+         * cancellation like a network error made the dashboard accuse itself of being broken on an
+         * ordinary page load: the banner read "Could not load dashboard metrics", every card showed
+         * 0, and System Status sat on "Checking", until the run that replaced this one happened to
+         * finish and clear it. The zeroes were the initial state, never overwritten.
+         *
+         * Returning here also skips setLoading(false) below, which matters just as much: the newer
+         * request is still in flight, so dropping the skeleton would expose those same zeroes as
+         * though they were real figures.
+         */
+        if (isAbortError(err)) return
         // Surfaced instead of console-only: the page otherwise rendered zeroes, which reads as "the
         // platform has no users" rather than "the request failed".
         setError(err instanceof ApiError ? err.message : 'Could not load dashboard metrics.')
-      } finally {
-        if (!cancelled) setLoading(false)
       }
+
+      setLoading(false)
     }
 
-    void loadDashboardData()
-    return () => {
-      cancelled = true
-    }
+    await loadDashboardData()
   }, [accessToken, dataRevision])
 
   /**
@@ -495,7 +514,7 @@ export function DashboardPage() {
             {/* Action 1: Add New User */}
             <div
               className={styles.quickOpItem}
-              onClick={() => pushLayer({ type: 'user-form' })}
+              onClick={() => navigate('/settings/users/new')}
               role="button"
               tabIndex={0}
             >
@@ -512,7 +531,7 @@ export function DashboardPage() {
             {/* Action 2: Create Role */}
             <div
               className={styles.quickOpItem}
-              onClick={() => pushLayer({ type: 'role-form' })}
+              onClick={() => navigate('/settings/roles/new')}
               role="button"
               tabIndex={0}
             >
@@ -529,7 +548,7 @@ export function DashboardPage() {
             {/* Action 3: Register Application */}
             <div
               className={styles.quickOpItem}
-              onClick={() => pushLayer({ type: 'app-form' })}
+              onClick={() => navigate('/settings/applications/new')}
               role="button"
               tabIndex={0}
             >
@@ -645,7 +664,7 @@ export function DashboardPage() {
             <button
               type="button"
               className={styles.headerManageBtn}
-              onClick={() => openDrawer('applications')}
+              onClick={() => navigate('/settings/applications')}
             >
               <span>Manage</span>
               <Icon.ChevronRight width={13} height={13} />
@@ -717,7 +736,7 @@ export function DashboardPage() {
                 <button
                   type="button"
                   className={styles.emptyRegisterBtn}
-                  onClick={() => pushLayer({ type: 'app-form' })}
+                  onClick={() => navigate('/settings/applications/new')}
                 >
                   <Icon.Plus width={14} height={14} />
                   <span>Register Application</span>

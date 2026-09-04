@@ -75,8 +75,37 @@ public class PermissionClaimsBuilder(AuthDbContext db)
             }
         }
 
+        /*
+         * Only capabilities that still exist, are still active, and are still API-enforced reach the
+         * token. Two separate reasons, both load-bearing.
+         *
+         * EXISTENCE. A grant is a (FeatureId, Capability-string) pair with no foreign key onto the
+         * capability row, and the query above filters on Feature.IsActive alone. So when a remote
+         * stopped declaring one capability of a module it still owned, the grant survived and kept
+         * minting into every affected user's token — a permission no attribute required any more, held
+         * by people nobody had granted it to since. Joining the live capability set is what ends that.
+         *
+         * TYPE. Only Api capabilities belong in the claim: those are the ones the four authorization
+         * filters read from it. Everything else — KPIs, charts, exports, bulk actions — is delivered
+         * through the cached per-user set instead, which is what stops the token growing without
+         * bound as remotes declare hundreds of them. This filter is the single point where that
+         * invariant is enforced, and a test asserts it.
+         */
+        var deliverable = await db.PermissionFeatureCapabilities
+            .AsNoTracking()
+            .Where(c => c.IsActive && c.Type == CapabilityType.Api && c.Feature!.IsActive)
+            .Select(c => new { FeatureKey = c.Feature!.Key, CapabilityKey = c.Key })
+            .ToListAsync(ct);
+
+        // A lookup rather than a pairwise comparison, so this stays one pass over the user's grants
+        // however large the catalog grows.
+        var apiCapabilities = new HashSet<string>(
+            deliverable.Select(c => $"{c.FeatureKey}:{c.CapabilityKey}"),
+            StringComparer.OrdinalIgnoreCase);
+
         var permissions = effective
             .Select(e => $"{e.Key}:{e.Capability}")
+            .Where(p => apiCapabilities.Contains(p))
             .OrderBy(s => s, StringComparer.Ordinal)
             .ToList();
 

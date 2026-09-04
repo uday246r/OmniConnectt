@@ -30,7 +30,7 @@ public class PermissionFeature
     /// "&lt;featureKey&gt;:&lt;capability&gt;", RolePermission and UserPermissionOverride are unchanged, and
     /// both enforcement attributes keep doing a plain string match. It also gives each sub-module a
     /// real DisplayName, which a composite capability key has nowhere to store (every DTO hop is a
-    /// bare Key/DisplayName pair, and the capability columns are capped at 50 chars).
+    /// bare Key/DisplayName pair).
     /// </para>
     /// </summary>
     public Guid? ParentFeatureId { get; set; }

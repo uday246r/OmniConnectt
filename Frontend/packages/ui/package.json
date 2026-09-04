@@ -7,6 +7,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./icons": "./src/icons.tsx",
+    "./validation": "./src/validation/index.ts",
     "./tokens.css": "./src/tokens/tokens.css"
   },
   "dependencies": {

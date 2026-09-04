@@ -1,6 +1,4 @@
 import React, { useEffect } from 'react';
-import { useHostSubRoute } from '@omniremit/ui';
-import { HostSidebarLeadNav } from './HostSidebarLeadNav';
 import { ToastNotification } from '../common/ToastNotification';
 import { useLeadStore } from '../../store/useLeadStore';
 import { CreateLeadPage } from '../../pages/CreateLeadPage';
@@ -8,31 +6,35 @@ import { DashboardPage } from '../../pages/DashboardPage';
 import { ViewLeadPage } from '../../pages/ViewLeadPage';
 import { AuditLogsPage } from '../../pages/AuditLogsPage';
 import { FieldSettingsPage } from '../../pages/FieldSettingsPage';
-import type { NavigationPage } from '../../types/lead';
 
-/** Every page this remote can be on — also the set of sub-routes it accepts from the URL. */
-const LEAD_PAGES: readonly NavigationPage[] = [
-  'dashboard',
-  'view-lead',
-  'create-lead',
-  'audit-logs',
-  'field-settings',
-];
+/** The page keys this remote exposes. They match the route segments declared in LeadNavigationManifest. */
+export type LeadPage = 'dashboard' | 'create-lead' | 'view-lead' | 'audit-logs' | 'field-settings';
 
-export const MainLayout: React.FC = () => {
-  const { activePage, setActivePage, fetchDashboardData, fetchMasterData, fetchLeads, products } = useLeadStore();
+interface MainLayoutProps {
+  /** Which page to render, decided by the host from the URL. Defaults to the dashboard. */
+  page?: string;
+}
+
+/**
+ * Renders one page. That is now this component's entire job.
+ *
+ * It used to also mount HostSidebarLeadNav, which located the host's own sidebar anchor by query
+ * selector, appended a chevron button into it and portalled a hardcoded array of sub-menu items
+ * beside it — with permissions enforced by a `visible` boolean in that array. All of that is gone:
+ * the host renders the sidebar from the navigation tree, and which page is showing is a prop rather
+ * than internal state the URL never saw.
+ */
+export const MainLayout: React.FC<MainLayoutProps> = ({ page }) => {
+  const { fetchDashboardData, fetchMasterData, fetchLeads, products } = useLeadStore();
 
   /*
-   * Puts the open page in the host's URL: `/apps/lead/audit-logs` rather than a bare `/apps/lead`
-   * for every page in the app. Refresh, Back/Forward and shared links all land where the reader
-   * actually was. No-ops when this remote runs outside the host shell.
-   */
-  useHostSubRoute<NavigationPage>({ page: activePage, setPage: setActivePage, pages: LEAD_PAGES });
-
-  /*
-   * App-level boot data, once per mount. `products.length` used to be a dependency here too, so the
-   * arrival of master data re-ran this whole effect and re-fetched the dashboard AND the leads —
-   * the second half of the skeleton → rows → skeleton → rows flicker on the Lead Directory.
+   * App-level boot data, once per mount.
+   *
+   * `products.length` used to be a dependency of this effect, so the arrival of master data re-ran
+   * the whole thing and re-fetched the dashboard AND the leads — the second half of the
+   * skeleton → rows → skeleton → rows flicker on the Lead Directory. Splitting the master-data
+   * fetch into its own mount-only effect removes the feedback loop: the thing that changes
+   * `products` is no longer in the dependency list of the thing that reads it.
    */
   useEffect(() => {
     fetchDashboardData();
@@ -45,6 +47,8 @@ export const MainLayout: React.FC = () => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const activePage = (page ?? 'dashboard') as LeadPage;
 
   const renderActivePage = () => {
     switch (activePage) {
@@ -59,23 +63,27 @@ export const MainLayout: React.FC = () => {
       case 'field-settings':
         return <FieldSettingsPage />;
       default:
+        // An unknown segment falls back rather than rendering nothing. The host only ever sends a
+        // page the navigation tree declared, so this is a guard against a stale bookmark, not a
+        // routine path.
         return <DashboardPage />;
     }
   };
 
+  const isWide =
+    activePage === 'dashboard' ||
+    activePage === 'view-lead' ||
+    activePage === 'audit-logs' ||
+    activePage === 'field-settings';
+
   return (
     <div className="lead-remote-app-root">
-      {/* Portals collapsible sub-sections directly into Host's main sidebar under Lead Management */}
-      <HostSidebarLeadNav />
-
-      {/* Main Workspace Content Area (Full Width) */}
       <div className="lead-workspace-content-area">
-        <main className={`lead-workspace-viewport${activePage === 'dashboard' || activePage === 'view-lead' || activePage === 'audit-logs' || activePage === 'field-settings' ? ' lead-workspace-viewport--wide' : ''}`}>
+        <main className={`lead-workspace-viewport${isWide ? ' lead-workspace-viewport--wide' : ''}`}>
           {renderActivePage()}
         </main>
       </div>
 
-      {/* Global Toast Notification */}
       <ToastNotification />
     </div>
   );

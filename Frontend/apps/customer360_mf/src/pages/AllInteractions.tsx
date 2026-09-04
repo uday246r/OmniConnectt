@@ -1,7 +1,7 @@
 import React, { useEffect, useState, type ChangeEvent } from 'react';
 import { useCustomerStore } from '../store/customerStore';
 import { useInteractionStore } from '../store/interactionStore';
-import { useNavigationStore } from '../store/navigationStore';
+import { useHostNavigate } from '../navigation/HostNavigation';
 import CaseDetailsModal from '../components/CaseDetailsModal';
 import { ArrowLeft, Search, Eye, MessageSquare, RefreshCw, X, ChevronLeft, ChevronRight, Clock, AlertTriangle } from '@omniremit/ui/icons';
 import type { IndividualProfile, CorporateProfile } from '../types/api';
@@ -35,7 +35,7 @@ const CASE_STATUS_OPTIONS = [
 
 export default function AllInteractions() {
   const { profile, customerType } = useCustomerStore();
-  const { setActivePage } = useNavigationStore();
+  const navigate = useHostNavigate();
   const {
     interactions,
     loading,
@@ -89,7 +89,7 @@ export default function AllInteractions() {
   }, [customerId, pageNumber, pageSize, loadInteractions]);
 
   const handleBack = () => {
-    setActivePage('customer-360');
+    navigate('customer-360');
   };
 
   const handleSearchChange = (e: ChangeEvent<HTMLInputElement>) => {

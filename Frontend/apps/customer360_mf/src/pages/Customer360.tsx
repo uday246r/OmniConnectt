@@ -1,3 +1,4 @@
+import { canSeeProfilePanel } from '../api/hostBridge';
 import React, { useEffect, useState, useRef } from 'react';
 import { useCustomerStore, readSavedCustomer, clearSavedCustomer } from '../store/customerStore';
 import { useInteractionStore } from '../store/interactionStore';
@@ -13,7 +14,7 @@ import ProductDetailsModal from '../components/ProductDetailsModal';
 import DynamicProfileSection, { groupBySection } from '../components/DynamicProfileSection';
 import { useFieldReveal } from '../hooks/useFieldReveal';
 import { Eye, EyeOff, ChevronRight, ChevronDown, SlidersHorizontal, Building2, Layers, User, Briefcase, Globe, Shield, FileText, Calendar, DollarSign, MapPin, Mail, Phone, TrendingUp, Search, RotateCcw, AlertCircle, Loader2 } from '@omniremit/ui/icons';
-import { useNavigationStore } from '../store/navigationStore';
+import { useHostNavigate } from '../navigation/HostNavigation';
 import type {
   IndividualProfile,
   CorporateProfile,
@@ -150,13 +151,24 @@ export default function Customer360() {
     setPageSize
   } = useProductStore();
 
-  const { setActivePage } = useNavigationStore();
+  const navigate = useHostNavigate();
 
   // Adjust tabs based on customerType
   const isIndividual = customerType === 'individual';
 
   // Tab states
   const [activeTab, setActiveTab] = useState('personal_details'); // 'personal_details' for Individual; 'overview' for Corporate
+
+  /*
+   * Which panels of the 360 view this user was granted.
+   *
+   * The keys match Customer360CapabilityManifest exactly, which is what an administrator sees in the
+   * Role editor and what the endpoints behind these panels enforce — a panel hidden here also
+   * answers 403 if requested directly, so this is presentation, not the control.
+   */
+  const canSeeContactsPanel = canSeeProfilePanel('panel.contacts');
+  const canSeeInteractionsPanel = canSeeProfilePanel('panel.interactions');
+  const canSeeProductsPanel = canSeeProfilePanel('panel.products');
   const [activeSubTab, setActiveSubTab] = useState(''); // no longer used for Individual details
   const [detailsExpanded, setDetailsExpanded] = useState(true);
   const [workspaceExpanded, setWorkspaceExpanded] = useState(true);
@@ -553,7 +565,9 @@ export default function Customer360() {
 
   // Load interactions when profile changes
   useEffect(() => {
-    if (profile) {
+    // Skipped outright when the panel was not granted: the endpoint answers 403, and the store would
+    // record that as a load failure the user then sees as an error on a panel they cannot open.
+    if (profile && canSeeInteractionsPanel) {
       const customerId = isIndividual ? (profile as IndividualProfile).nationalId : (profile as CorporateProfile).brn;
       loadInteractions(customerId as string);
     }
@@ -563,7 +577,7 @@ export default function Customer360() {
   const lastParamsRef = useRef<{ customerId: string | null | undefined; pageNumber: number | null; pageSize: number | null }>({ customerId: null, pageNumber: null, pageSize: null });
 
   useEffect(() => {
-    if (profile) {
+    if (profile && canSeeProductsPanel) {
       const customerId = isIndividual ? (profile as IndividualProfile).nationalId : (profile as CorporateProfile).brn;
       const isNewCustomer = lastParamsRef.current.customerId !== customerId;
 
@@ -1149,18 +1163,22 @@ export default function Customer360() {
                 </button>
                 {workspaceExpanded && (
                   <div className={styles.stack4}>
-                    <button
-                      className={`left-tab-btn ${activeTab === 'user_interactions' ? 'active' : ''}`}
-                      onClick={() => setActiveTab('user_interactions')}
-                    >
-                      <span>User Interactions</span>
-                    </button>
-                    <button
-                      className={`left-tab-btn ${activeTab === 'products' ? 'active' : ''}`}
-                      onClick={() => setActiveTab('products')}
-                    >
-                      <span>Products</span>
-                    </button>
+                    {canSeeInteractionsPanel && (
+                      <button
+                        className={`left-tab-btn ${activeTab === 'user_interactions' ? 'active' : ''}`}
+                        onClick={() => setActiveTab('user_interactions')}
+                      >
+                        <span>User Interactions</span>
+                      </button>
+                    )}
+                    {canSeeProductsPanel && (
+                      <button
+                        className={`left-tab-btn ${activeTab === 'products' ? 'active' : ''}`}
+                        onClick={() => setActiveTab('products')}
+                      >
+                        <span>Products</span>
+                      </button>
+                    )}
                     <button
                       className={`left-tab-btn ${activeTab === 'rm_details' ? 'active' : ''}`}
                       onClick={() => setActiveTab('rm_details')}
@@ -1819,13 +1837,15 @@ export default function Customer360() {
                 <span>Company Information</span>
               </button>
 
-              <button
-                className={`left-tab-btn ${activeTab === 'contact_relationship' ? 'active' : ''}`}
-                onClick={() => setActiveTab('contact_relationship')}
-              >
-                <Phone size={16} />
-                <span>Contact & Relationship</span>
-              </button>
+              {canSeeContactsPanel && (
+                <button
+                  className={`left-tab-btn ${activeTab === 'contact_relationship' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('contact_relationship')}
+                >
+                  <Phone size={16} />
+                  <span>Contact & Relationship</span>
+                </button>
+              )}
 
               <button
                 className={`left-tab-btn ${activeTab === 'rmManager' ? 'active' : ''}`}
@@ -1835,24 +1855,28 @@ export default function Customer360() {
                 <span>RM Manager Information</span>
               </button>
 
-              <button
-                className={`left-tab-btn ${activeTab === 'products_signatories' ? 'active' : ''}`}
-                onClick={() => {
-                  setActiveTab('products_signatories');
-                  setCorpSubTab('products');
-                }}
-              >
-                <Layers size={16} />
-                <span>Products & Signatories</span>
-              </button>
+              {canSeeProductsPanel && (
+                <button
+                  className={`left-tab-btn ${activeTab === 'products_signatories' ? 'active' : ''}`}
+                  onClick={() => {
+                    setActiveTab('products_signatories');
+                    setCorpSubTab('products');
+                  }}
+                >
+                  <Layers size={16} />
+                  <span>Products & Signatories</span>
+                </button>
+              )}
 
-              <button
-                className={`left-tab-btn ${activeTab === 'interestedProducts' ? 'active' : ''}`}
-                onClick={() => setActiveTab('interestedProducts')}
-              >
-                <TrendingUp size={16} />
-                <span>Interested Products</span>
-              </button>
+              {canSeeProductsPanel && (
+                <button
+                  className={`left-tab-btn ${activeTab === 'interestedProducts' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('interestedProducts')}
+                >
+                  <TrendingUp size={16} />
+                  <span>Interested Products</span>
+                </button>
+              )}
             </div>
           </div>
 

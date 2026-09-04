@@ -4,55 +4,77 @@
     {
       "name": "frontend-dev",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["-C", "Frontend", "--filter", "host", "dev"],
+      "runtimeArgs": [
+        "-C",
+        "Frontend",
+        "--filter",
+        "host",
+        "dev"
+      ],
       "port": 5173
     },
     {
       "name": "backend-dev",
       "runtimeExecutable": "dotnet",
-      "runtimeArgs": ["run", "--project", "Backend/AuthService"],
+      "runtimeArgs": [
+        "run",
+        "--project",
+        "Backend/AuthService"
+      ],
       "port": 5155
     },
     {
       "name": "registry-dev",
       "runtimeExecutable": "dotnet",
-      "runtimeArgs": ["run", "--project", "Backend/ModuleRegistry"],
+      "runtimeArgs": [
+        "run",
+        "--project",
+        "Backend/ModuleRegistry"
+      ],
       "port": 5200
-    },
-    {
-      "name": "employee-service-dev",
-      "runtimeExecutable": "dotnet",
-      "runtimeArgs": ["run", "--project", "Backend/EmployeeService"],
-      "port": 5285
-    },
-    {
-      "name": "employee-mf-dev",
-      "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["-C", "Frontend", "--filter", "employee-mf", "dev"],
-      "port": 5001
     },
     {
       "name": "lead-service-dev",
       "runtimeExecutable": "dotnet",
-      "runtimeArgs": ["run", "--project", "Backend/LeadService"],
+      "runtimeArgs": [
+        "run",
+        "--project",
+        "Backend/LeadService"
+      ],
       "port": 5046
     },
     {
       "name": "lead-mf-dev",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["-C", "Frontend", "--filter", "lead-mf", "dev"],
+      "runtimeArgs": [
+        "-C",
+        "Frontend",
+        "--filter",
+        "lead-mf",
+        "dev"
+      ],
       "port": 5002
     },
     {
       "name": "customer360-service-dev",
       "runtimeExecutable": "dotnet",
-      "runtimeArgs": ["run", "--project", "Backend/Customer360Service"],
+      "runtimeArgs": [
+        "run",
+        "--project",
+        "Backend/Customer360Service"
+      ],
       "port": 5059
     },
     {
       "name": "customer360-mf-dev",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["-C", "Frontend", "--filter", "customer360-mf", "dev"],
+      "runtimeArgs": [
+        "-C",
+        "Frontend",
+        "--filter",
+        "customer360-mf",
+        "dev"
+      ],
       "port": 5003
     }
   ]

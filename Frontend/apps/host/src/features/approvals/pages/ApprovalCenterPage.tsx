@@ -636,7 +636,7 @@ export function ApprovalCenterPage() {
   }, [loadSummary, dataRevision])
 
   const fetcher = useCallback(
-    async (token: string) => {
+    async (token: string, signal?: AbortSignal) => {
       let allItems: ApprovalRequestListItemDto[] = []
 
       // If statusFilter is explicitly set to 'Approved' or 'Rejected', query that directly:
@@ -646,24 +646,24 @@ export function ApprovalCenterPage() {
         const res = await approvalsApi.list(token, {
           page: 1, pageSize: 200, module: module || undefined, status: 'Approved',
           assignedToMe: assignedToMeOnly || undefined, from: range.from, to: range.to,
-        })
+        }, signal)
         allItems = res.items
       } else if (effectiveStatus === 'Rejected') {
         const res = await approvalsApi.list(token, {
           page: 1, pageSize: 200, module: module || undefined, status: 'Rejected',
           assignedToMe: assignedToMeOnly || undefined, from: range.from, to: range.to,
-        })
+        }, signal)
         allItems = res.items
       } else if (activeTab === TAB_IDS.processed && !statusFilter) {
         const [approved, rejected] = await Promise.all([
           approvalsApi.list(token, {
             page: 1, pageSize: 200, module: module || undefined, status: 'Approved',
             assignedToMe: assignedToMeOnly || undefined, from: range.from, to: range.to,
-          }),
+          }, signal),
           approvalsApi.list(token, {
             page: 1, pageSize: 200, module: module || undefined, status: 'Rejected',
             assignedToMe: assignedToMeOnly || undefined, from: range.from, to: range.to,
-          }),
+          }, signal),
         ])
         allItems = [...approved.items, ...rejected.items].sort(
           (a, b) => new Date(b.decidedAt ?? b.requestedAt).getTime() - new Date(a.decidedAt ?? a.requestedAt).getTime(),
@@ -674,7 +674,7 @@ export function ApprovalCenterPage() {
           status: effectiveStatus,
           assignedToMe: assignedToMeOnly || undefined,
           from: range.from, to: range.to,
-        })
+        }, signal)
         allItems = res.items
       }
 
@@ -801,6 +801,7 @@ export function ApprovalCenterPage() {
       setDeciding(false)
     }
   }
+
 
   function handleRowClick(r: ApprovalRequestListItemDto) {
     setViewingId(r.id)

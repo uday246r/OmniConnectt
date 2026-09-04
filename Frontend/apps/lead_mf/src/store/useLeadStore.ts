@@ -1,3 +1,4 @@
+import { validateFullPhone } from '@omniremit/ui/validation';
 import { create } from 'zustand';
 import { LeadFormData, FormValidationErrors, NavigationPage, LeadRecord, DropdownOption, AuditRecord } from '../types/lead';
 import {
@@ -10,6 +11,7 @@ import {
   DashboardFilterParams,
 } from '../api/apiClient';
 import { isFieldRequired, type LeadFieldConfig } from '../config/fieldControlRegistry';
+import { canSeeDashboardCapability } from '../api/hostBridge';
 import { readStoredPageSize } from '@omniremit/ui';
 
 /** LeadFormData's field names match the backend's apiField catalog 1:1 with exactly one exception —
@@ -50,8 +52,6 @@ export interface FilterRule {
 
 interface LeadStoreState {
   // Navigation
-  activePage: NavigationPage;
-  setActivePage: (page: NavigationPage) => void;
   isSidebarExpanded: boolean;
   toggleSidebar: () => void;
 
@@ -284,18 +284,13 @@ const initialKpiSummary: KpiSummary = {
 };
 
 export const useLeadStore = create<LeadStoreState>((set, get) => ({
-  activePage: 'dashboard',
-  setActivePage: (page) => {
-    set({ activePage: page });
-    if (page === 'view-lead') {
-      get().fetchLeads();
-      void get().fetchCommonFieldConfig();
-    } else if (page === 'dashboard') {
-      get().fetchDashboardData();
-    } else if (page === 'audit-logs') {
-      get().fetchAuditLogs();
-    }
-  },
+  // activePage and setActivePage are gone. The host owns which page is showing — it comes in as a
+  // prop resolved from the URL, so /apps/lead/view-lead is now a real, refresh-safe address instead
+  // of internal state the address bar never reflected.
+  //
+  // setActivePage also dispatched per-page fetches. That is no longer needed: switching pages
+  // unmounts one page component and mounts another, and every page already fetches what it needs in
+  // its own mount effect, so the dispatch was a second copy of the same rule.
   isSidebarExpanded: true,
   toggleSidebar: () => set((state) => ({ isSidebarExpanded: !state.isSidebarExpanded })),
 
@@ -469,7 +464,7 @@ export const useLeadStore = create<LeadStoreState>((set, get) => ({
         case 'phoneNumber':
           if (val && typeof val === 'string' && val.trim()) {
             const fullPhone = `${state.formData.phoneCountryCode}${val.trim().replace(/\s|-/g, '')}`;
-            if (!/^\+60[1-9]\d{7,9}$/.test(fullPhone)) {
+            if (validateFullPhone(fullPhone) !== undefined) {
               errors.phoneNumber = getIncorrectErrorMessage('phoneNumber');
             } else {
               delete errors.phoneNumber;
@@ -531,7 +526,7 @@ export const useLeadStore = create<LeadStoreState>((set, get) => ({
       errors.phoneNumber = getEmptyErrorMessage('phoneNumber');
     } else if (formData.phoneNumber.trim()) {
       const fullPhone = `${formData.phoneCountryCode}${formData.phoneNumber.trim().replace(/\s|-/g, '')}`;
-      if (!/^\+60[1-9]\d{7,9}$/.test(fullPhone)) {
+      if (validateFullPhone(fullPhone) !== undefined) {
         errors.phoneNumber = getIncorrectErrorMessage('phoneNumber');
       }
     }
@@ -977,21 +972,46 @@ export const useLeadStore = create<LeadStoreState>((set, get) => ({
         granularity: s.dashboardGranularity,
       };
 
+      /*
+       * Each panel is fetched only if this user was granted it, and independently of the others.
+       *
+       * Both halves of that matter now that charts are granted individually. Asking for a panel the
+       * user does not hold earns a 403 the page has no use for; and under the previous Promise.all,
+       * that single rejection discarded every other response with it — so a user granted one chart
+       * saw a completely blank dashboard rather than their one chart. allSettled keeps what
+       * succeeded, which is the only sensible reading of a partially-permitted page.
+       *
+       * Skipping is an optimisation, not the control. The endpoints refuse these requests themselves.
+       */
       const [kpiSummary, leadsOverTime, leadsByProduct, leadsByBranch, recentLeads] =
-        await Promise.all([
+        await Promise.allSettled([
           apiClient.getDashboardKpis(params),
-          apiClient.getLeadsOverTime(params),
-          apiClient.getLeadsByProduct(params),
-          apiClient.getLeadsByBranch(params),
-          apiClient.getRecentLeads(params, 5),
+          canSeeDashboardCapability('chart.leads-over-time')
+            ? apiClient.getLeadsOverTime(params)
+            : Promise.resolve([]),
+          canSeeDashboardCapability('chart.leads-by-product')
+            ? apiClient.getLeadsByProduct(params)
+            : Promise.resolve([]),
+          canSeeDashboardCapability('chart.leads-by-branch')
+            ? apiClient.getLeadsByBranch(params)
+            : Promise.resolve([]),
+          canSeeDashboardCapability('widget.recent-leads')
+            ? apiClient.getRecentLeads(params, 5)
+            : Promise.resolve([]),
         ]);
 
+      const settled = <T,>(result: PromiseSettledResult<T>, fallback: T): T => {
+        if (result.status === 'fulfilled') return result.value;
+        console.error('A dashboard panel could not be loaded:', result.reason);
+        return fallback;
+      };
+
       set({
-        kpiSummary,
-        leadsOverTime,
-        leadsByProduct,
-        leadsByBranch,
-        recentLeads,
+        kpiSummary: settled(kpiSummary, initialKpiSummary),
+        leadsOverTime: settled(leadsOverTime, []),
+        leadsByProduct: settled(leadsByProduct, []),
+        leadsByBranch: settled(leadsByBranch, []),
+        recentLeads: settled(recentLeads, []),
         isLoadingDashboard: false,
       });
     } catch (err) {
@@ -1113,7 +1133,7 @@ export const useLeadStore = create<LeadStoreState>((set, get) => ({
     if (isFieldRequired(fieldConfig, 'phoneNumber') && !editFormData.phoneNumber.trim()) errors.phoneNumber = getEmptyErrorMessage('phoneNumber');
     else if (editFormData.phoneNumber.trim()) {
       const fullPhone = `${editFormData.phoneCountryCode}${editFormData.phoneNumber.trim().replace(/\s|-/g, '')}`;
-      if (!/^\+60[1-9]\d{7,9}$/.test(fullPhone)) errors.phoneNumber = getIncorrectErrorMessage('phoneNumber');
+      if (validateFullPhone(fullPhone) !== undefined) errors.phoneNumber = getIncorrectErrorMessage('phoneNumber');
     }
 
     if (isFieldRequired(fieldConfig, 'email') && !editFormData.email.trim()) errors.email = getEmptyErrorMessage('email');

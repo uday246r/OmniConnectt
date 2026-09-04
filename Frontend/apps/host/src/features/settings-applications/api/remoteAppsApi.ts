@@ -70,10 +70,12 @@ export const remoteAppsApi = {
    * Mutations are deliberately left without a timeout: aborting a write tells you nothing about
    * whether the server applied it.
    */
-  list: (accessToken: string, params: ListRemoteAppsParams = {}) =>
+  list: (accessToken: string, params: ListRemoteAppsParams = {}, signal?: AbortSignal) =>
     apiFetch<PagedResult<RemoteAppDto>>(`${base}/api/remote-apps${buildQuery(params)}`, {
       accessToken,
-      signal: AbortSignal.timeout(8000),
+      // Combined, not replaced: the 8s ceiling still applies, and the caller can additionally
+      // cancel early when its effect tears down.
+      signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(8000)]) : AbortSignal.timeout(8000),
     }),
 
   get: (accessToken: string, id: string) => apiFetch<RemoteAppDto>(`${base}/api/remote-apps/${id}`, { accessToken }),

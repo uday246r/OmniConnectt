@@ -14,6 +14,7 @@ namespace backend.Controllers
     [ApiController]
     [Route("v1")]
     [RequiresCapability("products", "View")]
+    [RequiresFineCapability("profile", "panel.products")]
     public class ProductController : ControllerBase
     {
         private readonly CrmProxyService _crmProxy;

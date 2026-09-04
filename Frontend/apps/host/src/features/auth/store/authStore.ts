@@ -32,6 +32,15 @@ interface AuthState {
    */
   refreshSession: () => Promise<void>
   hasCapability: (featureKey: string, capability: string) => boolean
+  /**
+   * The capabilities deliberately kept out of the JWT — widgets, charts, exports, panels — fetched
+   * from /api/me/capabilities. Merged with the token's own permissions by `hasCapability`, so nothing
+   * downstream needs to know the difference. Empty until loaded, and empty is the safe default: it
+   * hides things rather than revealing them.
+   */
+  fineCapabilities: string[]
+  /** Loads the above. Called after every sign-in, hydrate and session refresh. */
+  loadFineCapabilities: () => Promise<void>
   clearSessionExpiredReason: () => void
 }
 
@@ -122,6 +131,10 @@ const signedOutState = {
   user: null,
   accessToken: null,
   accessTokenExpiresAt: null,
+  // Cleared with everything else. Leaving one user's widget grants behind would show them to the
+  // next person who signs in on this tab — the same bug the session-cleanup handlers already exist
+  // to prevent for the sidebar and the query cache.
+  fineCapabilities: [] as string[],
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
@@ -129,6 +142,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   accessToken: null,
   accessTokenExpiresAt: null,
+  fineCapabilities: [],
   loginLoading: false,
   loginError: null,
   sessionExpiredReason: null,
@@ -219,17 +233,63 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
   },
 
+  /**
+   * One question, two sources, and callers are not told which.
+   *
+   * `user.permissions` comes from the access token and holds every capability that guards an API
+   * endpoint. `fineCapabilities` is fetched separately and holds the rest — KPI cards, charts,
+   * exports, panels — which are deliberately kept out of the token so it cannot grow past what a
+   * proxy will forward once every app declares its own.
+   *
+   * The signature is unchanged on purpose. Every caller in the host, `PermissionGate`, and
+   * `window.__omniremitHost__.hasCapability` that remotes already use, all keep working untouched,
+   * and nothing has to learn which delivery path a given capability took.
+   */
   hasCapability(featureKey, capability) {
-    const user = get().user
+    const { user, fineCapabilities } = get()
     if (!user) return false
     if (user.isAdministrator) return true
-    return user.permissions.includes(`${featureKey}:${capability}`)
+
+    const required = `${featureKey}:${capability}`
+    return user.permissions.includes(required) || fineCapabilities.includes(required)
+  },
+
+  async loadFineCapabilities() {
+    // Never throws. This resolves what to SHOW; every one of these capabilities is separately
+    // enforced server-side, so failing to load them renders a thinner UI rather than an unsafe one.
+    // Throwing here would take down the app shell over a widget list.
+    try {
+      const token = await get().ensureFreshAccessToken()
+      set({ fineCapabilities: await authServiceClient.fineCapabilities(token) })
+    } catch {
+      set({ fineCapabilities: [] })
+    }
   },
 
   clearSessionExpiredReason() {
     set({ sessionExpiredReason: null })
   },
 }))
+
+/*
+ * Load the fine-grained capabilities whenever the signed-in identity changes.
+ *
+ * Subscribed here rather than called at each site that applies a session, because there are six of
+ * those — password login, Google login, hydrate, the explicit refresh, the silent near-expiry
+ * refresh, and httpClient's refresh-and-retry — and a new one added later would silently arrive
+ * without them, leaving that path's user with an empty set and every widget hidden. Keying on the
+ * user id also means a plain token refresh for the same person does not re-fetch.
+ */
+let lastCapabilityUserId: string | null = null
+useAuthStore.subscribe((state) => {
+  const userId = state.user?.id ?? null
+  if (userId === lastCapabilityUserId) return
+
+  lastCapabilityUserId = userId
+  if (userId) {
+    void useAuthStore.getState().loadFineCapabilities()
+  }
+})
 
 // Another tab signed out — drop this tab's in-memory session too.
 authChannel?.addEventListener('message', (event: MessageEvent<AuthBroadcast>) => {

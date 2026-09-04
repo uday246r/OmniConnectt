@@ -14,6 +14,7 @@ import {
 } from '@omniremit/ui/icons';
 import { Button, ColumnFilter, DataTable, FilterBar, PageHeader, Pagination, ResponsiveRows, RowsPerPage, SearchField, getInitials, type ActiveFilter } from '@omniremit/ui';
 import { useLeadStore } from '../store/useLeadStore';
+import { useHostNavigate } from '../navigation/HostNavigation';
 import styles from './ViewLeadPage.module.css';
 import shell from '../shared/leadPage.module.css';
 import { LeadDetailsDrawer } from '../components/lead/LeadDetailsDrawer';
@@ -80,13 +81,13 @@ export const ViewLeadPage: React.FC = () => {
     setPageSize,
     fetchLeads,
     fetchMasterData,
-    setActivePage,
     openDetailsDrawer,
     openEditWorkflow,
     openDeleteWorkflow,
     commonFieldConfig,
     fetchCommonFieldConfig,
   } = useLeadStore();
+  const navigate = useHostNavigate();
 
   const [showFilters, setShowFilters] = useState(false);
   const filterAnchorRef = useRef<HTMLDivElement>(null);
@@ -158,7 +159,7 @@ export const ViewLeadPage: React.FC = () => {
             <Button
               type="button"
               variant="onHeader"
-              onClick={() => setActivePage('create-lead')}
+              onClick={() => navigate('create-lead')}
               leadingIcon={<UserPlus size={15} />}
             >
               Create Lead

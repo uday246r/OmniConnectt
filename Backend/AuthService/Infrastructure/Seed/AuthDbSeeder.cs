@@ -81,7 +81,67 @@ public static class AuthDbSeeder
         var features = await SeedHostFeaturesAsync(db, ct);
         var roles = await SeedRolesAsync(db, features, ct);
         await SeedSuperAdminUserAsync(db, roles, logger, ct);
+        await SeedNavigationAsync(db, logger, ct);
+        await LegacyFeatureCleanup.RunAsync(db, logger, ct);
+
+        // Diagnostic only — logs grants the claims builder will no longer mint. Runs last, so it sees
+        // the catalog exactly as the rest of startup left it.
+        await StaleGrantReport.RunAsync(db, logger, ct);
     }
+
+    /// <summary>
+    /// Seeds the sidebar's sections and the host's own rows.
+    /// <para>
+    /// These used to be a static C# list, which meant renaming a heading or reordering the sidebar
+    /// required redeploying this service. They are data now: the navigation endpoint reads them, and
+    /// the browser renders whatever it is given.
+    /// </para>
+    /// <para>
+    /// Insert-only, keyed on what already exists, so an operator who has since renamed a label or
+    /// moved a row keeps their change across restarts. There is deliberately no "Setup" section: those
+    /// five screens live behind the Topbar gear, and duplicating them in the sidebar meant one
+    /// destination reachable two ways.
+    /// </para>
+    /// </summary>
+    private static async Task SeedNavigationAsync(AuthDbContext db, ILogger logger, CancellationToken ct)
+    {
+        var seedSections = new[]
+        {
+            new NavSection { Key = "main", Label = "Main", SortOrder = 10, PinToBottom = false },
+            new NavSection { Key = "apps", Label = "Apps", SortOrder = 20, PinToBottom = false },
+            // Pinned so it sits below the apps list rather than floating at the bottom of the viewport.
+            new NavSection { Key = "system", Label = "System", SortOrder = 30, PinToBottom = true },
+        };
+
+        var existingSections = await db.NavSections.Select(s => s.Key).ToListAsync(ct);
+        var newSections = seedSections.Where(s => !existingSections.Contains(s.Key)).ToList();
+        if (newSections.Count > 0)
+        {
+            db.NavSections.AddRange(newSections);
+            await db.SaveChangesAsync(ct);
+        }
+
+        var seedItems = new[]
+        {
+            new HostNavItem { Id = Guid.NewGuid(), Key = "host.dashboard", Label = "Dashboard", IconKey = "Home", RoutePath = "/", SectionKey = "main", SortOrder = 10, RequiredFeatureKey = HostFeatureKeys.Dashboard, RequiredCapability = "View" },
+            new HostNavItem { Id = Guid.NewGuid(), Key = "host.system.approvals", Label = "Approval Center", IconKey = "UserCheck", RoutePath = "/system/approvals", SectionKey = "system", SortOrder = 10, RequiredFeatureKey = HostFeatureKeys.SystemApprovals, RequiredCapability = "View" },
+            // Ungated on purpose: it shows only the caller's own requests, scoped server-side, so
+            // gating it would hide the page from exactly the people it exists for.
+            new HostNavItem { Id = Guid.NewGuid(), Key = "host.my-requests", Label = "My Requests", IconKey = "Clock", RoutePath = "/my-requests", SectionKey = "system", SortOrder = 20, RequiredFeatureKey = null, RequiredCapability = null },
+            new HostNavItem { Id = Guid.NewGuid(), Key = "host.system.audit-logs", Label = "Audit Logs", IconKey = "FileText", RoutePath = "/system/audit-logs", SectionKey = "system", SortOrder = 30, RequiredFeatureKey = HostFeatureKeys.SystemAuditLogs, RequiredCapability = "View" },
+        };
+
+        var existingItems = await db.HostNavItems.Select(h => h.Key).ToListAsync(ct);
+        var newItems = seedItems.Where(h => !existingItems.Contains(h.Key)).ToList();
+        if (newItems.Count > 0)
+        {
+            db.HostNavItems.AddRange(newItems);
+            await db.SaveChangesAsync(ct);
+            logger.LogInformation("Seeded {Sections} navigation section(s) and {Items} host nav row(s).", newSections.Count, newItems.Count);
+        }
+    }
+
+
 
     private static async Task RenameLegacyFeatureKeyAsync(AuthDbContext db, string oldKey, string newKey, string newDisplayName, CancellationToken ct)
     {

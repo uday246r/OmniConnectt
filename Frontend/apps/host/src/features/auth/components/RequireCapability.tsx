@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
-import { Navigate } from 'react-router-dom'
 import { useAuthStore } from '../store/authStore'
 import { SkeletonBlock } from '../../../shared/components/Skeleton'
+import { ForbiddenPage } from '../../../pages/ForbiddenPage/ForbiddenPage'
 import styles from './RequireCapability.module.css'
 
 export interface RequireCapabilityProps {
@@ -31,5 +31,5 @@ export function RequireCapability({ featureKey, capability = 'View', children }:
     )
   }
 
-  return allowed ? <>{children}</> : <Navigate to="/404" replace />
+  return allowed ? <>{children}</> : <ForbiddenPage />
 }

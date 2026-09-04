@@ -28,17 +28,41 @@ public class AuthServiceClient(HttpClient httpClient, IOptions<AuthIntegrationOp
 {
     private readonly AuthIntegrationOptions _options = options.Value;
 
-    private record UpsertCapabilityRequest(string Key, string DisplayName, int SortOrder = 100);
+    private record UpsertCapabilityRequest(
+        string Key,
+        string DisplayName,
+        int SortOrder = 100,
+        string? Description = null,
+        string Type = "Api");
+
+    /// <summary>One sidebar row. Nullable everywhere so an older AuthService simply ignores it.</summary>
+    private record UpsertNavItemRequest(
+        string Key, string Label, string? IconKey, string RouteSegment, int SortOrder, string? RequiredCapability);
 
     /// <summary>One sub-module of a feature, with its own capabilities. AuthService turns each into a child PermissionFeature.</summary>
-    private record UpsertModuleRequest(string Key, string DisplayName, int SortOrder, IReadOnlyList<UpsertCapabilityRequest> Capabilities);
+    private record UpsertModuleRequest(
+        string Key,
+        string DisplayName,
+        int SortOrder,
+        IReadOnlyList<UpsertCapabilityRequest> Capabilities,
+        /// <summary>Null means "leave whatever nav AuthService already has"; empty means "this module has no rows".</summary>
+        IReadOnlyList<UpsertNavItemRequest>? Nav);
 
     private record UpsertFeatureRequest(
         string Key,
         string DisplayName,
         int SortOrder,
         IReadOnlyList<UpsertCapabilityRequest> Capabilities,
-        IReadOnlyList<UpsertModuleRequest> Modules);
+        IReadOnlyList<UpsertModuleRequest> Modules,
+        // Render metadata replicated into AuthDb so the navigation tree can be served from one
+        // database. ModuleRegistry stays the system of record; this is a copy, refreshed on the same
+        // events that already push capabilities. Health is deliberately NOT here — it is rewritten on
+        // an interval by the health probe, so a replicated copy would always be stale.
+        string? IconKey = null,
+        string? ManifestUrl = null,
+        string? ContainerName = null,
+        string? Status = null,
+        string? MaintenanceMessage = null);
     private record DeactivateFeatureRequest(string Key);
     private record ResyncFeaturesRequest(IReadOnlyList<UpsertFeatureRequest> Features);
     private record RecordAuditLogRequest(
@@ -52,22 +76,24 @@ public class AuthServiceClient(HttpClient httpClient, IOptions<AuthIntegrationOp
 
     public Task<bool> UpsertAsync(
         string featureKey, string displayName, int sortOrder,
-        IReadOnlyList<RemoteCapability> capabilities, CancellationToken ct = default) =>
+        IReadOnlyList<RemoteCapability> capabilities, CancellationToken ct = default,
+        IReadOnlyList<RemoteNavItem>? nav = null, RemoteAppRenderMetadata? render = null) =>
         PostAsync(
             "internal/permission-features/upsert",
-            BuildFeatureRequest(featureKey, displayName, sortOrder, capabilities),
+            BuildFeatureRequest(featureKey, displayName, sortOrder, capabilities, nav, render),
             ct);
 
     public Task<bool> DeactivateAsync(string featureKey, CancellationToken ct = default) =>
         PostAsync("internal/permission-features/deactivate", new DeactivateFeatureRequest(featureKey), ct);
 
     public Task<bool> ResyncAsync(
-        IReadOnlyList<(string Key, string DisplayName, int SortOrder, IReadOnlyList<RemoteCapability> Capabilities)> features,
+        IReadOnlyList<(string Key, string DisplayName, int SortOrder, IReadOnlyList<RemoteCapability> Capabilities,
+                       IReadOnlyList<RemoteNavItem>? Nav, RemoteAppRenderMetadata? Render)> features,
         CancellationToken ct = default) =>
         PostAsync(
             "internal/permission-features/resync",
             new ResyncFeaturesRequest(features
-                .Select(f => BuildFeatureRequest(f.Key, f.DisplayName, f.SortOrder, f.Capabilities))
+                .Select(f => BuildFeatureRequest(f.Key, f.DisplayName, f.SortOrder, f.Capabilities, f.Nav, f.Render))
                 .ToList()),
             ct);
 
@@ -171,9 +197,29 @@ public class AuthServiceClient(HttpClient httpClient, IOptions<AuthIntegrationOp
     private record RemoteModuleEntry(
         [property: JsonPropertyName("key")] string Key,
         [property: JsonPropertyName("displayName")] string DisplayName,
-        [property: JsonPropertyName("capabilities")] List<RemoteCapabilityEntry>? Capabilities);
+        [property: JsonPropertyName("capabilities")] List<RemoteCapabilityEntry>? Capabilities,
+        [property: JsonPropertyName("sortOrder")] int SortOrder = 0,
+        [property: JsonPropertyName("nav")] List<RemoteNavEntry>? Nav = null);
 
-    private record RemoteCapabilityEntry([property: JsonPropertyName("key")] string Key, [property: JsonPropertyName("displayName")] string DisplayName);
+    private record RemoteNavEntry(
+        [property: JsonPropertyName("key")] string Key,
+        [property: JsonPropertyName("label")] string Label,
+        [property: JsonPropertyName("iconKey")] string? IconKey,
+        [property: JsonPropertyName("routeSegment")] string RouteSegment,
+        [property: JsonPropertyName("sortOrder")] int SortOrder,
+        [property: JsonPropertyName("requiredCapability")] string? RequiredCapability);
+
+    /// <param name="Type">
+    /// Absent from every remote that predates the capability manifest, and absent means "Api" — an
+    /// endpoint guard, which is all those remotes ever declared. Relayed verbatim rather than parsed:
+    /// a value this service does not recognise is AuthService's to interpret, and dropping it here
+    /// would turn a forward-compatible payload into a lossy one.
+    /// </param>
+    private record RemoteCapabilityEntry(
+        [property: JsonPropertyName("key")] string Key,
+        [property: JsonPropertyName("displayName")] string DisplayName,
+        [property: JsonPropertyName("description")] string? Description = null,
+        [property: JsonPropertyName("type")] string? Type = null);
 
     /// <summary>
     /// GETs a remote app's own PermissionsSourceUrl.
@@ -189,7 +235,7 @@ public class AuthServiceClient(HttpClient httpClient, IOptions<AuthIntegrationOp
     /// last-known set" apart from "reachable and genuinely declares zero capabilities".
     /// </para>
     /// </summary>
-    public async Task<IReadOnlyList<RemoteCapability>?> FetchRemoteCapabilitiesAsync(string sourceUrl, CancellationToken ct = default)
+    public async Task<RemoteDiscovery?> FetchRemoteCapabilitiesAsync(string sourceUrl, CancellationToken ct = default)
     {
         try
         {
@@ -204,10 +250,43 @@ public class AuthServiceClient(HttpClient httpClient, IOptions<AuthIntegrationOp
 
             if (body?.Modules is { Count: > 0 })
             {
-                return body.Modules
+                var capabilities = body.Modules
                     .SelectMany(m => (m.Capabilities ?? [])
-                        .Select(c => new RemoteCapability(m.Key, m.DisplayName, c.Key, c.DisplayName)))
+                        .Select(c => new RemoteCapability(m.Key, m.DisplayName, c.Key, c.DisplayName, c.Description, c.Type ?? "Api")))
                     .ToList();
+
+                // v3 — the remote declares its own sidebar rows.
+                if (body.Modules.Any(m => m.Nav is not null))
+                {
+                    var nav = body.Modules
+                        .SelectMany(m => (m.Nav ?? [])
+                            .Select(n => new RemoteNavItem(
+                                m.Key, n.Key, n.Label, n.IconKey, n.RouteSegment, n.SortOrder, n.RequiredCapability)))
+                        .ToList();
+
+                    return new RemoteDiscovery(capabilities, nav);
+                }
+
+                // v2 — modules but no nav. Synthesise one row per module so the sidebar is still
+                // complete and correctly permissioned; it just falls back to the host's default icon
+                // and uses the module key as both label and route. An un-upgraded remote must not
+                // lose its navigation entirely.
+                logger.LogInformation(
+                    "Remote app permissions source {Url} reports modules without navigation (v2). Synthesising one sidebar row per module.",
+                    sourceUrl);
+
+                var synthesised = body.Modules
+                    .Select((m, i) => new RemoteNavItem(
+                        m.Key,
+                        m.Key.ToLowerInvariant(),
+                        string.IsNullOrWhiteSpace(m.DisplayName) ? m.Key : m.DisplayName,
+                        IconKey: null,
+                        RouteSegment: m.Key.ToLowerInvariant(),
+                        SortOrder: i * 10,
+                        RequiredCapability: null))
+                    .ToList();
+
+                return new RemoteDiscovery(capabilities, synthesised);
             }
 
             if (body?.Capabilities is not null)
@@ -218,9 +297,14 @@ public class AuthServiceClient(HttpClient httpClient, IOptions<AuthIntegrationOp
 
                 // Empty ModuleKey means "no sub-module" — AuthService hangs these capabilities
                 // directly off the app's own feature, exactly as before.
-                return body.Capabilities
-                    .Select(c => new RemoteCapability(string.Empty, string.Empty, c.Key, c.DisplayName))
-                    .ToList();
+                //
+                // Nav is null, not empty: a v1 remote has no opinion about navigation, so AuthService
+                // must keep whatever it already holds rather than clearing the app's sidebar.
+                return new RemoteDiscovery(
+                    body.Capabilities
+                        .Select(c => new RemoteCapability(string.Empty, string.Empty, c.Key, c.DisplayName))
+                        .ToList(),
+                    Nav: null);
             }
 
             logger.LogWarning("Remote app permissions source {Url} returned an unexpected shape. Keeping last-known capability set.", sourceUrl);
@@ -235,13 +319,23 @@ public class AuthServiceClient(HttpClient httpClient, IOptions<AuthIntegrationOp
 
     /// <summary>Groups the flat capability rows back into the nested module shape AuthService expects.</summary>
     private static UpsertFeatureRequest BuildFeatureRequest(
-        string featureKey, string displayName, int sortOrder, IReadOnlyList<RemoteCapability> capabilities)
+        string featureKey,
+        string displayName,
+        int sortOrder,
+        IReadOnlyList<RemoteCapability> capabilities,
+        IReadOnlyList<RemoteNavItem>? nav = null,
+        RemoteAppRenderMetadata? render = null)
     {
         // Capabilities with no module hang directly off the feature; the rest become child features.
         var rootCapabilities = capabilities
             .Where(c => string.IsNullOrEmpty(c.ModuleKey))
-            .Select((c, i) => new UpsertCapabilityRequest(c.Key, c.DisplayName, i * 10))
+            .Select((c, i) => new UpsertCapabilityRequest(c.Key, c.DisplayName, i * 10, c.Description, c.Type))
             .ToList();
+
+        // Grouped once rather than per module, so the whole projection stays O(n).
+        var navByModule = nav?
+            .GroupBy(n => n.ModuleKey, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.ToList(), StringComparer.OrdinalIgnoreCase);
 
         var modules = capabilities
             .Where(c => !string.IsNullOrEmpty(c.ModuleKey))
@@ -250,10 +344,22 @@ public class AuthServiceClient(HttpClient httpClient, IOptions<AuthIntegrationOp
                 g.Key.ModuleKey,
                 g.Key.ModuleDisplayName,
                 moduleIndex * 10,
-                g.Select((c, i) => new UpsertCapabilityRequest(c.Key, c.DisplayName, i * 10)).ToList()))
+                g.Select((c, i) => new UpsertCapabilityRequest(c.Key, c.DisplayName, i * 10, c.Description, c.Type)).ToList(),
+                // Null when the remote reported no navigation at all, so AuthService keeps what it
+                // has. An empty list for a module the remote DID describe is a real answer: that
+                // module is grantable but has no sidebar row.
+                navByModule is null
+                    ? null
+                    : (navByModule.TryGetValue(g.Key.ModuleKey, out var rows) ? rows : [])
+                        .OrderBy(n => n.SortOrder)
+                        .Select(n => new UpsertNavItemRequest(
+                            n.Key, n.Label, n.IconKey, n.RouteSegment, n.SortOrder, n.RequiredCapability))
+                        .ToList()))
             .ToList();
 
-        return new UpsertFeatureRequest(featureKey, displayName, sortOrder, rootCapabilities, modules);
+        return new UpsertFeatureRequest(
+            featureKey, displayName, sortOrder, rootCapabilities, modules,
+            render?.IconKey, render?.ManifestUrl, render?.ContainerName, render?.Status, render?.MaintenanceMessage);
     }
 
     private async Task<bool> PostAsync<TBody>(string path, TBody body, CancellationToken ct)

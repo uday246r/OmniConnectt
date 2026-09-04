@@ -3,9 +3,32 @@ import { apiFetch } from './httpClient'
 
 const base = env.authServiceUrl
 
+/**
+ * What kind of thing a capability guards. Metadata only — nothing in the browser enforces on it.
+ *
+ * It matters here for two reasons. The editor groups and labels by it instead of showing one
+ * undifferentiated list, and it says where the capability arrives from: only `Api` capabilities ride
+ * in the token, everything else comes from the fine-grained set. An unrecognised value from a newer
+ * server should be rendered, not dropped, hence the open string arm.
+ */
+export type CapabilityType =
+  | 'Api'
+  | 'Ui'
+  | 'Widget'
+  | 'Chart'
+  | 'Export'
+  | 'BulkAction'
+  | 'Action'
+  | (string & {})
+
 export interface CapabilityDto {
   key: string
   displayName: string
+  /** What granting it actually lets someone do. Null for capabilities discovered from an attribute, which have no prose. */
+  description?: string | null
+  type?: CapabilityType
+  /** The key's dotted prefix — `kpi` from `kpi.total-leads` — so a long list can be grouped without parsing keys here. Null when the key has no prefix. */
+  groupKey?: string | null
 }
 
 export interface PermissionFeatureDto {

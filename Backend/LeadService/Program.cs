@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using LeadManagement.Api.Data;
 using LeadManagement.Api.Infrastructure;
+using LeadManagement.Api.Infrastructure.Security;
 using LeadManagement.Api.Middleware;
 using LeadManagement.Api.Options;
 using LeadManagement.Api.Services;
@@ -105,6 +106,9 @@ builder.Services.AddScoped<IDashboardService, DashboardService>();
 // Explicit timeout: a gating check now sits in the hot path of every Lead mutation, so an unbounded
 // default (100s) would hang the request instead of just delaying a best-effort audit push.
 builder.Services.AddHttpClient<AuthServiceClient>(client => client.Timeout = TimeSpan.FromSeconds(10));
+builder.Services.AddMemoryCache();
+builder.Services.AddHttpClient<FineCapabilityClient>(client => client.Timeout = TimeSpan.FromSeconds(10));
+builder.Services.AddScoped<KpiVisibilityService>();
 
 // CORS Policy
 builder.Services.AddCors(options =>

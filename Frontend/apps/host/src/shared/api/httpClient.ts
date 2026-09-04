@@ -34,6 +34,22 @@ export interface ApiFetchOptions extends Omit<RequestInit, 'body'> {
 }
 
 /**
+ * True when a rejection is a deliberate abort rather than a failure worth reporting.
+ *
+ * Anything that cancels a request — an effect cleanup, a component unmounting, a newer keystroke
+ * superseding an older search — surfaces as a rejected promise indistinguishable in shape from a
+ * network failure. Without this check every cancelled request would light up an error banner saying
+ * something went wrong, when in fact the caller asked for exactly what happened.
+ *
+ * Covers `AbortSignal.timeout()` too, which rejects with a TimeoutError rather than an AbortError;
+ * that is a genuine failure the caller usually DOES want to report, so it is deliberately not
+ * included here.
+ */
+export function isAbortError(err: unknown): boolean {
+  return err instanceof DOMException && err.name === 'AbortError'
+}
+
+/**
  * Hooks the auth layer into this module without importing it.
  *
  * httpClient is the lowest layer and is imported by every API client; authStore imports those

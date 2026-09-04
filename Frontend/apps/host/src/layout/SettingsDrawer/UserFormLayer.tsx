@@ -18,6 +18,11 @@ import { SkeletonBlock } from '../../shared/components/Skeleton'
 import { resolveIcon } from '../../shared/components/Icon/resolveIcon'
 import { toast } from '../../shared/stores/toastStore'
 import {
+  COUNTRY_PHONE_LIST,
+  splitDialCode,
+  validateCountryPhone,
+} from '@omniremit/ui/validation'
+import {
   LIMITS,
   required,
   maxLength,
@@ -32,97 +37,17 @@ import {
   allGrantablePairs,
   pairId,
 } from '../../shared/permissions/catalog'
+import { CapabilityPicker } from '../../shared/permissions/CapabilityPicker'
 import styles from './UserFormLayer.module.css'
 import { TOPICS, invalidate } from '../../shared/stores/invalidationStore'
 import { Switch } from '@omniremit/ui'
 
-export interface CountryPhoneConfig {
-  code: string
-  name: string
-  dialCode: string
-  flag: string
-  placeholder: string
-  minDigits: number
-  maxDigits: number
-}
-
-export const COUNTRY_PHONE_LIST: CountryPhoneConfig[] = [
-  { code: 'IN', name: 'India', dialCode: '+91', flag: '🇮🇳', placeholder: '98765 43210', minDigits: 10, maxDigits: 10 },
-  { code: 'US', name: 'United States', dialCode: '+1', flag: '🇺🇸', placeholder: '(555) 000-0000', minDigits: 10, maxDigits: 10 },
-  { code: 'GB', name: 'United Kingdom', dialCode: '+44', flag: '🇬🇧', placeholder: '7911 123456', minDigits: 10, maxDigits: 11 },
-  { code: 'AE', name: 'United Arab Emirates', dialCode: '+971', flag: '🇦🇪', placeholder: '50 123 4567', minDigits: 9, maxDigits: 9 },
-  { code: 'CA', name: 'Canada', dialCode: '+1', flag: '🇨🇦', placeholder: '(555) 000-0000', minDigits: 10, maxDigits: 10 },
-  { code: 'AU', name: 'Australia', dialCode: '+61', flag: '🇦🇺', placeholder: '412 345 678', minDigits: 9, maxDigits: 9 },
-  { code: 'SG', name: 'Singapore', dialCode: '+65', flag: '🇸🇬', placeholder: '8123 4567', minDigits: 8, maxDigits: 8 },
-  { code: 'DE', name: 'Germany', dialCode: '+49', flag: '🇩🇪', placeholder: '151 23456789', minDigits: 10, maxDigits: 11 },
-  { code: 'FR', name: 'France', dialCode: '+33', flag: '🇫🇷', placeholder: '6 12 34 56 78', minDigits: 9, maxDigits: 9 },
-  { code: 'SA', name: 'Saudi Arabia', dialCode: '+966', flag: '🇸🇦', placeholder: '50 123 4567', minDigits: 9, maxDigits: 9 },
-  { code: 'QA', name: 'Qatar', dialCode: '+974', flag: '🇶🇦', placeholder: '3312 3456', minDigits: 8, maxDigits: 8 },
-  { code: 'PH', name: 'Philippines', dialCode: '+63', flag: '🇵🇭', placeholder: '917 123 4567', minDigits: 10, maxDigits: 10 },
-  { code: 'NP', name: 'Nepal', dialCode: '+977', flag: '🇳🇵', placeholder: '9812345678', minDigits: 10, maxDigits: 10 },
-  { code: 'BD', name: 'Bangladesh', dialCode: '+880', flag: '🇧🇩', placeholder: '1712 345678', minDigits: 10, maxDigits: 10 },
-  { code: 'MY', name: 'Malaysia', dialCode: '+60', flag: '🇲🇾', placeholder: '12 345 6789', minDigits: 9, maxDigits: 10 },
-  { code: 'JP', name: 'Japan', dialCode: '+81', flag: '🇯🇵', placeholder: '90 1234 5678', minDigits: 10, maxDigits: 10 },
-  { code: 'NG', name: 'Nigeria', dialCode: '+234', flag: '🇳🇬', placeholder: '802 123 4567', minDigits: 10, maxDigits: 10 },
-  { code: 'KE', name: 'Kenya', dialCode: '+254', flag: '🇰🇪', placeholder: '712 345678', minDigits: 9, maxDigits: 9 },
-  { code: 'ZA', name: 'South Africa', dialCode: '+27', flag: '🇿🇦', placeholder: '82 123 4567', minDigits: 9, maxDigits: 9 },
-  { code: 'BR', name: 'Brazil', dialCode: '+55', flag: '🇧🇷', placeholder: '11 91234-5678', minDigits: 10, maxDigits: 11 },
-  { code: 'MX', name: 'Mexico', dialCode: '+52', flag: '🇲🇽', placeholder: '55 1234 5678', minDigits: 10, maxDigits: 10 },
-  { code: 'CN', name: 'China', dialCode: '+86', flag: '🇨🇳', placeholder: '138 0013 8000', minDigits: 11, maxDigits: 11 },
-  { code: 'HK', name: 'Hong Kong', dialCode: '+852', flag: '🇭🇰', placeholder: '9123 4567', minDigits: 8, maxDigits: 8 },
-  { code: 'ID', name: 'Indonesia', dialCode: '+62', flag: '🇮🇩', placeholder: '812 3456 7890', minDigits: 9, maxDigits: 12 },
-  { code: 'PK', name: 'Pakistan', dialCode: '+92', flag: '🇵🇰', placeholder: '300 1234567', minDigits: 10, maxDigits: 10 },
-  { code: 'LK', name: 'Sri Lanka', dialCode: '+94', flag: '🇱🇰', placeholder: '71 234 5678', minDigits: 9, maxDigits: 9 },
-  { code: 'CH', name: 'Switzerland', dialCode: '+41', flag: '🇨🇭', placeholder: '78 123 45 67', minDigits: 9, maxDigits: 9 },
-  { code: 'NL', name: 'Netherlands', dialCode: '+31', flag: '🇳🇱', placeholder: '6 12345678', minDigits: 9, maxDigits: 9 },
-  { code: 'SE', name: 'Sweden', dialCode: '+46', flag: '🇸🇪', placeholder: '70 123 45 67', minDigits: 9, maxDigits: 9 },
-  { code: 'IE', name: 'Ireland', dialCode: '+353', flag: '🇮🇪', placeholder: '85 123 4567', minDigits: 9, maxDigits: 9 },
-  { code: 'NZ', name: 'New Zealand', dialCode: '+64', flag: '🇳🇿', placeholder: '21 123 4567', minDigits: 8, maxDigits: 10 },
-  { code: 'ES', name: 'Spain', dialCode: '+34', flag: '🇪🇸', placeholder: '612 345 678', minDigits: 9, maxDigits: 9 },
-  { code: 'IT', name: 'Italy', dialCode: '+39', flag: '🇮🇹', placeholder: '312 345 6789', minDigits: 10, maxDigits: 10 },
-  { code: 'PT', name: 'Portugal', dialCode: '+351', flag: '🇵🇹', placeholder: '912 345 678', minDigits: 9, maxDigits: 9 },
-  { code: 'PL', name: 'Poland', dialCode: '+48', flag: '🇵🇱', placeholder: '512 345 678', minDigits: 9, maxDigits: 9 },
-]
-
-function parsePhoneNumber(rawPhone: string): { countryCode: string; nationalNumber: string } {
-  if (!rawPhone) return { countryCode: 'IN', nationalNumber: '' }
-  const trimmed = rawPhone.trim()
-  const sorted = [...COUNTRY_PHONE_LIST].sort((a, b) => b.dialCode.length - a.dialCode.length)
-  for (const c of sorted) {
-    if (trimmed.startsWith(c.dialCode)) {
-      const num = trimmed.slice(c.dialCode.length).trim()
-      return { countryCode: c.code, nationalNumber: num }
-    }
-  }
-  return { countryCode: 'IN', nationalNumber: trimmed.replace(/^\+91\s*/, '') }
-}
-
-function validateCountryPhone(
-  national: string | null | undefined,
-  country: CountryPhoneConfig,
-): string | undefined {
-  if (national == null || national.trim() === '') {
-    return 'Phone number is required.'
-  }
-  const trimmed = national.trim()
-  if (!/^[0-9\s()\-.]+$/.test(trimmed)) {
-    return 'Phone number may contain only digits and formatting characters.'
-  }
-  const digits = trimmed.replace(/\D/g, '').length
-  if (digits === 0) {
-    return 'Phone number is required.'
-  }
-  if (country.minDigits === country.maxDigits) {
-    if (digits !== country.minDigits) {
-      return `${country.name} phone number requires exactly ${country.minDigits} digits (${digits} entered).`
-    }
-  } else {
-    if (digits < country.minDigits || digits > country.maxDigits) {
-      return `${country.name} phone number must be between ${country.minDigits} and ${country.maxDigits} digits (${digits} entered).`
-    }
-  }
-  return undefined
-}
+/*
+ * Phone rules come from the shared package so the host, the remotes and (via the widened server
+ * rules) the backends all judge a number the same way. This file previously carried its own copy of
+ * the country table and validator, which is how the platform ended up with three incompatible
+ * definitions of a valid phone number.
+ */
 
 interface UserFormLayerProps {
   userId?: string
@@ -336,7 +261,7 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
           if (cancelled) return
           setName(userRes.name)
           setEmail(userRes.email)
-          const parsed = parsePhoneNumber(userRes.phoneNumber ?? '')
+          const parsed = splitDialCode(userRes.phoneNumber ?? '')
           setSelectedCountryCode(parsed.countryCode)
           setNationalPhone(parsed.nationalNumber)
           setRoleId(userRes.roleId ?? '')
@@ -1294,6 +1219,13 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
                             </tbody>
                           </table>
                           </div>
+
+                          <CapabilityPicker
+                            rows={hostGroups.flatMap((g) => g.rows)}
+                            isGranted={isOverrideGranted}
+                            onToggle={toggleOverride}
+                            emptyMessage="No host feature declares dashboard, export or panel capabilities."
+                          />
                         </div>
                       )}
                     </div>
@@ -1370,11 +1302,17 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
 
                           {isExpanded && (
                             <div className={styles.accordionBody}>
-                              {columns.length === 0 ? (
+                              {/*
+                               * No columns no longer means no capabilities. An app can declare only
+                               * business capabilities — a dashboard-only module with KPIs and charts
+                               * and no CRUD verb at all — and those have no columns by design. The
+                               * "declared nothing" message would have hidden every one of them.
+                               */}
+                              {columns.length === 0 && rows.every((r) => r.capabilities.length === 0) ? (
                                 <p className={styles.sectionHint}>
                                   This application hasn&rsquo;t declared any capabilities yet.
                                 </p>
-                              ) : (
+                              ) : columns.length === 0 ? null : (
                                 <div className={styles.matrixTableWrap}>
                                 <table className={styles.matrixTable}>
                                   <thead>
@@ -1424,6 +1362,13 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
                                 </table>
                                 </div>
                               )}
+
+                              <CapabilityPicker
+                                rows={rows}
+                                isGranted={isOverrideGranted}
+                                onToggle={toggleOverride}
+                                emptyMessage="This application declares no dashboard, export or panel capabilities."
+                              />
                             </div>
                           )}
                         </div>

@@ -19,7 +19,8 @@ const DEFAULT_PAGE_SIZE = 10
 const SERVICE_TONES: Record<string, BadgeTone> = {
   AuthService: 'primary',
   ModuleRegistry: 'info',
-  EmployeeService: 'warning',
+  LeadService: 'warning',
+  Customer360Service: 'success',
 }
 
 function serviceTone(serviceName: string): BadgeTone {

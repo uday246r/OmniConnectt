@@ -1,7 +1,7 @@
 import React, { useEffect, useState, type ChangeEvent } from 'react';
 import { useCustomerStore } from '../store/customerStore';
 import { useProductStore } from '../store/productStore';
-import { useNavigationStore } from '../store/navigationStore';
+import { useHostNavigate } from '../navigation/HostNavigation';
 import ProductDetailsModal from '../components/ProductDetailsModal';
 import { ArrowLeft, Search, Eye, Layers, RefreshCw, X, ChevronLeft, ChevronRight, AlertTriangle } from '@omniremit/ui/icons';
 import type { CorporateProfile, IndividualProfile } from '../types/api';
@@ -26,7 +26,7 @@ const PRODUCT_STATUS_OPTIONS = [
 ];
 export default function AllProducts() {
   const { profile, customerType } = useCustomerStore();
-  const { setActivePage } = useNavigationStore();
+  const navigate = useHostNavigate();
   const {
     products,
     loading,
@@ -68,7 +68,7 @@ export default function AllProducts() {
   }, [customerId, pageNumber, pageSize, loadProducts]);
 
   const handleBack = () => {
-    setActivePage('customer-360');
+    navigate('customer-360');
   };
 
   const handleSearchChange = (e: ChangeEvent<HTMLInputElement>) => {

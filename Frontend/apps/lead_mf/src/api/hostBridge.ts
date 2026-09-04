@@ -18,19 +18,12 @@ export interface OmniRemitHostBridge {
   ensureFreshAccessToken: () => Promise<string>;
   hasCapability: (featureKey: string, capability: string) => boolean;
   getUser: () => HostBridgeUser | null;
-  /**
-   * The host owns the router, so this is how this remote's own page reaches the URL
-   * (`/apps/lead/audit-logs`). Consumed through `useHostSubRoute` — see MainLayout. Optional
-   * because a standalone run has no host at all.
-   *
-   * Replaces a `navigate: (to: string) => void` declared here that the host never implemented:
-   * anything that had called it would have thrown.
+  /*
+   * No navigation member: the host hands this remote its current page as the `page` prop and an
+   * `onNavigate` callback to request a move (see `navigation/HostNavigation.tsx` and the host's
+   * RemoteAppPage). A `navigate: (to: string) => void` was declared here for a while that the host
+   * never implemented — anything that had called it would have thrown.
    */
-  navigation?: {
-    getSubRoute: () => string;
-    setSubRoute: (subRoute: string, options?: { replace?: boolean }) => void;
-    onSubRouteChange: (listener: (subRoute: string) => void) => () => void;
-  };
   apiBaseUrls?: {
     authService: string;
     moduleRegistry: string;
@@ -109,3 +102,23 @@ export const canViewAuditLogs = (): boolean =>
 
 export const canManageFieldSettings = (): boolean =>
   hasCapability(LEAD_SUBMODULE_FIELD_SETTINGS, 'Manage') || hasCapability(LEAD_FEATURE_KEY, 'View');
+
+/*
+ * Business capabilities — the dashboard's individual cards and charts, and the audit export.
+ *
+ * They go through the same bridge call as everything above and cost no more to ask about: the host
+ * merges what the token carries with what it fetched separately, so this side never learns which of
+ * the two answered.
+ *
+ * The difference from the helpers above is the missing fallback. Those accept the parent
+ * `remote.lead:View` as sufficient, which is right for a module-level read. It would be wrong here:
+ * being allowed into the app at all must not imply every KPI card inside it, or the per-card grant
+ * would exist and mean nothing.
+ */
+
+/** One dashboard card or chart, e.g. `kpi.total-leads`. Named by the manifest, never invented here. */
+export const canSeeDashboardCapability = (capabilityKey: string): boolean =>
+  hasCapability(LEAD_SUBMODULE_DASHBOARD, capabilityKey);
+
+export const canExportAuditLogs = (): boolean =>
+  hasCapability(LEAD_SUBMODULE_AUDIT, 'export.csv');

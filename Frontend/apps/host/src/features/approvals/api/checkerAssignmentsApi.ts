@@ -30,6 +30,12 @@ export interface CheckerAssignmentDto {
    */
   memberCount: number | null
   createdAt: string
+  /**
+   * True when the upsert matched a row that already existed. The call still succeeds — assignment is
+   * idempotent — but reporting it as a fresh success would tell the operator they changed something
+   * when they did not.
+   */
+  alreadyAssigned: boolean
 }
 
 /** Supply exactly one of the two ids. */

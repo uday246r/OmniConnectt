@@ -1,0 +1,302 @@
+/*
+ * Deliberately close to RoleFormLayer's matrix styling rather than a new visual language: this sits
+ * directly beneath that table in the same step, and two different-looking permission controls in one
+ * pane would read as two different systems.
+ */
+
+.picker {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.searchWrap {
+  position: relative;
+  flex: 1 1 220px;
+  min-width: 180px;
+}
+
+.search {
+  width: 100%;
+  padding: 7px 10px 7px 30px;
+  border: 1px solid var(--omni-color-border);
+  border-radius: var(--omni-radius-sm, 6px);
+  font-size: var(--omni-font-size-xs-plus);
+  background: var(--omni-color-surface);
+  color: var(--omni-color-text-primary);
+}
+
+.search:focus-visible {
+  outline: 2px solid var(--omni-color-primary-600);
+  outline-offset: -1px;
+}
+
+.searchIcon {
+  position: absolute;
+  left: 9px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  color: var(--omni-color-text-muted);
+  pointer-events: none;
+}
+
+.count {
+  font-size: var(--omni-font-size-2xs);
+  color: var(--omni-color-text-secondary);
+  white-space: nowrap;
+}
+
+/* Scrolls independently so a long capability list never pushes the drawer's own actions off-screen. */
+.scroller {
+  max-height: 320px;
+  overflow-y: auto;
+  border: 1px solid var(--omni-color-border);
+  border-radius: var(--omni-radius-sm, 6px);
+  background: var(--omni-color-surface);
+}
+
+.group {
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.group:last-child {
+  border-bottom: none;
+}
+
+.groupHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 0 11px 0 0;
+  background: var(--omni-color-surface-alt);
+}
+
+/* The expand control takes the whole row so the label is part of the hit target, not just the chevron. */
+.groupExpand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  padding: 8px 0 8px 11px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+}
+
+.groupExpand:focus-visible,
+.groupToggleAll:focus-visible {
+  outline: 2px solid var(--omni-color-primary-600);
+  outline-offset: -2px;
+}
+
+.groupChevron {
+  display: flex;
+  color: var(--omni-color-text-muted);
+  transition: transform 120ms ease;
+}
+
+.groupChevronOpen {
+  transform: rotate(90deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .groupChevron {
+    transition: none;
+  }
+}
+
+.groupLabel {
+  font-size: var(--omni-font-size-2xs);
+  font-weight: var(--omni-font-weight-bold);
+  color: #64748b;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  flex: 1;
+}
+
+.groupCount {
+  font-size: var(--omni-font-size-2xs);
+  color: var(--omni-color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.groupToggleAll {
+  font-size: var(--omni-font-size-2xs);
+  color: var(--omni-color-primary-600);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: var(--omni-radius-xs);
+}
+
+.groupToggleAll:hover {
+  text-decoration: underline;
+}
+
+.groupToggleAll:disabled {
+  color: var(--omni-color-text-muted);
+  cursor: default;
+  text-decoration: none;
+}
+
+.rows {
+  display: flex;
+  flex-direction: column;
+}
+
+/*
+ * A label, so the whole row is the hit target rather than the 14px box alone. The list is long and
+ * the entries are close together; a small target here is a mis-grant.
+ */
+.row {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 7px 11px 7px 26px;
+  cursor: pointer;
+  border-bottom: 1px solid #f8fafc;
+}
+
+.row:last-child {
+  border-bottom: none;
+}
+
+.row:hover {
+  background: var(--omni-color-surface-alt);
+}
+
+.rowDisabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.rowDisabled:hover {
+  background: transparent;
+}
+
+.checkbox {
+  width: 14px;
+  height: 14px;
+  margin-top: 2px;
+  flex: none;
+  border-radius: var(--omni-radius-xs);
+  accent-color: #2563eb;
+  cursor: pointer;
+}
+
+.rowDisabled .checkbox {
+  cursor: default;
+}
+
+.rowText {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.rowTitleLine {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+
+.rowLabel {
+  font-size: var(--omni-font-size-xs-plus);
+  font-weight: var(--omni-font-weight-semibold);
+  color: #1e293b;
+}
+
+.rowDescription {
+  font-size: var(--omni-font-size-3xs);
+  color: var(--omni-color-text-secondary);
+  line-height: 1.45;
+}
+
+.rowKey {
+  font-size: var(--omni-font-size-3xs);
+  color: var(--omni-color-text-muted);
+  font-family: var(--omni-font-mono);
+}
+
+/*
+ * The type badge is not decoration. It is the only place the UI says whether granting this refuses a
+ * request or merely hides a control, which is exactly what an administrator needs to know before
+ * relying on it.
+ */
+.typeBadge {
+  font-size: var(--omni-font-size-3xs);
+  font-weight: var(--omni-font-weight-semibold);
+  padding: 1px 6px;
+  border-radius: var(--omni-radius-circle);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.typeWidget {
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.typeChart {
+  background: #f5f3ff;
+  color: #6d28d9;
+}
+
+.typeExport {
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.typeBulkAction {
+  background: #fff7ed;
+  color: #c2410c;
+}
+
+.typeUi {
+  background: #fdf2f8;
+  color: #be185d;
+}
+
+.empty {
+  padding: 18px 12px;
+  text-align: center;
+  font-size: var(--omni-font-size-xs-plus);
+  color: var(--omni-color-text-secondary);
+}
+
+.showAll {
+  padding: 8px 11px 8px 26px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  font-size: var(--omni-font-size-3xs);
+  color: var(--omni-color-primary-600);
+}
+
+.showAll:hover {
+  text-decoration: underline;
+}
+
+.showAll:focus-visible {
+  outline: 2px solid var(--omni-color-primary-600);
+  outline-offset: -2px;
+}

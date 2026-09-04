@@ -1,7 +1,12 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { useAuthStore } from '../../auth/store/authStore'
 import { authServiceClient } from '../../../shared/api/authServiceClient'
 import { Icon } from '../../../shared/components/Icon/Icon'
+import {
+  describePasswordRules,
+  validatePassword,
+  type PasswordPolicy,
+} from '@omniremit/ui/validation'
 import styles from './ChangePasswordForm.module.css'
 import { Button, Input } from '@omniremit/ui'
 
@@ -29,6 +34,36 @@ export function ChangePasswordForm({ onSuccess, onCancel, submitLabel = 'Update 
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  /*
+   * The live policy, fetched rather than assumed.
+   *
+   * This form previously checked only that the two fields matched, while its own helper text told the
+   * user "your organisation's password policy is applied when you save" — so every complexity failure
+   * cost a round trip and came back as a server error string. The endpoint serving the real rules
+   * already existed and simply was not called.
+   */
+  const [policy, setPolicy] = useState<PasswordPolicy | null>(null)
+
+  useEffect(() => {
+    if (!accessToken) return
+    let cancelled = false
+    authServiceClient
+      .passwordPolicy(accessToken)
+      .then((p) => {
+        if (!cancelled) setPolicy(p)
+      })
+      .catch(() => {
+        // Not fatal: without the policy the checklist is hidden and the server stays authoritative,
+        // exactly as it was before. Blocking a password change because a hint failed to load would be
+        // a far worse outcome than showing no hint.
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [accessToken])
+
+  const rules = policy ? describePasswordRules(newPassword, policy) : []
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     if (!currentPassword) {
@@ -38,6 +73,14 @@ export function ChangePasswordForm({ onSuccess, onCancel, submitLabel = 'Update 
     if (!newPassword) {
       setError('New password is required.')
       return
+    }
+    // Caught here so the user is told before a round trip; the server still enforces it.
+    if (policy) {
+      const problem = validatePassword(newPassword, policy)
+      if (problem) {
+        setError(`Password does not meet the policy — ${problem.toLowerCase()}.`)
+        return
+      }
     }
     if (newPassword !== confirmPassword) {
       setError('New password and confirmation do not match.')
@@ -96,13 +139,35 @@ export function ChangePasswordForm({ onSuccess, onCancel, submitLabel = 'Update 
         required
         disabled={saving}
         leading={<Icon.Lock width={16} height={16} />}
-        helperText="Your organisation's password policy is applied when you save."
+        helperText={policy ? undefined : "Your organisation's password policy is applied when you save."}
         trailing={
           <button type="button" className={styles.eyeToggle} onClick={() => setShowNewPw(!showNewPw)} tabIndex={-1}>
             {showNewPw ? <Icon.EyeOff width={16} height={16} /> : <Icon.Eye width={16} height={16} />}
           </button>
         }
       />
+
+      {/*
+        The actual rules, ticking off as they are met — rather than the old sentence promising that a
+        policy exists somewhere and letting the server be the one to explain it afterwards.
+      */}
+      {rules.length > 0 && (
+        <ul className={styles.policyList} aria-label="Password requirements">
+          {rules.map((rule) => (
+            <li
+              key={rule.label}
+              className={rule.satisfied ? styles.policyRuleMet : styles.policyRule}
+            >
+              {rule.satisfied ? (
+                <Icon.CheckCircle width={13} height={13} />
+              ) : (
+                <span className={styles.policyDot} aria-hidden="true" />
+              )}
+              <span>{rule.label}</span>
+            </li>
+          ))}
+        </ul>
+      )}
 
       <Input
         label="Confirm New Password"
