@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { CapabilityPicker } from './CapabilityPicker'
@@ -161,8 +161,12 @@ describe('search', () => {
 
     await userEvent.type(screen.getByRole('searchbox', { name: /search capabilities/i }), 'card')
 
+    // Filtering is debounced (200ms), so the narrowed list is asserted once it settles rather than
+    // on the keystroke itself.
+    await waitFor(() => {
+      expect(screen.queryByRole('checkbox', { name: /leads over time/i })).not.toBeInTheDocument()
+    })
     expect(screen.getByRole('checkbox', { name: /total leads/i })).toBeInTheDocument()
-    expect(screen.queryByRole('checkbox', { name: /leads over time/i })).not.toBeInTheDocument()
   })
 
   it('hides a group whose entries all filtered out, rather than an empty header', async () => {
@@ -170,7 +174,9 @@ describe('search', () => {
 
     await userEvent.type(screen.getByRole('searchbox', { name: /search capabilities/i }), 'over time')
 
-    expect(screen.queryByRole('button', { name: /dashboard · kpi/i })).not.toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.queryByRole('button', { name: /dashboard · kpi/i })).not.toBeInTheDocument()
+    })
     expect(screen.getByRole('button', { name: /dashboard · chart/i })).toBeInTheDocument()
   })
 
@@ -179,7 +185,7 @@ describe('search', () => {
 
     await userEvent.type(screen.getByRole('searchbox', { name: /search capabilities/i }), 'zzzz')
 
-    expect(screen.getByText(/no capability matches/i)).toBeInTheDocument()
+    expect(await screen.findByText(/no capability matches/i)).toBeInTheDocument()
   })
 })
 
@@ -206,7 +212,7 @@ describe('collapsing', () => {
     await userEvent.click(screen.getByRole('button', { name: /dashboard · kpi/i }))
     await userEvent.type(screen.getByRole('searchbox', { name: /search capabilities/i }), 'total')
 
-    expect(screen.getByRole('checkbox', { name: /total leads/i })).toBeInTheDocument()
+    expect(await screen.findByRole('checkbox', { name: /total leads/i })).toBeInTheDocument()
   })
 })
 
@@ -245,7 +251,9 @@ describe('at scale', () => {
 
     await userEvent.type(screen.getByRole('searchbox', { name: /search capabilities/i }), 'Metric 1337')
 
-    expect(screen.getByRole('checkbox', { name: /metric 1337/i })).toBeInTheDocument()
-    expect(screen.getAllByRole('checkbox')).toHaveLength(1)
+    expect(await screen.findByRole('checkbox', { name: /metric 1337/i })).toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.getAllByRole('checkbox')).toHaveLength(1)
+    })
   })
 })
