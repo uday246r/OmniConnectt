@@ -14,13 +14,27 @@
   min-height: 320px;
 }
 
+/*
+ * The two dashboard charts, side by side. This base rule was missing entirely — only the
+ * mobile-narrowing override below existed — so on any normal-width screen the row had no grid at
+ * all and the cards fell back to plain block stacking, one on top of the other, full width each.
+ *
+ * Either chart can be independently withheld per role (`chart.leads-over-time` /
+ * `chart.leads-by-product` in DashboardPage.tsx), so `:only-child` is what makes the remaining one
+ * expand to fill the row when its neighbour is disabled, and drop back to sharing the row the
+ * moment both are granted again — no JS state to keep in sync with the permission check.
+ */
 .chartRow {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: var(--omni-space-5);
+  align-items: stretch;
 }
 
-/* Was `.lead-dash-charts-grid { grid-template-columns: 1fr !important }` in the injected tag. */
+.chartRow > :only-child {
+  grid-column: 1 / -1;
+}
+
 @media (max-width: 768px) {
   .chartRow {
     grid-template-columns: 1fr;

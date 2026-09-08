@@ -42,7 +42,13 @@ export { Select } from './primitives/Select/Select'
 export type { SelectProps, SelectOption } from './primitives/Select/Select'
 
 export { SearchField } from './primitives/SearchField/SearchField'
-export type { SearchFieldProps } from './primitives/SearchField/SearchField'
+export type { SearchFieldProps, SearchFieldSuggestion } from './primitives/SearchField/SearchField'
+
+export { useDebouncedValue } from './hooks/useDebouncedValue'
+export { useSuggestions } from './hooks/useSuggestions'
+export { useCommittedFilter } from './hooks/useCommittedFilter'
+export type { CommittedFilter } from './hooks/useCommittedFilter'
+export type { SuggestionSource, UseSuggestionsOptions, UseSuggestionsResult } from './hooks/useSuggestions'
 
 export { Checkbox } from './primitives/Checkbox/Checkbox'
 export type { CheckboxProps } from './primitives/Checkbox/Checkbox'

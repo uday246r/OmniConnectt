@@ -9,7 +9,7 @@
   justify-content: space-between;
   width: 100%;
   gap: 8px;
-}a
+}
 
 .rule {
   overflow-wrap: anywhere;
@@ -20,14 +20,18 @@
   border: none;
   cursor: pointer;
   padding: 2px;
-  color: #004EEB;
+  color: var(--omni-color-primary-600);
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
 }
 
-.text {
-  color: #004EEB;
+.linkValue {
+  color: var(--omni-color-primary-600);
   text-decoration: none;
+  word-break: break-all;
+}
+.linkValue:hover {
+  text-decoration: underline;
 }

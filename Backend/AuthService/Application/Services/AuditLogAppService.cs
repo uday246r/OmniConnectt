@@ -14,8 +14,66 @@ namespace AuthService.Application.Services;
 /// backend) posts here via the internal API-key-protected endpoint. One table, one query, whether
 /// the action happened in the host or a remote app.
 /// </summary>
-public class AuditLogAppService(AuthDbContext db, IPlatformEventPublisher events)
+public class AuditLogAppService(AuthDbContext db, IPlatformEventPublisher events, IHttpContextAccessor httpContextAccessor)
 {
+    private const string CorrelationIdItemsKey = "Audit.CorrelationId";
+
+    /// <summary>
+    /// The id every audit row written during THIS request shares, unless a caller explicitly
+    /// overrides it. Resolution order: an id already seeded or resolved earlier in this same request
+    /// (cached on <c>HttpContext.Items</c>, so every call within one request agrees); otherwise an
+    /// inbound <c>X-Correlation-Id</c> header, so a chain started by a remote keeps its own id;
+    /// otherwise <c>HttpContext.TraceIdentifier</c>, already stable for the life of the request; and
+    /// only a fresh GUID when there is no HttpContext at all (background work outside a request).
+    ///
+    /// Exposed (not just used internally by WriteAsync) so a multi-request chain — maker-checker is
+    /// the one that exists today — can capture this once, at the point the chain begins, and store it
+    /// somewhere longer-lived (ApprovalRequest.CorrelationId) to hand back via SeedCorrelationId on
+    /// every later request in that same chain.
+    /// </summary>
+    public string ResolveCorrelationId()
+    {
+        var http = httpContextAccessor.HttpContext;
+        if (http is null)
+        {
+            return Guid.NewGuid().ToString();
+        }
+
+        if (http.Items[CorrelationIdItemsKey] is string cached)
+        {
+            return cached;
+        }
+
+        var id = http.Request.Headers.TryGetValue("X-Correlation-Id", out var header) && !string.IsNullOrWhiteSpace(header)
+            ? header.ToString()
+            : http.TraceIdentifier;
+
+        http.Items[CorrelationIdItemsKey] = id;
+        if (!http.Response.HasStarted)
+        {
+            http.Response.Headers["X-Correlation-Id"] = id;
+        }
+        return id;
+    }
+
+    /// <summary>
+    /// Forces every audit write for the REST of this request (however deep — a replayed mutation
+    /// several call frames down included) to use <paramref name="correlationId"/> instead of the
+    /// per-request default ResolveCorrelationId would otherwise compute. This is how the
+    /// maker-checker flow keeps "approved" and the mutation it replays in the same thread as the
+    /// original "requested": ApprovalAppService seeds the approval's own long-lived correlation id
+    /// once, at the top of Approve/Reject, before calling into UserAppService/RoleAppService — which
+    /// call WriteAsync with no correlationId of their own and so pick up the seeded value through
+    /// ResolveCorrelationId's cache check, with no signature change needed on either service.
+    /// No-op outside an HTTP request.
+    /// </summary>
+    public void SeedCorrelationId(string correlationId)
+    {
+        var http = httpContextAccessor.HttpContext;
+        if (http is null) return;
+        http.Items[CorrelationIdItemsKey] = correlationId;
+    }
+
     public async Task WriteAsync(
         string serviceName, Guid? actorUserId, string? actorName, string action,
         string? entityType, string? entityId, string? details, string? sourceIp = null,
@@ -40,7 +98,7 @@ public class AuditLogAppService(AuthDbContext db, IPlatformEventPublisher events
             Result = result,
             UserAgent = userAgent,
             FailureReason = failureReason,
-            CorrelationId = correlationId ?? Guid.NewGuid().ToString(),
+            CorrelationId = correlationId ?? ResolveCorrelationId(),
         });
         await db.SaveChangesAsync(ct);
 
@@ -50,9 +108,10 @@ public class AuditLogAppService(AuthDbContext db, IPlatformEventPublisher events
 
     public async Task<PagedResult<AuditLogDto>> ListAsync(
         int page, int pageSize, string? service, string? action, string? result,
-        DateTimeOffset? from, DateTimeOffset? to, string? sortDir, CancellationToken ct = default)
+        DateTimeOffset? from, DateTimeOffset? to, string? sortDir, Guid? actorUserId = null,
+        string? correlationId = null, CancellationToken ct = default)
     {
-        var query = BuildFilteredQuery(service, action, result, from, to);
+        var query = BuildFilteredQuery(service, action, result, from, to, actorUserId, correlationId);
 
         var total = await query.CountAsync(ct);
         var ordered = string.Equals(sortDir, "asc", StringComparison.OrdinalIgnoreCase)
@@ -121,9 +180,19 @@ public class AuditLogAppService(AuthDbContext db, IPlatformEventPublisher events
         return sb.ToString();
     }
 
-    private IQueryable<AuditLog> BuildFilteredQuery(string? service, string? action, string? result, DateTimeOffset? from, DateTimeOffset? to)
+    private IQueryable<AuditLog> BuildFilteredQuery(string? service, string? action, string? result, DateTimeOffset? from, DateTimeOffset? to, Guid? actorUserId = null, string? correlationId = null)
     {
         var query = db.AuditLogs.AsNoTracking().AsQueryable();
+
+        if (actorUserId is not null)
+        {
+            query = query.Where(a => a.ActorUserId == actorUserId);
+        }
+
+        if (!string.IsNullOrWhiteSpace(correlationId))
+        {
+            query = query.Where(a => a.CorrelationId == correlationId);
+        }
 
         if (!string.IsNullOrWhiteSpace(service))
         {

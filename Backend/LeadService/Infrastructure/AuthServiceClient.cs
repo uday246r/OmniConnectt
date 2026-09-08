@@ -17,7 +17,7 @@ public class AuthServiceClient(HttpClient httpClient, IOptions<AuthIntegrationOp
 
     private record RecordAuditLogRequest(
         string ServiceName, Guid? ActorUserId, string? ActorName, string Action, string? EntityType, string? EntityId, string? Details,
-        string? EntityLabel, string? SourceIp, string? UserAgent);
+        string? EntityLabel, string? SourceIp, string? UserAgent, string? CorrelationId = null);
 
     private record SubmitInternalApprovalRequest(
         string Module, string Action, string? EntityType, string? EntityId, string? EntityLabel,

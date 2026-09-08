@@ -11,6 +11,34 @@
  * belongs below.
  */
 
+/*
+ * Toolbar search suggestion rows — customer name over a muted IC/phone line, so two customers
+ * sharing a name stay tellable apart. Same shape customer360's own toolbar suggestions use.
+ */
+.suggestionRow {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.suggestionPrimary {
+  font-size: var(--omni-font-size-sm);
+  color: var(--omni-color-text-primary);
+  font-weight: var(--omni-font-weight-medium);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.suggestionSecondary {
+  font-size: var(--omni-font-size-xs);
+  color: var(--omni-color-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* The Actions column is right-aligned; everything else inherits DataTable's default. */
 .thRight {
   text-align: right;

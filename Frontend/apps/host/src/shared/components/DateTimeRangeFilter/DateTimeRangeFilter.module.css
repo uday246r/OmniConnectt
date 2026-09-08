@@ -1,0 +1,83 @@
+.popover {
+  min-width: 260px;
+  width: 280px;
+}
+
+.currentSummary {
+  margin: 0;
+  padding: 6px 8px;
+  background: var(--omni-color-primary-50);
+  border-radius: var(--omni-radius-md);
+  font-size: var(--omni-font-size-2xs-plus);
+  font-weight: var(--omni-font-weight-semibold);
+  color: var(--omni-color-primary-700);
+  text-align: center;
+}
+
+.fieldGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.fieldLabel {
+  font-size: var(--omni-font-size-2xs-plus);
+  font-weight: var(--omni-font-weight-bold);
+  color: var(--omni-color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.fieldRow {
+  display: flex;
+  gap: 6px;
+}
+
+.dateInput,
+.timeInput {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 7px 8px;
+  background: var(--omni-color-surface-alt);
+  border: 1.5px solid var(--omni-color-border);
+  border-radius: var(--omni-radius-md);
+  font-size: var(--omni-font-size-2xs-plus);
+  color: var(--omni-color-text-primary);
+  outline: none;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+
+.dateInput {
+  flex: 1.3 1 0;
+}
+
+.dateInput:focus,
+.timeInput:focus {
+  border-color: var(--omni-color-primary-600);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+  background: var(--omni-color-surface);
+}
+
+.timeInput:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.applyBtn {
+  margin-top: 2px;
+  padding: 8px 12px;
+  background: var(--omni-color-primary-600);
+  color: #ffffff;
+  border: none;
+  border-radius: var(--omni-radius-md);
+  font-size: var(--omni-font-size-xs);
+  font-weight: var(--omni-font-weight-bold);
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 120ms ease;
+}
+
+.applyBtn:hover {
+  background: var(--omni-color-primary-700);
+}

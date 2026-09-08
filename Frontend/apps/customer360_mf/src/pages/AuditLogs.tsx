@@ -27,7 +27,7 @@ import type { AuditLog } from '../types/api';
 import { getFriendlyErrorMessage } from '../utils/errorMessages';
 import styles from './AuditLogs.module.css';
 import cc from '../shared/c360Common.module.css';
-import { ActorCell, Badge, Button, ColumnFilter, DataTable, DetailField, DetailGrid, DetailSection, DetailSections, Drawer, EMPTY_VALUE, FilterBar, PageHeader, Pagination, ResponsiveRows, RowAction, RowsPerPage, SearchField, formatAuditTimestamp, readStoredPageSize, type ActiveFilter, type BadgeTone } from '@omniremit/ui';
+import { ActorCell, Badge, Button, ColumnFilter, DataTable, DetailField, DetailGrid, DetailSection, DetailSections, Drawer, EMPTY_VALUE, FilterBar, PageHeader, Pagination, ResponsiveRows, RowAction, RowsPerPage, SearchField, formatAuditTimestamp, readStoredPageSize, useDebouncedValue, type ActiveFilter, type BadgeTone } from '@omniremit/ui';
 import { resolveActor } from '../shared/resolveActor';
 
 /* Action -> platform badge tone. Was four hardcoded {bg,text,border,dot} palettes handed to the
@@ -96,8 +96,11 @@ export default function AuditLogs() {
   const [totalCount, setTotalCount] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
 
-  // Filter states
-  const [searchQuery, setSearchQuery] = useState('');
+  // Filter states. `searchQuery` used to feed the fetch effect directly, so every keystroke fired a
+  // fresh GET /v1/audit — typing "search" sent six uncancelled requests. The input stays bound to
+  // the raw, un-debounced value so typing itself never feels laggy; only the request waits.
+  const [searchInput, setSearchInput] = useState('');
+  const searchQuery = useDebouncedValue(searchInput, 300);
   const [actionFilter, setActionFilter] = useState('');
   // Status has no server-side parameter, so it narrows the page already fetched. Kept explicit so
   // nobody later assumes it paginates like `action` and `search` do.
@@ -152,6 +155,54 @@ export default function AuditLogs() {
     () => distinct((l) => l.customerName || l.customerId),
     [logs]
   );
+
+  /*
+   * Description recommendations, from the page of logs already loaded — the same scope this
+   * column's filter itself works over, since GET /v1/audit accepts `search` and `action` only and
+   * description is filtered client-side. Actor qualifies otherwise near-identical descriptions.
+   */
+  const descPool = React.useMemo(
+    () =>
+      logs.map((l) => ({
+        value: l.description ?? '',
+        meta: resolveActor(l.user).name ?? l.user ?? undefined,
+      })),
+    [logs]
+  );
+
+  // Recommends matching rows from the currently-loaded page as the operator types, rather than
+  // leaving them to guess and press Enter — the same treatment the Name/Mobile column filters on
+  // the Users page have. Picking one narrows to that row's officer or customer.
+  const searchSuggestions = React.useMemo(() => {
+    const needle = searchQuery.trim().toLowerCase();
+    if (!needle) return [];
+    return logs
+      .filter((log) => {
+        const actor = resolveActor(log.user);
+        return (
+          (actor.name ?? log.user ?? '').toLowerCase().includes(needle) ||
+          (log.customerName ?? log.customerId ?? '').toLowerCase().includes(needle) ||
+          (log.description ?? '').toLowerCase().includes(needle)
+        );
+      })
+      .slice(0, 8)
+      .map((log) => {
+        const actor = resolveActor(log.user);
+        const value = actor.name ?? log.customerName ?? log.customerId ?? log.user ?? '';
+        return {
+          id: value,
+          label: (
+            <span className={styles.suggestionRow}>
+              <span className={styles.suggestionPrimary}>{actor.name ?? 'System'}</span>
+              <span className={styles.suggestionSecondary}>
+                {log.customerName || log.customerId ? `${log.customerName || log.customerId} · ` : ''}
+                {log.description}
+              </span>
+            </span>
+          ),
+        };
+      });
+  }, [logs, searchQuery]);
 
   // Selected Log for Details Drawer
   const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null);
@@ -299,7 +350,7 @@ export default function AuditLogs() {
             onRemove: () => setStatusFilter(''),
           },
           descFilter && { key: 'desc', label: 'Description', value: `"${descFilter}"`, onRemove: () => setDescFilter('') },
-          searchQuery && { key: 'search', label: 'Search', value: `"${searchQuery}"`, onRemove: () => setSearchQuery('') },
+          searchQuery && { key: 'search', label: 'Search', value: `"${searchQuery}"`, onRemove: () => setSearchInput('') },
         ].filter(Boolean) as ActiveFilter[]}
         onClearAll={() => {
           setActionFilter('');
@@ -307,24 +358,24 @@ export default function AuditLogs() {
           setCustomerFilter('');
           setDescFilter('');
           setStatusFilter('');
-          setSearchQuery('');
+          setSearchInput('');
         }}
       />
 
-      {/* Main Table Card */}
-      <div className="c360-table-container">
+      {/* Main Table Card — same shell as the host's Users page and lead_mf's card+toolbar
+          composition (`cc.card`), not the older `.c360-table-container` this page used before. */}
+      <div className={cc.card}>
         {/* Controls Toolbar */}
-        <div className={cc.toolbar}
-        >
+        <div className={cc.toolbar}>
           <div className={cc.toolbarSearch}>
-            <div className={styles.rule}>
-              <SearchField
-                placeholder="Search audit trail by officer, customer, or description..."
-                value={searchQuery}
-                onValueChange={setSearchQuery}
-              />
-            </div>
-
+            <SearchField
+              placeholder="Search audit trail by officer, customer, or description..."
+              value={searchInput}
+              onValueChange={setSearchInput}
+              suggestions={searchSuggestions}
+              onSelectSuggestion={(s) => setSearchInput(s.id)}
+              emptyHint="No matches in the loaded page."
+            />
           </div>
 
           <div className={cc.toolbarActions}>
@@ -332,15 +383,15 @@ export default function AuditLogs() {
               Logs is the reference for both the placement and the "ROWS" label. */}
           <RowsPerPage storageKey="c360.audit" value={pageSize} onChange={(n) => { setPageSize(n); setPageNumber(1); }} />
 
-          <button
-            type="button"
+          <Button
+            variant="secondary"
+            size="sm"
             onClick={fetchLogs}
             disabled={loading}
-            className={styles.panel}
+            leadingIcon={<RefreshCw size={14} className={loading ? 'animate-spin' : ''} />}
           >
-            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-            <span>Refresh</span>
-          </button>
+            Refresh
+          </Button>
         </div>
         </div>
 
@@ -360,7 +411,7 @@ export default function AuditLogs() {
           * underneath, rather than the table scrolling sideways with half its columns off screen.
           * `minWidth` is deliberately gone — the point is that it no longer needs a scroller.
           */}
-        <DataTable footer={<Pagination page={clientFiltered ? 1 : pageNumber} pageSize={clientFiltered ? Math.max(visibleLogs.length, 1) : pageSize} total={clientFiltered ? visibleLogs.length : totalCount} itemLabel="event" onPageChange={setPageNumber} />}>
+        <DataTable bare footer={<Pagination page={clientFiltered ? 1 : pageNumber} pageSize={clientFiltered ? Math.max(visibleLogs.length, 1) : pageSize} total={clientFiltered ? visibleLogs.length : totalCount} itemLabel="event" onPageChange={setPageNumber} />}>
             <ResponsiveRows
               loading={loading && logs.length === 0}
               loadingRows={pageSize}
@@ -475,7 +526,8 @@ export default function AuditLogs() {
                       allLabel={undefined}
                       freeText
                       searchPlaceholder="Type to filter description…"
-                      emptyHint="Press Enter to filter."
+                      suggestFrom={descPool}
+                      emptyHint="No matching activity on this page."
                     />
                   ),
                   render: (log) => <span className={styles.text8}>{log.description || EMPTY_VALUE}</span>,

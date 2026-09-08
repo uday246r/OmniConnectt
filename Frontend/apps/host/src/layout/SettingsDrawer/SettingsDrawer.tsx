@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../features/auth/store/authStore'
 import { useSettingsDrawerStore, type SettingsTab } from '../../shared/stores/settingsDrawerStore'
 import { Icon } from '../../shared/components/Icon/Icon'
-import { SettingsUsersTab } from './SettingsUsersTab'
 import { SettingsRolesTab } from './SettingsRolesTab'
 import { SettingsApplicationsTab } from './SettingsApplicationsTab'
 import { SettingsCheckerAssignmentTab } from './SettingsCheckerAssignmentTab'
@@ -18,6 +17,7 @@ export function SettingsDrawer() {
   const activeTab = useSettingsDrawerStore((s) => s.activeTab)
   const layerStack = useSettingsDrawerStore((s) => s.layerStack)
   const popLayer = useSettingsDrawerStore((s) => s.popLayer)
+  const closeDrawerStore = useSettingsDrawerStore((s) => s.close)
   const drawerRef = useRef<HTMLDivElement>(null)
   const navigate = useNavigate()
 
@@ -29,7 +29,29 @@ export function SettingsDrawer() {
    * exactly the behaviour being fixed: nothing was linkable and Back did not step between tabs.
    */
   const goToTab = (tab: SettingsTab) => navigate(`/settings/${tab}`)
-  const close = () => navigate('/')
+
+  /*
+   * Closing returns to wherever Settings was opened from, not to the dashboard.
+   *
+   * This was `navigate('/')`, which meant a trip into Settings always cost you your place: open the
+   * gear from a lead or an audit log, close it, and you were on the dashboard. `returnPath` is the
+   * last non-drawer route the shell saw, and falls back to '/' only for a cold deep-link where
+   * there is genuinely nothing to go back to.
+   */
+  const close = () => navigate(useSettingsDrawerStore.getState().returnPath)
+
+  /*
+   * Users left the drawer for a real page (UsersPage), so its tab button is a plain navigation +
+   * close instead of goToTab — /settings/users renders UsersPage directly now, not the drawer's own
+   * Users panel, so nothing here should open the drawer for it. Closing explicitly (rather than
+   * relying on SettingsRoute to do it) matters when this is clicked while the drawer is already open
+   * on another tab: without it, the drawer would stay open showing its previous tab while the page
+   * underneath silently changed.
+   */
+  const goToUsersPage = () => {
+    closeDrawerStore()
+    navigate('/settings/users')
+  }
 
   const isAdministrator = Boolean(useAuthStore((s) => s.user)?.isAdministrator)
   const hasCapability = useAuthStore((s) => s.hasCapability)
@@ -37,6 +59,9 @@ export function SettingsDrawer() {
   // someone who can at least VIEW who's assigned as a checker sees this tab at all; Manage (a
   // separate, further-narrowed capability) is what actually lets them add/remove assignments, see
   // SettingsCheckerAssignmentTab's own canManage check.
+  const canAccessUsers = isAdministrator || hasCapability('host.settings.users', 'View')
+const canAccessRoles = isAdministrator || hasCapability('host.settings.roles', 'View')
+const canAccessApplications = isAdministrator || hasCapability('host.settings.applications', 'View')
   const canAccessCheckerAssignment = isAdministrator || hasCapability('host.system.checker-assignment', 'View')
 
   // ESC key to close or pop layer
@@ -108,14 +133,18 @@ export function SettingsDrawer() {
 
             {/* Horizontal Tabs */}
             <div className={styles.tabsNav}>
-              <button
+              {canAccessUsers && (
+                <button
                 type="button"
-                className={`${styles.tabBtn} ${activeTab === 'users' ? styles.tabBtnActive : ''}`}
-                onClick={() => goToTab('users')}
+                className={styles.tabBtn}
+                onClick={goToUsersPage}
               >
                 <Icon.Users width={16} height={16} />
                 <span>Users</span>
               </button>
+              )}
+
+              {canAccessRoles && (
               <button
                 type="button"
                 className={`${styles.tabBtn} ${activeTab === 'roles' ? styles.tabBtnActive : ''}`}
@@ -124,6 +153,9 @@ export function SettingsDrawer() {
                 <Icon.ShieldCheck width={16} height={16} />
                 <span>Roles</span>
               </button>
+              )}
+
+              {canAccessApplications && (
               <button
                 type="button"
                 className={`${styles.tabBtn} ${activeTab === 'applications' ? styles.tabBtnActive : ''}`}
@@ -132,6 +164,8 @@ export function SettingsDrawer() {
                 <Icon.Grid width={16} height={16} />
                 <span>Applications</span>
               </button>
+              )}
+              
               {canAccessCheckerAssignment && (
                 <button
                   type="button"
@@ -146,7 +180,6 @@ export function SettingsDrawer() {
 
             {/* Tab Body */}
             <div className={styles.tabBody}>
-              {activeTab === 'users' && <SettingsUsersTab />}
               {activeTab === 'roles' && <SettingsRolesTab />}
               {activeTab === 'applications' && <SettingsApplicationsTab />}
               {activeTab === 'checker-assignment' && canAccessCheckerAssignment && <SettingsCheckerAssignmentTab />}

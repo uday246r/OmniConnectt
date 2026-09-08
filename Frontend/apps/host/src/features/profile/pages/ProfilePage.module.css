@@ -401,81 +401,148 @@
   color: var(--omni-color-info-text);
 }
 
-/* ── Capabilities Grid ───────────────────────────────────── */
-.capabilitiesGrid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 12px;
+/* ── App Section Container ───────────────────────────────── */
+.appSection {
+  background: var(--omni-color-surface);
+  border: 1.5px solid #e2eaf5;
+  border-radius: 16px;
+  overflow: hidden;
+  margin-bottom: 20px;
+  box-shadow: 0 1px 6px rgba(15, 23, 42, 0.05);
+  transition: box-shadow 0.18s ease;
 }
 
-@media (max-width: 768px) {
-  .capabilitiesGrid { grid-template-columns: 1fr; }
+.appSection:hover {
+  box-shadow: 0 6px 24px rgba(15, 23, 42, 0.09);
 }
 
-.capItem {
+.appSection:last-child { margin-bottom: 0; }
+
+/* Section header — gradient tinted background */
+.appSectionHeader {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 13px 14px;
-  background: var(--omni-color-surface-alt);
-  border: 1px solid #eaecf0;
-  border-radius: var(--omni-radius-lg);
-  transition: all 0.15s ease;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 22px;
+  background: linear-gradient(to right, #f8fafc 0%, #f1f5f9 100%);
+  border-bottom: 1px solid #e8edf5;
+  flex-wrap: wrap;
 }
 
-.capItem:hover {
-  background: var(--omni-color-surface);
-  border-color: var(--omni-color-primary-200);
-  box-shadow: 0 2px 10px rgba(37, 99, 235, 0.06);
-  transform: translateY(-1px);
+.appSectionLeft {
+  display: flex;
+  align-items: center;
+  gap: 14px;
 }
 
-.capIconWrap {
-  width: 36px; height: 36px;
-  border-radius: var(--omni-radius-lg-minus);
-  background: linear-gradient(135deg, #eff6ff, #dbeafe);
+.appIconWrap {
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
   color: var(--omni-color-primary-600);
   display: flex;
   align-items: center;
   justify-content: center;
+  border: 1px solid #bfdbfe;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.12);
   flex-shrink: 0;
-  box-shadow: 0 1px 3px rgba(37, 99, 235, 0.1);
 }
 
-.capText { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.appIconWrapRemote {
+  background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+  color: #15803d;
+  border-color: #bbf7d0;
+  box-shadow: 0 2px 8px rgba(22, 163, 74, 0.12);
+}
 
-.capTitle { font-size: var(--omni-font-size-sm); font-weight: var(--omni-font-weight-bold); color: var(--omni-color-text-primary); }
+.appSectionTitle {
+  font-size: var(--omni-font-size-md);
+  font-weight: var(--omni-font-weight-bold);
+  color: var(--omni-color-text-primary);
+  margin: 0 0 4px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
 
-.capDesc {
-  font-size: var(--omni-font-size-xs-minus);
+.appSourceTag {
+  font-size: 10px;
+  font-weight: var(--omni-font-weight-bold);
+  padding: 2px 8px;
+  border-radius: var(--omni-radius-pill);
+  background: #dbeafe;
+  color: #1e40af;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.appSectionSubtitle {
+  font-size: var(--omni-font-size-xs);
   color: #64748b;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  margin: 0;
+  line-height: 1.45;
+}
+
+.appCountTag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--omni-font-size-xs);
+  font-weight: var(--omni-font-weight-bold);
+  color: #0369a1;
+  background: #f0f9ff;
+  border: 1.5px solid #bae6fd;
+  border-radius: var(--omni-radius-pill);
+  padding: 5px 14px;
   white-space: nowrap;
 }
 
-.capActivePill {
-  display: inline-flex;
-  align-items: center;
-  background: linear-gradient(135deg, #ecfdf5, #d1fae5);
-  color: var(--omni-color-success-600);
-  border: 1px solid #a7f3d0;
-  border-radius: var(--omni-radius-pill);
-  padding: 2px 10px;
-  font-size: var(--omni-font-size-xs-minus);
-  font-weight: var(--omni-font-weight-semibold);
-  flex-shrink: 0;
+/* ── Module Groups ───────────────────────────────────────── */
+.moduleGroup {
+  margin-bottom: 0;
+  padding: 20px 22px;
+  border-bottom: 1px solid #f1f5f9;
 }
 
-.emptyCapBox {
-  padding: 20px;
-  text-align: center;
-  color: var(--omni-color-text-muted);
-  font-size: var(--omni-font-size-sm);
-  background: var(--omni-color-surface-alt);
-  border-radius: var(--omni-radius-lg-minus);
-  border: 1px dashed #e2e8f0;
+.moduleGroup:last-child {
+  border-bottom: none;
 }
+
+.moduleHeader {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.moduleTitle {
+  font-size: 10px;
+  font-weight: var(--omni-font-weight-bold);
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  padding: 3px 10px;
+  border-radius: var(--omni-radius-pill);
+}
+
+.moduleCategoryBadge {
+  font-size: 11px;
+  color: #94a3b8;
+  font-weight: var(--omni-font-weight-medium);
+}
+
+.moduleDivider {
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(to right, #e2e8f0, transparent);
+}
+
 
 /* ══════════════════════════════════════════════════════════
    Right Slide-Over Drawer

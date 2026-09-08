@@ -1,133 +1,23 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useAuthStore } from '../../auth/store/authStore'
 import { TOPICS, useDataRevision } from '../../../shared/stores/invalidationStore'
-import { ActorCell, Badge, DataTable, DetailField, DetailGrid, DetailSection, EMPTY_VALUE, FilterBar, PageHeader, Pagination, ResponsiveRows, RowAction, RowsPerPage, formatAuditTimestamp, readStoredPageSize, sanitizeFilterInput, filterTypeBlockedMessage, type ActiveFilter, type BadgeTone } from '@omniremit/ui'
+import { ActorCell, Badge, DataTable, EMPTY_VALUE, FilterBar, PageHeader, Pagination, ResponsiveRows, RowAction, RowsPerPage, formatAuditTimestamp, readStoredPageSize, sanitizeFilterInput, filterTypeBlockedMessage, useCommittedFilter, type ActiveFilter, type CommittedFilter } from '@omniremit/ui'
 import { PermissionGate } from '../../../shared/components/PermissionGate/PermissionGate'
 import { ApiError } from '../../../shared/api/httpClient'
 import { useDebouncedValue } from '../../../shared/hooks/useDebouncedValue'
 import { auditLogsApi, type AuditLogDto, type AuditLogSummaryDto } from '../api/auditLogsApi'
+import { formatActionLabel, actionChipClass, formatIpv4 } from '../utils/auditLogFormatting'
 import { Icon } from '../../../shared/components/Icon/Icon'
-// Same generated classes the Settings drawer and the System Audit Trail deep-link render from — reused
-// here so a single record's details open as the identical right-side drawer shell used everywhere else
-// in the host, rather than introducing a third drawer look.
-import drawerStyles from '../../../layout/SettingsDrawer/SettingsDrawer.module.css'
+import { AuditLogDetailDrawer, serviceTone, parseUserAgent } from '../components/AuditLogDetailDrawer/AuditLogDetailDrawer'
+import { OperationTimeline } from '../components/OperationTimeline/OperationTimeline'
 import styles from './AuditLogsPage.module.css'
 
 const FEATURE = 'host.system.audit-logs'
 const DEFAULT_PAGE_SIZE = 10
 
-const SERVICE_TONES: Record<string, BadgeTone> = {
-  AuthService: 'primary',
-  ModuleRegistry: 'info',
-  LeadService: 'warning',
-  Customer360Service: 'success',
-}
-
-function serviceTone(serviceName: string): BadgeTone {
-  return SERVICE_TONES[serviceName] ?? 'neutral'
-}
-
-// Raw actions arrive as backend event names ("auth.login_succeeded", "remoteapp.deleted") — accurate
-// for logs, unreadable for the person reviewing them. Known actions get an exact, hand-written label;
-// anything not in the map yet still gets turned into words instead of showing raw dot/underscore
-// notation, so a new action type added later degrades gracefully rather than looking broken.
-const ACTION_LABELS: Record<string, string> = {
-  'auth.login_succeeded': 'Login Succeeded',
-  'auth.login_failed': 'Login Failed',
-  'remoteapp.created': 'Remote App Registered',
-  'remoteapp.updated': 'Remote App Updated',
-  'remoteapp.deleted': 'Remote App Removed',
-  'remoteapp.status_changed': 'Remote App Status Changed',
-  'employee.created': 'Employee Created',
-  'employee.updated': 'Employee Updated',
-  'employee.deleted': 'Employee Deleted',
-  'lead.created': 'Lead Created',
-  'lead.updated': 'Lead Updated',
-  'lead.deleted': 'Lead Deleted',
-}
-
-function formatActionLabel(action: string): string {
-  if (!action) return 'Unknown Action'
-  const known = ACTION_LABELS[action]
-  if (known) return known
-  const segment = action.includes('.') ? action.slice(action.lastIndexOf('.') + 1) : action
-  return segment
-    .replace(/_/g, ' ')
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
-    .join(' ')
-}
-
-/** Maps a raw backend action key to one of the actionCell colour-variant CSS classes. */
-function actionChipClass(action: string): 'actionSuccess' | 'actionDanger' | 'actionWarning' | 'actionLogin' | 'actionNeutral' {
-  const a = action.toLowerCase()
-  if (a.includes('login_succeeded') || a.includes('login_success')) return 'actionSuccess'
-  if (a.includes('login_failed') || a.includes('login_fail')) return 'actionDanger'
-  if (a.includes('created') || a.includes('registered')) return 'actionSuccess'
-  if (a.includes('deleted') || a.includes('removed') || a.includes('unregistered')) return 'actionDanger'
-  if (a.includes('status_changed') || a.includes('maintenance')) return 'actionWarning'
-  if (a.includes('updated') || a.includes('changed') || a.includes('modified')) return 'actionLogin'
-  return 'actionNeutral'
-}
-
 /* Audit timestamps come from @omniremit/ui so the two remotes render the same shape. */
 const formatTimestamp = formatAuditTimestamp
-
-
-interface ParsedUserAgent {
-  browser: string
-  os: string
-}
-
-function parseUserAgent(ua?: string | null): ParsedUserAgent | null {
-  if (!ua) return null
-  let browser = 'Browser'
-  let os = 'Device'
-
-  // OS detection
-  if (/Windows NT 10.0|Windows NT 11/i.test(ua)) os = 'Windows 10/11'
-  else if (/Windows/i.test(ua)) os = 'Windows'
-  else if (/iPhone|iPad/i.test(ua)) os = 'iOS'
-  else if (/Android/i.test(ua)) os = 'Android'
-  else if (/Mac OS X|Macintosh/i.test(ua)) os = 'macOS'
-  else if (/Linux/i.test(ua)) os = 'Linux'
-
-  // Browser detection (order matters: Edge contains Chrome, Chrome contains Safari)
-  if (/Edg\/([\d.]+)/i.test(ua)) {
-    const m = ua.match(/Edg\/([\d.]+)/i)
-    browser = m ? `Edge ${m[1].split('.')[0]}` : 'Edge'
-  } else if (/Chrome\/([\d.]+)/i.test(ua)) {
-    const m = ua.match(/Chrome\/([\d.]+)/i)
-    browser = m ? `Chrome ${m[1].split('.')[0]}` : 'Chrome'
-  } else if (/Firefox\/([\d.]+)/i.test(ua)) {
-    const m = ua.match(/Firefox\/([\d.]+)/i)
-    browser = m ? `Firefox ${m[1].split('.')[0]}` : 'Firefox'
-  } else if (/Version\/([\d.]+).*Safari/i.test(ua)) {
-    const m = ua.match(/Version\/([\d.]+)/i)
-    browser = m ? `Safari ${m[1].split('.')[0]}` : 'Safari'
-  } else if (/Safari/i.test(ua)) {
-    browser = 'Safari'
-  }
-
-  return { browser, os }
-}
-
-function formatIpv4(ip?: string | null): string {
-  if (!ip) return '—'
-  let trimmed = ip.trim()
-  if (trimmed === '::1' || trimmed === 'localhost') {
-    return '127.0.0.1'
-  }
-  if (trimmed.startsWith('::ffff:')) {
-    trimmed = trimmed.substring(7)
-  }
-  if (trimmed === '::') {
-    return '127.0.0.1'
-  }
-  return trimmed
-}
 
 type DateFilterMode = 'all' | 'today' | 'yesterday' | 'week' | 'month' | 'custom'
 
@@ -139,11 +29,20 @@ const DATE_RANGES: { key: DateFilterMode; label: string }[] = [
   { key: 'month', label: 'Last 30 Days' },
 ]
 
-function computeRangeWithCustom(preset: DateFilterMode, customFrom?: string, customTo?: string): { from?: string; to?: string } {
+/** An empty time falls back to the start/end of that day, so a date-only custom range still behaves as a whole-day bound. */
+function computeRangeWithCustom(
+  preset: DateFilterMode,
+  customFrom?: string,
+  customTo?: string,
+  customFromTime?: string,
+  customToTime?: string,
+): { from?: string; to?: string } {
   if (preset === 'custom') {
+    // No trailing Z: interpreted in the operator's own local time, matching what they typed —
+    // "9am to 5pm" means their own 9-to-5, not UTC's.
     return {
-      from: customFrom ? new Date(customFrom + 'T00:00:00.000Z').toISOString() : undefined,
-      to: customTo ? new Date(customTo + 'T23:59:59.999Z').toISOString() : undefined,
+      from: customFrom ? new Date(`${customFrom}T${customFromTime || '00:00'}:00`).toISOString() : undefined,
+      to: customTo ? new Date(`${customTo}T${customToTime || '23:59'}:59`).toISOString() : undefined,
     }
   }
   const now = new Date()
@@ -176,15 +75,23 @@ function computeRangeWithCustom(preset: DateFilterMode, customFrom?: string, cus
   }
 }
 
-function matchesDateRange(dateStr: string | null | undefined, preset: DateFilterMode, customFrom?: string, customTo?: string): boolean {
+function matchesDateRange(
+  dateStr: string | null | undefined,
+  preset: DateFilterMode,
+  customFrom?: string,
+  customTo?: string,
+  customFromTime?: string,
+  customToTime?: string,
+): boolean {
   if (preset === 'all') return true
   if (!dateStr) return false
   const d = new Date(dateStr)
   if (isNaN(d.getTime())) return false
 
   if (preset === 'custom') {
-    if (customFrom && d < new Date(customFrom + 'T00:00:00.000Z')) return false
-    if (customTo && d > new Date(customTo + 'T23:59:59.999Z')) return false
+    const { from, to } = computeRangeWithCustom(preset, customFrom, customTo, customFromTime, customToTime)
+    if (from && d < new Date(from)) return false
+    if (to && d > new Date(to)) return false
     return true
   }
   const now = new Date()
@@ -225,6 +132,17 @@ const TAB_ACTION_FILTER: Record<TabId, string | undefined> = {
 
 export function AuditLogsPage() {
   const accessToken = useAuthStore((s) => s.accessToken)
+  const [searchParams, setSearchParams] = useSearchParams()
+
+  // Scopes the whole page to one operation's audit trail — set by "View related events" in the detail
+  // drawer, or by pasting a shared link. URL-driven (not just component state) so that link works.
+  const [correlationId, setCorrelationId] = useState(() => searchParams.get('correlationId') ?? '')
+  function clearCorrelationId() {
+    setCorrelationId('')
+    const next = new URLSearchParams(searchParams)
+    next.delete('correlationId')
+    setSearchParams(next, { replace: true })
+  }
 
   // Defaults to all activity, not to failures. See the tablist below for why.
   const [activeTab, setActiveTab] = useState<TabId>(TAB_IDS.auditEvents)
@@ -238,8 +156,37 @@ export function AuditLogsPage() {
   const [dateRange, setDateRange] = useState<DateFilterMode>('all')
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
+  const [customFromTime, setCustomFromTime] = useState('')
+  const [customToTime, setCustomToTime] = useState('')
   const [customDraftFrom, setCustomDraftFrom] = useState('')
   const [customDraftTo, setCustomDraftTo] = useState('')
+  const [customDraftFromTime, setCustomDraftFromTime] = useState('')
+  const [customDraftToTime, setCustomDraftToTime] = useState('')
+
+  /*
+   * Actor, Record, IP and Device are free-text popovers where the box used to BE the filter: every
+   * debounce tick refetched the table while simultaneously re-narrowing the "known values" list you
+   * were reading. useCommittedFilter splits the two — `query` drives the recommendations, `applied`
+   * drives the fetch — so typing is free and the table moves exactly once, on Enter or on picking a
+   * value. (Application, Action, Auth and Outcome never had the problem: their boxes only ever
+   * narrowed a list and the filter changed on click.)
+   */
+  const actorFilter = useCommittedFilter()
+  const recordFilter = useCommittedFilter()
+  const ipFilter = useCommittedFilter()
+  const deviceFilter = useCommittedFilter()
+
+  /**
+   * Enter applies whatever is typed and closes the popover — the escape hatch that keeps these
+   * boxes useful for a value with no suggestion behind it (a one-off IP, a record this page of
+   * results does not happen to contain).
+   */
+  const commitOnEnter = (f: CommittedFilter) => (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key !== 'Enter') return
+    e.preventDefault()
+    f.commit()
+    setActiveHeaderFilter(null)
+  }
 
   // Service filter & search
   const [service, setService] = useState('')
@@ -247,11 +194,10 @@ export function AuditLogsPage() {
 
   // Actor search — a person's name, so only letters are accepted; `actorSearchBlocked` flags the
   // instant after a keystroke that got stripped, driving a "why won't it let me type that" hint.
-  const [actorSearch, setActorSearch] = useState('')
   const [actorSearchBlocked, setActorSearchBlocked] = useState(false)
   function handleActorSearchChange(raw: string) {
     const clean = sanitizeFilterInput(raw, 'alpha')
-    setActorSearch(clean)
+    actorFilter.setQuery(clean)
     setActorSearchBlocked(clean !== raw)
   }
 
@@ -259,30 +205,27 @@ export function AuditLogsPage() {
   const [actionFilter, setActionFilter] = useState('')
   const [actionSearch, setActionSearch] = useState('')
 
-  // Entity search
-  const [entitySearch, setEntitySearch] = useState('')
-
   // Sign-in specific filters
   const [authMethodFilter, setAuthMethodFilter] = useState('')
   // An IPv4 address is digits and dots only.
-  const [ipSearch, setIpSearch] = useState('')
   const [ipSearchBlocked, setIpSearchBlocked] = useState(false)
   function handleIpSearchChange(raw: string) {
     const clean = sanitizeFilterInput(raw, 'numeric')
-    setIpSearch(clean)
+    ipFilter.setQuery(clean)
     setIpSearchBlocked(clean !== raw)
   }
-  const [deviceSearch, setDeviceSearch] = useState('')
   const [resultFilter, setResultFilter] = useState<'' | 'Success' | 'Failure'>('')
 
   // In-memory cached pool to extract available unique options with 0 extra API calls
   const [cachedPool, setCachedPool] = useState<AuditLogDto[]>([])
 
-  const debouncedService = useDebouncedValue(service, 200)
-  const debouncedActor = useDebouncedValue(actorSearch, 200)
-  const debouncedEntity = useDebouncedValue(entitySearch, 200)
-  const debouncedIp = useDebouncedValue(ipSearch, 200)
-  const debouncedDevice = useDebouncedValue(deviceSearch, 200)
+  // Debounced TYPED text — these feed the recommendation lists only. What the table is filtered by
+  // is `actorFilter.applied` / `recordFilter.applied` / `ipFilter.applied` / `deviceFilter.applied`, which change on commit.
+  const debouncedServiceSearch = useDebouncedValue(serviceSearch, 200)
+  const debouncedActor = useDebouncedValue(actorFilter.query, 200)
+  const debouncedEntity = useDebouncedValue(recordFilter.query, 200)
+  const debouncedIp = useDebouncedValue(ipFilter.query, 200)
+  const debouncedDevice = useDebouncedValue(deviceFilter.query, 200)
 
   const [summary, setSummary] = useState<AuditLogSummaryDto | null>(null)
   const [logs, setLogs] = useState<AuditLogDto[] | null>(null)
@@ -294,17 +237,33 @@ export function AuditLogsPage() {
   const dataRevision = useDataRevision(TOPICS.auditLogs)
   const prevDepsRef = useRef<unknown[] | null>(null)
 
-  const range = useMemo(() => computeRangeWithCustom(dateRange, customFrom, customTo), [dateRange, customFrom, customTo])
+  const range = useMemo(
+    () => computeRangeWithCustom(dateRange, customFrom, customTo, customFromTime, customToTime),
+    [dateRange, customFrom, customTo, customFromTime, customToTime],
+  )
 
-  // Zero extra API call: extract unique actors from loaded items
+  /*
+   * Zero extra API call: unique actors from the rows already loaded.
+   *
+   * This list did not narrow as you typed — it was built from `cachedPool` alone, with the search
+   * box's value absent from the dependency array, so "Known Actors" stayed identical no matter what
+   * was in the box next to it. Typing a name is exactly when you most want it to shrink to that
+   * name. Empty box still shows everything, which is the browse affordance the section is for, and
+   * matches how the Service and IP lists below already behave.
+   */
   const availableActors = useMemo(() => {
     const map = new Map<string, { id: string; name: string }>()
     for (const r of cachedPool) {
       const name = r.actorName || r.actorUserId
       if (name) map.set(name.toLowerCase(), { id: r.actorUserId || r.id, name })
     }
-    return Array.from(map.values())
-  }, [cachedPool])
+    // The name already applied is dropped: re-picking it changes nothing and it displaces a real
+    // alternative. Same rule on every list below.
+    const list = Array.from(map.values()).filter((a) => a.name.toLowerCase() !== actorFilter.applied.toLowerCase())
+    if (!debouncedActor.trim()) return list
+    const q = debouncedActor.toLowerCase().trim()
+    return list.filter((a) => a.name.toLowerCase().includes(q))
+  }, [cachedPool, debouncedActor, actorFilter.applied])
 
   /*
    * Services, actions and sign-in methods actually present in the loaded rows — nothing else.
@@ -324,10 +283,12 @@ export function AuditLogsPage() {
       if (r.serviceName) set.add(r.serviceName)
     }
     const list = Array.from(set).sort((a, b) => a.localeCompare(b))
-    if (!serviceSearch.trim()) return list
-    const q = serviceSearch.toLowerCase()
+    // Narrowed by the SEARCH BOX (serviceSearch), not by the applied filter (`service`) — these are
+    // two different things here, unlike the actor/IP/device popovers where the box is the filter.
+    if (!debouncedServiceSearch.trim()) return list
+    const q = debouncedServiceSearch.toLowerCase().trim()
     return list.filter((s) => s.toLowerCase().includes(q))
-  }, [cachedPool, serviceSearch])
+  }, [cachedPool, debouncedServiceSearch])
 
   const availableActions = useMemo(() => {
     const set = new Set<string>()
@@ -383,11 +344,30 @@ export function AuditLogsPage() {
         if (clean && clean !== '—') set.add(clean)
       }
     }
-    const list = Array.from(set)
-    if (!ipSearch.trim()) return list
-    const q = ipSearch.toLowerCase()
+    const list = Array.from(set).filter((v) => v !== ipFilter.applied)
+    if (!debouncedIp.trim()) return list
+    const q = debouncedIp.toLowerCase().trim()
     return list.filter((ip) => ip.toLowerCase().includes(q))
-  }, [cachedPool, ipSearch])
+  }, [cachedPool, debouncedIp, ipFilter.applied])
+
+  /*
+   * Zero extra API call: unique records touched, for the RECORD column's popover.
+   *
+   * That popover was the only one in this table offering a bare text box and no list at all — you
+   * had to already know what a record was called to filter by it. Same treatment as Known IPs
+   * above: everything when the box is empty, narrowed once you type.
+   */
+  const availableEntities = useMemo(() => {
+    const set = new Set<string>()
+    for (const r of cachedPool) {
+      const label = r.entityLabel || r.entityType
+      if (label) set.add(label)
+    }
+    const list = Array.from(set).sort((a, b) => a.localeCompare(b)).filter((v) => v !== recordFilter.applied)
+    if (!debouncedEntity.trim()) return list
+    const q = debouncedEntity.toLowerCase().trim()
+    return list.filter((e) => e.toLowerCase().includes(q))
+  }, [cachedPool, debouncedEntity, recordFilter.applied])
 
   // Zero extra API call: extract unique browser and OS / device options
   const availableDevices = useMemo(() => {
@@ -412,16 +392,17 @@ export function AuditLogsPage() {
     const oses = Array.from(osSet)
 
     const filterList = (arr: string[]) => {
-      if (!deviceSearch.trim()) return arr
-      const q = deviceSearch.toLowerCase()
-      return arr.filter((item) => item.toLowerCase().includes(q))
+      const pool = arr.filter((v) => v.toLowerCase() !== deviceFilter.applied.toLowerCase())
+      if (!debouncedDevice.trim()) return pool
+      const q = debouncedDevice.toLowerCase().trim()
+      return pool.filter((item) => item.toLowerCase().includes(q))
     }
 
     return {
       browsers: filterList(browsers),
       oses: filterList(oses),
     }
-  }, [cachedPool, deviceSearch])
+  }, [cachedPool, debouncedDevice, deviceFilter.applied])
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -471,9 +452,10 @@ export function AuditLogsPage() {
     let cancelled = false
 
     const activeDeps = [
-      page, pageSize, debouncedService, activeTab, actionFilter,
-      resultFilter, authMethodFilter, debouncedActor, debouncedEntity,
-      debouncedIp, debouncedDevice, range, dateRange, customFrom, customTo, refreshKey,
+      page, pageSize, service, activeTab, actionFilter,
+      resultFilter, authMethodFilter, actorFilter.applied, recordFilter.applied,
+      ipFilter.applied, deviceFilter.applied, range, dateRange, customFrom, customTo,
+      customFromTime, customToTime, refreshKey, correlationId,
     ]
 
     const activeDepsChanged =
@@ -496,9 +478,10 @@ export function AuditLogsPage() {
         const result = await auditLogsApi.list(accessToken!, {
           page: 1,
           pageSize: 200,
-          service: debouncedService || undefined,
+          service: service || undefined,
           action: effectiveAction,
           result: effectiveResult,
+          correlationId: correlationId || undefined,
           ...range,
         })
         if (cancelled) return
@@ -516,17 +499,17 @@ export function AuditLogsPage() {
 
         // Client-side precision filtering
         if (dateRange === 'custom') {
-          allItems = allItems.filter((r) => matchesDateRange(r.occurredAt, dateRange, customFrom, customTo))
+          allItems = allItems.filter((r) => matchesDateRange(r.occurredAt, dateRange, customFrom, customTo, customFromTime, customToTime))
         }
-        if (debouncedActor) {
-          const q = debouncedActor.toLowerCase()
+        if (actorFilter.applied) {
+          const q = actorFilter.applied.toLowerCase()
           allItems = allItems.filter((r) =>
             (r.actorName && r.actorName.toLowerCase().includes(q)) ||
             (r.actorUserId && r.actorUserId.toLowerCase().includes(q))
           )
         }
-        if (debouncedEntity) {
-          const q = debouncedEntity.toLowerCase()
+        if (recordFilter.applied) {
+          const q = recordFilter.applied.toLowerCase()
           allItems = allItems.filter((r) =>
             (r.entityType && r.entityType.toLowerCase().includes(q)) ||
             (r.entityLabel && r.entityLabel.toLowerCase().includes(q)) ||
@@ -536,16 +519,16 @@ export function AuditLogsPage() {
         if (authMethodFilter) {
           allItems = allItems.filter((r) => r.authMethod?.toLowerCase() === authMethodFilter.toLowerCase())
         }
-        if (debouncedIp) {
-          const q = debouncedIp.toLowerCase()
+        if (ipFilter.applied) {
+          const q = ipFilter.applied.toLowerCase()
           allItems = allItems.filter((r) => {
             const raw = r.sourceIp?.toLowerCase() || ''
             const formatted = formatIpv4(r.sourceIp).toLowerCase()
             return raw.includes(q) || formatted.includes(q)
           })
         }
-        if (debouncedDevice) {
-          const q = debouncedDevice.toLowerCase()
+        if (deviceFilter.applied) {
+          const q = deviceFilter.applied.toLowerCase()
           allItems = allItems.filter((r) => {
             if (!r.userAgent) return false
             const raw = r.userAgent.toLowerCase()
@@ -559,10 +542,20 @@ export function AuditLogsPage() {
           allItems = allItems.filter((r) => r.result === resultFilter)
         }
 
-        const totalCount = allItems.length
-        const start = (page - 1) * pageSize
-        setLogs(allItems.slice(start, start + pageSize))
-        setTotal(totalCount)
+        // Scoped to one operation: show the whole story, oldest first, never truncated to a page —
+        // an operation's few events would otherwise lose their later steps behind "page 2".
+        if (correlationId) {
+          const chronological = [...allItems].sort(
+            (a, b) => new Date(a.occurredAt).getTime() - new Date(b.occurredAt).getTime(),
+          )
+          setLogs(chronological)
+          setTotal(chronological.length)
+        } else {
+          const totalCount = allItems.length
+          const start = (page - 1) * pageSize
+          setLogs(allItems.slice(start, start + pageSize))
+          setTotal(totalCount)
+        }
       } catch (err) {
         if (cancelled) return
         setError(err instanceof ApiError ? err.message : 'Could not load audit logs.')
@@ -576,9 +569,10 @@ export function AuditLogsPage() {
       cancelled = true
     }
   }, [
-    accessToken, page, pageSize, debouncedService, activeTab, actionFilter,
-    resultFilter, authMethodFilter, debouncedActor, debouncedEntity,
-    debouncedIp, debouncedDevice, range, dateRange, customFrom, customTo, refreshKey,
+    accessToken, page, pageSize, service, activeTab, actionFilter,
+    resultFilter, authMethodFilter, actorFilter.applied, recordFilter.applied,
+    ipFilter.applied, deviceFilter.applied, range, dateRange, customFrom, customTo,
+    customFromTime, customToTime, refreshKey, correlationId,
     dataRevision,
   ])
 
@@ -586,9 +580,9 @@ export function AuditLogsPage() {
   useEffect(() => {
     setPage(1)
   }, [
-    activeTab, dateRange, customFrom, customTo, debouncedService,
-    actionFilter, resultFilter, authMethodFilter, debouncedActor,
-    debouncedEntity, debouncedIp, debouncedDevice, pageSize,
+    activeTab, dateRange, customFrom, customTo, customFromTime, customToTime, service,
+    actionFilter, resultFilter, authMethodFilter, actorFilter.applied,
+    recordFilter.applied, ipFilter.applied, deviceFilter.applied, pageSize, correlationId,
   ])
 
   async function handleExport() {
@@ -597,7 +591,7 @@ export function AuditLogsPage() {
     setError(null)
     try {
       await auditLogsApi.exportCsv(accessToken, {
-        service: debouncedService || undefined,
+        service: service || undefined,
         action: actionFilter || TAB_ACTION_FILTER[activeTab],
         result: resultFilter || (activeTab === TAB_IDS.loginErrors ? 'Failure' : activeTab === TAB_IDS.loginSuccesses ? 'Success' : undefined),
         ...range,
@@ -613,19 +607,24 @@ export function AuditLogsPage() {
   function clearAllFilters() {
     setService('')
     setServiceSearch('')
-    setActorSearch('')
+    actorFilter.clear()
     setActionFilter('')
     setActionSearch('')
-    setEntitySearch('')
+    recordFilter.clear()
     setAuthMethodFilter('')
-    setIpSearch('')
-    setDeviceSearch('')
+    ipFilter.clear()
+    deviceFilter.clear()
     setResultFilter('')
     setDateRange('all')
     setCustomFrom('')
     setCustomTo('')
+    setCustomFromTime('')
+    setCustomToTime('')
     setCustomDraftFrom('')
     setCustomDraftTo('')
+    setCustomDraftFromTime('')
+    setCustomDraftToTime('')
+    clearCorrelationId()
   }
 
   const isLoginTab = activeTab === TAB_IDS.loginErrors || activeTab === TAB_IDS.loginSuccesses
@@ -657,8 +656,12 @@ export function AuditLogsPage() {
                 if (r.key !== 'custom') {
                   setCustomFrom('')
                   setCustomTo('')
+                  setCustomFromTime('')
+                  setCustomToTime('')
                   setCustomDraftFrom('')
                   setCustomDraftTo('')
+                  setCustomDraftFromTime('')
+                  setCustomDraftToTime('')
                 }
               }}
             >
@@ -745,17 +748,20 @@ export function AuditLogsPage() {
         </div>
 
         <div className={styles.toolbarActions}>
-          {/* Rows-per-page dropdown */}
+          {/* Rows-per-page dropdown — meaningless once an operation's whole (unpaginated) story is
+              on screen, so hidden rather than left controlling nothing. */}
           {/* The shared control — same presets and Custom entry this page defined, now with the
               choice remembered per table so it survives navigation and reload. */}
-          <RowsPerPage
-            storageKey="host.audit"
-            value={pageSize}
-            onChange={(n) => {
-              setPageSize(n)
-              setPage(1)
-            }}
-          />
+          {!correlationId && (
+            <RowsPerPage
+              storageKey="host.audit"
+              value={pageSize}
+              onChange={(n) => {
+                setPageSize(n)
+                setPage(1)
+              }}
+            />
+          )}
 
           <button
             type="button"
@@ -793,28 +799,41 @@ export function AuditLogsPage() {
             label: 'Time',
             value:
               dateRange === 'custom'
-                ? `${customFrom || '…'} to ${customTo || '…'}`
+                ? `${customFrom ? `${customFrom}${customFromTime ? ` ${customFromTime}` : ''}` : '…'} to ${customTo ? `${customTo}${customToTime ? ` ${customToTime}` : ''}` : '…'}`
                 : (DATE_RANGES.find((d) => d.key === dateRange)?.label ?? dateRange),
             onRemove: () => {
               setDateRange('all')
               setCustomFrom('')
               setCustomTo('')
+              setCustomFromTime('')
+              setCustomToTime('')
             },
           },
           service && { key: 'service', label: 'Service', value: service, onRemove: () => setService('') },
-          actorSearch && { key: 'actor', label: 'Performed By', value: `"${actorSearch}"`, onRemove: () => setActorSearch('') },
+          actorFilter.applied && { key: 'actor', label: 'Performed By', value: `"${actorFilter.applied}"`, onRemove: () => actorFilter.clear() },
           actionFilter && { key: 'action', label: 'Action', value: actionFilter, onRemove: () => setActionFilter('') },
-          entitySearch && { key: 'entity', label: 'Record', value: `"${entitySearch}"`, onRemove: () => setEntitySearch('') },
+          recordFilter.applied && { key: 'entity', label: 'Record', value: `"${recordFilter.applied}"`, onRemove: () => recordFilter.clear() },
           authMethodFilter && { key: 'auth', label: 'Auth', value: authMethodFilter, onRemove: () => setAuthMethodFilter('') },
-          ipSearch && { key: 'ip', label: 'IP', value: `"${ipSearch}"`, onRemove: () => setIpSearch('') },
-          deviceSearch && { key: 'device', label: 'Device', value: `"${deviceSearch}"`, onRemove: () => setDeviceSearch('') },
+          ipFilter.applied && { key: 'ip', label: 'IP', value: `"${ipFilter.applied}"`, onRemove: () => ipFilter.clear() },
+          deviceFilter.applied && { key: 'device', label: 'Device', value: `"${deviceFilter.applied}"`, onRemove: () => deviceFilter.clear() },
           resultFilter && { key: 'result', label: 'Result', value: resultFilter, onRemove: () => setResultFilter('') },
+          correlationId && { key: 'correlation', label: 'Operation', value: `${total} event${total === 1 ? '' : 's'}`, onRemove: clearCorrelationId },
         ].filter(Boolean) as ActiveFilter[]}
         onClearAll={clearAllFilters}
       />
 
       {error && <div className={styles.errorBanner}>{error}</div>}
 
+      {/* Scoped to one operation: a connected thread telling the story in order, not a table meant
+          for scanning many unrelated rows. */}
+      {correlationId ? (
+        logs === null ? (
+          <p className={styles.timelineLoading}>Loading this operation's events…</p>
+        ) : (
+          <OperationTimeline logs={logs} onView={setViewingLog} />
+        )
+      ) : (
+      <>
       {/* Logs Table — chrome from @omniremit/ui so the host, Approval Center and both remotes all
           render the same table. This page's own `.tableContainer`/`.logTable` were the origin of
           that shared style; the duplicate copy in ApprovalCenterPage.module.css is now gone too. */}
@@ -851,7 +870,17 @@ export function AuditLogsPage() {
                                 <button
                                   type="button"
                                   className={styles.popoverClearBtn}
-                                  onClick={() => { setDateRange('all'); setCustomFrom(''); setCustomTo(''); setCustomDraftFrom(''); setCustomDraftTo('') }}
+                                  onClick={() => {
+                                    setDateRange('all')
+                                    setCustomFrom('')
+                                    setCustomTo('')
+                                    setCustomFromTime('')
+                                    setCustomToTime('')
+                                    setCustomDraftFrom('')
+                                    setCustomDraftTo('')
+                                    setCustomDraftFromTime('')
+                                    setCustomDraftToTime('')
+                                  }}
                                 >
                                   Reset
                                 </button>
@@ -879,12 +908,30 @@ export function AuditLogsPage() {
                                   value={customDraftFrom || customFrom}
                                   onChange={(e) => setCustomDraftFrom(e.target.value)}
                                 />
+                                <input
+                                  type="time"
+                                  className={styles.dateInput}
+                                  value={customDraftFromTime || customFromTime}
+                                  disabled={!(customDraftFrom || customFrom)}
+                                  onChange={(e) => setCustomDraftFromTime(e.target.value)}
+                                />
+                              </div>
+                              <div className={styles.customDateRow}>
                                 <span className={styles.alp1}>to</span>
+                              </div>
+                              <div className={styles.customDateRow}>
                                 <input
                                   type="date"
                                   className={styles.dateInput}
                                   value={customDraftTo || customTo}
                                   onChange={(e) => setCustomDraftTo(e.target.value)}
+                                />
+                                <input
+                                  type="time"
+                                  className={styles.dateInput}
+                                  value={customDraftToTime || customToTime}
+                                  disabled={!(customDraftTo || customTo)}
+                                  onChange={(e) => setCustomDraftToTime(e.target.value)}
                                 />
                               </div>
                               <button
@@ -893,6 +940,8 @@ export function AuditLogsPage() {
                                 onClick={() => {
                                   setCustomFrom(customDraftFrom)
                                   setCustomTo(customDraftTo)
+                                  setCustomFromTime(customDraftFromTime)
+                                  setCustomToTime(customDraftToTime)
                                   setDateRange('custom')
                                   setActiveHeaderFilter(null)
                                 }}
@@ -914,25 +963,26 @@ export function AuditLogsPage() {
                       <th className={styles.thFilterable}>
                         <button
                           type="button"
-                          className={`${styles.thFilterBtn} ${actorSearch ? styles.thFilterBtnActive : ''}`}
+                          className={`${styles.thFilterBtn} ${actorFilter.applied ? styles.thFilterBtnActive : ''}`}
                           onClick={() => setActiveHeaderFilter((c) => (c === 'actor' ? null : 'actor'))}
                         >
                           <span>PERFORMED BY</span>
                           <Icon.ChevronDown width={12} height={12} className={`${styles.filterIcon} ${activeHeaderFilter === 'actor' ? styles.filterIconActive : ''}`} />
-                          {actorSearch && <span className={styles.filterDot} />}
+                          {actorFilter.applied && <span className={styles.filterDot} />}
                         </button>
                         {activeHeaderFilter === 'actor' && (
                           <div className={styles.filterPopover}>
                             <div className={styles.popoverHeader}>
                               <span className={styles.popoverTitle}>Filter Performed By</span>
-                              {actorSearch && <button type="button" className={styles.popoverClearBtn} onClick={() => setActorSearch('')}>Reset</button>}
+                              {actorFilter.applied && <button type="button" className={styles.popoverClearBtn} onClick={() => actorFilter.clear()}>Reset</button>}
                             </div>
                             <input
                               type="text"
                               className={styles.popoverInput}
                               placeholder="Search name or email..."
-                              value={actorSearch}
-                              onChange={(e) => setActorSearch(e.target.value)}
+                              value={actorFilter.query}
+                              onChange={(e) => actorFilter.setQuery(e.target.value)}
+                              onKeyDown={commitOnEnter(actorFilter)}
                               autoFocus
                             />
                             {availableActors.length > 0 && (
@@ -944,8 +994,8 @@ export function AuditLogsPage() {
                                     <button
                                       key={a.id || a.name}
                                       type="button"
-                                      className={`${styles.userItem} ${actorSearch.toLowerCase() === a.name.toLowerCase() ? styles.userItemActive : ''}`}
-                                      onClick={() => { setActorSearch(a.name); setActiveHeaderFilter(null) }}
+                                      className={`${styles.userItem} ${actorFilter.applied.toLowerCase() === a.name.toLowerCase() ? styles.userItemActive : ''}`}
+                                      onClick={() => { actorFilter.commit(a.name); setActiveHeaderFilter(null) }}
                                     >
                                       <div className={styles.userAvatarSmall}>
                                         {a.name.charAt(0).toUpperCase()}
@@ -1016,26 +1066,27 @@ export function AuditLogsPage() {
                       <th className={styles.thFilterable}>
                         <button
                           type="button"
-                          className={`${styles.thFilterBtn} ${ipSearch ? styles.thFilterBtnActive : ''}`}
+                          className={`${styles.thFilterBtn} ${ipFilter.applied ? styles.thFilterBtnActive : ''}`}
                           onClick={() => setActiveHeaderFilter((c) => (c === 'ip' ? null : 'ip'))}
                         >
                           <span>IP ADDRESS</span>
                           <Icon.ChevronDown width={12} height={12} className={`${styles.filterIcon} ${activeHeaderFilter === 'ip' ? styles.filterIconActive : ''}`} />
-                          {ipSearch && <span className={styles.filterDot} />}
+                          {ipFilter.applied && <span className={styles.filterDot} />}
                         </button>
                         {activeHeaderFilter === 'ip' && (
                           <div className={styles.filterPopover}>
                             <div className={styles.popoverHeader}>
                               <span className={styles.popoverTitle}>Filter IP Address</span>
-                              {ipSearch && <button type="button" className={styles.popoverClearBtn} onClick={() => { setIpSearch(''); setIpSearchBlocked(false) }}>Reset</button>}
+                              {ipFilter.applied && <button type="button" className={styles.popoverClearBtn} onClick={() => { ipFilter.clear(); setIpSearchBlocked(false) }}>Reset</button>}
                             </div>
                             <input
                               type="text"
                               inputMode="numeric"
                               className={`${styles.popoverInput} ${ipSearchBlocked ? styles.popoverInputBlocked : ''}`}
                               placeholder="Search IP address..."
-                              value={ipSearch}
+                              value={ipFilter.query}
                               onChange={(e) => handleIpSearchChange(e.target.value)}
+                              onKeyDown={commitOnEnter(ipFilter)}
                               autoFocus
                             />
                             {ipSearchBlocked && (
@@ -1050,8 +1101,8 @@ export function AuditLogsPage() {
                                     <button
                                       key={ip}
                                       type="button"
-                                      className={`${styles.popoverItem} ${ipSearch === ip ? styles.popoverItemActive : ''}`}
-                                      onClick={() => { setIpSearch(ip); setActiveHeaderFilter(null) }}
+                                      className={`${styles.popoverItem} ${ipFilter.applied === ip ? styles.popoverItemActive : ''}`}
+                                      onClick={() => { ipFilter.commit(ip); setActiveHeaderFilter(null) }}
                                     >
                                       <span>{ip}</span>
                                     </button>
@@ -1081,25 +1132,26 @@ export function AuditLogsPage() {
                       <th className={styles.thFilterable}>
                         <button
                           type="button"
-                          className={`${styles.thFilterBtn} ${deviceSearch ? styles.thFilterBtnActive : ''}`}
+                          className={`${styles.thFilterBtn} ${deviceFilter.applied ? styles.thFilterBtnActive : ''}`}
                           onClick={() => setActiveHeaderFilter((c) => (c === 'device' ? null : 'device'))}
                         >
                           <span>BROWSER / DEVICE</span>
                           <Icon.ChevronDown width={12} height={12} className={`${styles.filterIcon} ${activeHeaderFilter === 'device' ? styles.filterIconActive : ''}`} />
-                          {deviceSearch && <span className={styles.filterDot} />}
+                          {deviceFilter.applied && <span className={styles.filterDot} />}
                         </button>
                         {activeHeaderFilter === 'device' && (
                           <div className={`${styles.filterPopover} ${styles.popoverRight}`}>
                             <div className={styles.popoverHeader}>
                               <span className={styles.popoverTitle}>Filter Browser / Device</span>
-                              {deviceSearch && <button type="button" className={styles.popoverClearBtn} onClick={() => setDeviceSearch('')}>Reset</button>}
+                              {deviceFilter.applied && <button type="button" className={styles.popoverClearBtn} onClick={() => deviceFilter.clear()}>Reset</button>}
                             </div>
                             <input
                               type="text"
                               className={styles.popoverInput}
                               placeholder="Search browser or OS..."
-                              value={deviceSearch}
-                              onChange={(e) => setDeviceSearch(e.target.value)}
+                              value={deviceFilter.query}
+                              onChange={(e) => deviceFilter.setQuery(e.target.value)}
+                              onKeyDown={commitOnEnter(deviceFilter)}
                               autoFocus
                             />
                             {(availableDevices.browsers.length > 0 || availableDevices.oses.length > 0) && (
@@ -1112,8 +1164,8 @@ export function AuditLogsPage() {
                                       <button
                                         key={b}
                                         type="button"
-                                        className={`${styles.popoverItem} ${deviceSearch.toLowerCase() === b.toLowerCase() ? styles.popoverItemActive : ''}`}
-                                        onClick={() => { setDeviceSearch(b); setActiveHeaderFilter(null) }}
+                                        className={`${styles.popoverItem} ${deviceFilter.applied.toLowerCase() === b.toLowerCase() ? styles.popoverItemActive : ''}`}
+                                        onClick={() => { deviceFilter.commit(b); setActiveHeaderFilter(null) }}
                                       >
                                         <span>{b}</span>
                                       </button>
@@ -1128,8 +1180,8 @@ export function AuditLogsPage() {
                                       <button
                                         key={os}
                                         type="button"
-                                        className={`${styles.popoverItem} ${deviceSearch.toLowerCase() === os.toLowerCase() ? styles.popoverItemActive : ''}`}
-                                        onClick={() => { setDeviceSearch(os); setActiveHeaderFilter(null) }}
+                                        className={`${styles.popoverItem} ${deviceFilter.applied.toLowerCase() === os.toLowerCase() ? styles.popoverItemActive : ''}`}
+                                        onClick={() => { deviceFilter.commit(os); setActiveHeaderFilter(null) }}
                                       >
                                         <span>{os}</span>
                                       </button>
@@ -1248,7 +1300,17 @@ export function AuditLogsPage() {
                                 <button
                                   type="button"
                                   className={styles.popoverClearBtn}
-                                  onClick={() => { setDateRange('all'); setCustomFrom(''); setCustomTo(''); setCustomDraftFrom(''); setCustomDraftTo('') }}
+                                  onClick={() => {
+                                    setDateRange('all')
+                                    setCustomFrom('')
+                                    setCustomTo('')
+                                    setCustomFromTime('')
+                                    setCustomToTime('')
+                                    setCustomDraftFrom('')
+                                    setCustomDraftTo('')
+                                    setCustomDraftFromTime('')
+                                    setCustomDraftToTime('')
+                                  }}
                                 >
                                   Reset
                                 </button>
@@ -1276,12 +1338,30 @@ export function AuditLogsPage() {
                                   value={customDraftFrom || customFrom}
                                   onChange={(e) => setCustomDraftFrom(e.target.value)}
                                 />
+                                <input
+                                  type="time"
+                                  className={styles.dateInput}
+                                  value={customDraftFromTime || customFromTime}
+                                  disabled={!(customDraftFrom || customFrom)}
+                                  onChange={(e) => setCustomDraftFromTime(e.target.value)}
+                                />
+                              </div>
+                              <div className={styles.customDateRow}>
                                 <span className={styles.alp1}>to</span>
+                              </div>
+                              <div className={styles.customDateRow}>
                                 <input
                                   type="date"
                                   className={styles.dateInput}
                                   value={customDraftTo || customTo}
                                   onChange={(e) => setCustomDraftTo(e.target.value)}
+                                />
+                                <input
+                                  type="time"
+                                  className={styles.dateInput}
+                                  value={customDraftToTime || customToTime}
+                                  disabled={!(customDraftTo || customTo)}
+                                  onChange={(e) => setCustomDraftToTime(e.target.value)}
                                 />
                               </div>
                               <button
@@ -1290,6 +1370,8 @@ export function AuditLogsPage() {
                                 onClick={() => {
                                   setCustomFrom(customDraftFrom)
                                   setCustomTo(customDraftTo)
+                                  setCustomFromTime(customDraftFromTime)
+                                  setCustomToTime(customDraftToTime)
                                   setDateRange('custom')
                                   setActiveHeaderFilter(null)
                                 }}
@@ -1365,26 +1447,27 @@ export function AuditLogsPage() {
                       <th className={styles.thFilterable}>
                         <button
                           type="button"
-                          className={`${styles.thFilterBtn} ${actorSearch ? styles.thFilterBtnActive : ''}`}
+                          className={`${styles.thFilterBtn} ${actorFilter.applied ? styles.thFilterBtnActive : ''}`}
                           onClick={() => setActiveHeaderFilter((c) => (c === 'actor' ? null : 'actor'))}
                         >
                           <span>PERFORMED BY</span>
                           <Icon.ChevronDown width={12} height={12} className={`${styles.filterIcon} ${activeHeaderFilter === 'actor' ? styles.filterIconActive : ''}`} />
-                          {actorSearch && <span className={styles.filterDot} />}
+                          {actorFilter.applied && <span className={styles.filterDot} />}
                         </button>
                         {activeHeaderFilter === 'actor' && (
                           <div className={styles.filterPopover}>
                             <div className={styles.popoverHeader}>
                               <span className={styles.popoverTitle}>Filter Performed By</span>
-                              {actorSearch && <button type="button" className={styles.popoverClearBtn} onClick={() => { setActorSearch(''); setActorSearchBlocked(false) }}>Reset</button>}
+                              {actorFilter.applied && <button type="button" className={styles.popoverClearBtn} onClick={() => { actorFilter.clear(); setActorSearchBlocked(false) }}>Reset</button>}
                             </div>
                             <input
                               type="text"
                               inputMode="text"
                               className={`${styles.popoverInput} ${actorSearchBlocked ? styles.popoverInputBlocked : ''}`}
                               placeholder="Search by name..."
-                              value={actorSearch}
+                              value={actorFilter.query}
                               onChange={(e) => handleActorSearchChange(e.target.value)}
+                              onKeyDown={commitOnEnter(actorFilter)}
                               autoFocus
                             />
                             {actorSearchBlocked && (
@@ -1399,8 +1482,8 @@ export function AuditLogsPage() {
                                     <button
                                       key={a.id || a.name}
                                       type="button"
-                                      className={`${styles.userItem} ${actorSearch.toLowerCase() === a.name.toLowerCase() ? styles.userItemActive : ''}`}
-                                      onClick={() => { setActorSearch(a.name); setActiveHeaderFilter(null) }}
+                                      className={`${styles.userItem} ${actorFilter.applied.toLowerCase() === a.name.toLowerCase() ? styles.userItemActive : ''}`}
+                                      onClick={() => { actorFilter.commit(a.name); setActiveHeaderFilter(null) }}
                                     >
                                       <div className={styles.userAvatarSmall}>
                                         {a.name.charAt(0).toUpperCase()}
@@ -1493,27 +1576,46 @@ export function AuditLogsPage() {
                       <th className={`${styles.thFilterable} ${styles.thNarrow}`}>
                         <button
                           type="button"
-                          className={`${styles.thFilterBtn} ${entitySearch ? styles.thFilterBtnActive : ''}`}
+                          className={`${styles.thFilterBtn} ${recordFilter.applied ? styles.thFilterBtnActive : ''}`}
                           onClick={() => setActiveHeaderFilter((c) => (c === 'entity' ? null : 'entity'))}
                         >
                           <span>RECORD</span>
                           <Icon.ChevronDown width={12} height={12} className={`${styles.filterIcon} ${activeHeaderFilter === 'entity' ? styles.filterIconActive : ''}`} />
-                          {entitySearch && <span className={styles.filterDot} />}
+                          {recordFilter.applied && <span className={styles.filterDot} />}
                         </button>
                         {activeHeaderFilter === 'entity' && (
                           <div className={`${styles.filterPopover} ${styles.popoverRight}`}>
                             <div className={styles.popoverHeader}>
                               <span className={styles.popoverTitle}>Search Entity</span>
-                              {entitySearch && <button type="button" className={styles.popoverClearBtn} onClick={() => setEntitySearch('')}>Reset</button>}
+                              {recordFilter.applied && <button type="button" className={styles.popoverClearBtn} onClick={() => recordFilter.clear()}>Reset</button>}
                             </div>
                             <input
                               type="text"
                               className={styles.popoverInput}
                               placeholder="Filter by record type or name..."
-                              value={entitySearch}
-                              onChange={(e) => setEntitySearch(e.target.value)}
+                              value={recordFilter.query}
+                              onChange={(e) => recordFilter.setQuery(e.target.value)}
+                              onKeyDown={commitOnEnter(recordFilter)}
                               autoFocus
                             />
+                            {availableEntities.length > 0 && (
+                              <>
+                                <div className={styles.popoverDivider} />
+                                <span className={styles.customDateLabel}>Known Records:</span>
+                                <div className={styles.popoverList}>
+                                  {availableEntities.map((e) => (
+                                    <button
+                                      key={e}
+                                      type="button"
+                                      className={`${styles.popoverItem} ${recordFilter.applied === e ? styles.popoverItemActive : ''}`}
+                                      onClick={() => { recordFilter.commit(e); setActiveHeaderFilter(null) }}
+                                    >
+                                      <span>{e}</span>
+                                    </button>
+                                  ))}
+                                </div>
+                              </>
+                            )}
                           </div>
                         )}
                       </th>
@@ -1542,250 +1644,26 @@ export function AuditLogsPage() {
                 ]}
               />
             </DataTable>
+      </>
+      )}
 
       {/* Record details drawer — opened per row by its "View" button (or, on the Sign-ins tabs, the
-          device cell). The SAME right-side drawer shell Settings and the System Audit Trail deep-link
-          use, scoped to just the one record clicked — NOT the whole audit log section. */}
+          device cell). The one shared AuditLogDetailDrawer, also used by a user's own Audit Log tab —
+          enhancing it here enhances both. */}
       {viewingLog && (
-        <div className={drawerStyles.overlayRoot}>
-          <div className={drawerStyles.backdrop} onClick={() => setViewingLog(null)} />
-          <div className={drawerStyles.drawerContainer}>
-            <div className={drawerStyles.rootPanel}>
-              <div className={drawerStyles.header}>
-                <div className={drawerStyles.headerLeft}>
-                  <div className={drawerStyles.headerIcon}>
-                    <Icon.Shield width={20} height={20} />
-                  </div>
-                  <div>
-                    <h2 className={drawerStyles.title}>Activity Details</h2>
-                    <p className={drawerStyles.subtitle}>What happened, who did it, and when</p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  className={drawerStyles.closeBtn}
-                  onClick={() => setViewingLog(null)}
-                  aria-label="Close details"
-                >
-                  <Icon.X width={20} height={20} />
-                </button>
-              </div>
-
-              <div className={drawerStyles.tabBody}>
-                <div className={styles.drawerSections}>
-                  {/* 1. Overview & Timeline Two-Column Section */}
-                  <section className={styles.drawerSection}>
-                    <div className={styles.overviewTimelineGrid}>
-                      <div className={styles.overviewTimelineCol}>
-                        <h3 className={styles.drawerSectionTitle}>
-                          <Icon.Grid width={12} height={12} />
-                          Summary
-                        </h3>
-                        <dl className={styles.detailList}>
-                          <div className={styles.detailRow}>
-                            <span className={styles.detailIcon}>
-                              <Icon.Layers width={15} height={15} />
-                            </span>
-                            <div className={styles.detailRowBody}>
-                              <dt className={styles.detailRowLabel}>Application</dt>
-                              <dd className={styles.detailRowValue}>
-                                <Badge tone={serviceTone(viewingLog.serviceName)}>
-                                  {viewingLog.serviceName}
-                                </Badge>
-                              </dd>
-                            </div>
-                          </div>
-
-                          <div className={styles.detailRow}>
-                            <span className={`${styles.detailIcon} ${styles.detailIconNeutral}`}>
-                              <Icon.Activity width={15} height={15} />
-                            </span>
-                            <div className={styles.detailRowBody}>
-                              <dt className={styles.detailRowLabel}>What Happened</dt>
-                              <dd className={styles.detailRowValue}>
-                                <span className={styles.actionCell}>
-                                  {formatActionLabel(viewingLog.action)}
-                                </span>
-                              </dd>
-                            </div>
-                          </div>
-
-                          <div className={styles.detailRow}>
-                            <span
-                              className={`${styles.detailIcon} ${
-                                viewingLog.result === 'Success'
-                                  ? styles.detailIconSuccess
-                                  : styles.detailIconDanger
-                              }`}
-                            >
-                              {viewingLog.result === 'Success' ? (
-                                <Icon.CheckCircle width={15} height={15} />
-                              ) : (
-                                <Icon.AlertTriangle width={15} height={15} />
-                              )}
-                            </span>
-                            <div className={styles.detailRowBody}>
-                              <dt className={styles.detailRowLabel}>Outcome</dt>
-                              <dd className={styles.detailRowValue}>
-                                <Badge
-                                  tone={viewingLog.result === 'Success' ? 'success' : 'danger'}
-                                  dot
-                                >
-                                  {viewingLog.result}
-                                </Badge>
-                              </dd>
-                            </div>
-                          </div>
-
-                          <div className={styles.detailRow}>
-                            <span className={`${styles.detailIcon} ${styles.detailIconPurple}`}>
-                              <Icon.Clock width={15} height={15} />
-                            </span>
-                            <div className={styles.detailRowBody}>
-                              <dt className={styles.detailRowLabel}>Date &amp; Time</dt>
-                              <dd className={styles.detailRowValue}>
-                                {formatTimestamp(viewingLog.occurredAt)}
-                              </dd>
-                            </div>
-                          </div>
-                        </dl>
-                      </div>
-
-                      <div className={`${styles.overviewTimelineCol} ${styles.overviewTimelineColDivider}`}>
-                        <h3 className={styles.drawerSectionTitle}>
-                          <Icon.Clock width={12} height={12} />
-                          Timeline
-                        </h3>
-                        <div className={styles.timeline}>
-                          <div className={styles.timelineStep}>
-                            <span className={styles.timelineDot} />
-                            <div className={styles.timelineStepCard}>
-                              <span className={styles.timelineLabel}>
-                                {viewingLog.actorName ? `Started by ${viewingLog.actorName}` : 'Activity recorded'}
-                              </span>
-                              <span className={styles.timelineTime}>
-                                <Icon.Clock width={12} height={12} />
-                                {formatTimestamp(viewingLog.occurredAt)}
-                              </span>
-                            </div>
-                          </div>
-
-                          <div className={styles.timelineStep}>
-                            <span
-                              className={`${styles.timelineDot} ${
-                                viewingLog.result === 'Success'
-                                  ? styles.timelineDotSuccess
-                                  : styles.timelineDotDanger
-                              }`}
-                            />
-                            <div className={styles.timelineStepCard}>
-                              <span className={styles.timelineLabel}>
-                                {viewingLog.result === 'Success'
-                                  ? 'Finished successfully'
-                                  : 'Did not complete'}
-                              </span>
-                              <span className={styles.timelineTime}>
-                                <Icon.ShieldCheck width={12} height={12} />
-                                {viewingLog.serviceName}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-
-                        {viewingLog.failureReason && (
-                          <div className={styles.failureAlert}>
-                            <Icon.AlertTriangle className={styles.failureAlertIcon} width={15} height={15} />
-                            <div>
-                              <strong>Why it failed:</strong> {viewingLog.failureReason}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </section>
-
-                  {/*
-                    Every field below is omitted when the record carries no value for it —
-                    DetailField returns null rather than printing "Not recorded", "System / None"
-                    or an em dash, which is what these cards used to do.
-
-                    Two fields were removed outright rather than relabelled: "Actor ID" and
-                    "Entity ID / Key" rendered raw database GUIDs. They mean nothing to the people
-                    who read an audit trail and cannot be acted on; the actor's name and the
-                    record's name carry the same meaning in readable form.
-                  */}
-                  <DetailSection title="Who Did This" icon={<Icon.User width={12} height={12} />}>
-                    <DetailGrid>
-                      <DetailField label="Performed By" icon={<Icon.User width={15} height={15} />}>
-                        {viewingLog.actorName ?? 'System'}
-                      </DetailField>
-
-                      <DetailField label="Sign-in Method" icon={<Icon.Shield width={15} height={15} />}>
-                        {viewingLog.authMethod ? (
-                          <span className={styles.authPill}>{viewingLog.authMethod}</span>
-                        ) : null}
-                      </DetailField>
-
-                      <DetailField label="IP Address" icon={<Icon.Globe width={15} height={15} />}>
-                        {viewingLog.sourceIp ? (
-                          <span className={styles.ipBadge}>
-                            <span className={styles.ipDot} />
-                            {formatIpv4(viewingLog.sourceIp)}
-                          </span>
-                        ) : null}
-                      </DetailField>
-                    </DetailGrid>
-                  </DetailSection>
-
-                  {(() => {
-                    const parsed = parseUserAgent(viewingLog.userAgent)
-                    return (
-                      <DetailSection
-                        title="Device Used"
-                        icon={<Icon.Globe width={12} height={12} />}
-                        hidden={!parsed}
-                      >
-                        <DetailGrid>
-                          <DetailField label="Browser" icon={<Icon.Globe width={15} height={15} />}>
-                            {parsed ? <span className={styles.browserPill}>{parsed.browser}</span> : null}
-                          </DetailField>
-
-                          <DetailField label="Operating System" icon={<Icon.Box width={15} height={15} />}>
-                            {parsed ? <span className={styles.osPill}>{parsed.os}</span> : null}
-                          </DetailField>
-                        </DetailGrid>
-                      </DetailSection>
-                    )
-                  })()}
-
-                  <DetailSection
-                    title="Affected Record"
-                    icon={<Icon.Box width={12} height={12} />}
-                    hidden={!viewingLog.entityType && !viewingLog.entityLabel}
-                  >
-                    <DetailGrid>
-                      <DetailField label="Record Type" icon={<Icon.Layers width={15} height={15} />}>
-                        {viewingLog.entityType ? (
-                          <Badge tone="neutral">{viewingLog.entityType}</Badge>
-                        ) : null}
-                      </DetailField>
-
-                      <DetailField label="Record Name" icon={<Icon.FileText width={15} height={15} />}>
-                        {viewingLog.entityLabel}
-                      </DetailField>
-                    </DetailGrid>
-                  </DetailSection>
-
-                  {viewingLog.details && (
-                    <DetailSection title="Additional Details" icon={<Icon.FileText width={12} height={12} />}>
-                      <pre className={styles.payloadCodeBox}>{viewingLog.details}</pre>
-                    </DetailSection>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <AuditLogDetailDrawer
+          log={viewingLog}
+          accessToken={accessToken}
+          onClose={() => setViewingLog(null)}
+          onViewRelated={(cid) => {
+            clearAllFilters()
+            setCorrelationId(cid)
+            const next = new URLSearchParams(searchParams)
+            next.set('correlationId', cid)
+            setSearchParams(next, { replace: true })
+            setViewingLog(null)
+          }}
+        />
       )}
     </div>
   )

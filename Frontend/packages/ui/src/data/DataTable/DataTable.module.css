@@ -31,7 +31,8 @@
 .scrollArea {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
-  min-width: var(--omni-data-table-min-width, 0);
+  width: 100%;
+  max-width: 100%;
 }
 
 /* Opt-in: the audit/approval tables reserve height so the page does not jump between pages of
@@ -65,7 +66,7 @@
 
 .table {
   width: 100%;
-  /* min-width is now on .scrollArea (runtime custom property hand-off); left here as 0 fallback */
+  min-width: var(--omni-data-table-min-width, 0);
   border-collapse: collapse;
   text-align: left;
 }
@@ -110,7 +111,7 @@
   max-width: var(--omni-data-table-cell-max, 280px);
   overflow: hidden;
   text-overflow: ellipsis;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word; /* break-word respects word boundaries; 'anywhere' broke mid-character */
 }
 
 /*
@@ -296,4 +297,11 @@
 
 .thRight {
   text-align: right;
+  white-space: nowrap;
+  width: 1%;
+  min-width: 84px;
+  /* The base .table td rule sets max-width+overflow:hidden for text truncation.
+     The action column must never clip a button — clear both overrides here. */
+  max-width: none;
+  overflow: visible;
 }

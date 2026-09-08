@@ -247,6 +247,58 @@
   padding: var(--omni-space-3) 0;
 }
 
+/* ── Free-text recommendations ────────────────────────────────────────────────────────────────
+ * IC / Phone / Name were the only criteria here offering a bare box and no list, so filtering by
+ * them meant already knowing the value. These rows list what the loaded leads actually hold —
+ * matched value on top, the customer's name beneath so a bare number is identifiable.
+ */
+.suggestList {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 220px;
+  overflow-y: auto;
+  border-top: 1px solid var(--omni-color-border);
+  padding-top: var(--omni-space-2);
+}
+
+.suggestItem {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  width: 100%;
+  padding: 7px 9px;
+  border: none;
+  background: none;
+  border-radius: var(--omni-radius-md);
+  text-align: left;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background var(--omni-transition-fast);
+}
+
+.suggestItem:hover {
+  background: var(--omni-color-surface-alt);
+}
+
+.suggestValue {
+  font-size: var(--omni-font-size-sm);
+  font-weight: var(--omni-font-weight-medium);
+  color: var(--omni-color-text-primary);
+}
+
+.suggestMeta {
+  font-size: var(--omni-font-size-xs);
+  color: var(--omni-color-text-muted);
+}
+
+.suggestEmpty {
+  margin: 0;
+  font-size: var(--omni-font-size-sm-minus);
+  color: var(--omni-color-text-muted);
+}
+
 /* ── Active filter chips ──────────────────────────────────────────────────────────────────────
  * One chip per criterion that currently has a value, each with its own ✕. Before this the only
  * way to drop a filter was Reset, which cleared all of them at once.

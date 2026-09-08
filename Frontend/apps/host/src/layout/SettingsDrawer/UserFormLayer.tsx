@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../features/auth/store/authStore'
 import {
   usersApi,
@@ -63,6 +64,25 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
   // Gates which roles this operator may hand out — see filteredRoles.
   const isAdministrator = Boolean(useAuthStore((s) => s.user)?.isAdministrator)
   const popLayer = useSettingsDrawerStore((s) => s.popLayer)
+  const navigate = useNavigate()
+
+  /*
+   * Where to go once the form is done.
+   *
+   * Every exit here used to call `resetToRoot('users')`, which reopens the drawer on its Users tab —
+   * except the drawer HAS no Users panel any more (Users became real pages, UsersPage /
+   * UserDetailPage), so the tab body rendered blank. Saving a user dropped you on an empty settings
+   * overlay and the record you had just edited was nowhere in sight.
+   *
+   * Closing and navigating instead puts you back on the page you came from: the detail view if you
+   * hit Edit there, the list if you came from the list. Anything outside /settings/users falls back
+   * to the list, which is the only sensible destination after creating a user.
+   */
+  const finish = () => {
+    const { returnPath, close } = useSettingsDrawerStore.getState()
+    close()
+    navigate(returnPath.startsWith('/settings/users') ? returnPath : '/settings/users')
+  }
 
   const [currentStep, setCurrentStep] = useState<Step>('basic')
   const [loading, setLoading] = useState(true)
@@ -489,7 +509,7 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
 
         if (isApprovalPending(result)) {
           toast.success(result.message)
-          useSettingsDrawerStore.getState().resetToRoot('users')
+          finish()
           return
         }
 
@@ -499,7 +519,7 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
         void refreshSession()
         invalidate(TOPICS.users, TOPICS.approvals, TOPICS.kpis)
         toast.success(`User '${name}' updated successfully.`)
-        useSettingsDrawerStore.getState().resetToRoot('users')
+        finish()
       } else {
         const res = await usersApi.create(
           token,
@@ -725,7 +745,7 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
             <button
               type="button"
               className={styles.doneBtn}
-              onClick={() => useSettingsDrawerStore.getState().resetToRoot('users')}
+              onClick={() => finish()}
             >
               Done & Return to Users List
             </button>
@@ -748,7 +768,7 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
             <button
               type="button"
               className={styles.doneBtn}
-              onClick={() => useSettingsDrawerStore.getState().resetToRoot('users')}
+              onClick={() => finish()}
             >
               Done & Return to Users List
             </button>

@@ -1,7 +1,8 @@
-import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { classNames } from '../../utils/classNames'
 import { sanitizeFilterInput, filterInputMode, filterTypeBlockedMessage, type FilterInputType } from '../../utils/filterInput'
+import { useSuggestions, type SuggestionSource } from '../../hooks/useSuggestions'
 import styles from './ColumnFilter.module.css'
 
 export interface ColumnFilterOption {
@@ -43,7 +44,35 @@ export interface ColumnFilterProps {
   /** Shown when a search matches nothing. */
   emptyHint?: ReactNode
   className?: string
+  /**
+   * Caller-computed matches shown under a `freeText` box as the operator types — a name, a phone
+   * number, anything the caller can look up from data it already has (or fetch). `undefined` (the
+   * default) means "no suggestions": the box behaves exactly as before, Enter-to-apply only.
+   * Passing an array — even an empty one — opts into the suggestion list; an empty array then
+   * renders as "no matches" rather than the plain "Press Enter to apply" hint.
+   */
+  suggestions?: ColumnFilterOption[]
+  /** Fires on every (sanitized) keystroke in a `freeText` box, so the caller can recompute `suggestions`. Ignored outside `freeText`. */
+  onSearchChange?: (value: string) => void
+  /** Shows a "Searching…" row in place of the suggestion list while the caller's own lookup is in flight. */
+  suggestionsLoading?: boolean
+  /**
+   * Candidate values taken from the rows this table has ALREADY loaded. The popover debounces the
+   * typed text itself, matches these against it and lists the hits — the zero-boilerplate
+   * alternative to computing `suggestions` by hand.
+   *
+   * Wiring a column the explicit way costs a raw state, a debounced derivation, a `useMemo` and two
+   * props — roughly a dozen lines each, which is why nine of the platform's ten free-text columns
+   * still showed nothing but "Press Enter to apply". This makes it one prop.
+   *
+   * Matching honours `filterType`, so a 'numeric' column compares digits only and typing `9898`
+   * finds a stored `+91 9898 989 898`. Ignored unless `freeText`, and `suggestions` wins if both
+   * are given.
+   */
+  suggestFrom?: (string | SuggestionSource)[]
 }
+
+const NO_POOL: (string | SuggestionSource)[] = []
 
 /**
  * A table column header that filters its own column.
@@ -74,6 +103,10 @@ export function ColumnFilter({
   searchPlaceholder = 'Type to search…',
   emptyHint,
   className,
+  suggestions,
+  onSearchChange,
+  suggestionsLoading,
+  suggestFrom,
 }: ColumnFilterProps) {
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
@@ -81,6 +114,10 @@ export function ColumnFilter({
   // cleared as soon as a keystroke doesn't, so the hint tracks "was that last character rejected"
   // rather than lingering once the operator has corrected course.
   const [blocked, setBlocked] = useState(false)
+  // Which suggestion the keyboard has moved to; -1 means none, so Enter still falls through to
+  // commitFreeText (the pre-existing behaviour) rather than picking something the operator never
+  // highlighted.
+  const [highlightedIndex, setHighlightedIndex] = useState(-1)
   const rootRef = useRef<HTMLTableCellElement>(null)
   const popoverRef = useRef<HTMLDivElement>(null)
   const popoverId = useId()
@@ -153,15 +190,58 @@ export function ColumnFilter({
   /** Sanitizes a keystroke against `filterType` (freeText or narrowing an options list alike) and
    *  flags `blocked` when the raw input actually had something stripped from it. */
   function handleSearchChange(raw: string) {
+    setHighlightedIndex(-1)
     if (filterType === 'text') {
       setSearch(raw)
       setBlocked(false)
+      if (freeText) onSearchChange?.(raw)
       return
     }
     const clean = sanitizeFilterInput(raw, filterType)
     setSearch(clean)
     setBlocked(clean !== raw)
+    if (freeText) onSearchChange?.(clean)
   }
+
+  /*
+   * `suggestFrom` support. The hook runs unconditionally (rules of hooks) but is inert without a
+   * pool: an empty array in, an empty array out, no debounce timer that matters.
+   *
+   * Only the SUPPLY of suggestions differs between the two paths — everything downstream (the
+   * popover, Arrow/Enter/Escape, highlight, click-outside, commit-on-blur) is shared, so
+   * `activeSuggestions` collapses them into one value the render already knows how to draw.
+   */
+  const { needle: suggestNeedle, items: derivedItems } = useSuggestions(
+    suggestFrom ? search : '',
+    suggestFrom ?? NO_POOL,
+    // The value already filtering this column is dropped from its own suggestions: picking it would
+    // change nothing, and it displaces an alternative that would.
+    { numeric: filterType === 'numeric', exclude: value },
+  )
+
+  const derivedSuggestions = useMemo<ColumnFilterOption[] | undefined>(() => {
+    if (!freeText || !suggestFrom) return undefined
+    // Below the debounce, or before the operator has typed, hand back `[]` rather than `undefined`
+    // so the popover shows its "start typing" affordance instead of falling back to the old
+    // Enter-only hint and flickering between the two on every keystroke.
+    if (!suggestNeedle) return []
+    return derivedItems.map((s) => {
+      const shown = s.label ?? s.value
+      return {
+        value: s.value,
+        label: s.meta ? (
+          <span className={styles.itemStack}>
+            <span className={styles.itemLabel}>{shown}</span>
+            <span className={styles.itemMeta}>{s.meta}</span>
+          </span>
+        ) : (
+          shown
+        ),
+      }
+    })
+  }, [freeText, suggestFrom, suggestNeedle, derivedItems])
+
+  const activeSuggestions = suggestions ?? derivedSuggestions
 
   const isFiltered = value !== ''
   const needle = search.trim().toLowerCase()
@@ -242,11 +322,21 @@ export function ColumnFilter({
               value={search}
               onChange={(e) => handleSearchChange(e.target.value)}
               onKeyDown={(e) => {
+                if (freeText && activeSuggestions && activeSuggestions.length > 0 && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+                  e.preventDefault()
+                  const delta = e.key === 'ArrowDown' ? 1 : -1
+                  setHighlightedIndex((i) => (i + delta + activeSuggestions.length) % activeSuggestions.length)
+                  return
+                }
                 if (e.key === 'Enter') {
                   e.preventDefault()
                   if (freeText) {
-                    commitFreeText()
-                    setOpen(false)
+                    if (activeSuggestions && highlightedIndex >= 0 && highlightedIndex < activeSuggestions.length) {
+                      pick(activeSuggestions[highlightedIndex].value)
+                    } else {
+                      commitFreeText()
+                      setOpen(false)
+                    }
                   } else if (visible.length > 0) {
                     pick(visible[0].value)
                   }
@@ -264,7 +354,32 @@ export function ColumnFilter({
           )}
 
           {freeText ? (
-            <p className={styles.emptyHint}>{emptyHint ?? 'Press Enter to apply.'}</p>
+            activeSuggestions !== undefined ? (
+              <div className={styles.list}>
+                {suggestionsLoading ? (
+                  <div className={styles.emptyHint}>Searching…</div>
+                ) : activeSuggestions.length === 0 ? (
+                  <div className={styles.emptyHint}>
+                    {search.trim() ? (emptyHint ?? `No matches for "${search}"`) : 'Start typing to see matches.'}
+                  </div>
+                ) : (
+                  activeSuggestions.map((o, i) => (
+                    <button
+                      key={o.value}
+                      type="button"
+                      className={classNames(styles.item, i === highlightedIndex && styles.itemActive)}
+                      onMouseEnter={() => setHighlightedIndex(i)}
+                      onClick={() => pick(o.value)}
+                    >
+                      {o.icon}
+                      <span className={styles.itemBody}>{o.label}</span>
+                    </button>
+                  ))
+                )}
+              </div>
+            ) : (
+              <p className={styles.emptyHint}>{emptyHint ?? 'Press Enter to apply.'}</p>
+            )
           ) : (
           <div className={styles.list}>
             {allLabel !== undefined && !needle && (
@@ -289,7 +404,7 @@ export function ColumnFilter({
                   onClick={() => pick(o.value)}
                 >
                   {o.icon}
-                  <span>{o.label}</span>
+                  <span className={styles.itemBody}>{o.label}</span>
                 </button>
               ))
             )}

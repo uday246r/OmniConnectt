@@ -26,8 +26,12 @@ public class AuditLogsController(AuditLogAppService auditLog) : ControllerBase
         [FromQuery] DateTimeOffset? from = null,
         [FromQuery] DateTimeOffset? to = null,
         [FromQuery] string? sortDir = null,
+        [FromQuery] Guid? actorUserId = null,
+        [FromQuery] string? correlationId = null,
         CancellationToken ct = default)
-        => Ok(await auditLog.ListAsync(Math.Max(page, 1), Math.Clamp(pageSize, 1, 100), service, action, result, from, to, sortDir, ct));
+        => Ok(await auditLog.ListAsync(
+            Math.Max(page, 1), Math.Clamp(pageSize, 1, 100), service, action, result, from, to, sortDir,
+            actorUserId: actorUserId, correlationId: correlationId, ct: ct));
 
     [HttpGet("summary")]
     [RequirePermission(Feature, "View")]

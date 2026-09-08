@@ -23,10 +23,23 @@ body {
   color: var(--omni-color-text-primary);
 }
 
-img,
-svg {
+img {
   display: block;
   max-width: 100%;
+}
+
+/*
+ * `max-width: 100%` (correct for a raster image that must never overflow a narrow container) is
+ * actively harmful on an icon svg: every icon in this codebase is already explicitly sized via
+ * width/height props, and a percentage max-width on an inline-flex button's only child (no text,
+ * no other sizing content — an icon-only action button) makes some browsers resolve the flex
+ * item's hypothetical size to 0, collapsing the icon to invisible while its background/border
+ * still render. `flex-shrink: 0` keeps a correctly-sized icon from being shrunk by a tight flex
+ * parent without reintroducing that collapse.
+ */
+svg {
+  display: block;
+  flex-shrink: 0;
 }
 
 button,

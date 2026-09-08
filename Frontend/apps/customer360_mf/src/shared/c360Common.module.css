@@ -109,6 +109,23 @@
 }
 
 /*
+ * The white table card — matches the host's Users page and lead_mf's View Leads / Audit Trail
+ * (`shell.card` there): 18px radius, the same border/shadow, so a card in this remote reads as the
+ * same platform surface rather than the older `.c360-table-container` global class's own token
+ * indirection layer.
+ */
+.card {
+  background: var(--omni-color-surface);
+  border-radius: 18px;
+  border: 1.5px solid #e8edf5;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+  overflow: hidden;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+}
+
+/*
  * Table toolbar: search on the left, actions on the right.
  *
  * The three table pages (Audit Logs, All Products, All Interactions) each had this element left

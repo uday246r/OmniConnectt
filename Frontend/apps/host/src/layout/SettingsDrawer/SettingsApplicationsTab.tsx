@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useAuthStore } from '../../features/auth/store/authStore'
 import { remoteAppsApi, type RemoteAppDto, type RemoteAppStatus } from '../../features/settings-applications/api/remoteAppsApi'
 import { isApprovalPending } from '../../features/approvals/api/approvalsApi'
@@ -11,7 +11,7 @@ import { ApiError } from '../../shared/api/httpClient'
 import { toast } from '../../shared/stores/toastStore'
 import styles from './SettingsApplicationsTab.module.css'
 import { TOPICS, invalidate, useDataRevision } from '../../shared/stores/invalidationStore'
-import { Button, EmptyState, Modal, Pagination } from '@omniremit/ui'
+import { Button, EmptyState, Modal, Pagination, SearchField, type SearchFieldSuggestion } from '@omniremit/ui'
 
 const PAGE_SIZE = 10
 
@@ -84,6 +84,12 @@ export function SettingsApplicationsTab() {
   useEffect(() => {
     setPage(1)
   }, [debouncedSearch])
+
+  /** Names from the page already fetched for this query — a recommendation costs no request. */
+  const appSuggestions: SearchFieldSuggestion[] = useMemo(
+    () => apps.slice(0, 8).map((a) => ({ id: a.displayName, label: a.displayName })),
+    [apps],
+  )
 
   async function confirmDelete() {
     if (!pendingDelete || !accessToken) return
@@ -185,17 +191,16 @@ export function SettingsApplicationsTab() {
         )}
       </div>
 
-      {/* Search Bar */}
-      <div className={styles.searchWrap}>
-        <input
-          type="text"
-          className={styles.searchInput}
-          placeholder="Search applications..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-        <Icon.Search width={16} height={16} className={styles.searchIcon} />
-      </div>
+      {/* Shared SearchField rather than a local input, so this box recommends as you type like
+          every other search on the platform, from the applications already fetched. */}
+      <SearchField
+        placeholder="Search applications..."
+        value={search}
+        onValueChange={setSearch}
+        suggestions={appSuggestions}
+        onSelectSuggestion={(s) => setSearch(s.id)}
+        emptyHint="No matching application."
+      />
 
       {error && (
         <div className={styles.errorBanner} role="alert">

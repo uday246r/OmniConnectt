@@ -13,7 +13,7 @@ import { ApiError } from '../../shared/api/httpClient'
 import { toast } from '../../shared/stores/toastStore'
 import styles from './SettingsCheckerAssignmentTab.module.css'
 import { TOPICS, invalidate, useDataRevision } from '../../shared/stores/invalidationStore'
-import { Button, Modal, getInitials } from '@omniremit/ui'
+import { Button, Modal, SearchField, getInitials, useSuggestions, type SearchFieldSuggestion } from '@omniremit/ui'
 function getModuleIcon(key: string, label: string) {
   const lower = (key + ' ' + label).toLowerCase()
   if (lower.includes('user')) return <Icon.Users width={14} height={14} />
@@ -153,6 +153,33 @@ export function SettingsCheckerAssignmentTab() {
       })
       .filter((group) => group.filteredModules.length > 0)
   }, [appGroups, selectedAppId, statusFilter, debouncedSearch, assignments])
+
+  /*
+   * Recommendations for the toolbar search — the same two things the filter above matches on, drawn
+   * from data already loaded: module labels (qualified by their application) and the names of
+   * checkers actually assigned. Nothing fetched, nothing offered that this list could not show.
+   */
+  const searchPool = useMemo(() => {
+    const pool: { value: string; meta?: string }[] = []
+    for (const group of appGroups) {
+      for (const mod of group.modules) pool.push({ value: mod.label, meta: group.name })
+    }
+    for (const a of assignments) {
+      if (a.checkerName) pool.push({ value: a.checkerName, meta: 'Checker' })
+    }
+    return pool
+  }, [appGroups, assignments])
+
+  const searchHits = useSuggestions(search, searchPool, { delayMs: 250 })
+  const searchSuggestions: SearchFieldSuggestion[] = searchHits.items.map((s) => ({
+    id: s.value,
+    label: (
+      <span className={styles.suggestionRow}>
+        <span className={styles.suggestionPrimary}>{s.value}</span>
+        {s.meta && <span className={styles.suggestionSecondary}>{s.meta}</span>}
+      </span>
+    ),
+  }))
 
   const totalFilteredModulesCount = useMemo(() => {
     return filteredAppGroups.reduce((acc, g) => acc + g.filteredModules.length, 0)
@@ -392,26 +419,17 @@ export function SettingsCheckerAssignmentTab() {
 
         {/* Row 2: Search & Status Filters */}
         <div className={styles.filterToolbar}>
-          <div className={styles.searchWrap}>
-            <input
-              type="text"
-              className={styles.searchInput}
-              placeholder="Search by module or checker name..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-            <Icon.Search width={14} height={14} className={styles.searchIcon} />
-            {search && (
-              <button
-                type="button"
-                className={styles.clearSearchBtn}
-                onClick={() => setSearch('')}
-                aria-label="Clear search query"
-              >
-                <Icon.X width={12} height={12} />
-              </button>
-            )}
-          </div>
+          {/* Shared SearchField rather than a local input + hand-rolled clear button, so this box
+              recommends as you type like every other search on the platform. */}
+          <SearchField
+            className={styles.searchWrap}
+            placeholder="Search by module or checker name..."
+            value={search}
+            onValueChange={setSearch}
+            suggestions={searchSuggestions}
+            onSelectSuggestion={(s) => setSearch(s.id)}
+            emptyHint="No matching module or checker."
+          />
 
           {/* Quick Filter Pills */}
           <div className={styles.filterPills}>

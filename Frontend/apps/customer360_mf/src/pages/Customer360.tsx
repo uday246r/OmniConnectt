@@ -8,12 +8,12 @@ import { getFriendlyErrorMessage, idTypeToFriendlyLabel } from '../utils/errorMe
 import { maskPhone, maskNRIC, maskTIN } from '../utils/masking';
 import CustomerHeader from '../components/CustomerHeader';
 import IndividualDetails from '../components/IndividualDetails';
-import SectionContainer from '../components/SectionContainer';
 import CaseDetailsModal from '../components/CaseDetailsModal';
 import ProductDetailsModal from '../components/ProductDetailsModal';
 import DynamicProfileSection, { groupBySection } from '../components/DynamicProfileSection';
 import { useFieldReveal } from '../hooks/useFieldReveal';
-import { Eye, EyeOff, ChevronRight, ChevronDown, SlidersHorizontal, Building2, Layers, User, Briefcase, Globe, Shield, FileText, Calendar, DollarSign, MapPin, Mail, Phone, TrendingUp, Search, RotateCcw, AlertCircle, Loader2 } from '@omniremit/ui/icons';
+import { useRecentLookups } from '../hooks/useRecentLookups';
+import { Eye, EyeOff, ChevronRight, ChevronDown, SlidersHorizontal, Building2, Layers, User, Briefcase, Globe, Shield, FileText, Calendar, DollarSign, MapPin, Mail, Phone, TrendingUp, Search, RotateCcw, RefreshCw, AlertCircle, Loader2 } from '@omniremit/ui/icons';
 import { useHostNavigate } from '../navigation/HostNavigation';
 import type {
   IndividualProfile,
@@ -26,9 +26,10 @@ import type {
 
 import { DEFAULT_INDIVIDUAL_FIELD_CONFIGS, DEFAULT_CORPORATE_FIELD_CONFIGS } from '../constants/defaultFieldConfigs';
 import styles from './Customer360.module.css';
-import { Button, DataTable, EMPTY_VALUE, PageHeader, ResponsiveRows, getInitials, sanitizeFilterInput, type FilterInputType } from '@omniremit/ui';
+import cc from '../shared/c360Common.module.css';
+import { Button, ColumnFilter, DataTable, EMPTY_VALUE, FilterBar, Input, PageHeader, Pagination, ResponsiveRows, RowAction, RowsPerPage, SearchField, Select, getInitials, sanitizeFilterInput, useDebouncedValue, type ActiveFilter, type FilterInputType } from '@omniremit/ui';
 import { StatusBadge } from '../shared/StatusBadge';
-import { formatValue, formatCurrency as formatMoney } from '../shared/formatValue';
+import { formatValue, formatCurrency as formatMoney, resolveProductStatus } from '../shared/formatValue';
 
 
 /** One "sub-item" row skeleton — matches .left-tab-btn's real height/padding (10px 14px, 13px text). */
@@ -214,32 +215,58 @@ export default function Customer360() {
   const [corpSearchError, setCorpSearchError] = useState('');
   const [loadingCorpSearch, setLoadingCorpSearch] = useState(false);
 
+  /*
+   * Recommendations for the two identity lookups.
+   *
+   * These panels fetch one profile from one identity number, so there is no loaded table to draw
+   * candidates from, and firing a server search on a half-typed NRIC would be both noisy and
+   * meaningless — the lookups stay Enter-to-submit. What can be offered for free is the operator's
+   * own successful lookups, which is also the common case: coming back to a customer they checked
+   * earlier. See useRecentLookups.
+   */
+  const individualRecents = useRecentLookups('c360.recentLookups.individual');
+  const corporateRecents = useRecentLookups('c360.recentLookups.corporate');
+
+  const matchRecents = (
+    entries: { value: string; idType: string; label: string }[],
+    idType: string,
+    typed: string,
+  ) => {
+    const scoped = entries.filter((e) => e.idType === idType);
+    const q = typed.trim().toLowerCase();
+    if (!q) return scoped;
+    return scoped.filter((e) => e.value.toLowerCase().includes(q) || e.label.toLowerCase().includes(q));
+  };
+
+  const individualSuggestions = matchRecents(individualRecents.recents, searchIdType, searchVal);
+  const corporateSuggestions = matchRecents(corporateRecents.recents, corpSearchType, corpSearchVal);
+
   // Individual Product Held states
   const [indSearchQuery, setIndSearchQuery] = useState('');
-  const [indShowFilter, setIndShowFilter] = useState(false);
   const [indTypeFilter, setIndTypeFilter] = useState('');
   const [indStatusFilter, setIndStatusFilter] = useState('');
-  const [indShowMode, setIndShowMode] = useState('5');
-  const [indCustomSize, setIndCustomSize] = useState<number | string>(5);
 
   // Corporate (Non-Individual) Product Held states
   const [corpSearchQuery, setCorpSearchQuery] = useState('');
-  const [corpShowFilter, setCorpShowFilter] = useState(false);
   const [corpTypeFilter, setCorpTypeFilter] = useState('');
   const [corpStatusFilter, setCorpStatusFilter] = useState('');
-  const [corpShowMode, setCorpShowMode] = useState('5');
-  const [corpCustomSize, setCorpCustomSize] = useState<number | string>(5);
 
   // Corporate Subtab toggle for Products & Signatories
   const [corpSubTab, setCorpSubTab] = useState('products');
 
   // Interactions states
   const [intSearchQuery, setIntSearchQuery] = useState('');
-  const [intShowFilter, setIntShowFilter] = useState(false);
   const [intStatusFilter, setIntStatusFilter] = useState('');
-  const [intShowMode, setIntShowMode] = useState('5');
-  const [intCustomSize, setIntCustomSize] = useState<number | string>(5);
+  const [intPageSize, setIntPageSize] = useState(5);
   const [intPageNumber, setIntPageNumber] = useState(1);
+
+  // These three search boxes filter an already-loaded, in-memory list on every keystroke — with no
+  // debounce that meant every character retyped the filtered array and re-rendered the whole table.
+  // The boxes themselves stay bound to the raw value (typing must never feel laggy); only the
+  // filtering below waits for the debounce.
+  const debouncedIndSearchQuery = useDebouncedValue(indSearchQuery, 200);
+  const debouncedCorpSearchQuery = useDebouncedValue(corpSearchQuery, 200);
+  const debouncedIntSearchQuery = useDebouncedValue(intSearchQuery, 200);
 
   const [revealed, setRevealed] = useState<Record<string, boolean>>({});
 
@@ -431,6 +458,12 @@ export default function Customer360() {
       // actually came back; otherwise leave it to whichever search superseded this one.
       if (loadedProfile) {
         setIsSearched(true);
+        // Only a lookup that actually resolved is remembered, so a typo never becomes a suggestion.
+        individualRecents.remember({
+          value: searchVal,
+          idType: searchIdType,
+          label: loadedProfile.fullName || searchVal,
+        });
 
         // Log success
         await api.logAudit({
@@ -477,6 +510,11 @@ export default function Customer360() {
       // discarded this response because a newer Corporate search superseded it — not a failure.
       if (loadedProfile) {
         setIsSearchedCorp(true);
+        corporateRecents.remember({
+          value: corpSearchVal,
+          idType: corpSearchType,
+          label: loadedProfile.organizationName || corpSearchVal,
+        });
 
         // Log success
         await api.logAudit({
@@ -616,24 +654,16 @@ export default function Customer360() {
   // Reset filter and search states when customer profile changes
   useEffect(() => {
     setIndSearchQuery('');
-    setIndShowFilter(false);
     setIndTypeFilter('');
     setIndStatusFilter('');
-    setIndShowMode('5');
-    setIndCustomSize(5);
 
     setCorpSearchQuery('');
-    setCorpShowFilter(false);
     setCorpTypeFilter('');
     setCorpStatusFilter('');
-    setCorpShowMode('5');
-    setCorpCustomSize(5);
 
     setIntSearchQuery('');
-    setIntShowFilter(false);
     setIntStatusFilter('');
-    setIntShowMode('5');
-    setIntCustomSize(5);
+    setIntPageSize(5);
     setIntPageNumber(1);
   }, [profile]);
 
@@ -679,12 +709,12 @@ export default function Customer360() {
   const getFilteredAndUnique = (isInd: boolean) => {
     // 1. Unique Types & Statuses (derived from the original complete list of products loaded in the store)
     const rawTypes = products.map(p => p.type || p.productCategory || '').filter(Boolean);
-    const rawStatuses = products.map(p => p.derivedAccountStatus || p.financingStatus || '').filter(Boolean);
+    const rawStatuses = products.map(p => resolveProductStatus(p)).filter(Boolean);
     const uniqueTypes = Array.from(new Set(rawTypes));
     const uniqueStatuses = Array.from(new Set(rawStatuses));
 
     // 2. Filter products
-    const query = (isInd ? indSearchQuery : corpSearchQuery).toLowerCase().trim();
+    const query = (isInd ? debouncedIndSearchQuery : debouncedCorpSearchQuery).toLowerCase().trim();
     const typeF = isInd ? indTypeFilter : corpTypeFilter;
     const statusF = isInd ? indStatusFilter : corpStatusFilter;
 
@@ -695,7 +725,7 @@ export default function Customer360() {
         (item.type || item.productCategory || '').toLowerCase().includes(query);
 
       const matchesType = !typeF || (item.type || item.productCategory || '') === typeF;
-      const matchesStatus = !statusF || (item.derivedAccountStatus || item.financingStatus || '') === statusF;
+      const matchesStatus = !statusF || resolveProductStatus(item) === statusF;
 
       return matchesSearch && matchesType && matchesStatus;
     });
@@ -706,8 +736,37 @@ export default function Customer360() {
   const indData = getFilteredAndUnique(true);
   const corpData = getFilteredAndUnique(false);
 
+  // Recommends matching products as the operator types, rather than only narrowing the table
+  // silently — the same "show it, don't make them press Enter" treatment the Name/Mobile column
+  // filters on the Users page have. Picking one commits the product's own name as the search term.
+  const productSuggestions = (isInd: boolean) => {
+    const query = (isInd ? debouncedIndSearchQuery : debouncedCorpSearchQuery).toLowerCase().trim();
+    if (!query) return [];
+    return products
+      .filter(
+        (item) =>
+          (item.productName || '').toLowerCase().includes(query) ||
+          (item.accountNumber || getLegacyProductField(item, 'accountNo') || '').toLowerCase().includes(query) ||
+          (item.type || item.productCategory || '').toLowerCase().includes(query),
+      )
+      .slice(0, 8)
+      .map((item) => ({
+        id: item.productName || (item.accountNumber ?? getLegacyProductField(item, 'accountNo')) || '',
+        label: (
+          <span className={styles.suggestionRow}>
+            <span className={styles.suggestionPrimary}>{formatValue(item.productName)}</span>
+            <span className={styles.suggestionSecondary}>
+              {item.type || item.productCategory} · {formatValue(item.accountNumber || getLegacyProductField(item, 'accountNo'))}
+            </span>
+          </span>
+        ),
+      }));
+  };
+  const indSearchSuggestions = productSuggestions(true);
+  const corpSearchSuggestions = productSuggestions(false);
+
   const getFilteredInteractions = () => {
-    const query = intSearchQuery.toLowerCase().trim();
+    const query = debouncedIntSearchQuery.toLowerCase().trim();
     const statusF = intStatusFilter;
 
     // 1. Filter interactions
@@ -732,17 +791,29 @@ export default function Customer360() {
 
   const intData = getFilteredInteractions();
 
-  const getIntPageSize = () => {
-    if (intShowMode === '5') return 5;
-    if (intShowMode === '10') return 10;
-    if (intShowMode === 'custom') {
-      const size = parseInt(String(intCustomSize), 10);
-      return (!isNaN(size) && size > 0) ? size : 5;
-    }
-    return intData.filtered.length || 5;
-  };
+  // Same recommend-as-you-type treatment for the interactions search.
+  const intSearchSuggestions = (() => {
+    const query = debouncedIntSearchQuery.toLowerCase().trim();
+    if (!query) return [];
+    return interactions
+      .filter(
+        (item) =>
+          (item.caseId || '').toLowerCase().includes(query) ||
+          (item.category || '').toLowerCase().includes(query) ||
+          (item.classification || item.subCategory1 || '').toLowerCase().includes(query),
+      )
+      .slice(0, 8)
+      .map((item) => ({
+        id: String(item.caseId ?? ''),
+        label: (
+          <span className={styles.suggestionRow}>
+            <span className={styles.suggestionPrimary}>{formatValue(item.caseId)}</span>
+            <span className={styles.suggestionSecondary}>{formatValue(item.category)}</span>
+          </span>
+        ),
+      }));
+  })();
 
-  const intPageSize = getIntPageSize();
   const intTotalPages = Math.ceil(intData.filtered.length / intPageSize) || 1;
   const safeIntPageNumber = Math.min(intPageNumber, intTotalPages);
 
@@ -787,7 +858,8 @@ export default function Customer360() {
             <label className="c360-label">
               Search By <span className="c360-required">*</span>
             </label>
-            <select
+            <Select
+              size="lg"
               value={searchIdType}
               onChange={(e) => {
                 setSearchIdType(e.target.value);
@@ -795,15 +867,9 @@ export default function Customer360() {
                 setSearchVal('');
                 setSearchError('');
               }}
-              className="c360-select"
-            >
-              <option value="">Select ID Type</option>
-              {dropdownOptions.idTypes.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
+              placeholder="Select ID Type"
+              options={dropdownOptions.idTypes}
+            />
           </div>
 
           {/* Secondary ID Type Select */}
@@ -812,22 +878,17 @@ export default function Customer360() {
               <label className="c360-label">
                 Document Type <span className="c360-required">*</span>
               </label>
-              <select
+              <Select
+                size="lg"
                 value={searchSubtype}
                 onChange={(e) => {
                   setSearchSubtype(e.target.value);
                   setSearchVal('');
                   setSearchError('');
                 }}
-                className="c360-select"
-              >
-                <option value="">Select Document</option>
-                {dropdownOptions.secondaryIdTypes.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
+                placeholder="Select Document"
+                options={dropdownOptions.secondaryIdTypes}
+              />
             </div>
           ) : (
             <div className={styles.rule} />
@@ -839,37 +900,53 @@ export default function Customer360() {
               confusing/broken; for Secondary ID specifically, the document type must be picked too,
               since the placeholder/label below depends on it. */}
           {searchIdType && (searchIdType !== 'SecondaryID' || searchSubtype) && (
-            <div className={`c360-form-group ${searchIdType === 'SecondaryID' ? styles.searchSpanNarrow : styles.searchSpan}`}>
-              <label className="c360-label">
-                {searchIdType === 'Phone' ? 'Phone Number' :
-                 searchIdType === 'Name' ? 'Full Name' :
-                 searchIdType === 'NRIC' ? 'National ID (NRIC)' :
-                 (dropdownOptions.secondaryIdTypes.find((opt) => opt.value === searchSubtype)?.label || 'Identity Number')} <span className="c360-required">*</span>
-              </label>
-              <div className="c360-input-wrapper">
-                <Search size={16} className="c360-input-icon" />
-                <input
-                  type="text"
-                  placeholder={
-                    searchIdType === 'Phone' ? 'e.g. +60123456789 or 0123456789' :
-                    searchIdType === 'Name' ? 'e.g. Ahmad bin Razak' :
-                    searchIdType === 'NRIC' ? 'e.g. 900101-14-5566 or 900101145566' :
-                    searchSubtype === 'PASSPORT' ? 'e.g. A12345678' : 'Enter identity number'
-                  }
-                  value={searchVal}
-                  onChange={(e) => {
-                    // Restrict keystrokes to what the chosen ID type can actually hold — NRIC and
-                    // Phone are digits-only, Name is letters-only. Secondary ID formats vary by
-                    // subtype (passport numbers mix letters and digits), so it stays unrestricted.
-                    const filterType: FilterInputType =
-                      searchIdType === 'Phone' || searchIdType === 'NRIC' ? 'numeric' :
-                      searchIdType === 'Name' ? 'alpha' : 'text';
-                    setSearchVal(sanitizeFilterInput(e.target.value, filterType));
-                    setSearchError('');
-                  }}
-                  className="c360-input"
-                  autoFocus
-                />
+            <Input
+              className={searchIdType === 'SecondaryID' ? styles.searchSpanNarrow : styles.searchSpan}
+              label={
+                searchIdType === 'Phone' ? 'Phone Number' :
+                searchIdType === 'Name' ? 'Full Name' :
+                searchIdType === 'NRIC' ? 'National ID (NRIC)' :
+                (dropdownOptions.secondaryIdTypes.find((opt) => opt.value === searchSubtype)?.label || 'Identity Number')
+              }
+              required
+              leading={<Search size={16} />}
+              type="text"
+              placeholder={
+                searchIdType === 'Phone' ? 'e.g. +60123456789 or 0123456789' :
+                searchIdType === 'Name' ? 'e.g. Ahmad bin Razak' :
+                searchIdType === 'NRIC' ? 'e.g. 900101-14-5566 or 900101145566' :
+                searchSubtype === 'PASSPORT' ? 'e.g. A12345678' : 'Enter identity number'
+              }
+              value={searchVal}
+              onChange={(e) => {
+                // Restrict keystrokes to what the chosen ID type can actually hold — NRIC and
+                // Phone are digits-only, Name is letters-only. Secondary ID formats vary by
+                // subtype (passport numbers mix letters and digits), so it stays unrestricted.
+                const filterType: FilterInputType =
+                  searchIdType === 'Phone' || searchIdType === 'NRIC' ? 'numeric' :
+                  searchIdType === 'Name' ? 'alpha' : 'text';
+                setSearchVal(sanitizeFilterInput(e.target.value, filterType));
+                setSearchError('');
+              }}
+              autoFocus
+            />
+          )}
+
+          {searchIdType && individualSuggestions.length > 0 && (
+            <div className={styles.recentWrap}>
+              <span className={styles.recentLabel}>Recent lookups</span>
+              <div className={styles.recentList}>
+                {individualSuggestions.map((r) => (
+                  <button
+                    key={`${r.idType}:${r.value}`}
+                    type="button"
+                    className={styles.recentItem}
+                    onClick={() => { setSearchVal(r.value); setSearchError(''); }}
+                  >
+                    <span className={styles.recentName}>{r.label}</span>
+                    <span className={styles.recentValue}>{r.value}</span>
+                  </button>
+                ))}
               </div>
             </div>
           )}
@@ -924,22 +1001,17 @@ export default function Customer360() {
             <label className="c360-label">
               Search Type <span className="c360-required">*</span>
             </label>
-            <select
+            <Select
+              size="lg"
               value={corpSearchType}
               onChange={(e) => {
                 setCorpSearchType(e.target.value);
                 setCorpSearchVal('');
                 setCorpSearchError('');
               }}
-              className="c360-select"
-            >
-              <option value="">Select Search Type</option>
-              {dropdownOptions.corpSearchTypes.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
+              placeholder="Select Search Type"
+              options={dropdownOptions.corpSearchTypes}
+            />
           </div>
 
           {/* Search Input — only once a search type is actually chosen. Previously unconditional,
@@ -947,29 +1019,45 @@ export default function Customer360() {
               else case) even with nothing selected — indistinguishable from genuinely having chosen
               Company Name search. */}
           {corpSearchType && (
-            <div className={`c360-form-group ${styles.rule2}`}>
-              <label className="c360-label">
-                {corpSearchType === 'BRN' ? 'BRN (Business Registration Number)' :
-                 corpSearchType === 'OLDBRN' ? 'Old Registration Number' :
-                 'Company / Organization Name'} <span className="c360-required">*</span>
-              </label>
-              <div className="c360-input-wrapper">
-                <Search size={16} className="c360-input-icon" />
-                <input
-                  type="text"
-                  placeholder={
-                    corpSearchType === 'BRN' ? 'e.g. 202003150001' :
-                    corpSearchType === 'OLDBRN' ? 'e.g. 202003151A' :
-                    'e.g. Omni Global Trading Sdn Bhd'
-                  }
-                  value={corpSearchVal}
-                  onChange={(e) => {
-                    setCorpSearchVal(e.target.value);
-                    setCorpSearchError('');
-                  }}
-                  className="c360-input"
-                  autoFocus
-                />
+            <Input
+              className={styles.rule2}
+              label={
+                corpSearchType === 'BRN' ? 'BRN (Business Registration Number)' :
+                corpSearchType === 'OLDBRN' ? 'Old Registration Number' :
+                'Company / Organization Name'
+              }
+              required
+              leading={<Search size={16} />}
+              type="text"
+              placeholder={
+                corpSearchType === 'BRN' ? 'e.g. 202003150001' :
+                corpSearchType === 'OLDBRN' ? 'e.g. 202003151A' :
+                'e.g. Omni Global Trading Sdn Bhd'
+              }
+              value={corpSearchVal}
+              onChange={(e) => {
+                setCorpSearchVal(e.target.value);
+                setCorpSearchError('');
+              }}
+              autoFocus
+            />
+          )}
+
+          {corpSearchType && corporateSuggestions.length > 0 && (
+            <div className={styles.recentWrap}>
+              <span className={styles.recentLabel}>Recent lookups</span>
+              <div className={styles.recentList}>
+                {corporateSuggestions.map((r) => (
+                  <button
+                    key={`${r.idType}:${r.value}`}
+                    type="button"
+                    className={styles.recentItem}
+                    onClick={() => { setCorpSearchVal(r.value); setCorpSearchError(''); }}
+                  >
+                    <span className={styles.recentName}>{r.label}</span>
+                    <span className={styles.recentValue}>{r.value}</span>
+                  </button>
+                ))}
               </div>
             </div>
           )}
@@ -1198,11 +1286,10 @@ export default function Customer360() {
 
             {/* Active Content container */}
             <div
-              className={['personal_details', 'residency_contact_details', 'employment_details', 'additional_relationship_details', 'overview', 'company_info', 'contact_relationship', 'rmManager'].includes(activeTab) ? "" : "data-table-container"}
-              style={
+              className={
                 ['personal_details', 'residency_contact_details', 'employment_details', 'additional_relationship_details', 'overview', 'company_info', 'contact_relationship', 'rmManager'].includes(activeTab)
-                  ? { padding: '8px 4px' }
-                  : { padding: '16px 20px', backgroundColor: '#FFFFFF' }
+                  ? styles.contentPad
+                  : styles.contentStack
               }
             >
               {/* DETAILS TABS & WORKSPACE DIRECT SECTIONS */}
@@ -1217,91 +1304,57 @@ export default function Customer360() {
 
               {/* USER INTERACTIONS TAB */}
               {activeTab === 'user_interactions' && (
-                <div>
-                  {/* Search & filters */}
-                  <div className={styles.spread}>
-                    <div className={styles.rule3}>
-                      <input
-                        type="text"
-                        placeholder="Search interactions..."
+                <div className={cc.card}>
+                  {/* Controls Toolbar */}
+                  <div className={cc.toolbar}>
+                    <div className={cc.toolbarSearch}>
+                      <SearchField
+                        placeholder="Search interactions by case ID, category..."
                         value={intSearchQuery}
-                        onChange={(e) => {
-                          setIntSearchQuery(e.target.value);
+                        onValueChange={(val) => {
+                          setIntSearchQuery(val);
                           setIntPageNumber(1);
                         }}
-                        className={styles.panel2}
+                        suggestions={intSearchSuggestions}
+                        onSelectSuggestion={(s) => { setIntSearchQuery(s.id); setIntPageNumber(1); }}
+                        emptyHint="No matching interactions."
                       />
                     </div>
-                    <div className={styles.row5}>
-                      <button
-                        className={`btn ${styles.filterToggle}${intShowFilter ? ` ${styles.filterToggleOn}` : ''}`}
+                    <div className={cc.toolbarActions}>
+                      <RowsPerPage
+                        storageKey="c360.ind.interactions"
+                        value={intPageSize}
+                        onChange={(s) => {
+                          setIntPageSize(s);
+                          setIntPageNumber(1);
+                        }}
+                      />
 
-                        onClick={() => setIntShowFilter(!intShowFilter)}
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => individualProfile.nationalId && loadInteractions(individualProfile.nationalId as string)}
+                        disabled={loadingInteractions}
+                        leadingIcon={<RefreshCw size={14} className={loadingInteractions ? 'animate-spin' : ''} />}
                       >
-                        <SlidersHorizontal size={13} className={styles.rule4} />
-                        Filter
-                      </button>
-                      <div className={styles.row6}>
-                        Show
-                        <select
-                          value={intShowMode}
-                          onChange={(e) => {
-                            setIntShowMode(e.target.value);
-                            setIntPageNumber(1);
-                          }}
-                          className={styles.panel3}
-                        >
-                          <option value="5">5</option>
-                          <option value="10">10</option>
-                          <option value="custom">Custom</option>
-                          <option value="all">All</option>
-                        </select>
-                        {intShowMode === 'custom' && (
-                          <input
-                            type="number"
-                            min="1"
-                            value={intCustomSize}
-                            onChange={(e) => {
-                              const val = parseInt(e.target.value, 10);
-                              if (!isNaN(val) && val > 0) {
-                                setIntCustomSize(val);
-                                setIntPageNumber(1);
-                              } else {
-                                setIntCustomSize(e.target.value);
-                              }
-                            }}
-                            className={styles.panel4}
-                          />
-                        )}
-                      </div>
+                        Refresh
+                      </Button>
                     </div>
                   </div>
 
-                  {intShowFilter && (
-                    <div className={styles.panel5}>
-                      <div className={styles.stack5}>
-                        <label className={styles.text}>Status</label>
-                        <select
-                          value={intStatusFilter}
-                          onChange={(e) => {
-                            setIntStatusFilter(e.target.value);
-                            setIntPageNumber(1);
-                          }}
-                          className={styles.panel6}
-                        >
-                          <option value="">All Statuses</option>
-                          {intData.uniqueStatuses.map(s => <option key={s} value={s}>{s}</option>)}
-                        </select>
-                      </div>
-
-                      <button
-                        className={`btn ${styles.row7}`}
-                        onClick={() => { setIntStatusFilter(''); setIntPageNumber(1); }}
-                      >
-                        Clear
-                      </button>
-                    </div>
-                  )}
+                  {/* Status is filtered via the column header below; this bar surfaces both active
+                      filters as removable chips, matching the Users page and Audit Logs convention. */}
+                  <FilterBar
+                    filters={[
+                      intSearchQuery && { key: 'search', label: 'Search', value: `"${intSearchQuery}"`, onRemove: () => setIntSearchQuery('') },
+                      intStatusFilter && { key: 'status', label: 'Status', value: intStatusFilter, onRemove: () => setIntStatusFilter('') },
+                    ].filter(Boolean) as ActiveFilter[]}
+                    onClearAll={() => {
+                      setIntSearchQuery('');
+                      setIntStatusFilter('');
+                      setIntPageNumber(1);
+                    }}
+                  />
 
                   {interactionsError ? (
                     <div className="error-container">
@@ -1310,22 +1363,37 @@ export default function Customer360() {
                         Retry
                       </Button>
                     </div>
-                  ) : !loadingInteractions && intData.filtered.length === 0 ? (
-                    <div className="empty-state">No interactions found.</div>
                   ) : (
-                    <DataTable bare>
+                    <DataTable
+                      bare
+                      minWidth={750}
+                      footer={
+                        <Pagination
+                          page={safeIntPageNumber}
+                          pageSize={intPageSize}
+                          total={intData.filtered.length}
+                          itemLabel="case"
+                          onPageChange={setIntPageNumber}
+                        />
+                      }
+                    >
                       <ResponsiveRows
                         rows={paginatedInteractions}
                         loading={loadingInteractions}
-                        loadingRows={5}
+                        loadingRows={intPageSize}
                         rowKey={(item) => String(item.caseId)}
+                        empty={
+                          intSearchQuery || intStatusFilter
+                            ? 'No interactions match the selected filters. Try adjusting your search query or filters.'
+                            : 'No customer interactions recorded yet.'
+                        }
                         columns={[
                           {
                             key: 'caseId',
                             label: 'Case ID',
                             priority: 'always',
                             render: (item) => (
-                              <span className="account-num-text">{formatValue(item.caseId)}</span>
+                              <span className={cc.monoValue}>{formatValue(item.caseId)}</span>
                             ),
                           },
                           {
@@ -1338,6 +1406,19 @@ export default function Customer360() {
                             key: 'status',
                             label: 'Status',
                             priority: 'always',
+                            header: (
+                              <ColumnFilter
+                                label="Status"
+                                value={intStatusFilter}
+                                onChange={(v) => {
+                                  setIntStatusFilter(v);
+                                  setIntPageNumber(1);
+                                }}
+                                options={intData.uniqueStatuses.map((s) => ({ value: s, label: s }))}
+                                allLabel="All Statuses"
+                                searchable={intData.uniqueStatuses.length > 6}
+                              />
+                            ),
                             render: (item) => (
                               <StatusBadge
                                 status={formatValue(
@@ -1375,48 +1456,12 @@ export default function Customer360() {
                             priority: 'always',
                             align: 'right',
                             render: (item) => (
-                              <span
-                                className={`action-link ${styles.row8}`}
-                                onClick={() => openCaseModal(item)}
-                              >
-                                <Eye size={13} />
-                                View
-                              </span>
+                              <RowAction onClick={() => openCaseModal(item)} />
                             ),
                           },
                         ]}
                       />
                     </DataTable>
-                  )}
-
-                  {/* Pagination */}
-                  {intTotalPages > 1 && (
-                    <div className={styles.row9}>
-                      <button
-                        className={`btn ${styles.avatar2}`}
-                        disabled={safeIntPageNumber === 1}
-                        onClick={() => setIntPageNumber(safeIntPageNumber - 1)}
-                      >
-                        &lt;
-                      </button>
-                      {Array.from({ length: intTotalPages }, (_, i) => i + 1).map((p) => (
-                        <button
-                          key={p}
-                          className={`btn ${styles.pageDot}${safeIntPageNumber === p ? ` ${styles.pageDotActive}` : ''}`}
-
-                          onClick={() => setIntPageNumber(p)}
-                        >
-                          {p}
-                        </button>
-                      ))}
-                      <button
-                        className={`btn ${styles.avatar2}`}
-                        disabled={safeIntPageNumber === intTotalPages}
-                        onClick={() => setIntPageNumber(safeIntPageNumber + 1)}
-                      >
-                        &gt;
-                      </button>
-                    </div>
                   )}
                 </div>
               )}
@@ -1441,111 +1486,56 @@ export default function Customer360() {
                   </div>
 
                   {productsTab === 'held' && (
-                    <div>
-                      {/* Search & filters */}
-                      <div className={styles.spread}>
-                        <div className={styles.rule3}>
-                          <input
-                            type="text"
-                            placeholder="Search products..."
+                    <div className={cc.card}>
+                      {/* Controls Toolbar */}
+                      <div className={cc.toolbar}>
+                        <div className={cc.toolbarSearch}>
+                          <SearchField
+                            placeholder="Search products by name, account number..."
                             value={indSearchQuery}
-                            onChange={(e) => setIndSearchQuery(e.target.value)}
-                            className={styles.panel2}
+                            onValueChange={setIndSearchQuery}
+                            suggestions={indSearchSuggestions}
+                            onSelectSuggestion={(s) => setIndSearchQuery(s.id)}
+                            emptyHint="No matching products."
                           />
                         </div>
-                        <div className={styles.row5}>
-                          <button
-                            className={`btn ${styles.filterToggle}${indShowFilter ? ` ${styles.filterToggleOn}` : ''}`}
+                        <div className={cc.toolbarActions}>
+                          <RowsPerPage
+                            storageKey="c360.ind.products"
+                            value={pageSize}
+                            onChange={(s) => {
+                              setPageSize(s);
+                              const customerId = individualProfile.nationalId as string;
+                              loadProducts(customerId, 1, s);
+                            }}
+                          />
 
-                            onClick={() => setIndShowFilter(!indShowFilter)}
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => individualProfile.nationalId && loadProducts(individualProfile.nationalId as string, pageNumber, pageSize)}
+                            disabled={loadingProducts}
+                            leadingIcon={<RefreshCw size={14} className={loadingProducts ? 'animate-spin' : ''} />}
                           >
-                            <SlidersHorizontal size={13} className={styles.rule4} />
-                            Filter
-                          </button>
-                          <div className={styles.row6}>
-                            Show
-                            <select
-                              value={indShowMode}
-                              onChange={(e) => {
-                                const mode = e.target.value;
-                                setIndShowMode(mode);
-                                const customerId = individualProfile.nationalId as string;
-                                if (mode === '5') {
-                                  loadProducts(customerId, 1, 5);
-                                } else if (mode === '10') {
-                                  loadProducts(customerId, 1, 10);
-                                } else if (mode === 'custom') {
-                                  const size = parseInt(String(indCustomSize), 10);
-                                  const finalSize = (!isNaN(size) && size > 0) ? size : 5;
-                                  loadProducts(customerId, 1, finalSize);
-                                } else if (mode === 'all') {
-                                  const targetSize = totalCount > 0 ? totalCount : 1000;
-                                  loadProducts(customerId, 1, targetSize);
-                                }
-                              }}
-                              className={styles.panel3}
-                            >
-                              <option value="5">5</option>
-                              <option value="10">10</option>
-                              <option value="custom">Custom</option>
-                              <option value="all">All</option>
-                            </select>
-                            {indShowMode === 'custom' && (
-                              <input
-                                type="number"
-                                min="1"
-                                value={indCustomSize}
-                                onChange={(e) => {
-                                  const val = parseInt(e.target.value, 10);
-                                  if (!isNaN(val) && val > 0) {
-                                    setIndCustomSize(val);
-                                    const customerId = individualProfile.nationalId as string;
-                                    loadProducts(customerId, 1, val);
-                                  } else {
-                                    setIndCustomSize(e.target.value);
-                                  }
-                                }}
-                                className={styles.panel4}
-                              />
-                            )}
-                          </div>
+                            Refresh
+                          </Button>
                         </div>
                       </div>
 
-                      {indShowFilter && (
-                        <div className={styles.panel5}>
-                          <div className={styles.stack5}>
-                            <label className={styles.text}>Product Type</label>
-                            <select
-                              value={indTypeFilter}
-                              onChange={(e) => setIndTypeFilter(e.target.value)}
-                              className={styles.panel6}
-                            >
-                              <option value="">All Types</option>
-                              {indData.uniqueTypes.map(t => <option key={t} value={t}>{t}</option>)}
-                            </select>
-                          </div>
-
-                          <div className={styles.stack5}>
-                            <label className={styles.text}>Status</label>
-                            <select
-                              value={indStatusFilter}
-                              onChange={(e) => setIndStatusFilter(e.target.value)}
-                              className={styles.panel6}
-                            >
-                              <option value="">All Statuses</option>
-                              {indData.uniqueStatuses.map(s => <option key={s} value={s}>{s}</option>)}
-                            </select>
-                          </div>
-
-                          <button
-                            className={`btn ${styles.row7}`}
-                            onClick={() => { setIndTypeFilter(''); setIndStatusFilter(''); }}
-                          >
-                            Clear
-                          </button>
-                        </div>
-                      )}
+                      {/* Type and Status are filtered via their own column headers below; this bar
+                          surfaces every active filter as a removable chip. */}
+                      <FilterBar
+                        filters={[
+                          indSearchQuery && { key: 'search', label: 'Search', value: `"${indSearchQuery}"`, onRemove: () => setIndSearchQuery('') },
+                          indTypeFilter && { key: 'type', label: 'Type', value: indTypeFilter, onRemove: () => setIndTypeFilter('') },
+                          indStatusFilter && { key: 'status', label: 'Status', value: indStatusFilter, onRemove: () => setIndStatusFilter('') },
+                        ].filter(Boolean) as ActiveFilter[]}
+                        onClearAll={() => {
+                          setIndSearchQuery('');
+                          setIndTypeFilter('');
+                          setIndStatusFilter('');
+                        }}
+                      />
 
                       {productsError ? (
                         <div className="error-container">
@@ -1554,16 +1544,30 @@ export default function Customer360() {
                             Retry
                           </Button>
                         </div>
-                      ) : !loadingProducts && indData.filtered.length === 0 ? (
-                        <div className="empty-state">No products found.</div>
                       ) : (
-                        <DataTable bare>
+                        <DataTable
+                          bare
+                          footer={
+                            <Pagination
+                              page={pageNumber}
+                              pageSize={pageSize}
+                              total={totalCount}
+                              itemLabel="product"
+                              onPageChange={(p) => loadProducts(individualProfile.nationalId as string, p, pageSize)}
+                            />
+                          }
+                        >
                           <ResponsiveRows
                             rows={indData.filtered}
                             loading={loadingProducts}
-                            loadingRows={5}
+                            loadingRows={pageSize}
                             rowKey={(item) =>
                               String(item.accountNumber || getLegacyProductField(item, 'accountNo'))
+                            }
+                            empty={
+                              indSearchQuery || indTypeFilter || indStatusFilter
+                                ? 'No products match the selected filters. Try adjusting your search query or filters.'
+                                : 'No active banking products found for this customer.'
                             }
                             columns={[
                               {
@@ -1571,38 +1575,68 @@ export default function Customer360() {
                                 label: 'Product Name',
                                 priority: 'always',
                                 render: (item) => (
-                                  <span className={styles.strong4}>{formatValue(item.productName)}</span>
+                                  <div>
+                                    <div className={styles.strong4}>
+                                      {formatValue(item.productName)}
+                                    </div>
+                                    {item.campaignCode && (
+                                      <div className={cc.monoMeta}>
+                                        Campaign: {item.campaignCode}
+                                      </div>
+                                    )}
+                                  </div>
                                 ),
                               },
                               {
                                 key: 'type',
                                 label: 'Type',
-                                priority: 'low',
-                                render: (item) => formatValue(item.type || item.productCategory),
+                                priority: 'always',
+                                header: (
+                                  <ColumnFilter
+                                    label="Type"
+                                    value={indTypeFilter}
+                                    onChange={setIndTypeFilter}
+                                    options={indData.uniqueTypes.map((t) => ({ value: t, label: t }))}
+                                    allLabel="All Types"
+                                    searchable={indData.uniqueTypes.length > 6}
+                                  />
+                                ),
+                                render: (item) => (
+                                  <span
+                                    className={`${styles.typeChip}${item.type === 'Deposit' ? ` ${styles.typeChipDeposit}` : ''}`}
+                                  >
+                                    {formatValue(item.type || item.productCategory)}
+                                  </span>
+                                ),
                               },
                               {
                                 key: 'accountNumber',
                                 label: 'Account Number',
                                 priority: 'high',
                                 render: (item) => (
-                                  <span className="account-num-text">
+                                  <span className={cc.monoValue}>
                                     {formatValue(item.accountNumber || getLegacyProductField(item, 'accountNo'))}
                                   </span>
                                 ),
                               },
                               {
-                                key: 'tenure',
-                                label: 'Tenure',
-                                priority: 'low',
-                                render: (item) => formatValue(item.tenure),
-                              },
-                              {
                                 key: 'accountStatus',
-                                label: 'Account Status',
+                                label: 'Status',
                                 priority: 'always',
+                                header: (
+                                  <ColumnFilter
+                                    label="Status"
+                                    value={indStatusFilter}
+                                    onChange={setIndStatusFilter}
+                                    options={indData.uniqueStatuses.map((s) => ({ value: s, label: s }))}
+                                    allLabel="All Statuses"
+                                    searchable={indData.uniqueStatuses.length > 6}
+                                  />
+                                ),
                                 render: (item) => (
                                   <StatusBadge
-                                    status={formatValue(item.derivedAccountStatus || item.financingStatus)}
+                                    status={resolveProductStatus(item)}
+                                    dot={true}
                                   />
                                 ),
                               },
@@ -1610,39 +1644,58 @@ export default function Customer360() {
                                 key: 'balance',
                                 label: 'Balance',
                                 priority: 'high',
-                                render: (item) =>
-                                  formatCurrency(
-                                    item.balances || getLegacyProductField(item, 'placementAmount')
-                                  ),
+                                render: (item) => (
+                                  <span className={cc.monoAccent}>
+                                    {formatCurrency(
+                                      item.balances || getLegacyProductField(item, 'placementAmount')
+                                    )}
+                                  </span>
+                                ),
                               },
                               {
                                 key: 'outstanding',
                                 label: 'Outstanding',
                                 priority: 'low',
-                                render: (item) => formatCurrency(item.outstanding),
+                                render: (item) => (
+                                  <span className={cc.monoValue}>
+                                    {item.outstanding ? formatCurrency(item.outstanding) : EMPTY_VALUE}
+                                  </span>
+                                ),
                               },
                               {
-                                key: 'maturityDate',
-                                label: 'Maturity Date',
+                                key: 'tenureMaturity',
+                                label: 'Tenure / Maturity',
                                 priority: 'low',
-                                render: (item) => formatValue(item.maturityDate),
+                                render: (item) => (
+                                  <div>
+                                    {item.tenure ? <div className={cc.monoValue}>{item.tenure}</div> : null}
+                                    {item.maturityDate ? (
+                                      <div className={cc.monoMeta}>
+                                        Matures: {item.maturityDate}
+                                      </div>
+                                    ) : null}
+                                    {!item.tenure && !item.maturityDate && (
+                                      <span className={cc.mutedText}>{EMPTY_VALUE}</span>
+                                    )}
+                                  </div>
+                                ),
                               },
                               {
-                                key: 'timeline',
-                                clamp: true,
-                                label: 'Timeline & Summary',
+                                key: 'effectiveDate',
+                                label: 'Opening Date',
                                 priority: 'low',
-                                render: (item) =>
-                                  formatValue(
-                                    getLegacyProductField(item, 'timelineSummary') ||
-                                      getLegacyProductField(item, 'timelineAndSummary')
-                                  ),
-                              },
-                              {
-                                key: 'campaignCode',
-                                label: 'Campaign Code',
-                                priority: 'low',
-                                render: (item) => formatValue(item.campaignCode),
+                                render: (item) => (
+                                  <span className={cc.monoValue}>
+                                    {formatValue(
+                                      item.accountOpeningDate ||
+                                        item.commencementDate ||
+                                        item.cardIssuanceDate ||
+                                        item.disbursedDate ||
+                                        item.createdDate ||
+                                        item.lastContactDate
+                                    )}
+                                  </span>
+                                ),
                               },
                               {
                                 key: 'action',
@@ -1650,8 +1703,7 @@ export default function Customer360() {
                                 priority: 'always',
                                 align: 'right',
                                 render: (item) => (
-                                  <span
-                                    className={`action-link ${styles.row8}`}
+                                  <RowAction
                                     onClick={() =>
                                       openProductModal(
                                         (item.accountNumber ||
@@ -1659,134 +1711,105 @@ export default function Customer360() {
                                         (item.type || item.productCategory) as string
                                       )
                                     }
-                                  >
-                                    <Eye size={13} />
-                                    View
-                                  </span>
+                                  />
                                 ),
                               },
                             ]}
                           />
                         </DataTable>
                       )}
-
-                      {/* Pagination */}
-                      {totalPages > 1 && (
-                        <div className={styles.row9}>
-                          <button
-                            className={`btn ${styles.avatar2}`}
-                            disabled={pageNumber === 1 || loadingProducts}
-                            onClick={() => loadProducts(individualProfile.nationalId as string, pageNumber - 1)}
-                          >
-                            &lt;
-                          </button>
-                          {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-                            <button
-                              key={p}
-                              className={`btn ${styles.pageDot}${pageNumber === p ? ` ${styles.pageDotActive}` : ''}`}
-                              disabled={loadingProducts}
-                              onClick={() => loadProducts(individualProfile.nationalId as string, p)}
-                            >
-                              {p}
-                            </button>
-                          ))}
-                          <button
-                            className={`btn ${styles.avatar2}`}
-                            disabled={pageNumber === totalPages || loadingProducts}
-                            onClick={() => loadProducts(individualProfile.nationalId as string, pageNumber + 1)}
-                          >
-                            &gt;
-                          </button>
-                        </div>
-                      )}
                     </div>
                   )}
 
                   {productsTab === 'interested' && (
-                    <DataTable bare>
-                      <ResponsiveRows
-                        rows={
-                          profile.interestedProductName || profile.interestedProductCategory
-                            ? [profile]
-                            : []
-                        }
-                        rowKey={() => 'interested-product'}
-                        empty="No interested products found."
-                        columns={[
-                          {
-                            key: 'name',
-                            label: 'Product Name',
-                            priority: 'always',
-                            render: (row) => (
-                              <span className={styles.strong4}>
-                                {formatValue(row.interestedProductName)}
-                              </span>
-                            ),
-                          },
-                          {
-                            key: 'category',
-                            label: 'Product Category',
-                            priority: 'always',
-                            render: (row) => formatValue(row.interestedProductCategory),
-                          },
-                          {
-                            key: 'engagement',
-                            label: 'Engagement Count',
-                            priority: 'low',
-                            render: (row) => formatValue(row.engagementCount),
-                          },
-                          {
-                            key: 'eligibility',
-                            label: 'Eligibility Score',
-                            priority: 'low',
-                            render: (row) => formatValue(row.eligibilityScore),
-                          },
-                        ]}
-                      />
-                    </DataTable>
+                    <div className={cc.card}>
+                      <DataTable bare minWidth={600}>
+                        <ResponsiveRows
+                          rows={
+                            profile.interestedProductName || profile.interestedProductCategory
+                              ? [profile]
+                              : []
+                          }
+                          rowKey={() => 'interested-product'}
+                          empty="No interested products found."
+                          columns={[
+                            {
+                              key: 'name',
+                              label: 'Product Name',
+                              priority: 'always',
+                              render: (row) => (
+                                <span className={styles.strong4}>
+                                  {formatValue(row.interestedProductName)}
+                                </span>
+                              ),
+                            },
+                            {
+                              key: 'category',
+                              label: 'Product Category',
+                              priority: 'always',
+                              render: (row) => formatValue(row.interestedProductCategory),
+                            },
+                            {
+                              key: 'engagement',
+                              label: 'Engagement Count',
+                              priority: 'low',
+                              render: (row) => formatValue(row.engagementCount),
+                            },
+                            {
+                              key: 'eligibility',
+                              label: 'Eligibility Score',
+                              priority: 'low',
+                              render: (row) => formatValue(row.eligibilityScore),
+                            },
+                          ]}
+                        />
+                      </DataTable>
+                    </div>
                   )}
                 </div>
               )}
 
               {/* RM DETAILS TAB */}
               {activeTab === 'rm_details' && (
-                <DataTable bare>
-                  <ResponsiveRows
-                    rows={profile.rmName || profile.rmId ? [profile] : []}
-                    rowKey={() => 'relationship-manager'}
-                    empty="No Relationship Manager details found."
-                    columns={[
-                      {
-                        key: 'rmName',
-                        label: 'Relationship Manager',
-                        priority: 'always',
-                        render: (row) => (
-                          <span className={styles.strong4}>{formatValue(row.rmName)}</span>
-                        ),
-                      },
-                      {
-                        key: 'rmId',
-                        label: 'Manager ID',
-                        priority: 'high',
-                        render: (row) => (
-                          <span className="account-num-text">{formatValue(row.rmId)}</span>
-                        ),
-                      },
-                      {
-                        key: 'rmBranchCode',
-                        label: 'Branch Code',
-                        priority: 'low',
-                        render: (row) => formatValue(row.rmBranchCode),
-                      },
-                      {
-                        key: 'rmContactNo',
-                        label: 'Manager Contact',
-                        priority: 'low',
-                        render: (row) => formatValue(row.rmContactNo),
-                      },
-                    ]}
-                  />
-                </DataTable>
+                <div className={cc.card}>
+                  <DataTable bare minWidth={600}>
+                    <ResponsiveRows
+                      rows={profile.rmName || profile.rmId ? [profile] : []}
+                      rowKey={() => 'relationship-manager'}
+                      empty="No Relationship Manager details found."
+                      columns={[
+                        {
+                          key: 'rmName',
+                          label: 'Relationship Manager',
+                          priority: 'always',
+                          render: (row) => (
+                            <span className={styles.strong4}>{formatValue(row.rmName)}</span>
+                          ),
+                        },
+                        {
+                          key: 'rmId',
+                          label: 'Manager ID',
+                          priority: 'high',
+                          render: (row) => (
+                            <span className={cc.monoValue}>{formatValue(row.rmId)}</span>
+                          ),
+                        },
+                        {
+                          key: 'rmBranchCode',
+                          label: 'Branch Code',
+                          priority: 'low',
+                          render: (row) => formatValue(row.rmBranchCode),
+                        },
+                        {
+                          key: 'rmContactNo',
+                          label: 'Manager Contact',
+                          priority: 'low',
+                          render: (row) => formatValue(row.rmContactNo),
+                        },
+                      ]}
+                    />
+                  </DataTable>
+                </div>
               )}
             </div>
           </div>
@@ -1884,11 +1907,10 @@ export default function Customer360() {
           <div className="customer-right-column">
 
             <div
-              className={['overview', 'company_info', 'contact_relationship', 'rmManager'].includes(activeTab) ? "" : "data-table-container"}
-              style={
+              className={
                 ['overview', 'company_info', 'contact_relationship', 'rmManager'].includes(activeTab)
-                  ? { padding: '8px 4px' }
-                  : { padding: '16px 20px', backgroundColor: '#FFFFFF' }
+                  ? styles.contentPad
+                  : styles.contentStack
               }
             >
               {/* NON-INDIVIDUAL DETAIL TABS — config-driven, same as IndividualDetails.tsx. Which
@@ -1956,110 +1978,56 @@ export default function Customer360() {
                   </div>
 
                   {corpSubTab === 'products' ? (
-                    <div>
+                    <div className={cc.card}>
                       {/* Search & filters */}
-                      <div className={styles.spread}>
-                        <div className={styles.rule3}>
-                          <input
-                            type="text"
-                            placeholder="Search products..."
+                      <div className={cc.toolbar}>
+                        <div className={cc.toolbarSearch}>
+                          <SearchField
+                            placeholder="Search corporate products..."
                             value={corpSearchQuery}
-                            onChange={(e) => setCorpSearchQuery(e.target.value)}
-                            className={styles.panel2}
+                            onValueChange={setCorpSearchQuery}
+                            suggestions={corpSearchSuggestions}
+                            onSelectSuggestion={(s) => setCorpSearchQuery(s.id)}
+                            emptyHint="No matching products."
                           />
                         </div>
-                        <div className={styles.row5}>
-                          <button
-                            className={`btn ${styles.filterToggle}${corpShowFilter ? ` ${styles.filterToggleOn}` : ''}`}
-                            onClick={() => setCorpShowFilter(!corpShowFilter)}
+                        <div className={cc.toolbarActions}>
+                          <RowsPerPage
+                            storageKey="c360.corp.products"
+                            value={pageSize}
+                            onChange={(s) => {
+                              setPageSize(s);
+                              const customerId = corporateProfile.brn as string;
+                              loadProducts(customerId, 1, s);
+                            }}
+                          />
+
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => corporateProfile.brn && loadProducts(corporateProfile.brn as string, pageNumber, pageSize)}
+                            disabled={loadingProducts}
+                            leadingIcon={<RefreshCw size={14} className={loadingProducts ? 'animate-spin' : ''} />}
                           >
-                            <SlidersHorizontal size={13} className={styles.rule4} />
-                            Filter
-                          </button>
-                          <div className={styles.row6}>
-                            Show
-                            <select
-                              value={corpShowMode}
-                              onChange={(e) => {
-                                const mode = e.target.value;
-                                setCorpShowMode(mode);
-                                const customerId = corporateProfile.brn as string;
-                                if (mode === '5') {
-                                  loadProducts(customerId, 1, 5);
-                                } else if (mode === '10') {
-                                  loadProducts(customerId, 1, 10);
-                                } else if (mode === 'custom') {
-                                  const size = parseInt(String(corpCustomSize), 10);
-                                  const finalSize = (!isNaN(size) && size > 0) ? size : 5;
-                                  loadProducts(customerId, 1, finalSize);
-                                } else if (mode === 'all') {
-                                  const targetSize = totalCount > 0 ? totalCount : 1000;
-                                  loadProducts(customerId, 1, targetSize);
-                                }
-                              }}
-                              className={styles.panel3}
-                            >
-                              <option value="5">5</option>
-                              <option value="10">10</option>
-                              <option value="custom">Custom</option>
-                              <option value="all">All</option>
-                            </select>
-                            {corpShowMode === 'custom' && (
-                              <input
-                                type="number"
-                                min="1"
-                                value={corpCustomSize}
-                                onChange={(e) => {
-                                  const val = parseInt(e.target.value, 10);
-                                  if (!isNaN(val) && val > 0) {
-                                    setCorpCustomSize(val);
-                                    const customerId = corporateProfile.brn as string;
-                                    loadProducts(customerId, 1, val);
-                                  } else {
-                                    setCorpCustomSize(e.target.value);
-                                  }
-                                }}
-                                className={styles.panel4}
-                              />
-                            )}
-                          </div>
+                            Refresh
+                          </Button>
                         </div>
                       </div>
 
-                      {corpShowFilter && (
-                        <div className={styles.panel5}>
-                          <div className={styles.stack5}>
-                            <label className={styles.text}>Product Type</label>
-                            <select
-                              value={corpTypeFilter}
-                              onChange={(e) => setCorpTypeFilter(e.target.value)}
-                              className={styles.panel6}
-                            >
-                              <option value="">All Types</option>
-                              {corpData.uniqueTypes.map(t => <option key={t} value={t}>{t}</option>)}
-                            </select>
-                          </div>
-
-                          <div className={styles.stack5}>
-                            <label className={styles.text}>Status</label>
-                            <select
-                              value={corpStatusFilter}
-                              onChange={(e) => setCorpStatusFilter(e.target.value)}
-                              className={styles.panel6}
-                            >
-                              <option value="">All Statuses</option>
-                              {corpData.uniqueStatuses.map(s => <option key={s} value={s}>{s}</option>)}
-                            </select>
-                          </div>
-
-                          <button
-                            className={`btn ${styles.row7}`}
-                            onClick={() => { setCorpTypeFilter(''); setCorpStatusFilter(''); }}
-                          >
-                            Clear
-                          </button>
-                        </div>
-                      )}
+                      {/* Type and Status are filtered via their own column headers below; this bar
+                          surfaces every active filter as a removable chip. */}
+                      <FilterBar
+                        filters={[
+                          corpSearchQuery && { key: 'search', label: 'Search', value: `"${corpSearchQuery}"`, onRemove: () => setCorpSearchQuery('') },
+                          corpTypeFilter && { key: 'type', label: 'Type', value: corpTypeFilter, onRemove: () => setCorpTypeFilter('') },
+                          corpStatusFilter && { key: 'status', label: 'Status', value: corpStatusFilter, onRemove: () => setCorpStatusFilter('') },
+                        ].filter(Boolean) as ActiveFilter[]}
+                        onClearAll={() => {
+                          setCorpSearchQuery('');
+                          setCorpTypeFilter('');
+                          setCorpStatusFilter('');
+                        }}
+                      />
 
                       {productsError ? (
                         <div className="error-container">
@@ -2068,148 +2036,185 @@ export default function Customer360() {
                             Retry
                           </Button>
                         </div>
-                      ) : !loadingProducts && corpData.filtered.length === 0 ? (
-                        <div className="empty-state">No products found.</div>
                       ) : (
-                        <div>
-                          <DataTable bare>
-                            <ResponsiveRows
-                              rows={corpData.filtered}
-                              loading={loadingProducts}
-                              loadingRows={5}
-                              rowKey={(item) => String(item.accountNumber)}
-                              columns={[
-                                {
-                                  key: 'category',
-                                  label: 'Category',
-                                  priority: 'always',
-                                  render: (item) => (
-                                    <span
-                                      className={`${styles.typeChip}${item.type === 'Deposit' ? ` ${styles.typeChipDeposit}` : ''}`}
-                                    >
-                                      {item.type}
-                                    </span>
-                                  ),
-                                },
-                                {
-                                  key: 'subCategory',
-                                  label: 'Sub Category',
-                                  priority: 'low',
-                                  render: (item) => item.productCategory,
-                                },
-                                {
-                                  key: 'productName',
-                                  label: 'Product Name',
-                                  priority: 'always',
-                                  render: (item) => (
-                                    <span className={styles.rule8}>{item.productName}</span>
-                                  ),
-                                },
-                                {
-                                  key: 'accountNumber',
-                                  label: 'Account Number',
-                                  priority: 'high',
-                                  render: (item) => (
-                                    <span className="account-num-text">{item.accountNumber}</span>
-                                  ),
-                                },
-                                {
-                                  key: 'accountStatus',
-                                  label: 'Account Status',
-                                  priority: 'always',
-                                  render: (item) => (
-                                    <StatusBadge
-                                      status={item.derivedAccountStatus || item.financingStatus || EMPTY_VALUE}
-                                    />
-                                  ),
-                                },
-                                {
-                                  key: 'balance',
-                                  label: 'Balance',
-                                  priority: 'high',
-                                  render: (item) => item.balances || EMPTY_VALUE,
-                                },
-                                {
-                                  key: 'outstanding',
-                                  label: 'Outstanding',
-                                  priority: 'low',
-                                  render: (item) => item.outstanding || EMPTY_VALUE,
-                                },
-                                {
-                                  key: 'lastContactDate',
-                                  label: 'Last Contact Date',
-                                  priority: 'low',
-                                  render: (item) => item.lastContactDate || EMPTY_VALUE,
-                                },
-                                {
-                                  key: 'action',
-                                  label: 'Action',
-                                  priority: 'always',
-                                  align: 'right',
-                                  render: (item) => (
-                                    <span
-                                      className={`action-link ${styles.row11}`}
-                                      onClick={() => openProductModal(item.accountNumber, item.type as string)}
-                                    >
-                                      <Eye size={13} />
-                                      View
-                                    </span>
-                                  ),
-                                },
-                              ]}
+                        <DataTable
+                          bare
+                          footer={
+                            <Pagination
+                              page={pageNumber}
+                              pageSize={pageSize}
+                              total={totalCount}
+                              itemLabel="product"
+                              onPageChange={(p) => loadProducts(corporateProfile.brn as string, p, pageSize)}
                             />
-                          </DataTable>
-
-                          {/* Pagination */}
-                          {totalPages > 1 && (
-                            <div className={styles.row9}>
-                              <button
-                                className={`btn ${styles.avatar2}`}
-                                disabled={pageNumber === 1 || loadingProducts}
-                                onClick={() => loadProducts(corporateProfile.brn as string, pageNumber - 1)}
-                              >
-                                &lt;
-                              </button>
-                              {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-                                <button
-                                  key={p}
-                                  className={`btn ${styles.pageDot}${pageNumber === p ? ` ${styles.pageDotActive}` : ''}`}
-                                  disabled={loadingProducts}
-                                  onClick={() => loadProducts(corporateProfile.brn as string, p)}
-                                >
-                                  {p}
-                                </button>
-                              ))}
-                              <button
-                                className={`btn ${styles.avatar2}`}
-                                disabled={pageNumber === totalPages || loadingProducts}
-                                onClick={() => loadProducts(corporateProfile.brn as string, pageNumber + 1)}
-                              >
-                                &gt;
-                              </button>
-                            </div>
-                          )}
-                        </div>
+                          }
+                        >
+                          <ResponsiveRows
+                            rows={corpData.filtered}
+                            loading={loadingProducts}
+                            loadingRows={pageSize}
+                            rowKey={(item) => String(item.accountNumber)}
+                            empty={
+                              corpSearchQuery || corpTypeFilter || corpStatusFilter
+                                ? 'No products match the selected filters. Try adjusting your search query or filters.'
+                                : 'No corporate banking products found.'
+                            }
+                            columns={[
+                              {
+                                key: 'productName',
+                                label: 'Product Name',
+                                priority: 'always',
+                                render: (item) => (
+                                  <div>
+                                    <div className={styles.strong4}>
+                                      {formatValue(item.productName)}
+                                    </div>
+                                    {item.campaignCode && (
+                                      <div className={cc.monoMeta}>
+                                        Campaign: {item.campaignCode}
+                                      </div>
+                                    )}
+                                  </div>
+                                ),
+                              },
+                              {
+                                key: 'category',
+                                label: 'Type',
+                                priority: 'always',
+                                header: (
+                                  <ColumnFilter
+                                    label="Type"
+                                    value={corpTypeFilter}
+                                    onChange={setCorpTypeFilter}
+                                    options={corpData.uniqueTypes.map((t) => ({ value: t, label: t }))}
+                                    allLabel="All Types"
+                                    searchable={corpData.uniqueTypes.length > 6}
+                                  />
+                                ),
+                                render: (item) => (
+                                  <span
+                                    className={`${styles.typeChip}${item.type === 'Deposit' ? ` ${styles.typeChipDeposit}` : ''}`}
+                                  >
+                                    {formatValue(item.type || item.productCategory)}
+                                  </span>
+                                ),
+                              },
+                              {
+                                key: 'accountNumber',
+                                label: 'Account Number',
+                                priority: 'high',
+                                render: (item) => (
+                                  <span className={cc.monoValue}>
+                                    {formatValue(item.accountNumber)}
+                                  </span>
+                                ),
+                              },
+                              {
+                                key: 'accountStatus',
+                                label: 'Status',
+                                priority: 'always',
+                                header: (
+                                  <ColumnFilter
+                                    label="Status"
+                                    value={corpStatusFilter}
+                                    onChange={setCorpStatusFilter}
+                                    options={corpData.uniqueStatuses.map((s) => ({ value: s, label: s }))}
+                                    allLabel="All Statuses"
+                                    searchable={corpData.uniqueStatuses.length > 6}
+                                  />
+                                ),
+                                render: (item) => (
+                                  <StatusBadge
+                                    status={resolveProductStatus(item)}
+                                    dot={true}
+                                  />
+                                ),
+                              },
+                              {
+                                key: 'balance',
+                                label: 'Balance',
+                                priority: 'high',
+                                render: (item) => (
+                                  <span className={cc.monoAccent}>
+                                    {formatCurrency(item.balances)}
+                                  </span>
+                                ),
+                              },
+                              {
+                                key: 'outstanding',
+                                label: 'Outstanding',
+                                priority: 'low',
+                                render: (item) => (
+                                  <span className={cc.monoValue}>
+                                    {item.outstanding ? formatCurrency(item.outstanding) : EMPTY_VALUE}
+                                  </span>
+                                ),
+                              },
+                              {
+                                key: 'tenureMaturity',
+                                label: 'Tenure / Maturity',
+                                priority: 'low',
+                                render: (item) => (
+                                  <div>
+                                    {item.tenure ? <div className={cc.monoValue}>{item.tenure}</div> : null}
+                                    {item.maturityDate ? (
+                                      <div className={cc.monoMeta}>
+                                        Matures: {item.maturityDate}
+                                      </div>
+                                    ) : null}
+                                    {!item.tenure && !item.maturityDate && (
+                                      <span className={cc.mutedText}>{EMPTY_VALUE}</span>
+                                    )}
+                                  </div>
+                                ),
+                              },
+                              {
+                                key: 'effectiveDate',
+                                label: 'Opening Date',
+                                priority: 'low',
+                                render: (item) => (
+                                  <span className={cc.monoValue}>
+                                    {formatValue(
+                                      item.accountOpeningDate ||
+                                        item.commencementDate ||
+                                        item.createdDate ||
+                                        item.disbursedDate ||
+                                        item.lastContactDate
+                                    )}
+                                  </span>
+                                ),
+                              },
+                              {
+                                key: 'action',
+                                label: 'Action',
+                                priority: 'always',
+                                align: 'right',
+                                render: (item) => (
+                                  <RowAction
+                                    onClick={() => openProductModal(item.accountNumber, (item.type || item.productCategory) as string)}
+                                  />
+                                ),
+                              },
+                            ]}
+                          />
+                        </DataTable>
                       )}
                     </div>
                   ) : (
-                    <div>
-                      <h4 className="info-section-title">
-                        <FileText size={16} />
-                        Authorized Signatories
-                      </h4>
-                      <DataTable bare>
+                    <div className={cc.card}>
+                      <DataTable bare minWidth={700}>
                         <ResponsiveRows
                           rows={[corporateProfile]}
                           rowKey={() => 'signatory'}
+                          empty="No authorized signatories found."
                           columns={[
                             {
                               key: 'name',
                               label: 'Signatory Name',
                               priority: 'always',
                               render: (row) => (
-                                <span className={styles.rule8}>
-                                  {row.signatoryName || EMPTY_VALUE}
+                                <span className={styles.strong4}>
+                                  {formatValue(row.signatoryName)}
                                 </span>
                               ),
                             },
@@ -2217,7 +2222,7 @@ export default function Customer360() {
                               key: 'dob',
                               label: 'Date of Birth',
                               priority: 'low',
-                              render: (row) => row.signatoryDateOfBirth || EMPTY_VALUE,
+                              render: (row) => formatValue(row.signatoryDateOfBirth),
                             },
                             {
                               key: 'id',
@@ -2225,9 +2230,9 @@ export default function Customer360() {
                               priority: 'always',
                               render: (row) => (
                                 <div className={styles.spread2}>
-                                  <span>
+                                  <span className={cc.monoValue}>
                                     {revealed['sigId']
-                                      ? row.signatoryIdNumber || EMPTY_VALUE
+                                      ? formatValue(row.signatoryIdNumber)
                                       : maskNRIC(row.signatoryIdNumber)}
                                   </span>
                                   {row.signatoryIdNumber &&
@@ -2256,9 +2261,9 @@ export default function Customer360() {
                               priority: 'high',
                               render: (row) => (
                                 <div className={styles.spread2}>
-                                  <span>
+                                  <span className={cc.monoValue}>
                                     {revealed['sigPhone']
-                                      ? row.signatoryPhoneNumber || EMPTY_VALUE
+                                      ? formatValue(row.signatoryPhoneNumber)
                                       : maskPhone(row.signatoryPhoneNumber)}
                                   </span>
                                   {row.signatoryPhoneNumber &&
@@ -2285,7 +2290,7 @@ export default function Customer360() {
                               key: 'position',
                               label: 'Position',
                               priority: 'low',
-                              render: (row) => row.signatoryPosition || EMPTY_VALUE,
+                              render: (row) => formatValue(row.signatoryPosition),
                             },
                           ]}
                         />
@@ -2297,22 +2302,23 @@ export default function Customer360() {
 
               {/* INTERESTED PRODUCTS */}
               {activeTab === 'interestedProducts' && (
-                <div>
-                  <h4 className={`info-section-title ${styles.label}`}>
-                    <TrendingUp size={14} />
-                    Interested Products
-                  </h4>
-                  <DataTable bare>
+                <div className={cc.card}>
+                  <DataTable bare minWidth={600}>
                     <ResponsiveRows
-                      rows={[profile]}
+                      rows={
+                        profile.interestedProductName || profile.interestedProductCategory
+                          ? [profile]
+                          : []
+                      }
                       rowKey={() => 'interested-product-corporate'}
+                      empty="No interested products found."
                       columns={[
                         {
                           key: 'name',
                           label: 'Product Name',
                           priority: 'always',
                           render: (row) => (
-                            <span className={styles.rule8}>
+                            <span className={styles.strong4}>
                               {formatValue(row.interestedProductName || row.interestedProduct)}
                             </span>
                           ),

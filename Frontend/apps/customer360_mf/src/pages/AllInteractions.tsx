@@ -1,4 +1,4 @@
-import React, { useEffect, useState, type ChangeEvent } from 'react';
+import React, { useEffect, useMemo, useState, type ChangeEvent } from 'react';
 import { useCustomerStore } from '../store/customerStore';
 import { useInteractionStore } from '../store/interactionStore';
 import { useHostNavigate } from '../navigation/HostNavigation';
@@ -6,7 +6,7 @@ import CaseDetailsModal from '../components/CaseDetailsModal';
 import { ArrowLeft, Search, Eye, MessageSquare, RefreshCw, X, ChevronLeft, ChevronRight, Clock, AlertTriangle } from '@omniremit/ui/icons';
 import type { IndividualProfile, CorporateProfile } from '../types/api';
 import { getFriendlyErrorMessage } from '../utils/errorMessages';
-import { Button, ColumnFilter, DataTable, EMPTY_VALUE, FilterBar, PageHeader, Pagination, ResponsiveRows, RowAction, RowsPerPage, SearchField, type ActiveFilter } from '@omniremit/ui';
+import { Button, ColumnFilter, DataTable, EMPTY_VALUE, FilterBar, PageHeader, Pagination, ResponsiveRows, RowAction, RowsPerPage, SearchField, useDebouncedValue, type ActiveFilter } from '@omniremit/ui';
 import styles from './AllInteractions.module.css';
 import cc from '../shared/c360Common.module.css';
 
@@ -96,16 +96,55 @@ export default function AllInteractions() {
     setSearchTerm(e.target.value);
   };
 
+  // The box stays bound to the raw `searchTerm` so typing never feels laggy; only the filtering
+  // below waits for the debounce, so a fast typist doesn't refilter and re-render the whole table
+  // once per keystroke.
+  const debouncedSearchTerm = useDebouncedValue(searchTerm, 200);
+
+  // Recommends matching interactions as the operator types, rather than only narrowing the table
+  // silently.
+  const searchSuggestions = (() => {
+    const query = debouncedSearchTerm.trim().toLowerCase();
+    if (!query) return [];
+    return interactions
+      .filter(
+        (item) =>
+          (item.caseId || '').toLowerCase().includes(query) ||
+          (item.classification || '').toLowerCase().includes(query) ||
+          (item.subRoleName || '').toLowerCase().includes(query) ||
+          (item.sourceName || '').toLowerCase().includes(query),
+      )
+      .slice(0, 8)
+      .map((item) => ({
+        id: String(item.caseId ?? ''),
+        label: (
+          <span className={styles.suggestionRow}>
+            <span className={styles.suggestionPrimary}>{item.caseId}</span>
+            <span className={styles.suggestionSecondary}>{item.classification}</span>
+          </span>
+        ),
+      }));
+  })();
+
+  /*
+   * Case-number recommendations, from the interactions already loaded — no extra request, and never
+   * a case this table could not show. Classification qualifies an otherwise opaque case id.
+   */
+  const caseIdPool = useMemo(
+    () => interactions.map((i) => ({ value: i.caseId ?? '', meta: i.classification || undefined })),
+    [interactions],
+  );
+
   // Filter local data based on search term & status.
   const filteredInteractions = interactions.filter((item) => {
     if (caseIdFilter && !(item.caseId || '').toLowerCase().includes(caseIdFilter.toLowerCase())) return false;
     if (channelFilter && !(item.sourceName || '').toLowerCase().includes(channelFilter.toLowerCase())) return false;
     if (officerFilter && !(item.subRoleName || '').toLowerCase().includes(officerFilter.toLowerCase())) return false;
     const matchesSearch =
-      (item.caseId || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (item.classification || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (item.subRoleName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (item.sourceName || '').toLowerCase().includes(searchTerm.toLowerCase());
+      (item.caseId || '').toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+      (item.classification || '').toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+      (item.subRoleName || '').toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+      (item.sourceName || '').toLowerCase().includes(debouncedSearchTerm.toLowerCase());
     const matchesStatus = statusFilter === '' || (item.statusParent || '').toLowerCase() === statusFilter.toLowerCase();
     return matchesSearch && matchesStatus;
   });
@@ -153,6 +192,9 @@ export default function AllInteractions() {
               placeholder="Search case #, subject, assignee..."
               value={searchTerm}
               onValueChange={setSearchTerm}
+              suggestions={searchSuggestions}
+              onSelectSuggestion={(s) => setSearchTerm(s.id)}
+              emptyHint="No matching interactions."
             />
           </div>
 
@@ -211,7 +253,8 @@ export default function AllInteractions() {
                       allLabel={undefined}
                       freeText
                       searchPlaceholder="Type to filter case #…"
-                      emptyHint="Press Enter to filter."
+                      suggestFrom={caseIdPool}
+                      emptyHint="No matching case."
                     />
                   ),
                   /* caseId is the real case identifier — no fabricated "CAS-100N" placeholder */

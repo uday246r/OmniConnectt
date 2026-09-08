@@ -15,6 +15,12 @@ export interface TabsProps {
   onChange: (key: string) => void
   /** Identifies the tab group for aria-controls/aria-labelledby pairing with the panel(s) the caller renders separately. */
   id: string
+  /**
+   * `underline` (default) is a lightweight secondary nav — thin bottom border, muted text.
+   * `pill` is a segmented control — matches Approval Center's and Audit Logs' own tab rows, for a
+   * page whose tabs are equally-weighted top-level views rather than a minor sub-nav.
+   */
+  variant?: 'underline' | 'pill'
 }
 
 /**
@@ -23,7 +29,7 @@ export interface TabsProps {
  * owns the tabpanel content (typically one `role="tabpanel"` div per tab, only the active one shown)
  * so this component stays reusable across pages with very different panel layouts.
  */
-export function Tabs({ tabs, activeKey, onChange, id }: TabsProps) {
+export function Tabs({ tabs, activeKey, onChange, id, variant = 'underline' }: TabsProps) {
   const tabRefs = useRef<Map<string, HTMLButtonElement>>(new Map())
 
   function focusAndSelect(key: string) {
@@ -58,8 +64,15 @@ export function Tabs({ tabs, activeKey, onChange, id }: TabsProps) {
     }
   }
 
+  const isPill = variant === 'pill'
+
   return (
-    <div className={styles.tablist} role="tablist" aria-orientation="horizontal" id={id}>
+    <div
+      className={isPill ? styles.tablistPill : styles.tablist}
+      role="tablist"
+      aria-orientation="horizontal"
+      id={id}
+    >
       {tabs.map((tab, index) => {
         const isActive = tab.key === activeKey
         return (
@@ -75,7 +88,11 @@ export function Tabs({ tabs, activeKey, onChange, id }: TabsProps) {
             aria-selected={isActive}
             aria-controls={`${id}-panel-${tab.key}`}
             tabIndex={isActive ? 0 : -1}
-            className={classNames(styles.tab, isActive && styles.tabActive)}
+            className={
+              isPill
+                ? classNames(styles.tabPill, isActive && styles.tabPillActive)
+                : classNames(styles.tab, isActive && styles.tabActive)
+            }
             onClick={() => onChange(tab.key)}
             onKeyDown={(e) => handleKeyDown(e, index)}
           >

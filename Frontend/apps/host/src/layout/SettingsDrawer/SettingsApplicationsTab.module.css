@@ -87,39 +87,9 @@
   transform: translateY(-1px);
 }
 
-.searchWrap { position: relative; width: 100%; }
-
-.searchInput {
-  width: 100%;
-  padding: 9px 14px 9px 38px;
-  background: var(--omni-color-surface);
-  border: 1.5px solid #e2e8f0;
-  border-radius: var(--omni-radius-md-plus);
-  font-size: var(--omni-font-size-sm);
-  font-family: 'Inter', -apple-system, sans-serif;
-  color: var(--omni-color-text-primary);
-  outline: none;
-  box-sizing: border-box;
-  transition: border-color 140ms ease, box-shadow 140ms ease;
-}
-
-.searchInput::placeholder { color: var(--omni-color-text-muted); }
-.searchInput:hover { border-color: #c8d4e4; }
-.searchInput:focus {
-  border-color: var(--omni-color-primary-600);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
-}
-
-.searchIcon {
-  position: absolute;
-  left: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  color: var(--omni-color-text-muted);
-  pointer-events: none;
-}
-
-.searchWrap:focus-within .searchIcon { color: var(--omni-color-primary-600); }
+/* The search box is @omniremit/ui's SearchField, which carries its own wrapper, icon, clear button
+   and suggestion popover — the local .searchWrap/.searchInput/.searchIcon rules that used to live
+   here duplicated it and are gone. */
 
 /* ── App list ─────────────────────────────────────────────── */
 .appList {

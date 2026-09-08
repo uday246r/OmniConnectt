@@ -26,17 +26,12 @@
   margin: 0;
 }
 
-/* 4-Stat Cards Grid */
+/*  Dynamic grid that adapts to any number of cards */
 .statGrid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 12px;
-}
-
-@media (max-width: 720px) {
-  .statGrid {
-    grid-template-columns: repeat(2, 1fr);
-  }
+  width: 100%;
 }
 
 .statCard {

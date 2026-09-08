@@ -9,6 +9,31 @@
   gap: 20px;
 }
 
+/* ── Toolbar search suggestion rows ─────────────────────────────── */
+.suggestionRow {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.suggestionPrimary {
+  font-size: var(--omni-font-size-sm);
+  color: var(--omni-color-text-primary);
+  font-weight: var(--omni-font-weight-medium);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.suggestionSecondary {
+  font-size: var(--omni-font-size-xs);
+  color: var(--omni-color-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .row {
   width: 50px;
   height: 50px;

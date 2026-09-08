@@ -9,7 +9,7 @@ import { usePlatformConnection } from './shared/realtime/usePlatformConnection'
 import { useAuthStore } from './features/auth/store/authStore'
 import { useModuleRegistryStore } from './shared/stores/moduleRegistryStore'
 import { useNavigationStore } from './shared/stores/navigationStore'
-import { useSettingsDrawerStore, type SettingsTab } from './shared/stores/settingsDrawerStore'
+import { isDrawerRoute, useSettingsDrawerStore, type SettingsTab } from './shared/stores/settingsDrawerStore'
 import { RouteFallback } from './shared/components/RouteFallback/RouteFallback'
 import { LoginPage } from './pages/LoginPage/LoginPage'
 import { PageSkeleton } from './shared/components/PageSkeleton/PageSkeleton'
@@ -42,6 +42,12 @@ const RemoteAppPage = lazy(() => import('./pages/RemoteAppPage/RemoteAppPage').t
 const ProfilePage = lazy(() => import('./features/profile/pages/ProfilePage').then((m) => ({ default: m.ProfilePage })))
 const AuditLogsPage = lazy(() =>
   import('./features/system-audit-logs/pages/AuditLogsPage').then((m) => ({ default: m.AuditLogsPage })),
+)
+const UsersPage = lazy(() =>
+  import('./features/settings-users/pages/UsersPage').then((m) => ({ default: m.UsersPage })),
+)
+const UserDetailPage = lazy(() =>
+  import('./features/settings-users/pages/UserDetailPage').then((m) => ({ default: m.UserDetailPage })),
 )
 const ApprovalCenterPage = lazy(() =>
   import('./features/approvals/pages/ApprovalCenterPage').then((m) => ({ default: m.ApprovalCenterPage })),
@@ -108,8 +114,13 @@ function SettingsRoute({ tab }: { tab: SettingsTab }) {
    * it. This is also exactly what was on screen before: the old version redirected to "/" after
    * opening the drawer, so the dashboard was already what you saw through it — only now the address
    * bar keeps saying where you actually are.
+   *
+   * Users is the one exception: /settings/users/new opens the drawer's create-user layer through
+   * this same component (the routed "new"/":id" behavior below), but the Users tab itself now has a
+   * real page (UsersPage) — showing that as the backdrop instead of the dashboard means the list is
+   * still visible, correctly, once the create form closes.
    */
-  return <DashboardPage />
+  return tab === 'users' ? <UsersPage /> : <DashboardPage />
 }
 
 /**
@@ -132,6 +143,16 @@ function SettingsRoute({ tab }: { tab: SettingsTab }) {
  * It used to resolve straight to the Users tab, so anyone without `Users:View` (a role that manages
  * only applications, say) was bounced from `/settings` to `/404` by that tab's own guard. The drawer
  * already picks its visible tabs this way; this makes the bare URL agree with it.
+ *
+ * Users is checked LAST, not first. Users has a real page now (UsersPage) instead of a drawer tab,
+ * so landing there means no drawer opens at all — which used to be fine when it was the only thing
+ * behind the gear icon, but would now silently strand Roles/Applications/Checker-Assignment for
+ * anyone who also has those (the gear icon calls this same redirect, and previously that operator
+ * saw a tab strip they could switch between; putting Users first made every one of those sections
+ * unreachable from the gear icon). Ordering the drawer-only tabs first means the gear icon still
+ * opens the drawer whenever the operator has any of those, and its tab strip's Users button (see
+ * SettingsDrawer.tsx) reaches the real page from there. Someone with ONLY Users access still lands
+ * correctly — Users is the fallback, not left out.
  */
 function SettingsIndexRedirect() {
   const isAdministrator = Boolean(useAuthStore((s) => s.user)?.isAdministrator)
@@ -139,10 +160,10 @@ function SettingsIndexRedirect() {
 
   const firstAllowed = (
     [
-      ['users', FEATURE_KEYS.users],
       ['roles', FEATURE_KEYS.roles],
       ['applications', FEATURE_KEYS.applications],
       ['checker-assignment', FEATURE_KEYS.checkerAssignment],
+      ['users', FEATURE_KEYS.users],
     ] as const
   ).find(([, featureKey]) => isAdministrator || hasCapability(featureKey, 'View'))
 
@@ -232,6 +253,23 @@ function AuthenticatedShell() {
   const logout = useAuthStore((s) => s.logout)
   const ensureFreshAccessToken = useAuthStore((s) => s.ensureFreshAccessToken)
   const navigate = useNavigate()
+
+  /*
+   * Remember where the operator was before the settings drawer took over, so closing it puts them
+   * back rather than on the dashboard.
+   *
+   * Recorded here, at the shell, because the drawer has many entry points — the gear button, sidebar
+   * rows, a global-search result, a bookmarked URL — and every one of them should return to the same
+   * place. Drawer routes themselves are skipped (see isDrawerRoute) or closing would just return to
+   * another drawer; /settings/users and /settings/users/:id are real pages and so remain valid
+   * targets.
+   */
+  const shellLocation = useLocation()
+  const setReturnPath = useSettingsDrawerStore((s) => s.setReturnPath)
+  useEffect(() => {
+    if (isDrawerRoute(shellLocation.pathname)) return
+    setReturnPath(`${shellLocation.pathname}${shellLocation.search}`)
+  }, [shellLocation.pathname, shellLocation.search, setReturnPath])
 
   const registryStatus = useModuleRegistryStore((s) => s.status)
   const registryApps = useModuleRegistryStore((s) => s.apps)
@@ -477,9 +515,44 @@ function AppRoutes() {
           */}
           <Route path="settings">
             <Route index element={<SettingsIndexRedirect />} />
+
+            {/*
+              Users has real pages now (UsersPage / UserDetailPage) instead of opening the drawer's
+              Users tab — a proper main-content table and profile view rather than a card list behind
+              an overlay. /new is left exactly as it was: it still opens the drawer's create-user form
+              (validated there, not rebuilt here — see the big comment below on why). index and :id are
+              gated on the default View capability, not Edit — viewing a profile shouldn't require
+              edit rights, unlike the old generic :id route this replaces.
+            */}
+            <Route path="users">
+              <Route
+                index
+                element={
+                  <RequireCapability featureKey={FEATURE_KEYS.users}>
+                    <UsersPage />
+                  </RequireCapability>
+                }
+              />
+              <Route
+                path="new"
+                element={
+                  <RequireCapability featureKey={FEATURE_KEYS.users} capability="Create">
+                    <SettingsRoute tab="users" />
+                  </RequireCapability>
+                }
+              />
+              <Route
+                path=":id"
+                element={
+                  <RequireCapability featureKey={FEATURE_KEYS.users}>
+                    <UserDetailPage />
+                  </RequireCapability>
+                }
+              />
+            </Route>
+
             {(
               [
-                ['users', FEATURE_KEYS.users, 'Create'],
                 ['roles', FEATURE_KEYS.roles, 'Create'],
                 ['applications', FEATURE_KEYS.applications, 'Register'],
                 ['checker-assignment', FEATURE_KEYS.checkerAssignment, 'Manage'],

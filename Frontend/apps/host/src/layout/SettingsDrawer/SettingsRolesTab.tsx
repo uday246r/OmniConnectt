@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useAuthStore } from '../../features/auth/store/authStore'
 import { rolesApi, type RoleListItemDto } from '../../features/settings-roles/api/rolesApi'
 import { isApprovalPending } from '../../features/approvals/api/approvalsApi'
@@ -12,7 +12,7 @@ import { ApiError } from '../../shared/api/httpClient'
 import { toast } from '../../shared/stores/toastStore'
 import styles from './SettingsRolesTab.module.css'
 import { TOPICS, invalidate, useDataRevision } from '../../shared/stores/invalidationStore'
-import { Button, EmptyState, Modal, Pagination } from '@omniremit/ui'
+import { Button, EmptyState, Modal, Pagination, SearchField, type SearchFieldSuggestion } from '@omniremit/ui'
 
 const PAGE_SIZE = 10
 
@@ -85,6 +85,12 @@ export function SettingsRolesTab() {
     setPage(1)
   }, [debouncedSearch])
 
+  /** Role names from the page already fetched for this query — a recommendation costs no request. */
+  const roleSuggestions: SearchFieldSuggestion[] = useMemo(
+    () => roles.slice(0, 8).map((r) => ({ id: r.name, label: r.name })),
+    [roles],
+  )
+
   async function confirmDelete() {
     if (!pendingDelete || !accessToken) return
     const roleName = pendingDelete.name
@@ -132,16 +138,17 @@ export function SettingsRolesTab() {
         )}
       </div>
 
-      <div className={styles.searchWrap}>
-        <input
-          type="text"
-          className={styles.searchInput}
-          placeholder="Search roles..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-        <Icon.Search width={16} height={16} className={styles.searchIcon} />
-      </div>
+      {/* Shared SearchField rather than a local input, so this box recommends as you type like
+          every other search on the platform. Candidates come from the roles already fetched for
+          this same query — no extra request, and never a role this list could not show. */}
+      <SearchField
+        placeholder="Search roles..."
+        value={search}
+        onValueChange={setSearch}
+        suggestions={roleSuggestions}
+        onSelectSuggestion={(s) => setSearch(s.id)}
+        emptyHint="No matching role."
+      />
 
       {error && (
         <div className={styles.errorBanner} role="alert">
