@@ -72,6 +72,13 @@ public class ApprovalGatingService(AuthDbContext db, AuditLogAppService auditLog
         // id yet — see ApprovalRequest.EntityKey.
         var resolvedKey = entityKey ?? entityId;
 
+        // A remote submission already brings its own id (its own request's correlation, forwarded
+        // through InternalApprovalsController); an in-process one (UserAppService/RoleAppService)
+        // never passes one, so this captures THIS submit request's own id and — critically — stores
+        // it on the ApprovalRequest, so ApproveAsync/RejectAsync can hand it back via SeedCorrelationId
+        // on whatever later request decides it, keeping "requested" and "approved" in one thread.
+        correlationId ??= auditLog.ResolveCorrelationId();
+
         await EnsureNoOpenRequestAsync(module, resolvedKey, makerId, ct);
 
         var makerName = await db.Users.AsNoTracking().Where(u => u.Id == makerId).Select(u => u.Name).FirstOrDefaultAsync(ct);
@@ -121,7 +128,7 @@ public class ApprovalGatingService(AuthDbContext db, AuditLogAppService auditLog
         await auditLog.WriteAsync(
             ServiceName, makerId, makerName, "approval.requested", "ApprovalRequest", request.Id.ToString(),
             $"Requested {action} on {module}" + (entityLabel is not null ? $" ({entityLabel})" : "") + $" — assigned to {checkerName ?? "an eligible checker"}.",
-            entityLabel: entityLabel, ct: ct);
+            entityLabel: entityLabel, correlationId: correlationId, ct: ct);
 
         var interestedUsers = new List<Guid> { makerId, checkerId };
         await events.PublishToApprovalViewersAsync(new PlatformEvent("approvals", "requested"), ct);
@@ -279,7 +286,7 @@ public class ApprovalGatingService(AuthDbContext db, AuditLogAppService auditLog
             await auditLog.WriteAsync(
                 ServiceName, actingUserId, actorName, "approval.reassigned", "ApprovalRequest", request.Id.ToString(),
                 $"Reassigned from {oldCheckerName ?? "Unknown"} to {newCheckerName ?? "Unknown"} on '{request.Module}' — {reason}.",
-                entityLabel: request.EntityLabel, ct: ct);
+                entityLabel: request.EntityLabel, correlationId: request.CorrelationId, ct: ct);
         }
 
         if (reassignments.Count > 0)

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Eye,
   Edit3,
@@ -12,7 +12,7 @@ import {
   FolderKanban,
   X,
 } from '@omniremit/ui/icons';
-import { Button, ColumnFilter, DataTable, FilterBar, PageHeader, Pagination, ResponsiveRows, RowsPerPage, SearchField, getInitials, type ActiveFilter } from '@omniremit/ui';
+import { Button, ColumnFilter, DataTable, FilterBar, PageHeader, Pagination, ResponsiveRows, RowsPerPage, SearchField, getInitials, sanitizeFilterInput, useDebouncedValue, type ActiveFilter, type SearchFieldSuggestion } from '@omniremit/ui';
 import { useLeadStore } from '../store/useLeadStore';
 import { useHostNavigate } from '../navigation/HostNavigation';
 import styles from './ViewLeadPage.module.css';
@@ -121,17 +121,92 @@ export const ViewLeadPage: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  /*
+   * The toolbar search used to reach the server only on Enter, which made it the one search box in
+   * the platform that did nothing while you typed. 300ms because a real request sits behind it —
+   * setSearchQuery resets to page 1 and refetches on its own, so this effect must not also call
+   * fetchLeads or every keystroke burst would fire twice.
+   */
+  const debouncedSearch = useDebouncedValue(localSearch, 300);
+  const searchPrimedRef = useRef(false);
+
+  /*
+   * Whether a field may appear in a recommendation at all.
+   *
+   * The table masks any field the config marks Sensitive (renderMaskedCell) and drops any it marks
+   * hidden. A suggestion list is the same data by another route, so it has to honour the same rule
+   * — otherwise the IC column would show `*******9184` while the dropdown beside it printed the
+   * number in full.
+   */
+  const suggestable = (apiField: string) => {
+    const entry = commonFieldConfig.find((f) => f.apiField === apiField);
+    return isFieldVisible(commonFieldConfig, apiField) && !entry?.sensitive;
+  };
+
+  useEffect(() => {
+    // Skip the first run: the mount effect above already fetched, and searchQuery seeds localSearch,
+    // so firing here would be a duplicate request before the operator has typed anything.
+    if (!searchPrimedRef.current) {
+      searchPrimedRef.current = true;
+      return;
+    }
+    if (debouncedSearch === searchQuery) return;
+    setSearchQuery(debouncedSearch);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedSearch]);
+
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    // Enter still applies immediately rather than waiting out the debounce.
+    if (localSearch === searchQuery) return;
     setSearchQuery(localSearch);
-    fetchLeads();
   };
 
   const handleClearSearch = () => {
     setLocalSearch('');
+    if (searchQuery === '') return;
     setSearchQuery('');
-    fetchLeads();
   };
+
+  /*
+   * Recommendations for the toolbar search, drawn from the leads already on this page — no extra
+   * request, and nothing offered that the directory could not show. Name on top, IC/phone beneath
+   * so two customers with the same name stay tellable apart.
+   */
+  const searchSuggestions: SearchFieldSuggestion[] = useMemo(() => {
+    const q = debouncedSearch.trim().toLowerCase();
+    if (!q) return [];
+    const seen = new Set<string>();
+    const out: SearchFieldSuggestion[] = [];
+    for (const lead of leads) {
+      const name = lead.name?.trim();
+      if (!name) continue;
+      const haystack = `${name} ${lead.icNumber ?? ''} ${lead.phone ?? ''} ${lead.branch ?? ''}`.toLowerCase();
+      if (!haystack.includes(q)) continue;
+      const key = name.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      // Only fields the config allows in the clear appear on the second line — otherwise this
+      // dropdown would print in full what the table's own cells mask.
+      const meta = [
+        suggestable('icNumber') && lead.icNumber,
+        suggestable('phoneNumber') && lead.phone && formatPhone(lead.phone),
+      ]
+        .filter(Boolean)
+        .join(' · ');
+      out.push({
+        id: name,
+        label: (
+          <span className={styles.suggestionRow}>
+            <span className={styles.suggestionPrimary}>{name}</span>
+            {meta && <span className={styles.suggestionSecondary}>{meta}</span>}
+          </span>
+        ),
+      });
+      if (out.length >= 8) break;
+    }
+    return out;
+  }, [leads, debouncedSearch]);
 
   const activeFilterCount = filterRules.filter((r) => r.value && r.value.trim().length > 0).length;
 
@@ -141,6 +216,55 @@ export const ViewLeadPage: React.FC = () => {
   const columnValue = (field: string) => filterRules.find((r) => r.field === field)?.value ?? '';
   const toOptions = (list: { value?: string; label?: string }[]) =>
     list.map((o) => ({ value: String(o.value ?? o.label ?? ''), label: o.label ?? String(o.value ?? '') }));
+  /*
+   * Per-column recommendations, taken from the leads already loaded — a header filter should only
+   * ever offer a value this directory actually holds, and typing must not cost a request.
+   *
+   * A column the field config hides, or marks Sensitive, is deliberately given NO pool (see
+   * `suggestable` above): the table masks those cells, and a dropdown listing the unmasked IC
+   * numbers would hand back exactly what the masking rule exists to withhold.
+   */
+
+  // The IC only qualifies the name when the config lets it be shown — otherwise the second line
+  // would print in full exactly what the IC column masks.
+  const namePool = useMemo(
+    () =>
+      leads.map((l) => ({
+        value: l.name ?? '',
+        meta: suggestable('icNumber') ? l.icNumber || undefined : undefined,
+      })),
+    [leads, commonFieldConfig],
+  );
+  const icPool = useMemo(
+    () => (suggestable('icNumber') ? leads.map((l) => ({ value: l.icNumber ?? '', meta: l.name || undefined })) : []),
+    [leads, commonFieldConfig],
+  );
+  /*
+   * Phone rows are stored with a doubled prefix (`+60 +60 17-234 5678`) — the reason formatPhone
+   * exists — and this filter box strips `+` outright, so the stored string is neither what the cell
+   * shows nor something the box could ever hold: recommending it verbatim displayed the doubled
+   * prefix and matched no rows when picked. Show the collapsed form the table shows, commit the
+   * digits-and-separators form the operator would have typed from it.
+   */
+  const phonePool = useMemo(
+    () =>
+      suggestable('phoneNumber')
+        ? leads.map((l) => {
+            const shown = formatPhone(l.phone);
+            return {
+              value: sanitizeFilterInput(shown, 'numeric').trim(),
+              label: shown,
+              meta: l.name || undefined,
+            };
+          })
+        : [],
+    [leads, commonFieldConfig],
+  );
+  const createdPool = useMemo(
+    () => leads.map((l) => ({ value: l.createdDate ?? '' })),
+    [leads],
+  );
+
   const startIndex = totalRecords > 0 ? (currentPage - 1) * pageSize + 1 : 0;
   const endIndex = Math.min(currentPage * pageSize, totalRecords);
 
@@ -205,6 +329,9 @@ export const ViewLeadPage: React.FC = () => {
                 placeholder="Search name, IC, phone, branch..."
                 value={localSearch}
                 onValueChange={(v) => (v === '' ? handleClearSearch() : setLocalSearch(v))}
+                suggestions={searchSuggestions}
+                onSelectSuggestion={(s) => setLocalSearch(s.id)}
+                emptyHint="No matching lead on this page."
               />
             </form>
           </div>
@@ -272,7 +399,8 @@ export const ViewLeadPage: React.FC = () => {
                       freeText
                       filterType="alpha"
                       searchPlaceholder="Type a customer name…"
-                      emptyHint="Press Enter to filter by name."
+                      suggestFrom={namePool}
+                      emptyHint="No matching customer on this page."
                     />
                   ),
                   render: (lead, idx) => {
@@ -315,7 +443,8 @@ export const ViewLeadPage: React.FC = () => {
                       freeText
                       filterType="numeric"
                       searchPlaceholder="Type an IC number…"
-                      emptyHint="Press Enter to filter by IC number."
+                      suggestFrom={icPool}
+                      emptyHint="No matching IC number on this page."
                     />
                   ),
                   /* Masked per Field Settings when the field is marked Sensitive. */
@@ -342,7 +471,8 @@ export const ViewLeadPage: React.FC = () => {
                       freeText
                       filterType="numeric"
                       searchPlaceholder="Type a phone number…"
-                      emptyHint="Press Enter to filter by phone."
+                      suggestFrom={phonePool}
+                      emptyHint="No matching phone number on this page."
                     />
                   ),
                   render: (lead) =>
@@ -403,7 +533,8 @@ export const ViewLeadPage: React.FC = () => {
                       freeText
                       filterType="numeric"
                       searchPlaceholder="YYYY-MM-DD"
-                      emptyHint="Enter a date, then press Enter."
+                      suggestFrom={createdPool}
+                      emptyHint="No lead created on a matching date."
                     />
                   ),
                   render: (lead) => <span className={styles.dateCell}>{lead.createdDate}</span>,

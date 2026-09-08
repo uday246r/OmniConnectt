@@ -41,6 +41,10 @@ export interface ListAuditLogsParams {
   from?: string
   to?: string
   sortDir?: 'asc' | 'desc'
+  /** Scopes the list to a single actor's history — e.g. a user's Audit Log tab. */
+  actorUserId?: string
+  /** Scopes the list to every row stamped with one operation's id — see AuditLogDetailDrawer's "Related Activity". */
+  correlationId?: string
 }
 
 export interface DateRangeParams {

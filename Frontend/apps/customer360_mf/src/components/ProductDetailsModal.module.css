@@ -1,0 +1,407 @@
+/* ============================================================
+   PRODUCT DETAILS RIGHT SIDEBAR DRAWER STYLING
+   Aligned with Host & Lead Standard Structured Inspect Drawer
+   ============================================================ */
+
+/* Hero Identity Banner */
+.heroCard {
+  background: var(--omni-color-surface, #ffffff);
+  border: 1.5px solid #e8edf5;
+  border-radius: var(--omni-radius-lg-plus, 14px);
+  padding: 18px 20px;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.04);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+  transition: all 180ms ease;
+}
+
+.heroCard:hover {
+  box-shadow: 0 4px 18px rgba(37, 99, 235, 0.08);
+  border-color: #dbeafe;
+}
+
+.heroLeft {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+  flex: 1;
+}
+
+.heroAvatar {
+  width: 50px;
+  height: 50px;
+  border-radius: var(--omni-radius-lg, 12px);
+  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+  color: var(--omni-color-primary-600, #2563eb);
+  border: 1.5px solid #bfdbfe;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.12);
+}
+
+.heroAvatarGreen {
+  background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+  color: var(--omni-color-success-600, #059669);
+  border-color: #a7f3d0;
+  box-shadow: 0 2px 6px rgba(5, 150, 105, 0.12);
+}
+
+.heroAvatarPurple {
+  background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%);
+  color: #7c3aed;
+  border-color: #ddd6fe;
+  box-shadow: 0 2px 6px rgba(124, 58, 237, 0.12);
+}
+
+.heroAvatarAmber {
+  background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+  color: #d97706;
+  border-color: #fde68a;
+  box-shadow: 0 2px 6px rgba(217, 119, 6, 0.12);
+}
+
+.heroMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.heroTitle {
+  font-size: 18px;
+  font-weight: var(--omni-font-weight-bold, 700);
+  color: var(--omni-color-text-primary, #0f172a);
+  letter-spacing: -0.02em;
+  line-height: 1.3;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.heroTags {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.accountPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--omni-font-mono, monospace);
+  font-size: 12px;
+  color: #475569;
+  background: #f1f5f9;
+  padding: 2px 8px;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+}
+
+/* Quick KPI Highlights Strip */
+.kpiGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+@media (max-width: 640px) {
+  .kpiGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.kpiCard {
+  background: var(--omni-color-surface, #ffffff);
+  border: 1.5px solid #e8edf5;
+  border-radius: var(--omni-radius-lg, 12px);
+  padding: 12px 14px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.04);
+  transition: all 180ms ease;
+  min-width: 0;
+}
+
+.kpiCard:hover {
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.08);
+  border-color: #bfdbfe;
+  transform: translateY(-1.5px);
+}
+
+.kpiIconBox {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--omni-radius-md, 8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.kpiTilePrimary {
+  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+  color: var(--omni-color-primary-600, #2563eb);
+}
+
+.kpiTileSuccess {
+  background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+  color: var(--omni-color-success-600, #059669);
+}
+
+.kpiTilePurple {
+  background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%);
+  color: #7c3aed;
+}
+
+.kpiTileAmber {
+  background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+  color: #d97706;
+}
+
+.kpiBody {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  flex: 1;
+}
+
+.kpiLabel {
+  font-size: 11px;
+  font-weight: var(--omni-font-weight-bold, 700);
+  color: var(--omni-color-text-muted, #64748b);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+
+.kpiValue {
+  font-size: 14px;
+  font-weight: var(--omni-font-weight-bold, 700);
+  color: var(--omni-color-text-primary, #0f172a);
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.kpiValueSuccess {
+  color: var(--omni-color-success-600, #059669);
+}
+
+.kpiValuePrimary {
+  color: var(--omni-color-primary-600, #2563eb);
+}
+
+/* Detail Section Cards */
+.sectionCard {
+  background: var(--omni-color-surface, #ffffff);
+  border: 1.5px solid #e8edf5;
+  border-radius: var(--omni-radius-lg-plus, 14px);
+  padding: 16px 18px 14px;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.04);
+  margin-bottom: 16px;
+  transition: all 180ms ease;
+}
+
+.sectionCard:hover {
+  box-shadow: 0 4px 18px rgba(37, 99, 235, 0.08);
+  border-color: #dbeafe;
+}
+
+.sectionTitle {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--omni-color-primary-700, #1d4ed8);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin: 0 0 12px;
+  background: linear-gradient(90deg, #eff6ff 0%, #f0f9ff 100%);
+  border: 1px solid #dbeafe;
+  border-radius: 9999px;
+  padding: 3.5px 12px;
+}
+
+.fieldGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+@media (max-width: 600px) {
+  .fieldGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.fieldCard {
+  background: #f8fafc;
+  border: 1px solid #f1f5f9;
+  border-radius: var(--omni-radius-md, 8px);
+  padding: 9px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  transition: all 120ms ease;
+  min-width: 0;
+}
+
+.fieldCard:hover {
+  background: #f1f5f9;
+  border-color: #e2e8f0;
+}
+
+.fieldCardFull {
+  grid-column: 1 / -1;
+}
+
+.fieldLabel {
+  font-size: 11px;
+  font-weight: var(--omni-font-weight-semibold, 600);
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.fieldValueRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  min-width: 0;
+}
+
+.fieldValue {
+  font-size: 13.5px;
+  font-weight: var(--omni-font-weight-medium, 500);
+  color: var(--omni-color-text-primary, #0f172a);
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+
+.fieldValueMono {
+  font-family: var(--omni-font-mono, monospace);
+  font-size: 12.5px;
+  letter-spacing: -0.01em;
+}
+
+.fieldValueBold {
+  font-weight: var(--omni-font-weight-bold, 700);
+}
+
+.fieldValueEmerald {
+  font-weight: var(--omni-font-weight-bold, 700);
+  color: #059669;
+}
+
+.copyBtn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #94a3b8;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px;
+  border-radius: 4px;
+  transition: all 120ms ease;
+  flex-shrink: 0;
+}
+
+.copyBtn:hover {
+  background: #e2e8f0;
+  color: #1e293b;
+}
+
+.copyBtnCopied {
+  color: #059669 !important;
+}
+
+/* Footer layout */
+.footerSpread {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.footerMeta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  min-width: 0;
+}
+
+.footerAccountId {
+  font-family: var(--omni-font-mono, monospace);
+  color: #64748b;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.footerCopyBtn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #475569;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 6px;
+  transition: all 140ms ease;
+}
+
+.footerCopyBtn:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.footerCopyBtnCopied {
+  color: #059669;
+}
+
+/* Loading Skeleton */
+.skeletonCard {
+  background: #ffffff;
+  border: 1.5px solid #e8edf5;
+  border-radius: 14px;
+  padding: 18px;
+  margin-bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.skeletonLine {
+  height: 14px;
+  background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 4px;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}

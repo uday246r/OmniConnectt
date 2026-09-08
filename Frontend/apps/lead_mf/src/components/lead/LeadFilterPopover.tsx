@@ -1,6 +1,6 @@
-import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
+import React, { useState, useRef, useEffect, useLayoutEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { Button, sanitizeFilterInput } from '@omniremit/ui';
+import { Button, sanitizeFilterInput, useDebouncedValue, useSuggestions } from '@omniremit/ui';
 import styles from './LeadFilterPopover.module.css';
 import {
   Layers,
@@ -14,6 +14,8 @@ import {
   X,
 } from '@omniremit/ui/icons';
 import { useLeadStore } from '../../store/useLeadStore';
+import { isFieldVisible } from '../../config/fieldControlRegistry';
+import { formatPhone } from '../../shared/formatPhone';
 import { FilterCriterion } from '../../types/lead';
 
 interface LeadFilterPopoverProps {
@@ -55,6 +57,8 @@ export const LeadFilterPopover: React.FC<LeadFilterPopoverProps> = ({ isOpen, on
   const {
     products,
     branches,
+    leads,
+    commonFieldConfig,
     filterRules,
     updateFilterRule,
     removeFilterRule,
@@ -126,13 +130,66 @@ export const LeadFilterPopover: React.FC<LeadFilterPopoverProps> = ({ isOpen, on
     return () => document.removeEventListener('keydown', onKeyDown);
   }, [isOpen, onClose]);
 
-  if (!isOpen || !coords) return null;
-
   // Helper to get rule value by field
   const getRuleValue = (field: FilterCriterion): string => {
     const rule = filterRules.find((r) => r.field === field);
     return rule ? rule.value : '';
   };
+
+  /*
+   * Everything hook-shaped has to sit ABOVE the `if (!isOpen)` bail-out below: React matches hooks
+   * by call order, so a hook after an early return is skipped on the closed render and present on
+   * the open one, which is the "Rendered more hooks than during the previous render" crash.
+   */
+  const currentSearch = searchQueries[activeTab] || '';
+  // The three checkbox tabs re-derive their whole option list per keystroke; 200ms is the platform's
+  // convention for narrowing an already-loaded pool. The box itself stays on the raw value, so
+  // typing never feels laggy — only the list waits.
+  const debouncedSearch = useDebouncedValue(currentSearch, 200);
+
+  /*
+   * Recommendations for the three free-text tabs (IC / Phone / Name).
+   *
+   * These were the only criteria in this popover offering a bare box and no list at all — you had
+   * to already know a value to filter by it, while Product/Branch/Status let you browse. Candidates
+   * come from the leads already loaded, so nothing is fetched and nothing is offered that the
+   * directory could not show.
+   *
+   * A field the config marks Sensitive is masked wherever the app prints it, so it gets no pool at
+   * all — a suggestion list is the same data by another route and has to honour the same rule.
+   */
+  const suggestable = (apiField: string) => {
+    const entry = commonFieldConfig.find((f) => f.apiField === apiField);
+    return isFieldVisible(commonFieldConfig, apiField) && !entry?.sensitive;
+  };
+
+  const namePool = useMemo(() => leads.map((l) => ({ value: l.name ?? '' })), [leads]);
+  const icPool = useMemo(
+    () => (suggestable('icNumber') ? leads.map((l) => ({ value: l.icNumber ?? '', meta: l.name || undefined })) : []),
+    [leads, commonFieldConfig],
+  );
+  // Same as the Contact column on the directory: rows store a doubled `+60` prefix and this box
+  // strips `+`, so show the collapsed form and commit what the operator could have typed.
+  const phonePool = useMemo(
+    () =>
+      suggestable('phoneNumber')
+        ? leads.map((l) => {
+            const shown = formatPhone(l.phone);
+            return {
+              value: sanitizeFilterInput(shown, 'numeric').trim(),
+              label: shown,
+              meta: l.name || undefined,
+            };
+          })
+        : [],
+    [leads, commonFieldConfig],
+  );
+
+  const nameHits = useSuggestions(getRuleValue('name'), namePool);
+  const icHits = useSuggestions(getRuleValue('icNumber'), icPool, { numeric: true });
+  const phoneHits = useSuggestions(getRuleValue('phone'), phonePool, { numeric: true });
+
+  if (!isOpen || !coords) return null;
 
   // Helper to set rule value by field
   const setRuleValue = (field: FilterCriterion, value: string) => {
@@ -169,18 +226,47 @@ export const LeadFilterPopover: React.FC<LeadFilterPopoverProps> = ({ isOpen, on
     setSearchQueries((prev) => ({ ...prev, [field]: val }));
   };
 
-  const currentSearch = searchQueries[activeTab] || '';
+  const narrow = (list: string[]) => {
+    const q = debouncedSearch.toLowerCase().trim();
+    return q ? list.filter((item) => item.toLowerCase().includes(q)) : list;
+  };
 
   // Get master product list
   const allProducts = products.length > 0 ? products.map((p) => p.label) : DEFAULT_PRODUCTS;
-  const filteredProducts = allProducts.filter((p) => p.toLowerCase().includes(currentSearch.toLowerCase()));
+  const filteredProducts = narrow(allProducts);
 
   // Get master branch list
   const allBranches = branches.map((b) => b.label);
-  const filteredBranches = allBranches.filter((b) => b.toLowerCase().includes(currentSearch.toLowerCase()));
+  const filteredBranches = narrow(allBranches);
 
   // Get statuses
-  const filteredStatuses = STATUSES.filter((s) => s.toLowerCase().includes(currentSearch.toLowerCase()));
+  const filteredStatuses = narrow(STATUSES);
+
+  /** The shared "did you mean" list under a free-text criterion. */
+  const renderHits = (
+    field: FilterCriterion,
+    hits: { needle: string; items: { value: string; label?: string; meta?: string }[] },
+  ) => {
+    if (!hits.needle) return null;
+    if (hits.items.length === 0) {
+      return <p className={styles.suggestEmpty}>No match on this page.</p>;
+    }
+    return (
+      <div className={styles.suggestList}>
+        {hits.items.map((s) => (
+          <button
+            key={s.value}
+            type="button"
+            className={styles.suggestItem}
+            onClick={() => setRuleValue(field, s.value)}
+          >
+            <span className={styles.suggestValue}>{s.label ?? s.value}</span>
+            {s.meta && <span className={styles.suggestMeta}>{s.meta}</span>}
+          </button>
+        ))}
+      </div>
+    );
+  };
 
   const handleReset = () => {
     clearAllFilters();
@@ -416,6 +502,7 @@ export const LeadFilterPopover: React.FC<LeadFilterPopoverProps> = ({ isOpen, on
                 onChange={(e) => setRuleValue('icNumber', sanitizeFilterInput(e.target.value, 'numeric'))}
                 className={styles.textInput}
               />
+              {renderHits('icNumber', icHits)}
             </div>
           )}
 
@@ -433,6 +520,7 @@ export const LeadFilterPopover: React.FC<LeadFilterPopoverProps> = ({ isOpen, on
                 onChange={(e) => setRuleValue('phone', sanitizeFilterInput(e.target.value, 'numeric'))}
                 className={styles.textInput}
               />
+              {renderHits('phone', phoneHits)}
             </div>
           )}
 
@@ -449,6 +537,7 @@ export const LeadFilterPopover: React.FC<LeadFilterPopoverProps> = ({ isOpen, on
                 onChange={(e) => setRuleValue('name', sanitizeFilterInput(e.target.value, 'alpha'))}
                 className={styles.textInput}
               />
+              {renderHits('name', nameHits)}
             </div>
           )}
 

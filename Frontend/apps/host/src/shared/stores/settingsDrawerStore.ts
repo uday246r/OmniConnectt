@@ -9,13 +9,40 @@ export type DrawerLayer =
   | { type: 'app-form'; appId?: string }
   | { type: 'checker-assignment-form'; module?: string; appId?: string }
 
+/**
+ * Routes that render the drawer rather than a page of their own.
+ *
+ * Everything else — including /settings/users and /settings/users/:id, which are real pages — is
+ * somewhere the operator can be sent back to when the drawer closes. Used to decide what counts as
+ * a return target; see `returnPath`.
+ */
+export function isDrawerRoute(pathname: string): boolean {
+  return (
+    pathname === '/settings' ||
+    pathname === '/settings/users/new' ||
+    pathname.startsWith('/settings/roles') ||
+    pathname.startsWith('/settings/applications') ||
+    pathname.startsWith('/settings/checker-assignment')
+  )
+}
+
 interface SettingsDrawerState {
   isOpen: boolean
   activeTab: SettingsTab
   layerStack: DrawerLayer[]
+  /**
+   * Where closing the drawer should land.
+   *
+   * Closing used to be a hard-coded `navigate('/')`, so every trip into Settings ended on the
+   * dashboard no matter where it started — open the gear from a lead, close it, and you had lost
+   * your place. This holds the last non-drawer route the operator was actually on; `/` is only the
+   * fallback for a cold deep-link into a settings URL, where there genuinely is no "back".
+   */
+  returnPath: string
   open: (tab?: SettingsTab) => void
   close: () => void
   setActiveTab: (tab: SettingsTab) => void
+  setReturnPath: (path: string) => void
   pushLayer: (layer: DrawerLayer) => void
   popLayer: () => void
   resetToRoot: (tab?: SettingsTab) => void
@@ -25,6 +52,7 @@ export const useSettingsDrawerStore = create<SettingsDrawerState>((set, get) => 
   isOpen: false,
   activeTab: 'users',
   layerStack: [{ type: 'root', tab: 'users' }],
+  returnPath: '/',
 
 
   open: (tab = 'users') => {
@@ -48,6 +76,8 @@ export const useSettingsDrawerStore = create<SettingsDrawerState>((set, get) => 
       layerStack: [{ type: 'root', tab }],
     })
   },
+
+  setReturnPath: (path) => set({ returnPath: path }),
 
   pushLayer: (layer) => {
     set((state) => ({

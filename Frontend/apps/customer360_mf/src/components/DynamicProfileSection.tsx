@@ -3,7 +3,7 @@ import {
   User, MapPin, Phone, Mail, Calendar, Globe, Shield, BookOpen, DollarSign, AlertTriangle,
   Hash, CreditCard, Building2, CheckSquare, TrendingUp, FileText, Briefcase, Eye, EyeOff,
 } from '@omniremit/ui/icons';
-import SectionContainer from './SectionContainer';
+import { DetailField, DetailGrid, DetailSection, isEmptyDetailValue } from '@omniremit/ui';
 import type { ContactDetail, CustomerProfile, FieldConfig } from '../types/api';
 import { applyMaskingRule, formatFieldValue, hasRevealableValue } from '../utils/fieldMasking';
 import styles from './DynamicProfileSection.module.css';
@@ -104,10 +104,13 @@ interface DynamicProfileSectionProps {
   onToggleReveal: (fieldKey: string, fieldLabel: string, realVal: string) => void;
 }
 
-/** Renders one Section's worth of fields exactly as IndividualDetails.tsx/the old inline corporate
- * JSX always did (same `info-cards-grid`/`info-card`/`info-label`/`info-value` classes — pixel
- * parity, not a new look) — except which fields appear, their labels, order, and masking now all
- * come from FieldConfig instead of being hardcoded per field. */
+/**
+ * Renders one Section's worth of fields through the platform's shared `DetailSection`/`DetailGrid`/
+ * `DetailField` primitives — the same ones the host's audit drawers and this remote's own Audit Logs
+ * page already use. Which fields appear, their labels, order, and masking all come from FieldConfig;
+ * a field whose resolved value is empty is skipped entirely (`DetailField`'s own rule), so a profile
+ * with 30 of its 80 possible fields populated renders 30 fields, not 30 values and 50 blanks.
+ */
 export default function DynamicProfileSection({
   section, fields, profile, contactInfo, revealed, onToggleReveal,
 }: DynamicProfileSectionProps) {
@@ -115,8 +118,8 @@ export default function DynamicProfileSection({
   if (visibleFields.length === 0) return null;
 
   return (
-    <SectionContainer title={section} icon={SECTION_ICONS[section] ?? <FileText size={16} />}>
-      <div className="info-cards-grid">
+    <DetailSection title={section} icon={SECTION_ICONS[section] ?? <FileText size={16} />}>
+      <DetailGrid>
         {visibleFields.map((config) => {
           const raw = resolveRawValue(profile, contactInfo, config.apiField);
           const revealable = config.sensitive && hasRevealableValue(raw);
@@ -132,6 +135,12 @@ export default function DynamicProfileSection({
             displayValue = formatFieldValue(raw);
           }
 
+          // A masked/sensitive field with nothing behind it, or any field the CRM simply never
+          // populated, is skipped outright rather than rendered as an empty card — DetailField would
+          // do this itself for a plain string, but a sensitive field's children is a <span>+button
+          // element, which DetailField's own emptiness check can't see through.
+          if (isEmptyDetailValue(displayValue)) return null;
+
           // Any non-sensitive field whose value happens to be a URL renders as a real link — a
           // generic behavior, not special-cased to one field name (the old inline JSX only did this
           // for "Company Website" specifically).
@@ -144,15 +153,14 @@ export default function DynamicProfileSection({
           const isFullWidth = displayValue.length > 40 || /address/i.test(config.displayLabel);
 
           return (
-            <div className={isFullWidth ? 'info-card full-width' : 'info-card'} key={config.id}>
-              <div className="info-label">
-                {FIELD_ICONS[config.apiField] ?? <FileText size={14} />}
-                {config.displayLabel}
-              </div>
+            <DetailField
+              key={config.id}
+              label={config.displayLabel}
+              icon={FIELD_ICONS[config.apiField] ?? <FileText size={14} />}
+              full={isFullWidth}
+            >
               {config.sensitive ? (
-                <div
-                  className={`info-value ${styles.spread}`}
-                >
+                <span className={styles.spread}>
                   <span className={styles.rule}>{displayValue}</span>
                   {revealable && (
                     <button
@@ -164,22 +172,18 @@ export default function DynamicProfileSection({
                       {isRevealed ? <EyeOff size={15} /> : <Eye size={15} />}
                     </button>
                   )}
-                </div>
+                </span>
+              ) : isLink ? (
+                <a href={displayValue} target="_blank" rel="noreferrer" className={styles.linkValue}>
+                  {displayValue}
+                </a>
               ) : (
-                <div className={`info-value ${styles.text}`} style={isLink ? { color: '#004EEB', wordBreak: 'break-all' } : undefined}>
-                  {isLink ? (
-                    <a href={displayValue} target="_blank" rel="noreferrer">
-                      {displayValue}
-                    </a>
-                  ) : (
-                    displayValue
-                  )}
-                </div>
+                displayValue
               )}
-            </div>
+            </DetailField>
           );
         })}
-      </div>
-    </SectionContainer>
+      </DetailGrid>
+    </DetailSection>
   );
 }

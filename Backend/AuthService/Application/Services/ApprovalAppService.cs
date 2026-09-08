@@ -71,6 +71,15 @@ public class ApprovalAppService(
         var request = await db.ApprovalRequests.FirstOrDefaultAsync(r => r.Id == id, ct) ?? throw NotFound(id);
         EnsureDecidable(request, checkerUserId, isAdministrator);
 
+        // Every audit row this decision produces — including the replayed mutation several call
+        // frames down inside UserAppService/RoleAppService — should read as part of the SAME
+        // operation the original "approval.requested" belongs to, not as belonging to this new
+        // request. See AuditLogAppService.SeedCorrelationId's own doc comment for how.
+        if (!string.IsNullOrWhiteSpace(request.CorrelationId))
+        {
+            auditLog.SeedCorrelationId(request.CorrelationId);
+        }
+
         // Refuse BEFORE the replay, not after. Approving a Create-User generates a temporary
         // password that exists only in memory; if it cannot be encrypted for the maker to collect,
         // the account would be created with a password nobody could ever learn. Failing up front
@@ -156,7 +165,7 @@ public class ApprovalAppService(
         await auditLog.WriteAsync(
             ServiceName, checkerUserId, checkerName, "approval.approved", "ApprovalRequest", request.Id.ToString(),
             $"Approved {request.Action} on {request.Module}" + (request.EntityLabel is not null ? $" ({request.EntityLabel})" : "") + $" — requested by {request.MakerName}.",
-            entityLabel: request.EntityLabel, ct: ct);
+            entityLabel: request.EntityLabel, correlationId: request.CorrelationId, ct: ct);
 
         if (issuedTempPassword is not null)
         {
@@ -166,7 +175,7 @@ public class ApprovalAppService(
             await auditLog.WriteAsync(
                 ServiceName, checkerUserId, checkerName, "user.temp_password_issued", "ApprovalRequest", request.Id.ToString(),
                 $"A one-time temporary password was issued for {request.EntityLabel ?? "the new account"} and is waiting for {request.MakerName} to collect from My Requests.",
-                entityLabel: request.EntityLabel, ct: ct);
+                entityLabel: request.EntityLabel, correlationId: request.CorrelationId, ct: ct);
         }
 
         var interestedUsers = new List<Guid> { request.MakerId, request.CheckerId };
@@ -182,6 +191,11 @@ public class ApprovalAppService(
     {
         var request = await db.ApprovalRequests.FirstOrDefaultAsync(r => r.Id == id, ct) ?? throw NotFound(id);
         EnsureDecidable(request, checkerUserId, isAdministrator);
+
+        if (!string.IsNullOrWhiteSpace(request.CorrelationId))
+        {
+            auditLog.SeedCorrelationId(request.CorrelationId);
+        }
 
         request.Status = ApprovalStatus.Rejected;
         request.DecidedAt = DateTimeOffset.UtcNow;
@@ -204,7 +218,7 @@ public class ApprovalAppService(
         await auditLog.WriteAsync(
             ServiceName, checkerUserId, checkerName, "approval.rejected", "ApprovalRequest", request.Id.ToString(),
             $"Rejected {request.Action} on {request.Module}" + (request.EntityLabel is not null ? $" ({request.EntityLabel})" : "") + $" — requested by {request.MakerName}. Reason: {reason}",
-            entityLabel: request.EntityLabel, ct: ct);
+            entityLabel: request.EntityLabel, correlationId: request.CorrelationId, ct: ct);
 
         var interestedUsers = new List<Guid> { request.MakerId, request.CheckerId };
         await events.PublishToApprovalViewersAsync(new PlatformEvent("approvals", "rejected"), ct);
@@ -268,7 +282,7 @@ public class ApprovalAppService(
         await auditLog.WriteAsync(
             ServiceName, callerUserId, makerName, "user.temp_password_revealed", "ApprovalRequest", request.Id.ToString(),
             $"Collected the one-time temporary password for {request.EntityLabel ?? "a new account"}. It is no longer retrievable.",
-            entityLabel: request.EntityLabel, ct: ct);
+            entityLabel: request.EntityLabel, correlationId: request.CorrelationId, ct: ct);
 
         await events.PublishToUsersAsync([callerUserId], new PlatformEvent("approvals", "temp-password-collected"), ct);
 

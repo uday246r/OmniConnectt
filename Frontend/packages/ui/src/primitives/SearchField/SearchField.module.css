@@ -87,3 +87,61 @@
   background: var(--omni-color-surface-alt);
   color: var(--omni-color-text-primary);
 }
+
+/*
+ * Suggestion dropdown — opt-in via the `suggestions` prop. Same visual language as ColumnFilter's
+ * own popover/list/item so a recommendation reads the same whether it came from a column header or
+ * a toolbar search box.
+ */
+.popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: var(--omni-z-dropdown, 100);
+  background: var(--omni-color-surface);
+  border: 1.5px solid var(--omni-color-border);
+  border-radius: var(--omni-radius-lg-plus);
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.14), 0 2px 8px rgba(15, 23, 42, 0.04);
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: var(--omni-radius-md);
+  font-size: var(--omni-font-size-xs);
+  font-weight: var(--omni-font-weight-medium);
+  color: #334155;
+  cursor: pointer;
+  transition: background 120ms ease;
+  background: none;
+  border: none;
+  text-align: left;
+  width: 100%;
+  font-family: inherit;
+}
+
+.item:hover,
+.itemActive {
+  background: var(--omni-color-surface-alt);
+}
+
+.itemActive {
+  color: var(--omni-color-primary-700);
+}
+
+.hint {
+  padding: 10px;
+  font-size: var(--omni-font-size-xs);
+  color: var(--omni-color-text-muted);
+  text-align: center;
+}

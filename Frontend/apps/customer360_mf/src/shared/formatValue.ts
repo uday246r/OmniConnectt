@@ -51,3 +51,26 @@ export function formatCurrency(val: unknown, country?: string | null): string {
   }
   return `${currency} ${formatted}`
 }
+
+/**
+ * Resolves the status string across diverse CRM product models
+ * (CASA, Financing, Card, Takaful/Insurance, Gold).
+ */
+export function resolveProductStatus(item: unknown): string {
+  if (!item || typeof item !== 'object') return ''
+  const rec = item as Record<string, unknown>
+  const s = String(
+    rec.derivedAccountStatus ||
+    rec.financingStatus ||
+    rec.certStatus ||
+    rec.goldStatus ||
+    rec.cardStatus ||
+    rec.accountStatus ||
+    rec.status ||
+    ''
+  ).trim()
+  if (!s || s.toLowerCase() === 'null' || s.toLowerCase() === 'undefined' || s === EMPTY_VALUE) {
+    return ''
+  }
+  return s
+}

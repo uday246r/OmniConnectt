@@ -5,7 +5,8 @@
 
 .grid {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  /* Automatically expands cards to fill 100% of the width regardless of whether there are 1, 2, 3, 4, or 5 cards */
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 16px;
   width: 100%;
   box-sizing: border-box;

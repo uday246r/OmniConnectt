@@ -40,7 +40,7 @@ export function Topbar({ userName, settingsAccess, onLogout, onMobileMenuToggle 
 
   const navigate = useNavigate()
   // Navigates rather than opening the store directly, so the gear icon produces a real URL.
-  const openSettings = () => navigate('/settings/users')
+  const openSettings = () => navigate('/settings')
   // The signed-in user's real role, for the menu header. See the comment on that header below.
   const user = useAuthStore((s) => s.user)
 

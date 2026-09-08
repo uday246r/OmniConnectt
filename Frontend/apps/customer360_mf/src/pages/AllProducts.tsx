@@ -1,4 +1,4 @@
-import React, { useEffect, useState, type ChangeEvent } from 'react';
+import React, { useEffect, useMemo, useState, type ChangeEvent } from 'react';
 import { useCustomerStore } from '../store/customerStore';
 import { useProductStore } from '../store/productStore';
 import { useHostNavigate } from '../navigation/HostNavigation';
@@ -6,7 +6,9 @@ import ProductDetailsModal from '../components/ProductDetailsModal';
 import { ArrowLeft, Search, Eye, Layers, RefreshCw, X, ChevronLeft, ChevronRight, AlertTriangle } from '@omniremit/ui/icons';
 import type { CorporateProfile, IndividualProfile } from '../types/api';
 import { getFriendlyErrorMessage } from '../utils/errorMessages';
-import { Button, ColumnFilter, DataTable, EMPTY_VALUE, FilterBar, PageHeader, Pagination, ResponsiveRows, RowAction, RowsPerPage, SearchField, type ActiveFilter } from '@omniremit/ui';
+import { Button, ColumnFilter, DataTable, EMPTY_VALUE, FilterBar, PageHeader, Pagination, ResponsiveRows, RowAction, RowsPerPage, SearchField, useDebouncedValue, type ActiveFilter } from '@omniremit/ui';
+import { StatusBadge } from '../shared/StatusBadge';
+import { formatCurrency, resolveProductStatus } from '../shared/formatValue';
 import styles from './AllProducts.module.css';
 import cc from '../shared/c360Common.module.css';
 
@@ -75,18 +77,61 @@ export default function AllProducts() {
     setSearchTerm(e.target.value);
   };
 
+  // The box stays bound to the raw `searchTerm` so typing never feels laggy; only the filtering
+  // below — recomputed on every render — waits for the debounce, so a fast typist doesn't refilter
+  // and re-render the whole table once per keystroke.
+  const debouncedSearchTerm = useDebouncedValue(searchTerm, 200);
+
+  // Recommends matching products as the operator types, rather than only narrowing the table
+  // silently.
+  const searchSuggestions = (() => {
+    const query = debouncedSearchTerm.trim().toLowerCase();
+    if (!query) return [];
+    return products
+      .filter(
+        (item) =>
+          (item.accountNumber || '').toLowerCase().includes(query) ||
+          (item.productName || '').toLowerCase().includes(query) ||
+          (item.productCategory || '').toLowerCase().includes(query),
+      )
+      .slice(0, 8)
+      .map((item) => ({
+        id: item.productName || item.accountNumber || '',
+        label: (
+          <span className={styles.suggestionRow}>
+            <span className={styles.suggestionPrimary}>{item.productName || 'Untitled Product'}</span>
+            <span className={styles.suggestionSecondary}>{item.productCategory} · {item.accountNumber}</span>
+          </span>
+        ),
+      }));
+  })();
+
+  /*
+   * Per-column recommendations, from the products already loaded — no extra request, and never a
+   * value this table could not show. Category qualifies a product name; the product name qualifies
+   * a bare account number.
+   */
+  const namePool = useMemo(
+    () => products.map((p) => ({ value: p.productName ?? '', meta: p.productCategory || undefined })),
+    [products],
+  );
+  const accountPool = useMemo(
+    () => products.map((p) => ({ value: p.accountNumber ?? '', meta: p.productName || undefined })),
+    [products],
+  );
+
   // Local filtering based on query
   const filteredProducts = products.filter((item) => {
     if (accountFilter && !(item.accountNumber || '').toLowerCase().includes(accountFilter.toLowerCase())) return false;
     if (nameFilter && !(item.productName || '').toLowerCase().includes(nameFilter.toLowerCase())) return false;
     if (statusFilter) {
-      const st = (item.derivedAccountStatus || item.financingStatus || '').toLowerCase();
+      const st = resolveProductStatus(item).toLowerCase();
       if (statusFilter === 'ACTIVE' ? !st.includes('active') : st.includes('active')) return false;
     }
     const matchesSearch =
-      (item.accountNumber || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (item.productName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (item.productCategory || '').toLowerCase().includes(searchTerm.toLowerCase());
+      (item.accountNumber || '').toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+      (item.productName || '').toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+      (item.productCategory || '').toLowerCase().includes(debouncedSearchTerm.toLowerCase());
     const matchesType = typeFilter === '' || (item.type || '').toLowerCase() === typeFilter.toLowerCase();
     return matchesSearch && matchesType;
   });
@@ -144,6 +189,9 @@ export default function AllProducts() {
               placeholder="Search product name, account number..."
               value={searchTerm}
               onValueChange={setSearchTerm}
+              suggestions={searchSuggestions}
+              onSelectSuggestion={(s) => setSearchTerm(s.id)}
+              emptyHint="No matching products."
             />
           </div>
 
@@ -225,7 +273,8 @@ export default function AllProducts() {
                       allLabel={undefined}
                       freeText
                       searchPlaceholder="Type to filter name…"
-                      emptyHint="Press Enter to filter."
+                      suggestFrom={namePool}
+                      emptyHint="No matching product."
                     />
                   ),
                   render: (prod) => <span className={styles.text4}>{prod.productName}</span>,
@@ -246,7 +295,8 @@ export default function AllProducts() {
                       freeText
                       filterType="numeric"
                       searchPlaceholder="Type to filter account #…"
-                      emptyHint="Press Enter to filter."
+                      suggestFrom={accountPool}
+                      emptyHint="No matching account number."
                     />
                   ),
                   render: (prod) => <span className={cc.monoValue}>{prod.accountNumber}</span>,
@@ -265,8 +315,8 @@ export default function AllProducts() {
                   label: 'Balance / Limit',
                   priority: 'low',
                   render: (prod) => (
-                    <span className={styles.strong3}>
-                      {prod.balances ? `RM ${Number(prod.balances).toLocaleString()}` : EMPTY_VALUE}
+                    <span className={styles.strong3} style={{ whiteSpace: 'nowrap' }}>
+                      {formatCurrency(prod.balances)}
                     </span>
                   ),
                 },
@@ -284,20 +334,9 @@ export default function AllProducts() {
                       allLabel="All Statuses"
                     />
                   ),
-                  /* No single generic status field exists — derivedAccountStatus is the one the
-                     backend explicitly provides as a normalized status across product types. The
-                     fixed green "Active" fallback previously shown regardless of real status has
-                     been removed: it is specifically the wrong direction to fail in for something
-                     this label implies about an account. */
-                  render: (prod) =>
-                    prod.derivedAccountStatus ? (
-                      <span className={styles.pill}>
-                        <span className={styles.avatar} />
-                        {prod.derivedAccountStatus}
-                      </span>
-                    ) : (
-                      <span className={styles.muted2}>{EMPTY_VALUE}</span>
-                    ),
+                  render: (prod) => (
+                    <StatusBadge status={resolveProductStatus(prod)} dot={true} />
+                  ),
                 },
                 {
                   key: 'actions',

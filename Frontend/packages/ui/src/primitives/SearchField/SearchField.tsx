@@ -1,6 +1,12 @@
-import type { InputHTMLAttributes, ReactNode } from 'react'
+import { useEffect, useRef, useState, type InputHTMLAttributes, type KeyboardEvent, type ReactNode } from 'react'
 import { classNames } from '../../utils/classNames'
 import styles from './SearchField.module.css'
+
+export interface SearchFieldSuggestion {
+  /** Unique key AND the value committed on selection unless `onSelectSuggestion` says otherwise. */
+  id: string
+  label: ReactNode
+}
 
 export interface SearchFieldProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'size' | 'onChange' | 'value'> {
   value: string
@@ -12,6 +18,20 @@ export interface SearchFieldProps extends Omit<InputHTMLAttributes<HTMLInputElem
   /** Override the leading glyph. Defaults to a magnifier. */
   icon?: ReactNode
   className?: string
+  /**
+   * Caller-computed matches shown in a dropdown as the operator types — the same "recommend as you
+   * type" behaviour the Name/Mobile column filters and the Users toolbar search already have.
+   * `undefined` (the default) means "no suggestions": the field behaves exactly as before, a plain
+   * debounced filter with no dropdown. Passing an array — even an empty one — opts in; an empty
+   * array then renders `emptyHint` rather than nothing, so the operator knows the search actually ran.
+   */
+  suggestions?: SearchFieldSuggestion[]
+  /** Fires when a suggestion is picked (click, or Enter while one is highlighted). */
+  onSelectSuggestion?: (suggestion: SearchFieldSuggestion) => void
+  /** Shows a "Searching…" row in place of the list while the caller's own lookup is in flight. */
+  suggestionsLoading?: boolean
+  /** Shown when `suggestions` is an empty array and the field has text. */
+  emptyHint?: ReactNode
 }
 
 function MagnifierIcon() {
@@ -41,18 +61,77 @@ export function SearchField({
   icon,
   className,
   placeholder = 'Search…',
+  suggestions,
+  onSelectSuggestion,
+  suggestionsLoading,
+  emptyHint = 'No matches.',
+  onFocus,
+  onBlur,
   ...rest
 }: SearchFieldProps) {
   const showClear = clearable && value.length > 0
+  const hasSuggestions = suggestions !== undefined
+  const [open, setOpen] = useState(false)
+  const [highlighted, setHighlighted] = useState(-1)
+  const wrapRef = useRef<HTMLDivElement | null>(null)
+
+  // Re-aim the highlight whenever the list itself changes, so an old index doesn't point at an
+  // unrelated row after the operator types another character.
+  useEffect(() => {
+    setHighlighted(-1)
+  }, [suggestions])
+
+  useEffect(() => {
+    if (!hasSuggestions || !open) return
+    function handleClickOutside(e: MouseEvent) {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [hasSuggestions, open])
+
+  function pick(s: SearchFieldSuggestion) {
+    onSelectSuggestion ? onSelectSuggestion(s) : onValueChange(s.id)
+    setOpen(false)
+  }
+
+  function handleKeyDown(e: KeyboardEvent<HTMLInputElement>) {
+    if (!hasSuggestions || !open || !suggestions || suggestions.length === 0) return
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      setHighlighted((h) => (h + 1) % suggestions.length)
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      setHighlighted((h) => (h - 1 + suggestions.length) % suggestions.length)
+    } else if (e.key === 'Enter' && highlighted >= 0) {
+      e.preventDefault()
+      pick(suggestions[highlighted])
+    } else if (e.key === 'Escape') {
+      setOpen(false)
+    }
+  }
+
+  const showPopover = hasSuggestions && open && value.trim().length > 0
 
   return (
-    <div className={classNames(styles.wrap, className)}>
+    <div className={classNames(styles.wrap, className)} ref={hasSuggestions ? wrapRef : undefined}>
       <input
         type="text"
         className={classNames(styles.input, styles[size], showClear && styles.clearable)}
         value={value}
-        onChange={(e) => onValueChange(e.target.value)}
+        onChange={(e) => {
+          onValueChange(e.target.value)
+          if (hasSuggestions) setOpen(true)
+        }}
+        onFocus={(e) => {
+          if (hasSuggestions) setOpen(true)
+          onFocus?.(e)
+        }}
+        onKeyDown={handleKeyDown}
         placeholder={placeholder}
+        role={hasSuggestions ? 'combobox' : undefined}
+        aria-expanded={hasSuggestions ? showPopover : undefined}
+        aria-autocomplete={hasSuggestions ? 'list' : undefined}
         {...rest}
       />
       <span className={styles.icon}>{icon ?? <MagnifierIcon />}</span>
@@ -60,6 +139,29 @@ export function SearchField({
         <button type="button" className={styles.clear} onClick={() => onValueChange('')} aria-label="Clear search">
           <ClearIcon />
         </button>
+      )}
+      {showPopover && (
+        <div className={styles.popover} role="listbox">
+          {suggestionsLoading ? (
+            <div className={styles.hint}>Searching…</div>
+          ) : suggestions!.length === 0 ? (
+            <div className={styles.hint}>{emptyHint}</div>
+          ) : (
+            suggestions!.map((s, i) => (
+              <button
+                key={s.id}
+                type="button"
+                role="option"
+                aria-selected={i === highlighted}
+                className={classNames(styles.item, i === highlighted && styles.itemActive)}
+                onMouseEnter={() => setHighlighted(i)}
+                onClick={() => pick(s)}
+              >
+                {s.label}
+              </button>
+            ))
+          )}
+        </div>
       )}
     </div>
   )

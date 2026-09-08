@@ -1,4 +1,5 @@
 import { useId, useMemo, useState } from 'react'
+import { useDebouncedValue } from '@omniremit/ui'
 import { Icon } from '../components/Icon/Icon'
 import { isBusinessCapability, type PermissionRow } from './catalog'
 import type { CapabilityDto } from '../api/permissionsApi'
@@ -147,7 +148,14 @@ export function CapabilityPicker({
     return [...byId.values()]
   }, [rows])
 
-  const query = search.trim().toLowerCase()
+  /*
+   * The grouped list below IS this box's recommendation — it narrows to matching capabilities as
+   * you type, grouped and tickable, so a floating dropdown over it would cover the very rows it is
+   * filtering and offer nothing to pick (you tick a capability here, you do not select a search
+   * term). What was missing is the debounce: every keystroke re-filtered and re-grouped the whole
+   * catalog. 200ms, the platform's convention for narrowing an already-loaded pool.
+   */
+  const query = useDebouncedValue(search, 200).trim().toLowerCase()
 
   /*
    * Filtering keeps a group only if something in it matched, so an empty group header never appears

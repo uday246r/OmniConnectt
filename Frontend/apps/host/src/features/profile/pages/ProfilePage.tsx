@@ -1,7 +1,10 @@
-import { useState, type FormEvent } from 'react'
+import { useState, useMemo, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../auth/store/authStore'
+import { useModuleRegistryStore } from '../../../shared/stores/moduleRegistryStore'
 import { usersApi } from '../../settings-users/api/usersApi'
+import { usePermissionCatalog } from '../../settings-users/hooks/usePermissionCatalog'
+import { PermissionMatrixTable } from '../../settings-users/components/PermissionMatrixTable/PermissionMatrixTable'
 import { isApprovalPending } from '../../approvals/api/approvalsApi'
 import { ChangePasswordForm } from '../components/ChangePasswordForm'
 import { Icon } from '../../../shared/components/Icon/Icon'
@@ -24,7 +27,6 @@ function formatDateTime(iso: string | null) {
 }
 
 function getUserInitials(name?: string | null): string {
-  // '?' rather than 'SA' — inventing initials shows an identity that may not be the viewer's own.
   if (!name) return '?'
   const parts = name.trim().split(/\s+/)
   if (parts.length >= 2) {
@@ -39,7 +41,9 @@ export function ProfilePage() {
   const navigate = useNavigate()
   const user = useAuthStore((s) => s.user)
   const accessToken = useAuthStore((s) => s.accessToken)
+  const fineCapabilities = useAuthStore((s) => s.fineCapabilities)
   const refreshSession = useAuthStore((s) => s.refreshSession)
+  const registryApps = useModuleRegistryStore((s) => s.apps)
 
   // Drawer state
   const [drawerOpen, setDrawerOpen] = useState(false)
@@ -54,6 +58,8 @@ export function ProfilePage() {
 
   // Toast
   const [toastMessage, setToastMessage] = useState<string | null>(null)
+
+  const { catalog } = usePermissionCatalog()
 
   if (!user) return null
 
@@ -83,18 +89,9 @@ export function ProfilePage() {
   async function handleSaveProfile(e: FormEvent) {
     e.preventDefault()
 
-    /*
-     * Runs the same rules the Users form and the server use, rather than the name-only check this
-     * previously had. Editing your own profile was the one place an invalid email or a malformed
-     * phone number reached the API unchallenged and came back as a raw server error.
-     *
-     * Email is only editable by a Super Admin (see the payload below), so it is only checked when it
-     * is actually being sent.
-     */
     const problem = firstError(
       required(name, 'Full name'),
       isSuperAdmin ? emailRule(email) : undefined,
-      // Optional here — the server accepts a null phone on update — so only validated when present.
       phoneNumber.trim() ? validateFullPhone(phoneNumber) : undefined,
     )
     if (problem) {
@@ -113,16 +110,10 @@ export function ProfilePage() {
         email: isSuperAdmin ? email.trim() : user.email,
         phoneNumber: phoneNumber.trim() || null,
         roleId: user.roleId,
-        // Editing your own profile must never change your account status. Sending the current value
-        // keeps this a no-op — omitting it would let the server default deactivate the account.
         isActive: user.isActive,
       })
 
       if (isApprovalPending(result)) {
-        // Nothing was actually changed yet — the "Users" module has a checker assigned, so this edit
-        // is queued instead of applied. No refreshSession(): there's nothing stale to pull yet, and
-        // doing so here would silently overwrite the drawer's now-closed form with the OLD profile,
-        // which could read as "my edit was discarded" rather than "it's pending".
         setDrawerOpen(false)
         triggerToast(result.message)
         return
@@ -137,6 +128,15 @@ export function ProfilePage() {
       setSavingProfile(false)
     }
   }
+
+  // Combine user.permissions and fineCapabilities
+  const allEffectivePermissions = useMemo(() => {
+    const set = new Set<string>(user?.permissions || [])
+    for (const cap of fineCapabilities || []) {
+      set.add(cap)
+    }
+    return Array.from(set)
+  }, [user?.permissions, fineCapabilities])
 
   return (
     <div className={styles.page}>
@@ -187,29 +187,29 @@ export function ProfilePage() {
       <div className={styles.identityCard}>
         <div className={styles.identityLeft}>
           <div className={styles.avatarWrap}>
-            <div className={styles.avatar} aria-hidden="true">
-              {initials}
-            </div>
-            <span className={styles.statusDot} />
+            <div className={styles.avatar}>{initials}</div>
+            <span className={styles.statusDot} title="Account Active" />
           </div>
 
           <div className={styles.identityInfo}>
             <div className={styles.nameRow}>
               <h2 className={styles.name}>{user.name}</h2>
-              <span className={styles.roleChip}>
-                <Icon.ShieldCheck width={14} height={14} />
-                <span>{user.isAdministrator ? 'Platform Administrator' : user.roleName || 'Authorized User'}</span>
-              </span>
+              {user.isAdministrator ? (
+                <span className={styles.superAdminChip}>
+                  <Icon.Crown width={13} height={13} />
+                  Super Administrator
+                </span>
+              ) : (
+                <span className={styles.roleChip}>
+                  <Icon.ShieldCheck width={14} height={14} />
+                  <span>{user.roleName || 'Standard User'}</span>
+                </span>
+              )}
             </div>
             <p className={styles.email}>{user.email}</p>
           </div>
         </div>
 
-        {/*
-          Status badge only. The duplicate "Edit Profile" button that sat here has been removed — the
-          page header already carries one, and the same action offered twice on one screen makes a
-          reader stop and work out whether the two do the same thing.
-        */}
         <div className={styles.identityRight}>
           <span className={user.isActive ? styles.activeBadge : styles.inactiveBadge}>
             <span className={styles.livePulse} />
@@ -265,7 +265,7 @@ export function ProfilePage() {
         {/* Card 2: Security & Authentication */}
         <div className={styles.sectionCard}>
           <div className={styles.cardHeader}>
-            <div className={`${styles.cardHeaderIcon} ${styles.iconPurple}`}>
+            <div className={styles.cardHeaderIcon}>
               <Icon.Lock width={20} height={20} />
             </div>
             <div>
@@ -316,7 +316,7 @@ export function ProfilePage() {
         </div>
       </div>
 
-      {/* Row 3: Granted Capabilities & Permissions Card */}
+      {/* ── System Capabilities & Permissions ── */}
       <div className={styles.sectionCard}>
         <div className={styles.cardHeader}>
           <div className={`${styles.cardHeaderIcon} ${styles.iconGreen}`}>
@@ -332,47 +332,15 @@ export function ProfilePage() {
           </div>
         </div>
 
-        <div className={styles.capabilitiesGrid}>
-          {user.isAdministrator ? (
-            [
-              { title: 'User Management', desc: 'Full authority to create, edit, deactivate, and assign role overrides to users.', icon: Icon.Users },
-              { title: 'Role & RBAC Configuration', desc: 'Manage system roles, assign application scopes, and fine-tune permissions.', icon: Icon.ShieldCheck },
-              { title: 'Micro-Frontend Registry', desc: 'Register, configure, and monitor Module Federation remote micro-frontends.', icon: Icon.Grid },
-              { title: 'System Security Audit Trail', desc: 'Real-time visibility into authentication logs and administrative actions.', icon: Icon.FileText },
-            ].map((cap, i) => (
-              <div key={i} className={styles.capItem}>
-                <div className={styles.capIconWrap}>
-                  <cap.icon width={18} height={18} />
-                </div>
-                <div className={styles.capText}>
-                  <span className={styles.capTitle}>{cap.title}</span>
-                  <span className={styles.capDesc}>{cap.desc}</span>
-                </div>
-                <span className={styles.capActivePill}>Full Access</span>
-              </div>
-            ))
-          ) : user.permissions && user.permissions.length > 0 ? (
-            user.permissions.map((perm, i) => (
-              <div key={i} className={styles.capItem}>
-                <div className={styles.capIconWrap}>
-                  <Icon.CheckCircle width={18} height={18} />
-                </div>
-                <div className={styles.capText}>
-                  <span className={styles.capTitle}>{perm}</span>
-                  <span className={styles.capDesc}>Active capability authorized for your account</span>
-                </div>
-                <span className={styles.capActivePill}>Authorized</span>
-              </div>
-            ))
-          ) : (
-            <div className={styles.emptyCapBox}>
-              <span>Standard application access authorized via role.</span>
-            </div>
-          )}
-        </div>
+        <PermissionMatrixTable
+          permissions={allEffectivePermissions}
+          catalog={catalog}
+          registryApps={registryApps}
+          isAdministrator={user.isAdministrator}
+          roleName={user.roleName}
+        />
       </div>
 
-      {/* Right Slide-Over Drawer */}
       {drawerOpen && (
         <div className={styles.drawerBackdrop} onClick={closeDrawer}>
           <div

@@ -393,51 +393,34 @@
   min-width: 200px;
 }
 
-.searchInput {
-  width: 100%;
-  padding: 8px 12px 8px 34px;
-  background: var(--omni-color-surface);
-  border: 1.5px solid #e2e8f0;
-  border-radius: var(--omni-radius-md-plus);
-  font-size: var(--omni-font-size-sm-minus);
-  color: var(--omni-color-text-primary);
-  outline: none;
-  font-family: inherit;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
-}
-
-.searchInput:focus {
-  border-color: var(--omni-color-primary-600);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
-}
-
-.searchIcon {
-  position: absolute;
-  left: 10px;
-  top: 50%;
-  transform: translateY(-50%);
-  color: var(--omni-color-text-muted);
-  pointer-events: none;
-}
-
-.clearSearchBtn {
-  position: absolute;
-  right: 9px;
-  top: 50%;
-  transform: translateY(-50%);
-  background: none;
-  border: none;
-  color: var(--omni-color-text-muted);
-  cursor: pointer;
+/* Suggestion rows for the toolbar search: module or checker name over what it belongs to. */
+.suggestionRow {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 2px;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
 }
 
-.clearSearchBtn:hover {
+.suggestionPrimary {
+  font-size: var(--omni-font-size-sm);
   color: var(--omni-color-text-primary);
+  font-weight: var(--omni-font-weight-medium);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
+
+.suggestionSecondary {
+  font-size: var(--omni-font-size-xs);
+  color: var(--omni-color-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The input, its icon and its clear button now come from @omniremit/ui's SearchField (which also
+   brings the suggestion popover), so the local .searchInput/.searchIcon/.clearSearchBtn rules that
+   duplicated them are gone. .searchWrap above is still passed to SearchField for its flex sizing. */
 
 .filterPills {
   display: flex;

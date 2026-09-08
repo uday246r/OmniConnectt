@@ -1,7 +1,7 @@
 import { canExportAuditLogs } from '../api/hostBridge';
 import React, { useEffect, useState } from 'react';
 import { ShieldCheck, Search, RefreshCw, Eye, Download, X, ChevronLeft, ChevronRight } from '@omniremit/ui/icons';
-import { ActorCell, Badge, Button, ColumnFilter, DataTable, FilterBar, Icon, PageHeader, Pagination, ResponsiveRows, RowAction, RowsPerPage, SearchField, formatAuditTimestamp, type ActiveFilter } from '@omniremit/ui';
+import { ActorCell, Badge, Button, ColumnFilter, DataTable, FilterBar, Icon, PageHeader, Pagination, ResponsiveRows, RowAction, RowsPerPage, SearchField, formatAuditTimestamp, useDebouncedValue, type ActiveFilter } from '@omniremit/ui';
 import { useLeadStore } from '../store/useLeadStore';
 import styles from './AuditLogsPage.module.css';
 import shell from '../shared/leadPage.module.css';
@@ -31,6 +31,17 @@ export const AuditLogsPage: React.FC = () => {
   const auditStartIndex = totalAuditRecords > 0 ? (auditPage - 1) * auditPageSize + 1 : 0;
   const auditEndIndex = Math.min(auditPage * auditPageSize, totalAuditRecords);
 
+  // `setAuditSearchQuery` fires a real request immediately (see the store), so typing "administrator"
+  // sent thirteen uncancelled requests. The box stays controlled by the raw, un-debounced value —
+  // typing never feels laggy — and only the store (and the server call it makes) waits for the
+  // debounce to settle.
+  const [searchInput, setSearchInput] = useState(auditSearchQuery);
+  const debouncedSearchInput = useDebouncedValue(searchInput, 300);
+  useEffect(() => {
+    if (debouncedSearchInput !== auditSearchQuery) setAuditSearchQuery(debouncedSearchInput);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedSearchInput]);
+
   // Client-side: the audit endpoint takes `action` and `search` only, so these narrow the page
   // that has already been fetched. Kept local rather than in the store for that reason.
   const [actorFilter, setActorFilter] = useState('');
@@ -53,6 +64,32 @@ export const AuditLogsPage: React.FC = () => {
     return [...seen.values()].sort((a, b) => a.localeCompare(b)).map((n) => ({ value: n, label: n }));
   }, [auditLogs]);
   const [statusFilter, setStatusFilter] = useState('');
+
+  // Recommends matching rows from the currently-loaded page as the operator types — the same
+  // "show it, don't make them press Enter to find out" treatment the Name/Mobile column filters
+  // have elsewhere. Picking one narrows the search to that entry's user, which is what the search
+  // box actually filters by server-side.
+  const searchSuggestions = React.useMemo(() => {
+    const needle = debouncedSearchInput.trim().toLowerCase();
+    if (!needle) return [];
+    return auditLogs
+      .filter(
+        (log) =>
+          (log.userName || '').toLowerCase().includes(needle) ||
+          (log.description || '').toLowerCase().includes(needle) ||
+          (log.ipAddress || '').toLowerCase().includes(needle),
+      )
+      .slice(0, 8)
+      .map((log) => ({
+        id: log.userName || log.description || '',
+        label: (
+          <span className={styles.suggestionRow}>
+            <span className={styles.suggestionPrimary}>{log.userName || 'System'}</span>
+            <span className={styles.suggestionSecondary}>{log.description}</span>
+          </span>
+        ),
+      }));
+  }, [auditLogs, debouncedSearchInput]);
 
   /*
    * Actor and Status filter CLIENT-SIDE — the audit endpoint accepts `action` and `search` only —
@@ -225,14 +262,14 @@ const getActionBadge = (action: string) => {
             key: 'search',
             label: 'Search',
             value: `"${auditSearchQuery}"`,
-            onRemove: () => setAuditSearchQuery(''),
+            onRemove: () => setSearchInput(''),
           },
         ].filter(Boolean) as ActiveFilter[]}
         onClearAll={() => {
           setAuditActionFilter('');
           setActorFilter('');
           setStatusFilter('');
-          setAuditSearchQuery('');
+          setSearchInput('');
         }}
       />
 
@@ -246,8 +283,11 @@ const getActionBadge = (action: string) => {
             <div className={shell.searchGrow}>
               <SearchField
                 placeholder="Search description, user, IP..."
-                value={auditSearchQuery}
-                onValueChange={setAuditSearchQuery}
+                value={searchInput}
+                onValueChange={setSearchInput}
+                suggestions={searchSuggestions}
+                onSelectSuggestion={(s) => setSearchInput(s.id)}
+                emptyHint="No matches in the loaded page."
               />
             </div>
           </div>

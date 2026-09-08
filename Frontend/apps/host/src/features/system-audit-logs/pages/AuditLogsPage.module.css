@@ -382,8 +382,43 @@
 }
 
 /* ════════════════════════════════════════════════════
+   ACTIVITY DETAIL DRAWER — explicit Back, alongside the corner X
+   ════════════════════════════════════════════════════ */
+
+.drawerBackBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  margin-right: 4px;
+  background: var(--omni-color-surface-alt);
+  border: 1.5px solid var(--omni-color-border);
+  border-radius: var(--omni-radius-pill);
+  font-size: var(--omni-font-size-xs);
+  font-weight: var(--omni-font-weight-bold);
+  color: var(--omni-color-text-secondary);
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 120ms ease;
+  flex-shrink: 0;
+}
+
+.drawerBackBtn:hover {
+  background: var(--omni-color-primary-50);
+  border-color: var(--omni-color-primary-200);
+  color: var(--omni-color-primary-700);
+}
+
+/* ════════════════════════════════════════════════════
    ERROR BANNER
    ════════════════════════════════════════════════════ */
+
+.timelineLoading {
+  padding: 40px 0;
+  text-align: center;
+  color: var(--omni-color-text-muted);
+  font-size: var(--omni-font-size-sm);
+}
 
 .errorBanner {
   padding: 12px 18px;

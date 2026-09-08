@@ -135,6 +135,10 @@
   flex-direction: column;
   gap: 16px;
   transition: box-shadow 0.2s ease, border-color 0.2s ease;
+  /* The panel is a sibling of PageHeader inside a bare <div> with no gap.
+     This top margin keeps it clear of the header's decorative bloom (::after
+     extends -80px below the banner) — matches the c360-workspace-viewport gap. */
+  margin-top: 20px;
 }
 
 .c360-search-panel:focus-within {
@@ -440,10 +444,11 @@
 }
 
 /* Corporate Cards Grid */
-.c360-corp-grid {
+.c360-corp-cards-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 16px;
+  width: 100%;
 }
 
 .c360-corp-card {
@@ -551,8 +556,9 @@
 
 .info-cards-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: 14px;
+  width: 100%;
 }
 
 @media (max-width: 640px) {

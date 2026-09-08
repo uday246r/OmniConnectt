@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useAuthStore } from '../../auth/store/authStore'
-import { Badge, DataTable, EMPTY_VALUE, PageHeader, Pagination, ResponsiveRows, RowAction, RowsPerPage, readStoredPageSize, sanitizeFilterInput, filterTypeBlockedMessage, type BadgeTone } from '@omniremit/ui'
+import { Badge, DataTable, EMPTY_VALUE, PageHeader, Pagination, ResponsiveRows, RowAction, RowsPerPage, readStoredPageSize, sanitizeFilterInput, filterTypeBlockedMessage, useCommittedFilter, type BadgeTone, type CommittedFilter } from '@omniremit/ui'
 import { SkeletonBlock } from '../../../shared/components/Skeleton'
 import { ApiError } from '../../../shared/api/httpClient'
 import { useDebouncedValue } from '../../../shared/hooks/useDebouncedValue'
@@ -512,24 +512,38 @@ export function ApprovalCenterPage() {
   // Action filter
   const [actionFilter, setActionFilter] = useState('')
 
-  // Entity search
-  const [entitySearch, setEntitySearch] = useState('')
+  /*
+   * Record, Maker and Checker are free-text popovers whose box used to BE the filter: every debounce
+   * tick re-filtered the table while simultaneously re-narrowing the "known values" list you were
+   * reading. useCommittedFilter separates them — `query` feeds the recommendations, `applied` feeds
+   * the table — so typing costs nothing and the rows move exactly once, on Enter or on a pick.
+   * (Module, Action and Status were always pick-only and are left alone.)
+   */
+  const recordFilter = useCommittedFilter()
+  const makerFilter = useCommittedFilter()
+  const checkerFilter = useCommittedFilter()
 
-  // Maker search & user selection — a person's name, letters only.
-  const [makerSearch, setMakerSearch] = useState('')
+  /** Enter applies what is typed — the escape hatch for a value with no suggestion behind it. */
+  const commitOnEnter = (f: CommittedFilter) => (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key !== 'Enter') return
+    e.preventDefault()
+    f.commit()
+    setActiveHeaderFilter(null)
+  }
+
+  // Maker search — a person's name, letters only.
   const [makerSearchBlocked, setMakerSearchBlocked] = useState(false)
   function handleMakerSearchChange(raw: string) {
     const clean = sanitizeFilterInput(raw, 'alpha')
-    setMakerSearch(clean)
+    makerFilter.setQuery(clean)
     setMakerSearchBlocked(clean !== raw)
   }
 
-  // Checker search & user selection & assigned to me — same as maker, letters only.
-  const [checkerSearch, setCheckerSearch] = useState('')
+  // Checker search & assigned to me — same as maker, letters only.
   const [checkerSearchBlocked, setCheckerSearchBlocked] = useState(false)
   function handleCheckerSearchChange(raw: string) {
     const clean = sanitizeFilterInput(raw, 'alpha')
-    setCheckerSearch(clean)
+    checkerFilter.setQuery(clean)
     setCheckerSearchBlocked(clean !== raw)
   }
   const [assignedToMeOnly, setAssignedToMeOnly] = useState(false)
@@ -540,29 +554,60 @@ export function ApprovalCenterPage() {
   // In-memory cache pool to derive unique makers, checkers, and modules with 0 extra API calls
   const [cachedPool, setCachedPool] = useState<ApprovalRequestListItemDto[]>([])
 
-  const debouncedMaker = useDebouncedValue(makerSearch, 200)
-  const debouncedEntity = useDebouncedValue(entitySearch, 200)
-  const debouncedChecker = useDebouncedValue(checkerSearch, 200)
+  // Debounced TYPED text — feeds the recommendation lists only. The table reads `.applied`.
+  const debouncedMaker = useDebouncedValue(makerFilter.query, 200)
+  const debouncedEntity = useDebouncedValue(recordFilter.query, 200)
+  const debouncedChecker = useDebouncedValue(checkerFilter.query, 200)
 
   const range = useMemo(() => computeRangeWithCustom(dateRange, customFrom, customTo), [dateRange, customFrom, customTo])
 
-  // Zero extra API call: extract unique makers from all loaded items
+  /*
+   * Zero extra API call: unique makers and checkers from the rows already loaded.
+   *
+   * Neither list narrowed as you typed — both were built from `cachedPool` alone, with the search
+   * box's value absent from the dependency array, so "Known Makers" / "Known Checkers" showed the
+   * same names no matter what was in the box beside them. They read as a browse list that was
+   * ignoring you. Empty box still lists everyone, which is what the section is for; typing now
+   * shrinks it, in step with the table (both read the same debounced value).
+   */
+  const narrowByName = <T extends { name: string }>(list: T[], query: string, applied: string) => {
+    const withoutApplied = applied
+      ? list.filter((x) => x.name.toLowerCase() !== applied.toLowerCase())
+      : list
+    const q = query.toLowerCase().trim()
+    return q ? withoutApplied.filter((x) => x.name.toLowerCase().includes(q)) : withoutApplied
+  }
+
   const availableMakers = useMemo(() => {
     const map = new Map<string, { id: string; name: string }>()
     for (const r of cachedPool) {
       if (r.makerName) map.set(r.makerName.toLowerCase(), { id: r.makerId, name: r.makerName })
     }
-    return Array.from(map.values())
-  }, [cachedPool])
+    return narrowByName(Array.from(map.values()), debouncedMaker, makerFilter.applied)
+  }, [cachedPool, debouncedMaker, makerFilter.applied])
 
-  // Zero extra API call: extract unique checkers from all loaded items
   const availableCheckers = useMemo(() => {
     const map = new Map<string, { id: string; name: string }>()
     for (const r of cachedPool) {
       if (r.checkerName) map.set(r.checkerName.toLowerCase(), { id: r.checkerId, name: r.checkerName })
     }
-    return Array.from(map.values())
-  }, [cachedPool])
+    return narrowByName(Array.from(map.values()), debouncedChecker, checkerFilter.applied)
+  }, [cachedPool, debouncedChecker, checkerFilter.applied])
+
+  /*
+   * Records awaiting or holding a decision, for the RECORD column. This popover offered a bare text
+   * box and nothing else, so filtering it required already knowing what a record was called —
+   * the same gap the Maker and Checker columns had, minus even the ignored list.
+   */
+  const availableEntities = useMemo(() => {
+    const set = new Set<string>()
+    for (const r of cachedPool) {
+      if (r.entityLabel) set.add(r.entityLabel)
+    }
+    const list = Array.from(set).sort((a, b) => a.localeCompare(b)).filter((e) => e !== recordFilter.applied)
+    const q = debouncedEntity.toLowerCase().trim()
+    return q ? list.filter((e) => e.toLowerCase().includes(q)) : list
+  }, [cachedPool, debouncedEntity, recordFilter.applied])
 
   /*
    * Module filter options, derived from the rows on this page and nothing else.
@@ -697,14 +742,14 @@ export function ApprovalCenterPage() {
       if (actionFilter) {
         allItems = allItems.filter((r) => r.action === actionFilter)
       }
-      if (debouncedMaker) {
-        allItems = allItems.filter((r) => r.makerName?.toLowerCase().includes(debouncedMaker.toLowerCase()))
+      if (makerFilter.applied) {
+        allItems = allItems.filter((r) => r.makerName?.toLowerCase().includes(makerFilter.applied.toLowerCase()))
       }
-      if (debouncedChecker) {
-        allItems = allItems.filter((r) => r.checkerName?.toLowerCase().includes(debouncedChecker.toLowerCase()))
+      if (checkerFilter.applied) {
+        allItems = allItems.filter((r) => r.checkerName?.toLowerCase().includes(checkerFilter.applied.toLowerCase()))
       }
-      if (debouncedEntity) {
-        allItems = allItems.filter((r) => r.entityLabel?.toLowerCase().includes(debouncedEntity.toLowerCase()))
+      if (recordFilter.applied) {
+        allItems = allItems.filter((r) => r.entityLabel?.toLowerCase().includes(recordFilter.applied.toLowerCase()))
       }
       if (decidedRange !== 'all') {
         allItems = allItems.filter((r) => matchesDateRange(r.decidedAt, decidedRange, decidedCustomFrom, decidedCustomTo))
@@ -716,7 +761,7 @@ export function ApprovalCenterPage() {
     },
     [
       activeTab, page, pageSize, module, actionFilter, assignedToMeOnly,
-      debouncedMaker, debouncedEntity, debouncedChecker, statusFilter,
+      makerFilter.applied, recordFilter.applied, checkerFilter.applied, statusFilter,
       range.from, range.to, decidedRange, decidedCustomFrom, decidedCustomTo, currentUserId,
     ],
   )
@@ -725,7 +770,7 @@ export function ApprovalCenterPage() {
     fetcher,
     [
       activeTab, page, pageSize, module, actionFilter, assignedToMeOnly,
-      debouncedMaker, debouncedEntity, debouncedChecker, statusFilter,
+      makerFilter.applied, recordFilter.applied, checkerFilter.applied, statusFilter,
       refreshKey, range.from, range.to, decidedRange, decidedCustomFrom, decidedCustomTo,
     ],
     [dataRevision],
@@ -736,7 +781,7 @@ export function ApprovalCenterPage() {
     setPage(1)
   }, [
     activeTab, module, actionFilter, assignedToMeOnly,
-    debouncedMaker, debouncedEntity, debouncedChecker, statusFilter,
+    makerFilter.applied, recordFilter.applied, checkerFilter.applied, statusFilter,
     dateRange, customFrom, customTo, decidedRange, decidedCustomFrom, decidedCustomTo,
     pageSize,
   ])
@@ -820,10 +865,10 @@ export function ApprovalCenterPage() {
     setModule('')
     setModuleSearch('')
     setActionFilter('')
-    setMakerSearch('')
+    makerFilter.clear()
     setMakerSearchBlocked(false)
-    setEntitySearch('')
-    setCheckerSearch('')
+    recordFilter.clear()
+    checkerFilter.clear()
     setCheckerSearchBlocked(false)
     setAssignedToMeOnly(false)
     setStatusFilter('')
@@ -840,7 +885,7 @@ export function ApprovalCenterPage() {
   }
 
   const hasActiveFilters = Boolean(
-    module || actionFilter || makerSearch || entitySearch || checkerSearch || assignedToMeOnly ||
+    module || actionFilter || makerFilter.applied || recordFilter.applied || checkerFilter.applied || assignedToMeOnly ||
     dateRange !== 'all' || decidedRange !== 'all' || statusFilter
   )
 
@@ -1027,26 +1072,26 @@ export function ApprovalCenterPage() {
               </button>
             </span>
           )}
-          {entitySearch && (
+          {recordFilter.applied && (
             <span className={styles.filterChip}>
-              <span>Entity: "{entitySearch}"</span>
-              <button type="button" className={styles.filterChipRemove} onClick={() => setEntitySearch('')} aria-label="Remove entity filter">
+              <span>Entity: "{recordFilter.applied}"</span>
+              <button type="button" className={styles.filterChipRemove} onClick={() => recordFilter.clear()} aria-label="Remove entity filter">
                 <Icon.X width={12} height={12} />
               </button>
             </span>
           )}
-          {makerSearch && (
+          {makerFilter.applied && (
             <span className={styles.filterChip}>
-              <span>Maker: "{makerSearch}"</span>
-              <button type="button" className={styles.filterChipRemove} onClick={() => { setMakerSearch(''); setMakerSearchBlocked(false) }} aria-label="Remove maker filter">
+              <span>Maker: "{makerFilter.applied}"</span>
+              <button type="button" className={styles.filterChipRemove} onClick={() => { makerFilter.clear(); setMakerSearchBlocked(false) }} aria-label="Remove maker filter">
                 <Icon.X width={12} height={12} />
               </button>
             </span>
           )}
-          {checkerSearch && (
+          {checkerFilter.applied && (
             <span className={styles.filterChip}>
-              <span>Checker: "{checkerSearch}"</span>
-              <button type="button" className={styles.filterChipRemove} onClick={() => { setCheckerSearch(''); setCheckerSearchBlocked(false) }} aria-label="Remove checker filter">
+              <span>Checker: "{checkerFilter.applied}"</span>
+              <button type="button" className={styles.filterChipRemove} onClick={() => { checkerFilter.clear(); setCheckerSearchBlocked(false) }} aria-label="Remove checker filter">
                 <Icon.X width={12} height={12} />
               </button>
             </span>
@@ -1282,27 +1327,46 @@ export function ApprovalCenterPage() {
                     <th className={styles.thFilterable}>
                       <button
                         type="button"
-                        className={`${styles.thFilterBtn} ${entitySearch ? styles.thFilterBtnActive : ''}`}
+                        className={`${styles.thFilterBtn} ${recordFilter.applied ? styles.thFilterBtnActive : ''}`}
                         onClick={() => setActiveHeaderFilter((c) => (c === 'entity' ? null : 'entity'))}
                       >
                         <span>RECORD</span>
                         <Icon.ChevronDown width={12} height={12} className={`${styles.filterIcon} ${activeHeaderFilter === 'entity' ? styles.filterIconActive : ''}`} />
-                        {entitySearch && <span className={styles.filterDot} />}
+                        {recordFilter.applied && <span className={styles.filterDot} />}
                       </button>
                       {activeHeaderFilter === 'entity' && (
                         <div className={styles.filterPopover}>
                           <div className={styles.popoverHeader}>
                             <span className={styles.popoverTitle}>Search Entity</span>
-                            {entitySearch && <button type="button" className={styles.popoverClearBtn} onClick={() => setEntitySearch('')}>Reset</button>}
+                            {recordFilter.applied && <button type="button" className={styles.popoverClearBtn} onClick={() => recordFilter.clear()}>Reset</button>}
                           </div>
                           <input
                             type="text"
                             className={styles.popoverInput}
                             placeholder="Filter by entity name/ID..."
-                            value={entitySearch}
-                            onChange={(e) => setEntitySearch(e.target.value)}
+                            value={recordFilter.query}
+                            onChange={(e) => recordFilter.setQuery(e.target.value)}
+                            onKeyDown={commitOnEnter(recordFilter)}
                             autoFocus
                           />
+                          {availableEntities.length > 0 && (
+                            <>
+                              <div className={styles.popoverDivider} />
+                              <span className={styles.customDateLabel}>Known Records:</span>
+                              <div className={styles.popoverList}>
+                                {availableEntities.map((e) => (
+                                  <button
+                                    key={e}
+                                    type="button"
+                                    className={`${styles.popoverItem} ${recordFilter.applied === e ? styles.popoverItemActive : ''}`}
+                                    onClick={() => { recordFilter.commit(e); setActiveHeaderFilter(null) }}
+                                  >
+                                    <span>{e}</span>
+                                  </button>
+                                ))}
+                              </div>
+                            </>
+                          )}
                         </div>
                       )}
                     </th>
@@ -1322,26 +1386,27 @@ export function ApprovalCenterPage() {
                     <th className={styles.thFilterable}>
                       <button
                         type="button"
-                        className={`${styles.thFilterBtn} ${makerSearch ? styles.thFilterBtnActive : ''}`}
+                        className={`${styles.thFilterBtn} ${makerFilter.applied ? styles.thFilterBtnActive : ''}`}
                         onClick={() => setActiveHeaderFilter((c) => (c === 'maker' ? null : 'maker'))}
                       >
                         <span>MAKER</span>
                         <Icon.ChevronDown width={12} height={12} className={`${styles.filterIcon} ${activeHeaderFilter === 'maker' ? styles.filterIconActive : ''}`} />
-                        {makerSearch && <span className={styles.filterDot} />}
+                        {makerFilter.applied && <span className={styles.filterDot} />}
                       </button>
                       {activeHeaderFilter === 'maker' && (
                         <div className={styles.filterPopover}>
                           <div className={styles.popoverHeader}>
                             <span className={styles.popoverTitle}>Filter Maker</span>
-                            {makerSearch && <button type="button" className={styles.popoverClearBtn} onClick={() => { setMakerSearch(''); setMakerSearchBlocked(false) }}>Reset</button>}
+                            {makerFilter.applied && <button type="button" className={styles.popoverClearBtn} onClick={() => { makerFilter.clear(); setMakerSearchBlocked(false) }}>Reset</button>}
                           </div>
                           <input
                             type="text"
                             inputMode="text"
                             className={`${styles.popoverInput} ${makerSearchBlocked ? styles.popoverInputBlocked : ''}`}
                             placeholder="Search maker name..."
-                            value={makerSearch}
+                            value={makerFilter.query}
                             onChange={(e) => handleMakerSearchChange(e.target.value)}
+                            onKeyDown={commitOnEnter(makerFilter)}
                             autoFocus
                           />
                           {makerSearchBlocked && (
@@ -1356,8 +1421,8 @@ export function ApprovalCenterPage() {
                                   <button
                                     key={m.id || m.name}
                                     type="button"
-                                    className={`${styles.userItem} ${makerSearch.toLowerCase() === m.name.toLowerCase() ? styles.userItemActive : ''}`}
-                                    onClick={() => { setMakerSearch(m.name); setActiveHeaderFilter(null) }}
+                                    className={`${styles.userItem} ${makerFilter.applied.toLowerCase() === m.name.toLowerCase() ? styles.userItemActive : ''}`}
+                                    onClick={() => { makerFilter.commit(m.name); setActiveHeaderFilter(null) }}
                                   >
                                     <div className={styles.userAvatarSmall}>
                                       {m.name.charAt(0).toUpperCase()}
@@ -1390,22 +1455,22 @@ export function ApprovalCenterPage() {
                     <th className={styles.thFilterable}>
                       <button
                         type="button"
-                        className={`${styles.thFilterBtn} ${assignedToMeOnly || checkerSearch ? styles.thFilterBtnActive : ''}`}
+                        className={`${styles.thFilterBtn} ${assignedToMeOnly || checkerFilter.applied ? styles.thFilterBtnActive : ''}`}
                         onClick={() => setActiveHeaderFilter((c) => (c === 'checker' ? null : 'checker'))}
                       >
                         <span>CHECKER</span>
                         <Icon.ChevronDown width={12} height={12} className={`${styles.filterIcon} ${activeHeaderFilter === 'checker' ? styles.filterIconActive : ''}`} />
-                        {(assignedToMeOnly || checkerSearch) && <span className={styles.filterDot} />}
+                        {(assignedToMeOnly || checkerFilter.applied) && <span className={styles.filterDot} />}
                       </button>
                       {activeHeaderFilter === 'checker' && (
                         <div className={`${styles.filterPopover} ${styles.popoverRight}`}>
                           <div className={styles.popoverHeader}>
                             <span className={styles.popoverTitle}>Filter Checker</span>
-                            {(assignedToMeOnly || checkerSearch) && (
+                            {(assignedToMeOnly || checkerFilter.applied) && (
                               <button
                                 type="button"
                                 className={styles.popoverClearBtn}
-                                onClick={() => { setAssignedToMeOnly(false); setCheckerSearch('') }}
+                                onClick={() => { setAssignedToMeOnly(false); checkerFilter.clear() }}
                               >
                                 Reset
                               </button>
@@ -1424,8 +1489,9 @@ export function ApprovalCenterPage() {
                             inputMode="text"
                             className={`${styles.popoverInput} ${checkerSearchBlocked ? styles.popoverInputBlocked : ''}`}
                             placeholder="Search checker name..."
-                            value={checkerSearch}
+                            value={checkerFilter.query}
                             onChange={(e) => handleCheckerSearchChange(e.target.value)}
+                            onKeyDown={commitOnEnter(checkerFilter)}
                           />
                           {checkerSearchBlocked && (
                             <p className={styles.blockedHint} role="alert">{filterTypeBlockedMessage('alpha')}</p>
@@ -1439,8 +1505,8 @@ export function ApprovalCenterPage() {
                                   <button
                                     key={c.id || c.name}
                                     type="button"
-                                    className={`${styles.userItem} ${checkerSearch.toLowerCase() === c.name.toLowerCase() ? styles.userItemActive : ''}`}
-                                    onClick={() => { setCheckerSearch(c.name); setActiveHeaderFilter(null) }}
+                                    className={`${styles.userItem} ${checkerFilter.applied.toLowerCase() === c.name.toLowerCase() ? styles.userItemActive : ''}`}
+                                    onClick={() => { checkerFilter.commit(c.name); setActiveHeaderFilter(null) }}
                                   >
                                     <div className={`${styles.userAvatarSmall} ${styles.checkerAvatarSmall}`}>
                                       {c.name.charAt(0).toUpperCase()}

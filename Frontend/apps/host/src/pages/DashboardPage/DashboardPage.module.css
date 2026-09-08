@@ -187,15 +187,13 @@
    STAT CARDS — 4 across, colored left accent
    ════════════════════════════════════════════════════ */
 
+/* AFTER: Dynamic auto-fit */
 .statCardsGrid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 16px;
+  width: 100%;
 }
-
-@media (max-width: 1100px) { .statCardsGrid { grid-template-columns: repeat(2, 1fr); } }
-@media (max-width: 600px)  { .statCardsGrid { grid-template-columns: 1fr; } }
-
 .statCard {
   background: var(--omni-color-surface);
   border: 1px solid #eaecf0;
@@ -346,26 +344,20 @@
    TWO-COLUMN GRID & AUDIT-APPS ASYMMETRIC GRID
    ════════════════════════════════════════════════════ */
 
+/* AFTER: Expands to 100% if only 1 widget is visible, splits 50/50 if 2, reflows if more */
 .twoColumnGrid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
   gap: 20px;
+  width: 100%;
 }
-
-@media (max-width: 960px) { .twoColumnGrid { grid-template-columns: 1fr; } }
-
 /* Asymmetric 40% / 60% grid for Audit Trail (left, compact) vs Registered Apps (right, wider) */
+/* AFTER: Maintains good proportions when both exist, but seamlessly stretches to 100% if one is hidden */
 .auditAppsGrid {
   display: grid;
-  grid-template-columns: minmax(0, 42fr) minmax(0, 58fr);
+  grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
   gap: 20px;
-}
-
-@media (max-width: 1024px) {
-  .auditAppsGrid {
-    grid-template-columns: 1fr;
-    gap: 16px;
-  }
+  width: 100%;
 }
 
 /* ════════════════════════════════════════════════════

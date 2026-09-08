@@ -1,6 +1,6 @@
 # Shared UI Refactor — Status & Handoff
 
-**As of:** 2026-09-02 · **Branch:** `main` (uncommitted, 148 files changed) · **Nothing committed.**
+**As of:** 2026-09-08 · **Branch:** `main` (uncommitted, 75 files changed) · **Nothing committed.**
 
 This document exists because the work spans more than one session. It records what changed, what is
 **verified in a browser**, what is **not**, and the exact traps that already bit once — so the next
@@ -17,11 +17,19 @@ Introduced `@omniremit/ui` (`Frontend/packages/ui`), a pnpm workspace package co
 remotes; remotes stay independently buildable and deployable. `@omniremit/ui` is also NOT an MF
 shared singleton — it holds no cross-instance state and `loadShare` carries real bundle cost.
 
-### Shared components (17)
-`Button` (+`onHeader` variant), `Badge`, `Input`, `Checkbox`, `Switch`, `Tabs`, `Icon` (57 inline
-SVGs), `DataTable` (+`bare`, `Empty`), `Pagination`, `EmptyState`, `PageHeader`, `Drawer`
-(+`tone="danger"`), `Modal`, `Skeleton`×4, `classNames`, `formatDate`/`formatDateTime`/
-`formatTime`/`formatRelativeTime`.
+### Shared components — 17 at the start of the refactor, 20+ now
+Original set: `Button` (+`onHeader` variant), `Badge`, `Input`, `Checkbox`, `Switch`, `Tabs`
+(+`variant="pill"`), `Icon` (57 inline SVGs), `DataTable` (+`bare`, `Empty`), `Pagination`,
+`EmptyState`, `PageHeader`, `Drawer` (+`tone="danger"`), `Modal`, `Skeleton`×4, `classNames`,
+`formatDate`/`formatDateTime`/`formatTime`/`formatRelativeTime`.
+
+Added by later passes (each has its own section below): `ActorCell` §4e · `ColumnFilter` §4c ·
+`SearchField` §4d · `FilterBar` §4j · `RowAction` §4c · `RowsPerPage` §4k · `NavItem` §4c ·
+`Select` §4g · `ResponsiveRows` §4n · `Card` §4p · `DetailPanel` §4z.
+
+**Hooks** (`packages/ui/src/hooks/`): `useDebouncedValue`, `useSuggestions`, `useCommittedFilter` —
+the last two are §4ab and are what every search box on the platform now runs on. Read §4ab before
+touching any filter: the query/applied split there is load-bearing, not stylistic.
 
 ### Application-level shared (deliberately not global)
 - `lead_mf/src/shared/` — `LeadDiffTable`, `leadPage`, `drawerLayout`, `formField`, `dashboardCard`
@@ -1691,6 +1699,119 @@ drawer (3.5px, correct gradient, `opacity: 0` at rest), the compiled CSS matchin
 declaration for declaration, and the reduced-motion scoping. Restoring the window and hovering a
 "Performed By" card is the last visual check.
 
+### 4ab. Search recommendations everywhere, and the commit/query split (2026-09-08)
+
+Two rounds of work on the same theme: every search box should recommend as you type, and typing
+should never move the table underneath you.
+
+#### Three new shared pieces
+
+| file | what it owns |
+|---|---|
+| `packages/ui/src/hooks/useSuggestions.ts` | debounce + substring match + dedupe + cap, with `numeric` digit-only matching and `exclude` |
+| `packages/ui/src/hooks/useCommittedFilter.ts` | splits `query` (what you type) from `applied` (what the table filters by) |
+| `ColumnFilter`'s `suggestFrom` prop | one prop turns a free-text column into a recommending one |
+
+`suggestFrom` exists because the explicit path — raw state, debounced derivation, a `useMemo`
+building `ColumnFilterOption[]`, two props — costs ~12 lines per column. Across ~40 sites that is
+unshippable, which is why nine of the platform's ten free-text columns still said nothing but
+"Press Enter to apply". Explicit `suggestions` still wins where a call site wants richer rows.
+
+#### Wired
+
+10 free-text `ColumnFilter`s across all three apps; the Lead Directory toolbar search (the only
+`SearchField` still submit-only); the Settings drawer's Roles / Applications / Checker-assignment
+toolbars, migrated onto the shared `SearchField` (their local `.searchWrap`/`.searchInput`/
+`.searchIcon`/`.clearSearchBtn` rules are deleted, not shadowed); `LeadFilterPopover`'s IC / Phone /
+Name tabs, which had a bare box and no list at all; and Customer 360's two identity lookups, which
+keep Enter-to-submit — a partial NRIC/BRN is not a meaningful server query — and instead recommend
+from `useRecentLookups`, a per-browser record of lookups that actually resolved.
+
+**Every pool comes from rows already loaded.** Verified by counting `fetch`: opening a filter and
+typing ten characters issues **zero** extra requests.
+
+#### The commit/query split — typing must not filter the table
+
+Actor, Record, IP and Device in host Audit Logs, and Maker, Checker and Record in Approval Center,
+bound the box *directly* to the fetch dependency. Every debounce tick re-queried the table while
+simultaneously re-narrowing the "known values" list you were reading: four characters of a name
+reshuffled the rows three times before you reached the one you were aiming at, and the list moved
+while you read it.
+
+`useCommittedFilter` separates them. Typing narrows suggestions only; the table changes once, on a
+pick or on **Enter** — Enter is deliberate, it is the escape hatch that keeps free-text working for
+a value with no suggestion behind it. Measured live: typing 5 characters → **0 API calls**, table
+untouched; picking → **1**.
+
+Application / Action / Auth / Outcome never had the problem — their boxes only ever narrowed a list
+and the filter changed on click. Worth knowing before "fixing" them.
+
+`useSuggestions`' `exclude` (and `narrowByName`'s third argument) drops the value already applied
+from its own list: re-picking it is a no-op that displaces a real alternative.
+
+#### Still live-filtering, by decision
+
+Toolbar quick-search (Users, Lead Directory, six in Customer 360) still filters as you type. The
+rule settled on is **column and header filters commit on selection; toolbar quick-search filters
+live** — in a toolbar the dropdown covers the table anyway, so the "both moving" problem is not
+visible, and a search box that does nothing until Enter reads as broken. Flagged to the user as an
+open choice.
+
+#### Bugs this surfaced
+
+1. **Masked data leaking into suggestions.** The lead name column's second line printed IC numbers
+   in full that the table masks as `*******9184`. Suggestions are the same data by another route, so
+   they now honour the same `sensitive`/`visible` field config — a masked field gets **no pool at
+   all**. Applies to `ViewLeadPage` and `LeadFilterPopover`.
+2. **Phone suggestions matched nothing.** Rows store a doubled `+60 +60 17-234 5678` (the reason
+   `formatPhone` exists) and the filter box strips `+`, so the stored string was neither what the
+   cell shows nor something the box could hold — it displayed a doubled prefix and returned 0 rows
+   when picked. `SuggestionSource` gained an optional `label` so display and committed value can
+   differ: label as the table reads, commit what the box would have produced.
+3. **A hooks crash I introduced.** `LeadFilterPopover` has an early `return null` and my hooks sat
+   below it — "Rendered more hooks than during the previous render". Hook-shaped code in that file
+   must stay above the bail-out.
+4. **Duplicate React keys** on the Users dropdown: `id` was the user's name and two users are called
+   Tushar. Now the user id, with the handler resolving it back to the name.
+5. **Long text overflowed the popover** instead of ellipsing. `.item`'s text span is a flex item and
+   defaults to `min-width: auto`, so it refused to shrink; `.itemBody` sets `min-width: 0`.
+6. **A regression from round one:** I had pointed the Service list at the *applied* filter instead of
+   its search box, breaking that box's narrowing. `serviceSearch` and `service` are two different
+   things in that file, unlike the actor/IP/device popovers where the box is the filter.
+
+#### Tab-bar parity, and why the first attempt missed it
+
+User Detail's `.navBar` was missing Approval Center's `border-top: 3.5px solid
+var(--omni-color-primary-600)`. The first pass compared the two with a `getComputedStyle` probe
+reading `.border` — **that property returns an empty string as soon as the four sides differ**, so
+it reported nothing for both pages and every other value matched. Read borders per side.
+
+#### Settings drawer navigation
+
+- **Closing always went to the dashboard.** `SettingsDrawer`'s close was a hard-coded
+  `navigate('/')`. The store now carries `returnPath`, recorded in `AuthenticatedShell` for every
+  non-drawer route (see `isDrawerRoute`), so all entry points — gear, sidebar, global search,
+  bookmark — return where they came from. `/` remains the fallback for a cold deep-link.
+- **Saving a user landed on an empty settings overlay.** All four exits in `UserFormLayer` called
+  `resetToRoot('users')`, which reopens the drawer on its Users tab — but that panel was removed when
+  Users became real pages (`SettingsDrawer` has no `activeTab === 'users'` branch), so the body
+  rendered blank. They now close and navigate: back to the detail page if Edit was pressed there,
+  the list otherwise.
+
+#### Verified in-browser
+
+Tab bar measured per-side against Approval Center (identical). Audit Logs and Approval Center: 0
+calls while typing, 1 on pick, applied value absent from its own list. Column search picking and
+filtering on host, lead and c360. Numeric matching (`172345678` → `+60 17-234 5678`). Settings
+opened from Audit Logs and closed → back on `/system/audit-logs`. User edited from the detail page
+and saved → back on the detail page with updated values. 4/4 typecheck; a fresh tab loads host and
+lead_mf with **zero console errors**.
+
+#### Deliberately not done
+
+`CapabilityPicker` got the missing debounce but no floating dropdown — its grouped, tickable list
+*is* the result, so a popover would cover the rows it filters and offer nothing selectable.
+
 ## 5. Known remaining work
 
 - **Auto-generated class names in the host** — `styles.suc1`, `ufl3`, `rfl7`, `afl2`, `alp1`, `dp2`
@@ -1706,8 +1827,17 @@ declaration for declaration, and the reduced-motion scoping. Restoring the windo
   fix in `AuditController.cs` to take effect; until then c360 audit rows fall back to
   `resolveActor`, which shows an id rather than inventing a name.
 - The two Field Settings tables and `LeadDiffTable` remain on hand-written rows by design.
+- **Toolbar quick-search still filters live** while column/header filters commit on selection — a
+  deliberate split (§4ab), raised with the user and awaiting their call on whether to unify.
+- **`ColumnFilter` free-text suggestions only see rows already loaded.** On the two server-paged
+  audit tables that means recommendations cover the current page, the same scope those columns'
+  filters already had. Widening it needs server-side suggestion endpoints.
+- **`resolveActor` / c360 audit** — unchanged from §4e: only the current user's id resolves.
 
 ## 6. Related context
-- Plan: `C:\Users\udayo\.claude\plans\host-remote-apps-sunny-waffle.md`
-- Graphify graph: `graphify-out/graph.json` (4,209 nodes / 8,289 edges, updated post-refactor).
+- Plans: `C:\Users\udayo\.claude\plans\host-remote-apps-sunny-waffle.md`,
+  `C:\Users\udayo\.claude\plans\tingly-humming-tide.md` (the §4ab search work).
+- Graphify graph: `graphify-out/graph.json` — **5,169 nodes / 10,910 edges / 253 communities**,
+  re-extracted 2026-09-08 after §4ab (was 4,209 / 8,289). Rebuild with
+  `graphify update .` from `OmniRemit/` — AST only, no LLM, no API cost.
   Note it is AST-only — **no cross-service HTTP edges**, so "no path" ≠ "unrelated".

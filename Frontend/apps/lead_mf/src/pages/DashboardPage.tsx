@@ -74,17 +74,21 @@ export const DashboardPage: React.FC = () => {
         <div
           className={styles.chartRow}
         >
-          {/* One boundary per card so a slow chunk cannot hold the other chart back. */}
+          {/* One boundary per card so a slow chunk cannot hold the other chart back. Leads by
+              Product renders first (left), Leads Over Time second (right). */}
+
           {canSeeOverTime && (
             <Suspense fallback={<ChartCardFallback />}>
               <LeadsOverTimeCard />
             </Suspense>
           )}
+
           {canSeeByProduct && (
             <Suspense fallback={<ChartCardFallback />}>
               <LeadsByProductCard />
             </Suspense>
           )}
+    
         </div>
       )}
 

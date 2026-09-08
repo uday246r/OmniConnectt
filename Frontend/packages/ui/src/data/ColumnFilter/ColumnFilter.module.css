@@ -165,6 +165,46 @@
   font-weight: var(--omni-font-weight-bold);
 }
 
+/*
+ * A row's text, next to its optional icon. `min-width: 0` is what actually lets it truncate: as a
+ * flex item it defaults to min-width:auto and refuses to shrink below its content, so a long
+ * description (an audit row's "Viewed Signatory Phone Number for customer '…'") pushed the popover
+ * into a horizontal scrollbar and clipped mid-word instead of ellipsing.
+ */
+.itemBody {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/*
+ * Two-line suggestion rows, for a `suggestFrom` candidate that carries `meta` — the matched value
+ * on top, a disambiguator under it (an IC number beside a customer name, an account number beside a
+ * product). Mirrors the toolbar SearchField's own suggestion rows so the two read as one pattern.
+ */
+.itemStack {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.itemLabel {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.itemMeta {
+  font-size: var(--omni-font-size-xs-plus);
+  font-weight: var(--omni-font-weight-medium);
+  color: var(--omni-color-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .input {
   width: 100%;
   padding: 7px 11px;

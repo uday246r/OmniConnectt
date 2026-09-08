@@ -18,7 +18,7 @@ public class AuthServiceClient(HttpClient httpClient, IOptions<AuthIntegrationOp
 
     private record RecordAuditLogRequest(
         string ServiceName, Guid? ActorUserId, string? ActorName, string Action, string? EntityType, string? EntityId, string? Details,
-        string? EntityLabel, string? SourceIp, string? UserAgent);
+        string? EntityLabel, string? SourceIp, string? UserAgent, string? CorrelationId = null);
 
     private record SubmitInternalApprovalRequest(
         string Module, string Action, string? EntityType, string? EntityId, string? EntityLabel,
@@ -31,9 +31,13 @@ public class AuthServiceClient(HttpClient httpClient, IOptions<AuthIntegrationOp
         var httpContext = httpContextAccessor.HttpContext;
         var sourceIp = httpContext?.Connection.RemoteIpAddress?.ToString();
         var userAgent = httpContext?.Request.Headers.UserAgent.ToString();
+        // This service's own request id, so two audit writes fired within the same inbound request
+        // (e.g. a mutation plus a related side-effect) land in AuthService sharing one correlation id
+        // instead of each minting its own from AuthService's perspective of a fresh internal POST.
+        var correlationId = httpContext?.TraceIdentifier;
         return PostAsync(
             "internal/audit-logs",
-            new RecordAuditLogRequest("Customer360Service", actorUserId, actorName, action, entityType, entityId, details, entityLabel, sourceIp, userAgent),
+            new RecordAuditLogRequest("Customer360Service", actorUserId, actorName, action, entityType, entityId, details, entityLabel, sourceIp, userAgent, correlationId),
             ct);
     }
 
