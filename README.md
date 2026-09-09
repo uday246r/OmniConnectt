@@ -41,9 +41,15 @@ of the solution.
 
 - Node.js v24, pnpm 9+ (`corepack enable` picks up the version pinned in `Frontend/package.json`)
 - .NET SDK 10
-- **SQL Server** — four databases, one each for AuthService, ModuleRegistry, LeadService and
-  Customer360Service. Local SQL Server / LocalDB / SQL Server in Docker all work; production targets
-  Azure SQL. Connection strings come from environment variables and are never committed.
+- **SQL Server** — four databases (`OmniConnect_Auth`, `OmniConnect_ModuleRegistry`,
+  `OmniConnect_Lead`, `OmniConnect_Customer360`), one per service. Local SQL Server / LocalDB /
+  SQL Server in Docker all work.
+  For local development against `localhost` with Windows Authentication, the connection strings are
+  already set in each service's `appsettings.Development.json` — a trusted connection carries no
+  password, so it is safe to commit, and that file is only read when
+  `ASPNETCORE_ENVIRONMENT=Development`. Every other environment supplies `ConnectionStrings__*` as
+  environment variables, which outrank that file. **No secret-bearing connection string is ever
+  committed.**
 
 ## First-time setup
 
@@ -199,15 +205,16 @@ any remote registered in the Module Registry must:
 
 - Service-to-service auth is a shared static API key (`Internal__ApiKey`), not mTLS or OAuth
   client-credentials — a documented v1 simplification.
-- `Backend/LeadService/.env.example` ships a **real-looking `AuthService__InternalApiKey` value
-  committed into the repo**. Treat that key as compromised and rotate it in any environment that
-  used it.
+- `Backend/LeadService/.env.example` previously shipped a **real `AuthService__InternalApiKey` value
+  committed into the repo**. It has been blanked, but the value remains in git history — treat that
+  key as compromised and rotate it in any environment that used it.
 - The bootstrap Super Admin password is a fixed constant in `AuthDbSeeder.cs`, not a generated
-  one-time secret.
-- No test suite exists anywhere in the repo, and there is no CI pipeline.
-- `docs/DEPLOYMENT.md`, `docs/ADDING-A-REMOTE-APP.md` and `docs/PERFORMANCE-AND-INFRA.md` still
-  describe the earlier Neon Postgres / `employee_mf` / `EmployeeService` topology and have not yet
-  been brought in line with this README.
+  one-time secret. It is no longer written to the startup log, but it is still a known constant.
+- There is no CI pipeline. (Tests do exist: 180 backend across four xUnit projects, 160 frontend
+  across the host, both remotes and `@omniremit/ui`.)
+- `docs/ADDING-A-REMOTE-APP.md` still describes the earlier `employee_mf` / `EmployeeService`
+  topology. `docs/DEPLOYMENT.md` and `docs/PERFORMANCE-AND-INFRA.md` now carry banners marking which
+  parts are stale.
 
 ## Docs
 

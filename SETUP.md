@@ -61,24 +61,57 @@ Create four empty databases:
 
 | Database | Used by | Connection string key |
 |---|---|---|
-| `omniremit_auth` | AuthService | `ConnectionStrings__AuthDb` |
-| `omniremit_registry` | ModuleRegistry | `ConnectionStrings__RegistryDb` |
-| `omniremit_lead` | LeadService | `ConnectionStrings__LeadDb` |
-| `omniremit_customer360` | Customer360Service | `ConnectionStrings__Customer360Db` |
+| `OmniConnect_Auth` | AuthService | `AuthDb` |
+| `OmniConnect_ModuleRegistry` | ModuleRegistry | `RegistryDb` |
+| `OmniConnect_Lead` | LeadService | `LeadDb` |
+| `OmniConnect_Customer360` | Customer360Service | `Customer360Db` |
 
 You do **not** need to create any tables — each service applies its own EF Core migrations on first
 startup.
 
-### Local SQL Server (Windows authentication)
+### Local SQL Server with Windows authentication — the default
+
+If your SQL Server is on `localhost` and you sign in with Windows Authentication, **there is nothing
+to configure.** Each service already ships a local connection string in its
+`appsettings.Development.json`:
 
 ```
-Server=localhost;Database=omniremit_auth;Trusted_Connection=True;TrustServerCertificate=True;
+Server=localhost;Database=OmniConnect_Auth;Trusted_Connection=True;TrustServerCertificate=True;MultipleActiveResultSets=True;
+```
+
+That file is committed on purpose, and it is safe to commit: a trusted connection carries no
+password. It is read **only** when `ASPNETCORE_ENVIRONMENT=Development` (which
+`Properties/launchSettings.json` sets), so it never applies to a deployed environment.
+
+Create the four databases and skip to step 4:
+
+```sql
+CREATE DATABASE OmniConnect_Auth;
+CREATE DATABASE OmniConnect_ModuleRegistry;
+CREATE DATABASE OmniConnect_Lead;
+CREATE DATABASE OmniConnect_Customer360;
+```
+
+> **Precedence matters.** `.env` values are loaded into real environment variables before the host
+> builder runs, and environment variables **outrank** `appsettings.Development.json`. So if you set
+> `ConnectionStrings__AuthDb` in `Backend/AuthService/.env`, that wins and the local default is
+> ignored. Comment the `.env` line out to go back to the local default. This is the mechanism that
+> lets the same source deploy to production unchanged.
+
+### Anything else — different server, named instance, or SQL authentication
+
+Set the connection string as an environment variable instead, either in the service's `.env` file or
+in your shell. ASP.NET Core maps a double underscore to a nested key, so
+`ConnectionStrings__AuthDb` becomes `ConnectionStrings:AuthDb`:
+
+```
+ConnectionStrings__AuthDb=Server=localhost\SQLEXPRESS;Database=OmniConnect_Auth;Trusted_Connection=True;TrustServerCertificate=True;
 ```
 
 ### Local SQL Server or Docker (SQL authentication)
 
 ```
-Server=localhost,1433;Database=omniremit_auth;User Id=sa;Password=<your-password>;TrustServerCertificate=True;
+Server=localhost,1433;Database=OmniConnect_Auth;User Id=sa;Password=<your-password>;TrustServerCertificate=True;
 ```
 
 To run SQL Server in Docker:
@@ -90,7 +123,7 @@ docker run -e "ACCEPT_EULA=Y" -e "MSSQL_SA_PASSWORD=<your-password>" -p 1433:143
 ### Azure SQL (what production uses)
 
 ```
-Server=tcp:<your-server>.database.windows.net,1433;Initial Catalog=omniremit_auth;Persist Security Info=False;User ID=<user>;Password=<pass>;MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;
+Server=tcp:<your-server>.database.windows.net,1433;Initial Catalog=OmniConnect_Auth;Persist Security Info=False;User ID=<user>;Password=<pass>;MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;
 ```
 
 Repeat with the right `Database` / `Initial Catalog` name for each of the four.
@@ -141,9 +174,14 @@ Copy each `.env.example` to `.env` in the same folder, then fill in the blanks. 
   plus `Internal__ApiKey` in each of the other three. Generate one with `openssl rand -base64 32`
   and paste the same value into all of them.
 
-> ⚠️ `Backend/LeadService/.env.example` currently has a real-looking internal API key and a public
-> key **committed into the repo**. Do not reuse either — overwrite both with your own values, and
-> treat the committed key as compromised anywhere it has been used.
+The **connection strings are optional** if you are on local SQL Server with Windows Authentication —
+step 3 already covers you through `appsettings.Development.json`. Leave them commented out unless you
+need a different server.
+
+> ⚠️ `Backend/LeadService/.env.example` previously shipped a real internal API key and a real public
+> key committed into the repo. Both are now blank, but **treat that internal API key as compromised
+> anywhere it has ever been used** — it is still in the git history. Generate a fresh one and use it
+> in all four services.
 
 ### `Backend/AuthService/.env`
 
@@ -152,7 +190,7 @@ cp Backend/AuthService/.env.example Backend/AuthService/.env
 ```
 
 Fill in:
-- `ConnectionStrings__AuthDb` — your AuthService connection string (step 3)
+- `ConnectionStrings__AuthDb` — **only if** you are not using local SQL Server with Windows auth (step 3)
 - `Jwt__SigningKeyPrivate` / `Jwt__SigningKeyPublic` — both keys, single-line `\n`-escaped (step 4)
 - `Internal__ApiKey` — the shared internal key
 - `Security__TempPasswordKey` — 32 random bytes, base64: `openssl rand -base64 32`. Without it,
@@ -168,7 +206,7 @@ Everything else has a working local default — `Cors__AllowedOrigins__0` is alr
 cp Backend/ModuleRegistry/.env.example Backend/ModuleRegistry/.env
 ```
 
-Fill in `ConnectionStrings__RegistryDb`, `Jwt__SigningKeyPublic`, `AuthService__InternalApiKey` and
+Fill in `Jwt__SigningKeyPublic`, `AuthService__InternalApiKey` and
 `Internal__ApiKey`. `AuthService__BaseUrl` and `Self__PublicBaseUrl` already default to the right
 localhost ports.
 
@@ -178,8 +216,8 @@ localhost ports.
 cp Backend/LeadService/.env.example Backend/LeadService/.env
 ```
 
-Fill in `ConnectionStrings__LeadDb`, `Jwt__SigningKeyPublic` (**replace** the committed one),
-`AuthService__InternalApiKey` (**replace** the committed one) and `Internal__ApiKey`.
+Fill in `Jwt__SigningKeyPublic`,
+`AuthService__InternalApiKey` and `Internal__ApiKey`. (Add `ConnectionStrings__LeadDb` only if not using local Windows auth.)
 
 `Self__PublicBaseUrl` already includes the `/api/lead-service` path base, which is required — that is
 the URL AuthService calls back to replay an approved mutation.
@@ -195,7 +233,7 @@ exercise maker-checker gating.
 cp Backend/Customer360Service/.env.example Backend/Customer360Service/.env
 ```
 
-Fill in `ConnectionStrings__Customer360Db`, `Jwt__SigningKeyPublic`, `AuthService__InternalApiKey`
+Fill in `Jwt__SigningKeyPublic`, `AuthService__InternalApiKey`
 and `Internal__ApiKey`. `Self__FieldSettingsModuleKey` is the same kind of runtime value as
 LeadService's — leave it blank initially.
 
@@ -229,15 +267,23 @@ controllers at the root.
 
 ## 6. Run everything
 
-Each in its own terminal, from the repo root:
+Each in its own terminal, from the repo root. **On a first run against empty databases the order
+matters** — start them in the order below.
+
+Why: ModuleRegistry's seeder fetches each remote's capability list from that remote's *backend*
+(`PermissionsSourceUrl`) and pushes the result, plus the sidebar navigation, into AuthService. If
+ModuleRegistry boots before AuthService, LeadService and Customer360Service are listening, that push
+contributes nothing and you get a sidebar with no apps in it. (It is recoverable — Setup →
+Applications → **Resync Permissions** does the same work on demand — but it is easier to avoid.)
+After the first successful boot the order no longer matters.
+
+**1. AuthService** — creates its schema, seeds the permission catalog, roles and the bootstrap admin:
 
 ```bash
 dotnet run --project Backend/AuthService
 ```
 
-```bash
-dotnet run --project Backend/ModuleRegistry
-```
+**2. LeadService and Customer360Service** — each creates its own schema and exposes `/permissions`:
 
 ```bash
 dotnet run --project Backend/LeadService
@@ -246,6 +292,21 @@ dotnet run --project Backend/LeadService
 ```bash
 dotnet run --project Backend/Customer360Service
 ```
+
+**3. ModuleRegistry** — seeds the two remote-app rows and pushes navigation to AuthService:
+
+```bash
+dotnet run --project Backend/ModuleRegistry
+```
+
+Confirm the push worked before moving on — the ModuleRegistry terminal should show:
+
+```
+info: ModuleRegistry[0]
+      Synced remote app permissions and navigation to AuthService.
+```
+
+**4. The three frontends:**
 
 ```bash
 cd Frontend && pnpm dev:host
@@ -261,17 +322,24 @@ cd Frontend && pnpm dev:customer360
 
 Or run all three frontends at once with `pnpm dev:all` from `Frontend/`.
 
-The remotes' Vite **dev** servers publish `mf-manifest.json` directly, so no build step is needed
-locally. `pnpm --filter lead-mf build` then `preview` serves the production output on the same port
-if you want to test what actually gets deployed.
+Note what the remotes' `dev` script actually does: `concurrently "vite build --watch" "vite preview"`.
+Unlike the host, a remote is **built and served from `dist/`**, not from a dev server — that is what
+publishes `mf-manifest.json`. So a remote takes a few seconds longer to come up on first start, and
+the host cannot load it until `http://localhost:5002/mf-manifest.json` returns 200.
 
 Each backend **applies its database migrations automatically on first startup** — no `dotnet ef`
 commands required. Watch the AuthService terminal for a one-time line like:
 
 ```
 info: AuthService[0]
-      Seeded default Super Admin account. Email: superadmin@omniconnect.com | Password: Admin@123456
+      Seeded default Super Admin account. Email: superadmin@omniconnect.com. The bootstrap password
+      is documented in SETUP.md — sign in and change it before exposing this instance to anyone else.
 ```
+
+The bootstrap credentials are **`superadmin@omniconnect.com` / `Admin@123456`**. They are a fixed
+constant in `AuthDbSeeder.cs`, seeded only when the user table is empty. The password is deliberately
+**not** written to the log — logs get aggregated and retained far more widely than a database does.
+Change it after first sign-in.
 
 ## 7. Verify it's working
 
@@ -404,6 +472,24 @@ STARTTLS upgrade and fails rather than silently falling back to an unencrypted s
   exact scheme/host/port). Development also reads these from `appsettings.Development.json`.
 - **A backend logs "ConnectionStrings__... is not set"** — it starts anyway, but every DB-backed
   endpoint fails. Fill in that service's connection string and restart.
+- **A backend still tries to reach an old/remote server even though `appsettings.Development.json`
+  says `localhost`** — an environment variable is winning. Environment variables outrank
+  `appsettings.Development.json`, and `.env` files are loaded *as* environment variables. Check for
+  an uncommented `ConnectionStrings__*` line in that service's `.env`, and for a stale value in your
+  shell (`echo $env:ConnectionStrings__AuthDb` in PowerShell).
+- **"Login failed for user" / "Cannot open database ... requested by the login"** — Windows
+  Authentication reached SQL Server but your account has no access, or the database does not exist
+  yet. Confirm all four `OmniConnect_*` databases exist and that your Windows login can open them.
+  The four names are case-insensitive but must match otherwise.
+- **A backend hangs for ~30s then fails on every DB call** — the connection string points somewhere
+  unreachable. `EnableRetryOnFailure` retries six times with backoff before surfacing the error, so a
+  wrong host looks like a hang rather than an immediate failure.
+- **`dotnet ef database update` seems to target the wrong database** — AuthService and ModuleRegistry
+  have an `IDesignTimeDbContextFactory`, and EF prefers it over the application's host builder. Both
+  now read the same configuration the running service does, so `dotnet ef dbcontext info` should
+  report `Database name: OmniConnect_Auth`. If it reports something else, configuration is being
+  resolved from a different working directory — run the command from inside the service's project
+  folder.
 - **A backend can't reach SQL Server** ("certificate chain … not trusted") — add
   `TrustServerCertificate=True` for a local or Docker instance. Do not use it against Azure SQL; use
   `Encrypt=True;TrustServerCertificate=False` there.

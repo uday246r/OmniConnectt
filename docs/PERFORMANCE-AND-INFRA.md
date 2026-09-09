@@ -3,6 +3,12 @@
 Measured on the local stack (five .NET services on one Windows machine) against the live Neon
 Postgres databases, 2026-08-24. Numbers are from a real load test, not estimates.
 
+> ⚠️ **These numbers predate the move to Microsoft SQL Server** and the removal of EmployeeService.
+> The dominant term below is round-trip latency to a *remote* managed database; against local SQL
+> Server that term largely disappears, so these figures are no longer a valid baseline for the
+> current stack. The *analysis* — where time goes and which infrastructure work matters — still
+> holds. Re-run the load test before quoting any number here.
+
 ## What was measured
 
 Read path, `GET /api/roles?page=1&pageSize=25`, warm:

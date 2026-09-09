@@ -1,7 +1,15 @@
 # Deploying OmniRemit
 
-Target topology: **two Vercel projects** (host + employee remote) and **three Render web services**
-(AuthService, ModuleRegistry, EmployeeService), with **Neon** Postgres.
+> ⚠️ **This document is stale in two respects.** It was written when the platform used Neon Postgres
+> and still had an EmployeeService. The database is now **Microsoft SQL Server** (EF Core provider
+> `Microsoft.EntityFrameworkCore.SqlServer`), and EmployeeService and its `employee_mf` remote have
+> been removed. The live services are AuthService, ModuleRegistry, LeadService and
+> Customer360Service. The deployment *mechanics* below — Render, Vercel, DNS, cookie and CORS
+> configuration — are still accurate; substitute SQL Server for Postgres and the four current
+> services for the three listed. For local development see [SETUP.md](../SETUP.md).
+
+Target topology: **Vercel projects** for the host and each remote, and **Render web services** for
+the backends, with a managed **SQL Server** database per service.
 
 Everything below assumes a domain you control, with all five components on subdomains of it. That is
 not cosmetic — see [Why one parent domain](#why-one-parent-domain).
@@ -78,10 +86,12 @@ time, not read at runtime.
 
 ## Step 1 — Databases
 
-Create three Neon databases (one project is fine): `omniremit_auth`, `omniremit_registry`,
-`omniremit_employee`. Collect a pooled connection string for each.
+Create one SQL Server database per service: `OmniConnect_Auth`, `OmniConnect_ModuleRegistry`,
+`OmniConnect_Lead`, `OmniConnect_Customer360`. Collect a connection string for each and supply it as
+the `ConnectionStrings__AuthDb` / `__RegistryDb` / `__LeadDb` / `__Customer360Db` environment
+variable (see `render.yaml`, where they are declared `sync: false`).
 
-All three services run `db.Database.MigrateAsync()` at startup, so schema is applied automatically on
+All four services run `db.Database.MigrateAsync()` at startup, so schema is applied automatically on
 first boot. Deploy **one instance per service initially** — several instances racing the same
 migration on a cold database is asking for trouble. Scale out after the first successful boot.
 

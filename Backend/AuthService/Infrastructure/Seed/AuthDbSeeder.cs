@@ -433,9 +433,12 @@ public static class AuthDbSeeder
         db.Users.Add(user);
         await db.SaveChangesAsync(ct);
 
+        // The password is deliberately not logged. Logs are aggregated, shipped and retained far
+        // more widely than the database is, so a credential written here outlives the machine it
+        // was printed on. It is a fixed value documented in SETUP.md, so nothing is unrecoverable.
         logger.LogInformation(
-            "Seeded default Super Admin account. Email: {Email} | Password: {Password}",
-            bootstrapEmail,
-            bootstrapPassword);
+            "Seeded default Super Admin account. Email: {Email}. The bootstrap password is documented "
+                + "in SETUP.md — sign in and change it before exposing this instance to anyone else.",
+            bootstrapEmail);
     }
 }

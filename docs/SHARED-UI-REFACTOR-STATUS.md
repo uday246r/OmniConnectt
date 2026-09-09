@@ -149,8 +149,9 @@ and the repo audited for the same signature with no other instances found — bu
 close look.
 
 ### How to verify (next session)
-Prereqs: Azure SQL firewall must allow the dev machine's current public IP (error 40615 blocks all
-four backends), then all four services on 5155 / 5200 / 5046 / 5059 return `/health` 200.
+Prereqs: local SQL Server reachable on `localhost` with the four `OmniConnect_*` databases created
+(see [SETUP.md](../SETUP.md) step 3), then all four services on 5155 / 5200 / 5046 / 5059 return
+`/health` 200.
 
 The Browser pane is a **separate browser with its own cookie jar** — a sign-in in the user's own
 browser does not carry over. The user must sign in *in the pane*; the assistant must not type
