@@ -1,5 +1,6 @@
 using AuthService.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
+using Npgsql.EntityFrameworkCore.PostgreSQL;
 
 namespace AuthService.Infrastructure;
 
@@ -40,7 +41,7 @@ public class AuthDbContext(DbContextOptions<AuthDbContext> options) : DbContext(
             // raw DbUpdateException. The filter string must stay in sync with the migration
             // 20260818090000_PartialUniqueEmailForSoftDelete, or EF will scaffold a migration to
             // undo it.
-            entity.HasIndex(u => u.Email).IsUnique().HasFilter("[IsDeleted] = 0");
+            entity.HasIndex(u => u.Email).IsUnique().HasFilter("\"IsDeleted\" = false");
             entity.Property(u => u.Name).HasMaxLength(200);
             entity.Property(u => u.Email).HasMaxLength(320);
             entity.Property(u => u.PhoneNumber).HasMaxLength(32);
@@ -319,9 +320,8 @@ public class AuthDbContext(DbContextOptions<AuthDbContext> options) : DbContext(
              * The filter string must stay in sync with the migration
              * 20260821..._AddEntityKeyAndPendingUniqueIndex, or EF will scaffold a migration to undo it.
              */
-            entity.HasIndex(a => new { a.Module, a.EntityKey })
-                .IsUnique()
-                .HasFilter("[Status] = 'Pending'");
+            entity.HasIndex(a => new { a.Module, a.EntityKey }).IsUnique().HasFilter("\"Status\" = 'Pending'");
+
 
             // Restrict, not Cascade — an approval request is itself a historical/audit record and must
             // never silently disappear because the maker or checker account was later deleted (soft
@@ -343,7 +343,7 @@ public class AuthDbContext(DbContextOptions<AuthDbContext> options) : DbContext(
              * zero rows, and ApprovalAppService turns the resulting DbUpdateConcurrencyException into a
              * plain "already decided" 409.
              */
-           entity.Property(a => a.RowVersion).IsRowVersion();
+            entity.Property<uint>("xmin").HasColumnName("xmin").ValueGeneratedOnAddOrUpdate().IsConcurrencyToken();
         });
 
         modelBuilder.Entity<CheckerAssignment>(entity =>
@@ -357,22 +357,14 @@ public class AuthDbContext(DbContextOptions<AuthDbContext> options) : DbContext(
              * (Module, CheckerUserId) would treat every role assignment as a row with a NULL user.
              * One filtered index per target type states the real rule: a given user appears at most once per module, and so does a given role.
              */
-            entity.HasIndex(c => new { c.Module, c.CheckerUserId })
-                .IsUnique()
-                .HasFilter("[CheckerUserId] IS NOT NULL");
 
-            entity.HasIndex(c => new { c.Module, c.CheckerRoleId })
-                .IsUnique()
-                .HasFilter("[CheckerRoleId] IS NOT NULL");
-
-            // Enforced in the database, not just in the service: this invariant is what the checker
-            // selection logic relies on, and application-level guards can be bypassed by a migration,
-            // a script, or a future code path that forgets.
-            entity.ToTable(t => t.HasCheckConstraint(
-                "CK_CheckerAssignment_UserOrRole",
-                "([CheckerUserId] IS NOT NULL AND [CheckerRoleId] IS NULL) OR "
-                + "([CheckerUserId] IS NULL AND [CheckerRoleId] IS NOT NULL)"));
-
+            entity.HasIndex(c => new { c.Module, c.CheckerUserId }).IsUnique().HasFilter("\"CheckerUserId\" IS NOT NULL");
+entity.HasIndex(c => new { c.Module, c.CheckerRoleId }).IsUnique().HasFilter("\"CheckerRoleId\" IS NOT NULL");
+entity.ToTable(t => t.HasCheckConstraint(
+    "CK_CheckerAssignment_UserOrRole",
+    "(\"CheckerUserId\" IS NOT NULL AND \"CheckerRoleId\" IS NULL) OR "
+    + "(\"CheckerUserId\" IS NULL AND \"CheckerRoleId\" IS NOT NULL)"));
+          
             // Backs both IsGatedAsync's existence check and the least-workload selection query.
             entity.HasIndex(c => c.Module);
 

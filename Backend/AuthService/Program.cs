@@ -66,23 +66,12 @@ var isDbConfigured = !string.IsNullOrWhiteSpace(connectionString);
  * constructor - they take only DbContextOptions, which is what pooling requires.
  */
 builder.Services.AddDbContextPool<AuthDbContext>(options =>
-    options.UseSqlServer(
-        isDbConfigured ? connectionString : "Server=unconfigured;Database=unconfigured;Trusted_Connection=True;TrustServerCertificate=True;",
-        /*
-         * Transient-fault resiliency for Azure SQL — see LeadService/Program.cs for the full
-         * rationale (serverless auto-pause returns error 40613 on the first connection after idle,
-         * which without retry hard-fails the startup migration below).
-         *
-         * NOTE: enabling this makes EF refuse a user-initiated transaction unless it runs inside an
-         * execution strategy. This solution has exactly one — ApprovalAppService.ApproveAsync — and
-         * it is wrapped accordingly. Any NEW BeginTransaction in this service must do the same, or
-         * it will throw "The configured execution strategy 'SqlServerRetryingExecutionStrategy' does
-         * not support user-initiated transactions." at runtime.
-         */
-        sqlOptions => sqlOptions.EnableRetryOnFailure(
+    options.UseNpgsql(
+        isDbConfigured ? connectionString : "Host=unconfigured;Database=unconfigured;Username=unconfigured;Password=unconfigured",
+        npgsqlOptions => npgsqlOptions.EnableRetryOnFailure(
             maxRetryCount: 6,
             maxRetryDelay: TimeSpan.FromSeconds(20),
-            errorNumbersToAdd: null)));
+            errorCodesToAdd: null)));
 
 builder.Services.AddScoped<PasswordHasher>();
 builder.Services.AddScoped<SecretProtector>();

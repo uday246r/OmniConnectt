@@ -42,20 +42,14 @@ var isDbConfigured = !string.IsNullOrWhiteSpace(connectionString);
  * Safe here because no DbContext in this solution holds request-scoped state injected through its
  * constructor - they take only DbContextOptions, which is what pooling requires.
  */
+
 builder.Services.AddDbContextPool<Customer360DbContext>(options =>
-    options.UseSqlServer(
-        isDbConfigured ? connectionString : "Server=unconfigured;Database=unconfigured;Trusted_Connection=True;TrustServerCertificate=True;",
-        /*
-         * Transient-fault resiliency for Azure SQL — see LeadService/Program.cs for the full
-         * rationale. In short: the serverless tier auto-pauses when idle and the first connection
-         * after that fails with error 40613 ("Database is not currently available"), which EF
-         * already classifies as transient. Without this, startup migration hard-fails on a cold
-         * database. Safe here: this service issues no explicit BeginTransaction.
-         */
-        sqlOptions => sqlOptions.EnableRetryOnFailure(
+    options.UseNpgsql(
+        isDbConfigured ? connectionString : "Host=unconfigured;Database=unconfigured;Username=unconfigured;Password=unconfigured",
+        npgsqlOptions => npgsqlOptions.EnableRetryOnFailure(
             maxRetryCount: 6,
             maxRetryDelay: TimeSpan.FromSeconds(20),
-            errorNumbersToAdd: null)));
+            errorCodesToAdd: null)));
 
 // ---------------------------------------------------------------------------
 // Controllers + JSON serialization

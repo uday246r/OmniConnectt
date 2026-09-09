@@ -9,6 +9,16 @@ export type DrawerLayer =
   | { type: 'app-form'; appId?: string }
   | { type: 'checker-assignment-form'; module?: string; appId?: string }
 
+const STORAGE_KEY = 'omni_settings_return_path'
+
+function getStoredReturnPath(): string {
+  try {
+    const stored = sessionStorage.getItem(STORAGE_KEY)
+    if (stored && !isDrawerRoute(stored)) return stored
+  } catch {}
+  return '/'
+}
+
 /**
  * Routes that render the drawer rather than a page of their own.
  *
@@ -17,12 +27,14 @@ export type DrawerLayer =
  * a return target; see `returnPath`.
  */
 export function isDrawerRoute(pathname: string): boolean {
+  if (!pathname) return false
+  const clean = pathname.split('?')[0].replace(/\/+$/, '')
   return (
-    pathname === '/settings' ||
-    pathname === '/settings/users/new' ||
-    pathname.startsWith('/settings/roles') ||
-    pathname.startsWith('/settings/applications') ||
-    pathname.startsWith('/settings/checker-assignment')
+    clean === '/settings' ||
+    clean === '/settings/users/new' ||
+    clean.startsWith('/settings/roles') ||
+    clean.startsWith('/settings/applications') ||
+    clean.startsWith('/settings/checker-assignment')
   )
 }
 
@@ -52,7 +64,7 @@ export const useSettingsDrawerStore = create<SettingsDrawerState>((set, get) => 
   isOpen: false,
   activeTab: 'users',
   layerStack: [{ type: 'root', tab: 'users' }],
-  returnPath: '/',
+  returnPath: getStoredReturnPath(),
 
 
   open: (tab = 'users') => {
@@ -77,7 +89,13 @@ export const useSettingsDrawerStore = create<SettingsDrawerState>((set, get) => 
     })
   },
 
-  setReturnPath: (path) => set({ returnPath: path }),
+  setReturnPath: (path) => {
+    if (!path || isDrawerRoute(path)) return
+    try {
+      sessionStorage.setItem(STORAGE_KEY, path)
+    } catch {}
+    set({ returnPath: path })
+  },
 
   pushLayer: (layer) => {
     set((state) => ({

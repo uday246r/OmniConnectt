@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../features/auth/store/authStore'
-import { useSettingsDrawerStore, type SettingsTab } from '../../shared/stores/settingsDrawerStore'
+import { isDrawerRoute, useSettingsDrawerStore, type SettingsTab } from '../../shared/stores/settingsDrawerStore'
 import { Icon } from '../../shared/components/Icon/Icon'
 import { SettingsRolesTab } from './SettingsRolesTab'
 import { SettingsApplicationsTab } from './SettingsApplicationsTab'
@@ -33,12 +33,15 @@ export function SettingsDrawer() {
   /*
    * Closing returns to wherever Settings was opened from, not to the dashboard.
    *
-   * This was `navigate('/')`, which meant a trip into Settings always cost you your place: open the
-   * gear from a lead or an audit log, close it, and you were on the dashboard. `returnPath` is the
-   * last non-drawer route the shell saw, and falls back to '/' only for a cold deep-link where
-   * there is genuinely nothing to go back to.
+   * We close the drawer store synchronously so the overlay is dismissed, then navigate back to
+   * the operator's last non-drawer location (or '/' if opened directly without prior history).
    */
-  const close = () => navigate(useSettingsDrawerStore.getState().returnPath)
+  const close = () => {
+    closeDrawerStore()
+    const { returnPath } = useSettingsDrawerStore.getState()
+    const target = returnPath && !isDrawerRoute(returnPath) ? returnPath : '/'
+    navigate(target)
+  }
 
   /*
    * Users left the drawer for a real page (UsersPage), so its tab button is a plain navigation +

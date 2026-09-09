@@ -14,7 +14,7 @@ public class ModuleRegistryDbContextFactory : IDesignTimeDbContextFactory<Module
     private const string ConnectionStringName = "RegistryDb";
 
     private const string UnconfiguredFallback =
-        "Server=unconfigured;Database=unconfigured;Trusted_Connection=True;TrustServerCertificate=True;";
+        "Host=unconfigured;Database=unconfigured;Username=unconfigured;Password=unconfigured";
 
     public ModuleRegistryDbContext CreateDbContext(string[] args)
     {
@@ -38,7 +38,7 @@ public class ModuleRegistryDbContextFactory : IDesignTimeDbContextFactory<Module
         var connectionString = configuration.GetConnectionString(ConnectionStringName);
 
         var optionsBuilder = new DbContextOptionsBuilder<ModuleRegistryDbContext>();
-        optionsBuilder.UseSqlServer(
+        optionsBuilder.UseNpgsql(
             string.IsNullOrWhiteSpace(connectionString) ? UnconfiguredFallback : connectionString);
 
         return new ModuleRegistryDbContext(optionsBuilder.Options);

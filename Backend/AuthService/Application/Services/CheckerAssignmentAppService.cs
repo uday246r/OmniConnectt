@@ -6,6 +6,7 @@ using AuthService.Domain.Enums;
 using AuthService.Infrastructure;
 using AuthService.Infrastructure.Seed;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace AuthService.Application.Services;
 
@@ -497,7 +498,7 @@ public class CheckerAssignmentAppService(
     /// misleading 409.
     /// </remarks>
     private static bool IsUniqueViolation(DbUpdateException ex) =>
-        ex.InnerException is Microsoft.Data.SqlClient.SqlException { Number: 2601 or 2627 };
+        ex.InnerException is PostgresException pgEx && pgEx.SqlState == PostgresErrorCodes.UniqueViolation;
 
     /// <summary>
     /// Removing a checker must never strand an already-Pending request with nobody able to act on it —

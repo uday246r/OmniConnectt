@@ -5,7 +5,7 @@ using AuthService.Domain.Entities;
 using AuthService.Domain.Enums;
 using AuthService.Infrastructure;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Data.SqlClient;
+using Npgsql;
 
 namespace AuthService.Application.Services;
 
@@ -110,7 +110,7 @@ public class ApprovalGatingService(AuthDbContext db, AuditLogAppService auditLog
         {
             await db.SaveChangesAsync(ct);
         }
-        catch (DbUpdateException ex) when (ex.InnerException is SqlException sqlEx && (sqlEx.Number == 2601 || sqlEx.Number == 2627))
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException pgEx && pgEx.SqlState == PostgresErrorCodes.UniqueViolation)
         {
             // Lost the race: another submission for this same record committed between our check above
             // and this save. Detach the row we failed to insert so the retry below reads clean, then

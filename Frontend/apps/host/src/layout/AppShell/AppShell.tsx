@@ -2,7 +2,7 @@ import { Suspense, useEffect, useState, useCallback } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 import { Sidebar } from '../Sidebar/Sidebar'
 import { Topbar, type TopbarSettingsAccess } from '../Topbar/Topbar'
-import { useSettingsDrawerStore } from '../../shared/stores/settingsDrawerStore'
+import { isDrawerRoute, useSettingsDrawerStore } from '../../shared/stores/settingsDrawerStore'
 import { lazyWithPreload, preloadWhenIdle } from '../../shared/utils/lazyWithPreload'
 import styles from './AppShell.module.css'
 
@@ -56,7 +56,7 @@ export function AppShell({ appHealth, userName, settingsAccess, onLogout }: AppS
    */
   const closeDrawer = useSettingsDrawerStore((s) => s.close)
   useEffect(() => {
-    if (!location.pathname.startsWith('/settings') && drawerOpen) {
+    if (!isDrawerRoute(location.pathname) && drawerOpen) {
       closeDrawer()
     }
   }, [location.pathname, drawerOpen, closeDrawer])

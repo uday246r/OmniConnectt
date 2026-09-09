@@ -17,20 +17,20 @@ namespace LeadManagement.Api.Migrations
                 name: "AuditLogs",
                 columns: table => new
                 {
-                    Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    Timestamp = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    UserId = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
-                    UserName = table.Column<string>(type: "nvarchar(150)", maxLength: 150, nullable: false),
-                    UserRole = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false),
-                    ActionType = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false),
-                    EntityType = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false),
-                    EntityId = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
-                    Description = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: false),
-                    Reason = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    PreviousValues = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    NewValues = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    IpAddress = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false),
-                    Status = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: false)
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    Timestamp = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    UserId = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
+                    UserName = table.Column<string>(type: "character varying(150)", maxLength: 150, nullable: false),
+                    UserRole = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
+                    ActionType = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
+                    EntityType = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
+                    EntityId = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
+                    Description = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
+                    Reason = table.Column<string>(type: "text", nullable: true),
+                    PreviousValues = table.Column<string>(type: "text", nullable: true),
+                    NewValues = table.Column<string>(type: "text", nullable: true),
+                    IpAddress = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
+                    Status = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false)
                 },
                 constraints: table =>
                 {
@@ -41,8 +41,8 @@ namespace LeadManagement.Api.Migrations
                 name: "EntityTypes",
                 columns: table => new
                 {
-                    Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    Name = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false)
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    Name = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false)
                 },
                 constraints: table =>
                 {
@@ -53,10 +53,10 @@ namespace LeadManagement.Api.Migrations
                 name: "Products",
                 columns: table => new
                 {
-                    Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    Code = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
-                    Name = table.Column<string>(type: "nvarchar(150)", maxLength: 150, nullable: false),
-                    IsActive = table.Column<bool>(type: "bit", nullable: false)
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    Code = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
+                    Name = table.Column<string>(type: "character varying(150)", maxLength: 150, nullable: false),
+                    IsActive = table.Column<bool>(type: "boolean", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -67,8 +67,8 @@ namespace LeadManagement.Api.Migrations
                 name: "PropertyStatuses",
                 columns: table => new
                 {
-                    Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    Name = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false)
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    Name = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false)
                 },
                 constraints: table =>
                 {
@@ -79,8 +79,8 @@ namespace LeadManagement.Api.Migrations
                 name: "PropertyTypes",
                 columns: table => new
                 {
-                    Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    Name = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false)
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    Name = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false)
                 },
                 constraints: table =>
                 {
@@ -91,11 +91,11 @@ namespace LeadManagement.Api.Migrations
                 name: "SalesExecutives",
                 columns: table => new
                 {
-                    Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    StaffId = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false),
-                    Name = table.Column<string>(type: "nvarchar(150)", maxLength: 150, nullable: false),
-                    Email = table.Column<string>(type: "nvarchar(150)", maxLength: 150, nullable: false),
-                    IsActive = table.Column<bool>(type: "bit", nullable: false)
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    StaffId = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
+                    Name = table.Column<string>(type: "character varying(150)", maxLength: 150, nullable: false),
+                    Email = table.Column<string>(type: "character varying(150)", maxLength: 150, nullable: false),
+                    IsActive = table.Column<bool>(type: "boolean", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -106,9 +106,9 @@ namespace LeadManagement.Api.Migrations
                 name: "States",
                 columns: table => new
                 {
-                    Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    Code = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false),
-                    Name = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false)
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    Code = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
+                    Name = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false)
                 },
                 constraints: table =>
                 {
@@ -119,18 +119,18 @@ namespace LeadManagement.Api.Migrations
                 name: "LeadFieldConfigs",
                 columns: table => new
                 {
-                    Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    ProductId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    ApiField = table.Column<string>(type: "nvarchar(150)", maxLength: 150, nullable: false),
-                    DisplayLabel = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: false),
-                    Section = table.Column<string>(type: "nvarchar(150)", maxLength: 150, nullable: false),
-                    DisplayOrder = table.Column<int>(type: "int", nullable: false),
-                    Visible = table.Column<bool>(type: "bit", nullable: false),
-                    Required = table.Column<bool>(type: "bit", nullable: false),
-                    Editable = table.Column<bool>(type: "bit", nullable: false),
-                    Sensitive = table.Column<bool>(type: "bit", nullable: false),
-                    MaskingRule = table.Column<string>(type: "nvarchar(40)", maxLength: 40, nullable: false),
-                    VisibleCharCount = table.Column<int>(type: "int", nullable: false)
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    ProductId = table.Column<Guid>(type: "uuid", nullable: false),
+                    ApiField = table.Column<string>(type: "character varying(150)", maxLength: 150, nullable: false),
+                    DisplayLabel = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
+                    Section = table.Column<string>(type: "character varying(150)", maxLength: 150, nullable: false),
+                    DisplayOrder = table.Column<int>(type: "integer", nullable: false),
+                    Visible = table.Column<bool>(type: "boolean", nullable: false),
+                    Required = table.Column<bool>(type: "boolean", nullable: false),
+                    Editable = table.Column<bool>(type: "boolean", nullable: false),
+                    Sensitive = table.Column<bool>(type: "boolean", nullable: false),
+                    MaskingRule = table.Column<string>(type: "character varying(40)", maxLength: 40, nullable: false),
+                    VisibleCharCount = table.Column<int>(type: "integer", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -147,11 +147,11 @@ namespace LeadManagement.Api.Migrations
                 name: "Branches",
                 columns: table => new
                 {
-                    Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    StateId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    Code = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
-                    Name = table.Column<string>(type: "nvarchar(150)", maxLength: 150, nullable: false),
-                    IsActive = table.Column<bool>(type: "bit", nullable: false)
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    StateId = table.Column<Guid>(type: "uuid", nullable: false),
+                    Code = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
+                    Name = table.Column<string>(type: "character varying(150)", maxLength: 150, nullable: false),
+                    IsActive = table.Column<bool>(type: "boolean", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -168,24 +168,24 @@ namespace LeadManagement.Api.Migrations
                 name: "Leads",
                 columns: table => new
                 {
-                    Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    LeadReference = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false),
-                    CustomerName = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: false),
-                    IcNumber = table.Column<string>(type: "nvarchar(30)", maxLength: 30, nullable: false),
-                    PhoneCountryCode = table.Column<string>(type: "nvarchar(10)", maxLength: 10, nullable: false),
-                    PhoneNumber = table.Column<string>(type: "nvarchar(30)", maxLength: 30, nullable: false),
-                    Email = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: false),
-                    ProductId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    StateId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    BranchId = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
-                    EmployerName = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: false),
-                    AppliedAmount = table.Column<decimal>(type: "decimal(18,2)", nullable: false),
-                    HasPreferredSalesExecutive = table.Column<bool>(type: "bit", nullable: false),
-                    PreferredSalesExecutiveId = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
-                    Status = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false),
-                    IsDeleted = table.Column<bool>(type: "bit", nullable: false),
-                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    LeadReference = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
+                    CustomerName = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
+                    IcNumber = table.Column<string>(type: "character varying(30)", maxLength: 30, nullable: false),
+                    PhoneCountryCode = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: false),
+                    PhoneNumber = table.Column<string>(type: "character varying(30)", maxLength: 30, nullable: false),
+                    Email = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
+                    ProductId = table.Column<Guid>(type: "uuid", nullable: false),
+                    StateId = table.Column<Guid>(type: "uuid", nullable: false),
+                    BranchId = table.Column<Guid>(type: "uuid", nullable: true),
+                    EmployerName = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
+                    AppliedAmount = table.Column<decimal>(type: "numeric(18,2)", nullable: false),
+                    HasPreferredSalesExecutive = table.Column<bool>(type: "boolean", nullable: false),
+                    PreferredSalesExecutiveId = table.Column<Guid>(type: "uuid", nullable: true),
+                    Status = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
+                    IsDeleted = table.Column<bool>(type: "boolean", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -218,11 +218,11 @@ namespace LeadManagement.Api.Migrations
                 name: "LeadConsentDetails",
                 columns: table => new
                 {
-                    Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    LeadId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    MarketingConsent = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false),
-                    AgreedToPrivacyPolicy = table.Column<bool>(type: "bit", nullable: false),
-                    ConsentedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    LeadId = table.Column<Guid>(type: "uuid", nullable: false),
+                    MarketingConsent = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
+                    AgreedToPrivacyPolicy = table.Column<bool>(type: "boolean", nullable: false),
+                    ConsentedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -239,10 +239,10 @@ namespace LeadManagement.Api.Migrations
                 name: "LeadHomeFinancingDetails",
                 columns: table => new
                 {
-                    Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    LeadId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    PropertyType = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
-                    PropertyStatus = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false)
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    LeadId = table.Column<Guid>(type: "uuid", nullable: false),
+                    PropertyType = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
+                    PropertyStatus = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false)
                 },
                 constraints: table =>
                 {
@@ -259,11 +259,11 @@ namespace LeadManagement.Api.Migrations
                 name: "LeadMicrofinanceDetails",
                 columns: table => new
                 {
-                    Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    LeadId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    DateOfIncorporation = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false),
-                    CompanyName = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: false),
-                    EntityType = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false)
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    LeadId = table.Column<Guid>(type: "uuid", nullable: false),
+                    DateOfIncorporation = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
+                    CompanyName = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
+                    EntityType = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false)
                 },
                 constraints: table =>
                 {

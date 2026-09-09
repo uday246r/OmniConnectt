@@ -2,7 +2,7 @@ using AuthService.Application.Exceptions;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Data.SqlClient;
+using Npgsql;
 
 namespace AuthService.Infrastructure;
 
@@ -61,7 +61,7 @@ public class AppExceptionFilter(ILogger<AppExceptionFilter> logger) : IException
     {
         // A unique violation is a genuine conflict the caller can act on, so it earns a 409 and a
         // readable message (SQL Server error 2601 / 2627 for duplicate key / unique constraint).
-        if (ex.InnerException is SqlException sqlEx && (sqlEx.Number == 2601 || sqlEx.Number == 2627))
+    if (ex.InnerException is PostgresException pgEx && pgEx.SqlState == PostgresErrorCodes.UniqueViolation)
         {
             return (StatusCodes.Status409Conflict,
                 "That value is already in use by another record.");

@@ -93,6 +93,7 @@ function SettingsRoute({ tab }: { tab: SettingsTab }) {
   const { id } = useParams<{ id: string }>()
   const openTab = useSettingsDrawerStore((s) => s.open)
   const pushLayer = useSettingsDrawerStore((s) => s.pushLayer)
+  const returnPath = useSettingsDrawerStore((s) => s.returnPath)
   const location = useLocation()
 
   useEffect(() => {
@@ -110,17 +111,39 @@ function SettingsRoute({ tab }: { tab: SettingsTab }) {
   }, [tab, id, location.pathname, openTab, pushLayer])
 
   /*
-   * The dashboard is the backdrop, because the drawer is an overlay and something has to be behind
-   * it. This is also exactly what was on screen before: the old version redirected to "/" after
-   * opening the drawer, so the dashboard was already what you saw through it — only now the address
-   * bar keeps saying where you actually are.
+   * The backdrop behind the drawer must match where the operator actually was before the gear icon
+   * was clicked — not hard-coded to DashboardPage, which flashes briefly for every user who opened
+   * Settings from a non-dashboard page.
    *
-   * Users is the one exception: /settings/users/new opens the drawer's create-user layer through
-   * this same component (the routed "new"/":id" behavior below), but the Users tab itself now has a
-   * real page (UsersPage) — showing that as the backdrop instead of the dashboard means the list is
-   * still visible, correctly, once the create form closes.
+   * `returnPath` is captured by Topbar.openSettings() synchronously before navigate('/settings') is
+   * called, so by the time this component renders it already holds the correct origin path. We strip
+   * the query string for the prefix checks; query params don't change which component to render.
+   *
+   * Fallback: if returnPath is '/' or anything unrecognised, DashboardPage is the correct default
+   * because that IS the root route. Users who genuinely come from the dashboard should see it.
    */
-  return tab === 'users' ? <UsersPage /> : <DashboardPage />
+  const basePath = returnPath.split('?')[0].replace(/\/$/, '') || '/'
+
+  if (tab === 'users' || basePath === '/settings/users') {
+    return <UsersPage />
+  }
+  if (basePath === '/profile') {
+    return <ProfilePage />
+  }
+  if (basePath === '/system/audit-logs') {
+    return <AuditLogsPage />
+  }
+  if (basePath === '/system/approvals') {
+    return <ApprovalCenterPage />
+  }
+  if (basePath === '/my-requests') {
+    return <MyRequestsPage />
+  }
+  if (basePath.startsWith('/apps/')) {
+    return <RemoteAppPage />
+  }
+  // Default: dashboard (covers '/' and any future routes not yet listed above)
+  return <DashboardPage />
 }
 
 /**

@@ -31,7 +31,7 @@ public class AuthDbContextFactory : IDesignTimeDbContextFactory<AuthDbContext>
     private const string ConnectionStringName = "AuthDb";
 
     private const string UnconfiguredFallback =
-        "Server=unconfigured;Database=unconfigured;Trusted_Connection=True;TrustServerCertificate=True;";
+        "Host=unconfigured;Database=unconfigured;Username=unconfigured;Password=unconfigured";
 
     public AuthDbContext CreateDbContext(string[] args)
     {
@@ -56,7 +56,7 @@ public class AuthDbContextFactory : IDesignTimeDbContextFactory<AuthDbContext>
         var connectionString = configuration.GetConnectionString(ConnectionStringName);
 
         var optionsBuilder = new DbContextOptionsBuilder<AuthDbContext>();
-        optionsBuilder.UseSqlServer(
+        optionsBuilder.UseNpgsql(
             string.IsNullOrWhiteSpace(connectionString) ? UnconfiguredFallback : connectionString);
 
         return new AuthDbContext(optionsBuilder.Options);

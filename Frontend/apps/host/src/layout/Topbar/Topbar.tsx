@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { isDrawerRoute, useSettingsDrawerStore } from '../../shared/stores/settingsDrawerStore'
 import { useClickOutside } from '../../shared/hooks/useClickOutside'
 import { useMenuKeyboardNav } from '../../shared/hooks/useMenuKeyboardNav'
 import { useAuthStore } from '../../features/auth/store/authStore'
@@ -38,9 +39,15 @@ export function Topbar({ userName, settingsAccess, onLogout, onMobileMenuToggle 
   const menuRef      = useRef<HTMLDivElement>(null)
   const triggerRef   = useRef<HTMLButtonElement>(null)
 
+  const location = useLocation()
   const navigate = useNavigate()
   // Navigates rather than opening the store directly, so the gear icon produces a real URL.
-  const openSettings = () => navigate('/settings')
+  const openSettings = () => {
+    if (!isDrawerRoute(location.pathname)) {
+      useSettingsDrawerStore.getState().setReturnPath(`${location.pathname}${location.search}`)
+    }
+    navigate('/settings')
+  }
   // The signed-in user's real role, for the menu header. See the comment on that header below.
   const user = useAuthStore((s) => s.user)
 
