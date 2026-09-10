@@ -114,6 +114,29 @@ public class AuthServiceClient(HttpClient httpClient, IOptions<AuthIntegrationOp
     }
 
     /// <summary>
+    /// Pushes a system-level log (error, warning, health event) to AuthService's centralized system
+    /// log table, matching PushAuditLogAsync's best-effort semantics — a transient failure logs a
+    /// warning locally rather than blocking the caller.
+    /// </summary>
+    public Task<bool> PushSystemLogAsync(string severity, string eventCode, string message, string? module = null,
+        int? statusCode = null, string? stackTrace = null, string? metadata = null, CancellationToken ct = default)
+    {
+        var httpContext = httpContextAccessor.HttpContext;
+        return PostAsync(
+            "internal/system-logs",
+            new RecordSystemLogRequest(severity, "ModuleRegistry", eventCode, message, module,
+                CorrelationId: httpContext?.TraceIdentifier, RequestId: httpContext?.TraceIdentifier,
+                StatusCode: statusCode, StackTrace: stackTrace, Metadata: metadata),
+            ct);
+    }
+
+    private record RecordSystemLogRequest(
+        string Severity, string ServiceName, string EventCode, string Message,
+        string? Module = null, string? Environment = null, string? TenantId = null, Guid? UserId = null,
+        string? CorrelationId = null, string? RequestId = null, int? StatusCode = null,
+        string? StackTrace = null, string? Metadata = null);
+
+    /// <summary>
     /// Maker-Checker gating check. UNLIKE every other method on this class, this deliberately does NOT
     /// swallow failures — a gating check AuthService couldn't answer must block the mutation, not let
     /// it through unchecked. Any network failure or non-2xx throws ApprovalServiceUnavailableAppException.

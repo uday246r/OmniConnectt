@@ -231,9 +231,30 @@ export function AuditLogsPage() {
   const [logs, setLogs] = useState<AuditLogDto[] | null>(null)
   const [total, setTotal] = useState(0)
   const [error, setError] = useState<string | null>(null)
-  const [exporting, setExporting] = useState(false)
   const [viewingLog, setViewingLog] = useState<AuditLogDto | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
+  const [exporting, setExporting] = useState(false)
+
+  const handleOpenDetail = useCallback((log: AuditLogDto) => {
+    setViewingLog(log)
+    if (accessToken) {
+      const app = log.sourceApplication || log.serviceName
+      const label = log.entityLabel || (log.module && log.page ? `${log.module} — ${log.page}` : log.page || formatActionLabel(log.action))
+      auditLogsApi
+        .recordActivity(accessToken, {
+          page: 'audit-logs',
+          module: 'System',
+          sourceApplication: 'Host',
+          action: 'audit_log.details_viewed',
+          actionCategory: 'ViewDetails',
+          entityType: 'AuditLog',
+          entityId: log.id,
+          entityLabel: `${app} — ${formatActionLabel(log.action)}`,
+          details: `Viewed details for audit log ${log.id} (${formatActionLabel(log.action)} on ${app} - ${label})`,
+        })
+        .catch(() => {})
+    }
+  }, [accessToken])
   const dataRevision = useDataRevision(TOPICS.auditLogs)
   const prevDepsRef = useRef<unknown[] | null>(null)
 
@@ -280,7 +301,8 @@ export function AuditLogsPage() {
   const availableServices = useMemo(() => {
     const set = new Set<string>()
     for (const r of cachedPool) {
-      if (r.serviceName) set.add(r.serviceName)
+      const app = r.sourceApplication || r.serviceName
+      if (app) set.add(app)
     }
     const list = Array.from(set).sort((a, b) => a.localeCompare(b))
     // Narrowed by the SEARCH BOX (serviceSearch), not by the applied filter (`service`) — these are
@@ -360,7 +382,7 @@ export function AuditLogsPage() {
   const availableEntities = useMemo(() => {
     const set = new Set<string>()
     for (const r of cachedPool) {
-      const label = r.entityLabel || r.entityType
+      const label = r.entityLabel || (r.module && r.page ? `${r.module} — ${r.page}` : r.page) || r.entityType
       if (label) set.add(label)
     }
     const list = Array.from(set).sort((a, b) => a.localeCompare(b)).filter((v) => v !== recordFilter.applied)
@@ -508,11 +530,20 @@ export function AuditLogsPage() {
             (r.actorUserId && r.actorUserId.toLowerCase().includes(q))
           )
         }
+        if (service) {
+          const s = service.toLowerCase()
+          allItems = allItems.filter((r) =>
+            (r.sourceApplication && r.sourceApplication.toLowerCase() === s) ||
+            (r.serviceName && r.serviceName.toLowerCase() === s)
+          )
+        }
         if (recordFilter.applied) {
           const q = recordFilter.applied.toLowerCase()
           allItems = allItems.filter((r) =>
             (r.entityType && r.entityType.toLowerCase().includes(q)) ||
             (r.entityLabel && r.entityLabel.toLowerCase().includes(q)) ||
+            (r.page && r.page.toLowerCase().includes(q)) ||
+            (r.module && r.module.toLowerCase().includes(q)) ||
             (r.entityId && r.entityId.toLowerCase().includes(q))
           )
         }
@@ -594,6 +625,9 @@ export function AuditLogsPage() {
         service: service || undefined,
         action: actionFilter || TAB_ACTION_FILTER[activeTab],
         result: resultFilter || (activeTab === TAB_IDS.loginErrors ? 'Failure' : activeTab === TAB_IDS.loginSuccesses ? 'Success' : undefined),
+        actorName: actorFilter.applied || undefined,
+        correlationId: correlationId || undefined,
+        entityId: recordFilter.applied || undefined,
         ...range,
       })
     } catch (err) {
@@ -830,7 +864,7 @@ export function AuditLogsPage() {
         logs === null ? (
           <p className={styles.timelineLoading}>Loading this operation's events…</p>
         ) : (
-          <OperationTimeline logs={logs} onView={setViewingLog} />
+          <OperationTimeline logs={logs} onView={handleOpenDetail} />
         )
       ) : (
       <>
@@ -1199,7 +1233,7 @@ export function AuditLogsPage() {
                       return (
                         <span
                           className={`${styles.deviceCell} ${log.userAgent ? styles.deviceCellClickable : ''}`}
-                          onClick={() => setViewingLog(log)}
+                          onClick={() => handleOpenDetail(log)}
                           title="Click to view full details"
                         >
                           {parsed ? (
@@ -1273,7 +1307,7 @@ export function AuditLogsPage() {
                     label: 'DETAILS',
                     priority: 'always',
                     align: 'right',
-                    render: (log) => <RowAction onClick={() => setViewingLog(log)} title="View full details" />,
+                    render: (log) => <RowAction onClick={() => handleOpenDetail(log)} title="View full details" />,
                   },
                   ]
                 : [
@@ -1437,7 +1471,10 @@ export function AuditLogsPage() {
                         )}
                       </th>
                     ),
-                    render: (log) => <Badge tone={serviceTone(log.serviceName)}>{log.serviceName}</Badge>,
+                    render: (log) => {
+                      const app = log.sourceApplication || log.serviceName
+                      return <Badge tone={serviceTone(app)}>{app}</Badge>
+                    },
                   },
                   {
                     key: 'actor',
@@ -1620,26 +1657,30 @@ export function AuditLogsPage() {
                         )}
                       </th>
                     ),
-                    render: (log) =>
-                      log.entityType ? (
-                        <div className={styles.entityWrap}>
-                          <span className={styles.entityType}>{log.entityType}</span>
-                          {log.entityLabel && (
-                            <span className={styles.entityId} title={log.entityLabel}>
-                              {log.entityLabel}
-                            </span>
-                          )}
-                        </div>
-                      ) : (
-                        <span className={styles.mutedText}>{EMPTY_VALUE}</span>
-                      ),
+                    render: (log) => {
+                      const type = log.entityType || (log.page || log.actionCategory === 'Navigation' ? 'Page' : null)
+                      const label = log.entityLabel || (log.module && log.page ? `${log.module} — ${log.page}` : log.page || log.module)
+                      if (type || label) {
+                        return (
+                          <div className={styles.entityWrap}>
+                            {type && <span className={styles.entityType}>{type}</span>}
+                            {label && (
+                              <span className={styles.entityId} title={label}>
+                                {label}
+                              </span>
+                            )}
+                          </div>
+                        )
+                      }
+                      return <span className={styles.mutedText}>{EMPTY_VALUE}</span>
+                    },
                   },
                   {
                     key: 'details',
                     label: 'DETAILS',
                     priority: 'always',
                     align: 'right',
-                    render: (log) => <RowAction onClick={() => setViewingLog(log)} title="View full details" />,
+                    render: (log) => <RowAction onClick={() => handleOpenDetail(log)} title="View full details" />,
                   },
                 ]}
               />

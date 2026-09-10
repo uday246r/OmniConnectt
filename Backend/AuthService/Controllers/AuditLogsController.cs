@@ -28,10 +28,15 @@ public class AuditLogsController(AuditLogAppService auditLog) : ControllerBase
         [FromQuery] string? sortDir = null,
         [FromQuery] Guid? actorUserId = null,
         [FromQuery] string? correlationId = null,
+        [FromQuery] string? sourceApplication = null,
+        [FromQuery] string? module = null,
+        [FromQuery(Name = "pageName")] string? pageName = null,
+        [FromQuery] string? actionCategory = null,
         CancellationToken ct = default)
         => Ok(await auditLog.ListAsync(
             Math.Max(page, 1), Math.Clamp(pageSize, 1, 100), service, action, result, from, to, sortDir,
-            actorUserId: actorUserId, correlationId: correlationId, ct: ct));
+            actorUserId: actorUserId, correlationId: correlationId, 
+            sourceApplication: sourceApplication, module: module, pageName: pageName, actionCategory: actionCategory, ct: ct));
 
     [HttpGet("summary")]
     [RequirePermission(Feature, "View")]
@@ -47,9 +52,17 @@ public class AuditLogsController(AuditLogAppService auditLog) : ControllerBase
         [FromQuery] string? result = null,
         [FromQuery] DateTimeOffset? from = null,
         [FromQuery] DateTimeOffset? to = null,
+        [FromQuery] string? actorName = null,
+        [FromQuery] string? correlationId = null,
+        [FromQuery] string? entityType = null,
+        [FromQuery] string? entityId = null,
+        [FromQuery] string? sourceApplication = null,
+        [FromQuery] string? module = null,
+        [FromQuery(Name = "pageName")] string? pageName = null,
+        [FromQuery] string? actionCategory = null,
         CancellationToken ct = default)
     {
-        var csv = await auditLog.ExportCsvAsync(service, action, result, from, to, ct);
+        var csv = await auditLog.ExportCsvAsync(service, action, result, from, to, actorName, correlationId, entityType, entityId, sourceApplication, module, pageName, actionCategory, ct);
         var bytes = Encoding.UTF8.GetBytes(csv);
         return File(bytes, "text/csv", $"audit-logs-{DateTimeOffset.UtcNow:yyyyMMdd-HHmmss}.csv");
     }

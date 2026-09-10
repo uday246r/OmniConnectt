@@ -23,6 +23,10 @@ export interface AuditLogDto {
   userAgent: string | null
   failureReason: string | null
   correlationId: string
+  sourceApplication: string | null
+  module: string | null
+  page: string | null
+  actionCategory: string | null
 }
 
 export interface AuditLogSummaryDto {
@@ -45,6 +49,13 @@ export interface ListAuditLogsParams {
   actorUserId?: string
   /** Scopes the list to every row stamped with one operation's id — see AuditLogDetailDrawer's "Related Activity". */
   correlationId?: string
+  actorName?: string
+  entityType?: string
+  entityId?: string
+  sourceApplication?: string
+  module?: string
+  pageName?: string
+  actionCategory?: string
 }
 
 export interface DateRangeParams {
@@ -61,12 +72,32 @@ function buildQuery(params: object) {
   return query ? `?${query}` : ''
 }
 
+export interface ActivityEventDto {
+  page: string
+  module?: string
+  sourceApplication?: string
+  action?: string
+  actionCategory?: string
+  pageLabel?: string
+  details?: string
+  entityType?: string
+  entityId?: string
+  entityLabel?: string
+}
+
 export const auditLogsApi = {
   list: (accessToken: string, params: ListAuditLogsParams = {}, signal?: AbortSignal) =>
     apiFetch<PagedResult<AuditLogDto>>(`${base}/api/audit-logs${buildQuery(params)}`, { accessToken, signal }),
 
   summary: (accessToken: string, params: DateRangeParams = {}) =>
     apiFetch<AuditLogSummaryDto>(`${base}/api/audit-logs/summary${buildQuery(params)}`, { accessToken }),
+
+  recordActivity: (accessToken: string, evt: ActivityEventDto) =>
+    apiFetch<void>(`${base}/api/audit-logs/activity`, {
+      method: 'POST',
+      accessToken,
+      body: evt,
+    }),
 
   /**
    * Downloads the CSV export as a real browser file-save (not apiFetch — that always parses JSON).
@@ -83,7 +114,7 @@ export const auditLogsApi = {
       let title = response.statusText || `Request failed with status ${response.status}`
       try {
         const problem = (await response.json()) as { title?: string }
-        title = problem.title ?? title
+        problem.title && (title = problem.title)
       } catch {
         // body wasn't JSON — keep the status-text fallback
       }

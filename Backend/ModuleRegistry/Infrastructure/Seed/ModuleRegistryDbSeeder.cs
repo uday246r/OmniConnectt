@@ -120,13 +120,20 @@ public static class ModuleRegistryDbSeeder
     private static async Task PushOneAsync(RemoteApp app, AuthServiceClient authServiceClient, CancellationToken ct)
     {
         var discovered = await authServiceClient.FetchRemoteCapabilitiesAsync(app.PermissionsSourceUrl!, ct);
+        if (discovered is null)
+        {
+            // Do not push empty capabilities if the remote service is temporarily unreachable at startup;
+            // pushing empty capabilities would deactivate the app's existing submodules in AuthService.
+            return;
+        }
+
         await authServiceClient.UpsertAsync(
             app.PermissionFeatureKey,
             app.DisplayName,
             app.SidebarOrder,
-            discovered?.Capabilities ?? [],
+            discovered.Capabilities,
             ct,
-            discovered?.Nav,
+            discovered.Nav,
             new RemoteAppRenderMetadata(
                 app.IconKey, app.ManifestUrl, app.ContainerName, app.Status.ToString(), app.MaintenanceMessage));
     }

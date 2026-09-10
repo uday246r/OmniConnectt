@@ -13,6 +13,10 @@ const SERVICE_TONES: Record<string, BadgeTone> = {
   ModuleRegistry: 'info',
   LeadService: 'warning',
   Customer360Service: 'success',
+  Host: 'primary',
+  'Lead Management': 'warning',
+  'Customer 360': 'success',
+  Dashboard: 'primary',
 }
 
 export function serviceTone(serviceName: string): BadgeTone {
@@ -111,10 +115,6 @@ export function AuditLogDetailDrawer({ log, accessToken, onClose, onViewRelated 
         <div className={drawerStyles.rootPanel}>
           <div className={drawerStyles.header}>
             <div className={drawerStyles.headerLeft}>
-              <button type="button" className={styles.drawerBackBtn} onClick={onClose}>
-                <Icon.ChevronLeft width={16} height={16} />
-                Back
-              </button>
               <div className={drawerStyles.headerIcon}>
                 <Icon.Shield width={20} height={20} />
               </div>
@@ -146,10 +146,24 @@ export function AuditLogDetailDrawer({ log, accessToken, onClose, onViewRelated 
                         <div className={styles.detailRowBody}>
                           <dt className={styles.detailRowLabel}>Application</dt>
                           <dd className={styles.detailRowValue}>
-                            <Badge tone={serviceTone(log.serviceName)}>{log.serviceName}</Badge>
+                            <Badge tone={serviceTone(log.sourceApplication || log.serviceName)}>{log.sourceApplication || log.serviceName}</Badge>
                           </dd>
                         </div>
                       </div>
+
+                      {log.module && (
+                        <div className={styles.detailRow}>
+                          <span className={styles.detailIcon}>
+                            <Icon.Box width={15} height={15} />
+                          </span>
+                          <div className={styles.detailRowBody}>
+                            <dt className={styles.detailRowLabel}>Module</dt>
+                            <dd className={styles.detailRowValue}>
+                              <span>{log.module}</span>
+                            </dd>
+                          </div>
+                        </div>
+                      )}
 
                       <div className={styles.detailRow}>
                         <span className={`${styles.detailIcon} ${styles.detailIconNeutral}`}>
@@ -269,13 +283,13 @@ export function AuditLogDetailDrawer({ log, accessToken, onClose, onViewRelated 
                 </DetailGrid>
               </DetailSection>
 
-              <DetailSection title="Affected Record" icon={<Icon.Box width={12} height={12} />} hidden={!log.entityType && !log.entityLabel}>
+              <DetailSection title="Affected Record" icon={<Icon.Box width={12} height={12} />} hidden={!log.entityType && !log.entityLabel && !log.page}>
                 <DetailGrid>
                   <DetailField label="Record Type" icon={<Icon.Layers width={15} height={15} />}>
-                    {log.entityType ? <Badge tone="neutral">{log.entityType}</Badge> : null}
+                    <Badge tone="neutral">{log.entityType || (log.actionCategory === 'Navigation' ? 'Page' : 'Record')}</Badge>
                   </DetailField>
                   <DetailField label="Record Name" icon={<Icon.FileText width={15} height={15} />}>
-                    {log.entityLabel}
+                    {log.entityLabel || (log.module && log.page ? `${log.module} — ${log.page}` : log.page || '—')}
                   </DetailField>
                 </DetailGrid>
               </DetailSection>

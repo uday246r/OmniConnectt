@@ -25,6 +25,7 @@ public static class AuthDbSeeder
         public const string SettingsRoles = "host.settings.roles";
         public const string SettingsApplications = "host.settings.applications";
         public const string SystemAuditLogs = "host.system.audit-logs";
+        public const string SystemLogs = "host.system.system-logs";
         public const string SystemApprovals = "host.system.approvals";
         public const string SystemCheckerAssignment = "host.system.checker-assignment";
     }
@@ -41,6 +42,7 @@ public static class AuthDbSeeder
     private static readonly string[] UsersCapabilities = ["View", "Create", "Edit", "Delete", "Disable"];
     private static readonly string[] ApplicationsCapabilities = ["View", "Register", "Edit", "Delete", "Disable"];
     private static readonly string[] AuditLogsCapabilities = ["View", "Export"];
+    private static readonly string[] SystemLogsCapabilities = ["View", "Export"];
 
     // Maker-Checker Approval Workflow — Approvals covers viewing the centralized Approval Center and
     // acting on requests (Approve covers both approve and reject, matching how Disable already covers
@@ -129,6 +131,7 @@ public static class AuthDbSeeder
             // gating it would hide the page from exactly the people it exists for.
             new HostNavItem { Id = Guid.NewGuid(), Key = "host.my-requests", Label = "My Requests", IconKey = "Clock", RoutePath = "/my-requests", SectionKey = "system", SortOrder = 20, RequiredFeatureKey = null, RequiredCapability = null },
             new HostNavItem { Id = Guid.NewGuid(), Key = "host.system.audit-logs", Label = "Audit Logs", IconKey = "FileText", RoutePath = "/system/audit-logs", SectionKey = "system", SortOrder = 30, RequiredFeatureKey = HostFeatureKeys.SystemAuditLogs, RequiredCapability = "View" },
+            new HostNavItem { Id = Guid.NewGuid(), Key = "host.system.system-logs", Label = "System Logs", IconKey = "Terminal", RoutePath = "/system/system-logs", SectionKey = "system", SortOrder = 40, RequiredFeatureKey = HostFeatureKeys.SystemLogs, RequiredCapability = "View" },
         };
 
         var existingItems = await db.HostNavItems.Select(h => h.Key).ToListAsync(ct);
@@ -221,6 +224,7 @@ public static class AuthDbSeeder
             new { Key = HostFeatureKeys.SettingsRoles, DisplayName = "Setup — Role", SortOrder = 20, Capabilities = StandardCrud },
             new { Key = HostFeatureKeys.SettingsApplications, DisplayName = "Setup — Applications", SortOrder = 30, Capabilities = ApplicationsCapabilities },
             new { Key = HostFeatureKeys.SystemAuditLogs, DisplayName = "System — Audit Logs", SortOrder = 40, Capabilities = AuditLogsCapabilities },
+            new { Key = HostFeatureKeys.SystemLogs, DisplayName = "System — System Logs", SortOrder = 45, Capabilities = SystemLogsCapabilities },
             new { Key = HostFeatureKeys.SystemApprovals, DisplayName = "System — Approval Center", SortOrder = 50, Capabilities = ApprovalsCapabilities },
             new { Key = HostFeatureKeys.SystemCheckerAssignment, DisplayName = "System — Checker Assignment", SortOrder = 60, Capabilities = CheckerAssignmentCapabilities },
         };
@@ -311,6 +315,7 @@ public static class AuthDbSeeder
                 [HostFeatureKeys.SettingsRoles] = ["View", "Create", "Edit"],
                 [HostFeatureKeys.SettingsApplications] = ["View", "Register", "Edit", "Disable"],
                 [HostFeatureKeys.SystemAuditLogs] = ["View", "Export"],
+                [HostFeatureKeys.SystemLogs] = ["View", "Export"],
                 [HostFeatureKeys.SystemApprovals] = ["View", "Approve"],
                 // Manage stays Super-Admin-only, per "only users with Manage Checker Assignment
                 // permission" — Admin can see who's assigned but not reassign checkers.
@@ -335,6 +340,7 @@ public static class AuthDbSeeder
                 [HostFeatureKeys.SettingsRoles] = ["View"],
                 [HostFeatureKeys.SettingsApplications] = ["View"],
                 [HostFeatureKeys.SystemAuditLogs] = ["View"],
+                [HostFeatureKeys.SystemLogs] = ["View"],
                 [HostFeatureKeys.SystemApprovals] = ["View"],
                 [HostFeatureKeys.SystemCheckerAssignment] = ["View"],
             }),

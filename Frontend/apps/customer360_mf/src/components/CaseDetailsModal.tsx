@@ -9,6 +9,28 @@ export default function CaseDetailsModal() {
   const { selectedCase, modalOpen, closeCaseModal } = useInteractionStore();
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
+  React.useEffect(() => {
+    if (modalOpen && selectedCase) {
+      const caseIdStr = String(selectedCase.caseId || '').trim();
+      window.dispatchEvent(
+        new CustomEvent('omni:track-activity', {
+          detail: {
+            page: 'individual',
+            module: 'Customer 360',
+            sourceApplication: 'Customer 360',
+            pageLabel: 'Individual',
+            action: 'case.details_viewed',
+            actionCategory: 'ViewDetails',
+            entityType: 'Case',
+            entityId: caseIdStr,
+            entityLabel: selectedCase.main || `Case #${caseIdStr}`,
+            details: `Viewed details for case #${caseIdStr} (${selectedCase.main || 'Interaction'})`,
+          },
+        })
+      );
+    }
+  }, [modalOpen, selectedCase]);
+
   if (!modalOpen || !selectedCase) return null;
 
   const handleCopyText = (key: string, text?: string | null) => {

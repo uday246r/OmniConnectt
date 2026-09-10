@@ -80,6 +80,7 @@ builder.Services.AddScoped<RefreshTokenService>();
 builder.Services.AddScoped<PermissionClaimsBuilder>();
 builder.Services.AddScoped<AuthAppService>();
 builder.Services.AddScoped<AuditLogAppService>();
+builder.Services.AddScoped<SystemLogAppService>();
 // ApprovalGatingService has no dependency on UserAppService/RoleAppService/ApprovalAppService, so it
 // must be registered (and read here) before them to make the dependency direction obvious: gating is
 // depended ON by UserAppService/RoleAppService, and ApprovalAppService depends on all three of those —

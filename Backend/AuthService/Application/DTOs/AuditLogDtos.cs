@@ -16,7 +16,11 @@ public record AuditLogDto(
     string Result,
     string? UserAgent,
     string? FailureReason,
-    string CorrelationId);
+    string CorrelationId,
+    string? SourceApplication,
+    string? Module,
+    string? Page,
+    string? ActionCategory);
 
 /// <summary>What any service (ModuleRegistry, EmployeeService, LeadService, any future remote's backend) posts to record one audit entry.</summary>
 public record RecordAuditLogRequest(
@@ -33,7 +37,11 @@ public record RecordAuditLogRequest(
     string Result = "Success",
     string? UserAgent = null,
     string? FailureReason = null,
-    string? CorrelationId = null);
+    string? CorrelationId = null,
+    string? SourceApplication = null,
+    string? Module = null,
+    string? Page = null,
+    string? ActionCategory = null);
 
 /// <summary>Real aggregate counts over a date range — backs the Audit Logs page's summary cards. Never client-derived from a partial page of rows.</summary>
 public record AuditLogSummaryDto(

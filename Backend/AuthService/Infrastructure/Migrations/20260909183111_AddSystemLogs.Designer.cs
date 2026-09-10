@@ -3,6 +3,7 @@ using System;
 using AuthService.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace AuthService.Infrastructure.Migrations
 {
     [DbContext(typeof(AuthDbContext))]
-    partial class AuthDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260909183111_AddSystemLogs")]
+    partial class AddSystemLogs
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -148,10 +151,6 @@ namespace AuthService.Infrastructure.Migrations
                         .HasMaxLength(150)
                         .HasColumnType("character varying(150)");
 
-                    b.Property<string>("ActionCategory")
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
                     b.Property<string>("ActorName")
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
@@ -184,24 +183,8 @@ namespace AuthService.Infrastructure.Migrations
                     b.Property<string>("FailureReason")
                         .HasColumnType("text");
 
-                    b.Property<string>("HostOrRemote")
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)");
-
-                    b.Property<string>("Module")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
                     b.Property<DateTimeOffset>("OccurredAt")
                         .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Page")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<string>("RemoteName")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
 
                     b.Property<string>("Result")
                         .IsRequired()
@@ -209,10 +192,6 @@ namespace AuthService.Infrastructure.Migrations
 
                     b.Property<string>("ServiceName")
                         .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<string>("SourceApplication")
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
@@ -227,18 +206,11 @@ namespace AuthService.Infrastructure.Migrations
 
                     b.HasIndex("Action");
 
-                    b.HasIndex("ActionCategory");
-
                     b.HasIndex("ActorUserId");
 
                     b.HasIndex("OccurredAt");
 
                     b.HasIndex("ServiceName");
-
-                    b.HasIndex("SourceApplication");
-
-                    b.HasIndex("ActorUserId", "OccurredAt")
-                        .IsDescending(false, true);
 
                     b.HasIndex("Result", "OccurredAt")
                         .IsDescending(false, true);

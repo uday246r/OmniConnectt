@@ -15,6 +15,7 @@ import { LoginPage } from './pages/LoginPage/LoginPage'
 import { PageSkeleton } from './shared/components/PageSkeleton/PageSkeleton'
 import { ForbiddenPage } from './pages/ForbiddenPage/ForbiddenPage'
 import { lazyWithPreload, preloadWhenIdle } from './shared/utils/lazyWithPreload'
+import { useActivityTracking } from './shared/hooks/useActivityTracking'
 
 /**
  * Every route is code-split.
@@ -59,12 +60,15 @@ const MyRequestsPage = lazy(() =>
   import('./features/approvals/pages/MyRequestsPage').then((m) => ({ default: m.MyRequestsPage })),
 )
 
+const SystemLogsPage = lazy(() => import('./features/system-logs/pages/SystemLogsPage').then((m) => ({ default: m.SystemLogsPage })))
+
 const FEATURE_KEYS = {
   dashboard: 'host.dashboard',
   users: 'host.settings.users',
   roles: 'host.settings.roles',
   applications: 'host.settings.applications',
   auditLogs: 'host.system.audit-logs',
+  systemLogs: 'host.system.system-logs',
   approvals: 'host.system.approvals',
   checkerAssignment: 'host.system.checker-assignment',
 } as const
@@ -132,6 +136,9 @@ function SettingsRoute({ tab }: { tab: SettingsTab }) {
   }
   if (basePath === '/system/audit-logs') {
     return <AuditLogsPage />
+  }
+  if (basePath === '/system/system-logs') {
+    return <SystemLogsPage />
   }
   if (basePath === '/system/approvals') {
     return <ApprovalCenterPage />
@@ -270,6 +277,7 @@ function LoginRoute() {
  */
 
 function AuthenticatedShell() {
+  useActivityTracking()
   const user = useAuthStore((s) => s.user)
   const accessToken = useAuthStore((s) => s.accessToken)
   const hasCapability = useAuthStore((s) => s.hasCapability)
@@ -503,6 +511,15 @@ function AppRoutes() {
             element={
               <RequireCapability featureKey={FEATURE_KEYS.auditLogs}>
                 <AuditLogsPage />
+              </RequireCapability>
+            }
+          />
+
+          <Route
+            path="system/system-logs"
+            element={
+              <RequireCapability featureKey={FEATURE_KEYS.systemLogs}>
+                <SystemLogsPage />
               </RequireCapability>
             }
           />

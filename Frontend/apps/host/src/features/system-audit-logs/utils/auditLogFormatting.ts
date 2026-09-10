@@ -5,6 +5,12 @@
 const ACTION_LABELS: Record<string, string> = {
   'auth.login_succeeded': 'Login Succeeded',
   'auth.login_failed': 'Login Failed',
+  'page.viewed': 'Viewed Page',
+  'details.viewed': 'Viewed Details',
+  'system_log.details_viewed': 'Viewed System Log Details',
+  'audit_log.details_viewed': 'Viewed Audit Log Details',
+  'lead.details_viewed': 'Viewed Lead Details',
+  'customer.details_viewed': 'Viewed Customer Details',
   'remoteapp.created': 'Remote App Registered',
   'remoteapp.updated': 'Remote App Updated',
   'remoteapp.deleted': 'Remote App Removed',
@@ -39,7 +45,7 @@ export function actionChipClass(action: string): 'actionSuccess' | 'actionDanger
   if (a.includes('created') || a.includes('registered')) return 'actionSuccess'
   if (a.includes('deleted') || a.includes('removed') || a.includes('unregistered')) return 'actionDanger'
   if (a.includes('status_changed') || a.includes('maintenance')) return 'actionWarning'
-  if (a.includes('updated') || a.includes('changed') || a.includes('modified')) return 'actionLogin'
+  if (a.includes('updated') || a.includes('changed') || a.includes('modified') || a.includes('details') || a.includes('view')) return 'actionLogin'
   return 'actionNeutral'
 }
 

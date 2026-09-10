@@ -143,3 +143,11 @@
   font-size: var(--omni-font-size-sm);
   font-weight: var(--omni-font-weight-semibold);
 }
+
+.activityToolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-bottom: 12px;
+}

@@ -79,6 +79,7 @@ public class AuditLogAppService(AuthDbContext db, IPlatformEventPublisher events
         string? entityType, string? entityId, string? details, string? sourceIp = null,
         string? authMethod = null, string result = "Success", string? userAgent = null,
         string? failureReason = null, string? correlationId = null, string? entityLabel = null,
+        string? sourceApplication = null, string? module = null, string? page = null, string? actionCategory = null,
         CancellationToken ct = default)
     {
         db.AuditLogs.Add(new AuditLog
@@ -99,6 +100,12 @@ public class AuditLogAppService(AuthDbContext db, IPlatformEventPublisher events
             UserAgent = userAgent,
             FailureReason = failureReason,
             CorrelationId = correlationId ?? ResolveCorrelationId(),
+            SourceApplication = sourceApplication,
+            HostOrRemote = sourceApplication != null ? (sourceApplication == "Host" ? "Host" : "Remote") : null,
+            RemoteName = sourceApplication != null && sourceApplication != "Host" ? sourceApplication : null,
+            Module = module,
+            Page = page,
+            ActionCategory = actionCategory
         });
         await db.SaveChangesAsync(ct);
 
@@ -109,9 +116,10 @@ public class AuditLogAppService(AuthDbContext db, IPlatformEventPublisher events
     public async Task<PagedResult<AuditLogDto>> ListAsync(
         int page, int pageSize, string? service, string? action, string? result,
         DateTimeOffset? from, DateTimeOffset? to, string? sortDir, Guid? actorUserId = null,
-        string? correlationId = null, CancellationToken ct = default)
+        string? correlationId = null, string? sourceApplication = null, string? module = null,
+        string? pageName = null, string? actionCategory = null, CancellationToken ct = default)
     {
-        var query = BuildFilteredQuery(service, action, result, from, to, actorUserId, correlationId);
+        var query = BuildFilteredQuery(service, action, result, from, to, actorUserId, correlationId, sourceApplication: sourceApplication, module: module, page: pageName, actionCategory: actionCategory);
 
         var total = await query.CountAsync(ct);
         var ordered = string.Equals(sortDir, "asc", StringComparison.OrdinalIgnoreCase)
@@ -128,7 +136,7 @@ public class AuditLogAppService(AuthDbContext db, IPlatformEventPublisher events
     }
 
     /// <summary>Real aggregate counts over the given date range — never derived client-side from a partial page of rows.</summary>
-    public async Task<AuditLogSummaryDto> SummaryAsync(DateTimeOffset? from, DateTimeOffset? to, CancellationToken ct = default)
+    public async Task<AuditLogSummaryDto> SummaryAsync(DateTimeOffset? from = null, DateTimeOffset? to = null, CancellationToken ct = default)
     {
         var query = BuildFilteredQuery(null, null, null, from, to);
 
@@ -146,16 +154,19 @@ public class AuditLogAppService(AuthDbContext db, IPlatformEventPublisher events
 
     /// <summary>CSV of the current filtered result set, capped at a sane row count so a huge unfiltered export can't lock up the request.</summary>
     public async Task<string> ExportCsvAsync(
-        string? service, string? action, string? result, DateTimeOffset? from, DateTimeOffset? to, CancellationToken ct = default)
+        string? service = null, string? action = null, string? result = null, DateTimeOffset? from = null, DateTimeOffset? to = null, 
+        string? actorName = null, string? correlationId = null, string? entityType = null, string? entityId = null,
+        string? sourceApplication = null, string? module = null, string? pageName = null, string? actionCategory = null,
+        CancellationToken ct = default)
     {
         const int maxRows = 10_000;
-        var items = await BuildFilteredQuery(service, action, result, from, to)
+        var items = await BuildFilteredQuery(service, action, result, from, to, correlationId: correlationId, actorName: actorName, entityType: entityType, entityId: entityId, sourceApplication: sourceApplication, module: module, page: pageName, actionCategory: actionCategory)
             .OrderByDescending(a => a.OccurredAt)
             .Take(maxRows)
             .ToListAsync(ct);
 
         var sb = new StringBuilder();
-        sb.AppendLine("Time,Service,Actor,Action,Result,AuthMethod,EntityType,EntityLabel,EntityId,SourceIp,UserAgent,FailureReason,CorrelationId,Details");
+        sb.AppendLine("Time,Service,Actor,Action,Result,AuthMethod,EntityType,EntityLabel,EntityId,SourceIp,UserAgent,FailureReason,Details,SourceApplication,Module,Page,ActionCategory");
         foreach (var a in items)
         {
             sb.AppendLine(string.Join(",", new[]
@@ -172,15 +183,22 @@ public class AuditLogAppService(AuthDbContext db, IPlatformEventPublisher events
                 CsvField(a.SourceIp),
                 CsvField(a.UserAgent),
                 CsvField(a.FailureReason),
-                CsvField(a.CorrelationId),
                 CsvField(a.Details),
+                CsvField(a.SourceApplication),
+                CsvField(a.Module),
+                CsvField(a.Page),
+                CsvField(a.ActionCategory),
             }));
         }
 
         return sb.ToString();
     }
 
-    private IQueryable<AuditLog> BuildFilteredQuery(string? service, string? action, string? result, DateTimeOffset? from, DateTimeOffset? to, Guid? actorUserId = null, string? correlationId = null)
+    private IQueryable<AuditLog> BuildFilteredQuery(
+        string? service = null, string? action = null, string? result = null, DateTimeOffset? from = null, DateTimeOffset? to = null, 
+        Guid? actorUserId = null, string? correlationId = null, string? actorName = null, 
+        string? entityType = null, string? entityId = null, string? sourceApplication = null, 
+        string? module = null, string? page = null, string? actionCategory = null)
     {
         var query = db.AuditLogs.AsNoTracking().AsQueryable();
 
@@ -196,7 +214,7 @@ public class AuditLogAppService(AuthDbContext db, IPlatformEventPublisher events
 
         if (!string.IsNullOrWhiteSpace(service))
         {
-            query = query.Where(a => a.ServiceName == service);
+            query = query.Where(a => a.ServiceName == service || a.SourceApplication == service);
         }
 
         if (!string.IsNullOrWhiteSpace(action))
@@ -219,6 +237,41 @@ public class AuditLogAppService(AuthDbContext db, IPlatformEventPublisher events
             query = query.Where(a => a.OccurredAt <= to);
         }
 
+        if (!string.IsNullOrWhiteSpace(actorName))
+        {
+            query = query.Where(a => (a.ActorName != null && a.ActorName.Contains(actorName)) || (a.ActorUserId != null && a.ActorUserId.ToString() == actorName));
+        }
+
+        if (!string.IsNullOrWhiteSpace(entityType))
+        {
+            query = query.Where(a => a.EntityType != null && a.EntityType.Contains(entityType));
+        }
+
+        if (!string.IsNullOrWhiteSpace(entityId))
+        {
+            query = query.Where(a => (a.EntityId != null && a.EntityId.Contains(entityId)) || (a.EntityLabel != null && a.EntityLabel.Contains(entityId)) || (a.EntityType != null && a.EntityType.Contains(entityId)));
+        }
+
+        if (!string.IsNullOrWhiteSpace(sourceApplication))
+        {
+            query = query.Where(a => a.SourceApplication == sourceApplication);
+        }
+
+        if (!string.IsNullOrWhiteSpace(module))
+        {
+            query = query.Where(a => a.Module == module);
+        }
+
+        if (!string.IsNullOrWhiteSpace(page))
+        {
+            query = query.Where(a => a.Page == page);
+        }
+
+        if (!string.IsNullOrWhiteSpace(actionCategory))
+        {
+            query = query.Where(a => a.ActionCategory == actionCategory);
+        }
+
         return query;
     }
 
@@ -232,5 +285,6 @@ public class AuditLogAppService(AuthDbContext db, IPlatformEventPublisher events
 
     private static AuditLogDto ToDto(AuditLog a) => new(
         a.Id, a.OccurredAt, a.ServiceName, a.ActorUserId, a.ActorName, a.Action, a.EntityType, a.EntityId, a.EntityLabel,
-        a.Details, a.SourceIp, a.AuthMethod, a.Result, a.UserAgent, a.FailureReason, a.CorrelationId);
+        a.Details, a.SourceIp, a.AuthMethod, a.Result, a.UserAgent, a.FailureReason, a.CorrelationId,
+        a.SourceApplication, a.Module, a.Page, a.ActionCategory);
 }

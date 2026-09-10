@@ -28,6 +28,8 @@ export const TOPICS = {
   approvals: 'approvals',
   /** Centralized audit logs and security alerts. Wire contract with backend PlatformHub. */
   auditLogs: 'audit-logs',
+  /** Technical and operational system logs. */
+  systemLogs: 'system-logs',
   /** Dashboard metrics and KPIs. Wire contract with backend PlatformHub. */
   kpis: 'kpis',
 } as const

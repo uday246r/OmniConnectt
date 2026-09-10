@@ -66,6 +66,7 @@ export function UserDetailPage() {
   const canEdit = isAdministrator || hasCapability('host.settings.users', 'Edit')
   const canDelete = isAdministrator || hasCapability('host.settings.users', 'Delete')
   const canDisable = isAdministrator || hasCapability('host.settings.users', 'Disable')
+  const canExportAuditLogs = isAdministrator || hasCapability('host.system.audit-logs', 'Export')
 
   const [detail, setDetail] = useState<UserDetailDto | null>(null)
   const [roleDetail, setRoleDetail] = useState<RoleDetailDto | null>(null)
@@ -83,9 +84,11 @@ export function UserDetailPage() {
   const [logsPage, setLogsPage] = useState(1)
   const [actionFilter, setActionFilter] = useState('')
   const [resultFilter, setResultFilter] = useState('')
+  const [appFilter, setAppFilter] = useState('')
   const [entitySearch, setEntitySearch] = useState('')
   const [timeRange, setTimeRange] = useState<DateTimeRangeValue>({})
   const [viewingLog, setViewingLog] = useState<AuditLogDto | null>(null)
+  const [exporting, setExporting] = useState(false)
 
   const debouncedEntitySearch = useDebouncedValue(entitySearch, 300)
 
@@ -154,7 +157,7 @@ export function UserDetailPage() {
 
   useEffect(() => {
     setLogsPage(1)
-  }, [actionFilter, resultFilter, debouncedEntitySearch, timeRange])
+  }, [actionFilter, resultFilter, appFilter, debouncedEntitySearch, timeRange])
 
   const actionOptions: ColumnFilterOption[] = useMemo(() => {
     if (!logsPool) return []
@@ -165,6 +168,18 @@ export function UserDetailPage() {
     return [...seen.entries()]
       .sort((a, b) => a[1].localeCompare(b[1]))
       .map(([value, label]) => ({ value, label }))
+  }, [logsPool])
+
+  const appOptions: ColumnFilterOption[] = useMemo(() => {
+    if (!logsPool) return []
+    const seen = new Set<string>()
+    for (const l of logsPool) {
+      const app = l.sourceApplication || l.serviceName
+      if (app) seen.add(app)
+    }
+    return [...seen]
+      .sort((a, b) => a.localeCompare(b))
+      .map((value) => ({ value, label: value }))
   }, [logsPool])
 
   const RESULT_OPTIONS: ColumnFilterOption[] = [
@@ -192,10 +207,11 @@ export function UserDetailPage() {
     return logsPool.filter((l) => {
       if (actionFilter && l.action !== actionFilter) return false
       if (resultFilter && l.result !== resultFilter) return false
+      if (appFilter && (l.sourceApplication || l.serviceName) !== appFilter) return false
       if (needle && !(l.entityLabel ?? l.entityType ?? '').toLowerCase().includes(needle)) return false
       return true
     })
-  }, [logsPool, actionFilter, resultFilter, debouncedEntitySearch])
+  }, [logsPool, actionFilter, resultFilter, appFilter, debouncedEntitySearch])
 
   const logsTotal = visibleLogs?.length ?? 0
   const pagedLogs = useMemo(() => {
@@ -211,6 +227,12 @@ export function UserDetailPage() {
       value: formatActionLabel(actionFilter),
       onRemove: () => setActionFilter(''),
     },
+    appFilter && {
+      key: 'app',
+      label: 'Application',
+      value: appFilter,
+      onRemove: () => setAppFilter(''),
+    },
     resultFilter && { key: 'result', label: 'Result', value: resultFilter, onRemove: () => setResultFilter('') },
     debouncedEntitySearch && {
       key: 'entity',
@@ -225,6 +247,26 @@ export function UserDetailPage() {
       onRemove: () => setTimeRange({}),
     },
   ].filter(Boolean) as ActiveFilter[]
+
+  async function handleExportActivity() {
+    if (!accessToken || !detail) return
+    setExporting(true)
+    try {
+      await auditLogsApi.exportCsv(accessToken, {
+        actorUserId: detail.id,
+        from: timeRange.from,
+        to: timeRange.to,
+        action: actionFilter || undefined,
+        result: (resultFilter as any) || undefined,
+        sourceApplication: appFilter || undefined,
+      })
+      toast.success('Audit log report exported successfully.')
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'Failed to export audit report.')
+    } finally {
+      setExporting(false)
+    }
+  }
 
   const effectivePermissions = useMemo(() => {
     if (!detail || detail.isAdministrator) return []
@@ -309,6 +351,22 @@ export function UserDetailPage() {
         />
       ),
       render: (l) => <Badge tone={actionBadgeTone(l.action)}>{formatActionLabel(l.action)}</Badge>,
+    },
+    {
+      key: 'app',
+      label: 'Application',
+      priority: 'high',
+      header: (
+        <ColumnFilter
+          label="Application"
+          value={appFilter}
+          onChange={setAppFilter}
+          options={appOptions}
+          allLabel="All Apps"
+          searchable={appOptions.length > 6}
+        />
+      ),
+      render: (l) => <Badge tone="neutral">{l.sourceApplication || l.serviceName}</Badge>,
     },
     {
       key: 'entity',
@@ -484,11 +542,24 @@ export function UserDetailPage() {
       </TabPanel>
 
       <TabPanel id="user-detail-tabs" tabId="activity" active={tab === 'activity'}>
+        <div className={styles.activityToolbar}>
+          {canExportAuditLogs && (
+            <Button
+              variant="secondary"
+              leadingIcon={<Icon.Download width={15} height={15} />}
+              loading={exporting}
+              onClick={handleExportActivity}
+            >
+              Export Report
+            </Button>
+          )}
+        </div>
         <FilterBar
           filters={activityFilters}
           onClearAll={() => {
             setActionFilter('')
             setResultFilter('')
+            setAppFilter('')
             setEntitySearch('')
             setTimeRange({})
           }}

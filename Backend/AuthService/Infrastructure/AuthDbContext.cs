@@ -14,6 +14,7 @@ public class AuthDbContext(DbContextOptions<AuthDbContext> options) : DbContext(
     public DbSet<UserPermissionOverride> UserPermissionOverrides => Set<UserPermissionOverride>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+    public DbSet<SystemLog> SystemLogs => Set<SystemLog>();
     public DbSet<ApprovalRequest> ApprovalRequests => Set<ApprovalRequest>();
     public DbSet<CheckerAssignment> CheckerAssignments => Set<CheckerAssignment>();
     public DbSet<SetPasswordInvite> SetPasswordInvites => Set<SetPasswordInvite>();
@@ -273,6 +274,35 @@ public class AuthDbContext(DbContextOptions<AuthDbContext> options) : DbContext(
             entity.Property(a => a.EntityId).HasMaxLength(200);
             entity.Property(a => a.EntityLabel).HasMaxLength(300);
             entity.Property(a => a.SourceIp).HasMaxLength(64);
+
+            entity.HasIndex(a => a.SourceApplication);
+            entity.HasIndex(a => a.ActionCategory);
+            entity.HasIndex(a => new { a.ActorUserId, a.OccurredAt }).IsDescending(false, true);
+            entity.Property(a => a.SourceApplication).HasMaxLength(100);
+            entity.Property(a => a.HostOrRemote).HasMaxLength(10);
+            entity.Property(a => a.RemoteName).HasMaxLength(100);
+            entity.Property(a => a.Module).HasMaxLength(200);
+            entity.Property(a => a.Page).HasMaxLength(200);
+            entity.Property(a => a.ActionCategory).HasMaxLength(50);
+        });
+
+        modelBuilder.Entity<SystemLog>(entity =>
+        {
+            entity.HasIndex(a => a.OccurredAt);
+            entity.HasIndex(a => a.Severity);
+            entity.HasIndex(a => a.ServiceName);
+            entity.HasIndex(a => a.EventCode);
+            entity.HasIndex(a => new { a.Severity, a.OccurredAt }).IsDescending(false, true);
+            entity.HasIndex(a => new { a.ServiceName, a.OccurredAt }).IsDescending(false, true);
+            
+            entity.Property(a => a.ServiceName).HasMaxLength(100);
+            entity.Property(a => a.Severity).HasMaxLength(20);
+            entity.Property(a => a.Module).HasMaxLength(100);
+            entity.Property(a => a.Environment).HasMaxLength(50);
+            entity.Property(a => a.EventCode).HasMaxLength(150);
+            entity.Property(a => a.Message).HasMaxLength(2000);
+            entity.Property(a => a.CorrelationId).HasMaxLength(200);
+            entity.Property(a => a.RequestId).HasMaxLength(200);
         });
 
         modelBuilder.Entity<ApprovalRequest>(entity =>

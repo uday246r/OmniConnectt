@@ -50,4 +50,22 @@ public class AuditLog
 
     /// <summary>A real per-request Guid, generated at write time if the caller doesn't supply one — lets support correlate a login failure row back to the request that produced it.</summary>
     public string CorrelationId { get; set; } = string.Empty;
+
+    /// <summary>"Host", "Lead Management", "Customer 360" — which application generated this event.</summary>
+    public string? SourceApplication { get; set; }
+
+    /// <summary>"Host" or "Remote" — whether this came from the shell or a micro-frontend.</summary>
+    public string? HostOrRemote { get; set; }
+
+    /// <summary>The remote's container name, e.g. "lead_mf", "customer360_mf". Null for host events.</summary>
+    public string? RemoteName { get; set; }
+
+    /// <summary>Functional area, e.g. "Dashboard", "Lead Management", "Users", "Roles".</summary>
+    public string? Module { get; set; }
+
+    /// <summary>Specific page or view, e.g. "dashboard", "create-lead", "audit-logs".</summary>
+    public string? Page { get; set; }
+
+    /// <summary>"Navigation", "CRUD", "Export", "Search", "Filter", "Approval", "Auth".</summary>
+    public string? ActionCategory { get; set; }
 }

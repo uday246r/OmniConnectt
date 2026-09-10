@@ -33,10 +33,25 @@ public class InternalAuditLogsController(AuditLogAppService auditLog) : Controll
             : request.UserAgent;
 
         await auditLog.WriteAsync(
-            request.ServiceName, request.ActorUserId, request.ActorName, request.Action,
-            request.EntityType, request.EntityId, request.Details, sourceIp,
-            request.AuthMethod, request.Result, userAgent, request.FailureReason, request.CorrelationId,
-            request.EntityLabel, ct);
+            serviceName: request.ServiceName, 
+            actorUserId: request.ActorUserId, 
+            actorName: request.ActorName, 
+            action: request.Action,
+            entityType: request.EntityType, 
+            entityId: request.EntityId, 
+            details: request.Details, 
+            sourceIp: sourceIp,
+            authMethod: request.AuthMethod, 
+            result: request.Result, 
+            userAgent: userAgent, 
+            failureReason: request.FailureReason, 
+            correlationId: request.CorrelationId,
+            entityLabel: request.EntityLabel, 
+            sourceApplication: request.SourceApplication, 
+            module: request.Module, 
+            page: request.Page, 
+            actionCategory: request.ActionCategory, 
+            ct: ct);
         return NoContent();
     }
 }
