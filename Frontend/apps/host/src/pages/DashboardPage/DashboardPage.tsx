@@ -304,7 +304,9 @@ export function DashboardPage() {
             <div className={styles.heroGreetingRow}>
               <h1 className={styles.heroTitle}>
                 <span className={styles.welcomeIntro}>Welcome back,</span>{' '}
-                <span className={styles.userNameHighlight}>{user?.name ?? 'there'}</span>
+                <span className={styles.userNameHighlight}>
+                  {user ? [user.salutation, user.name].filter(Boolean).join(' ') : 'there'}
+                </span>
               </h1>
               <span className={styles.roleChip}>
                 <Icon.ShieldCheck width={15} height={15} className={styles.roleShieldIcon} />

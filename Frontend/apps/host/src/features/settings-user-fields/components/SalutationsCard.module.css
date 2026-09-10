@@ -1,0 +1,75 @@
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  background: var(--omni-color-surface);
+  border: 1px solid #eaecf0;
+  border-radius: var(--omni-radius-lg-plus);
+  padding: 18px 20px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.02);
+}
+
+.header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+
+.title {
+  font-size: var(--omni-font-size-sm-plus);
+  font-weight: var(--omni-font-weight-bold);
+  color: var(--omni-color-text-primary);
+  margin: 0;
+}
+
+.subtitle { font-size: var(--omni-font-size-xs); color: #64748b; margin: 3px 0 0; max-width: 480px; }
+
+.hint { font-size: var(--omni-font-size-xs); color: #64748b; }
+
+.errorBanner {
+  padding: 8px 10px;
+  border: 1px solid var(--omni-color-danger-200, #fecaca);
+  border-left: 3px solid #ef4444;
+  border-radius: var(--omni-radius-lg-minus);
+  background: var(--omni-color-danger-50, #fef2f2);
+  color: var(--omni-color-danger-700, #b91c1c);
+  font-size: var(--omni-font-size-xs);
+}
+
+.chipRow { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--omni-color-primary-50);
+  color: var(--omni-color-primary-700, #1d4ed8);
+  border: 1px solid #bfdbfe;
+  border-radius: var(--omni-radius-pill);
+  padding: 5px 8px 5px 12px;
+  font-size: var(--omni-font-size-sm);
+  font-weight: var(--omni-font-weight-medium);
+}
+
+.chipRemove {
+  background: none;
+  border: none;
+  padding: 3px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: inherit;
+  cursor: pointer;
+  opacity: 0.7;
+}
+.chipRemove:hover { opacity: 1; background: rgba(37, 99, 235, 0.14); }
+
+.addRow { display: flex; gap: 8px; align-items: center; max-width: 320px; }
+
+.input {
+  flex: 1;
+  border: 1.5px solid #e2e8f0;
+  border-radius: var(--omni-radius-md);
+  padding: 7px 10px;
+  font-size: var(--omni-font-size-sm);
+  color: var(--omni-color-text-primary);
+  background: var(--omni-color-surface);
+}
+.input:focus { outline: none; border-color: var(--omni-color-primary-400, #60a5fa); }

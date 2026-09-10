@@ -5,6 +5,12 @@ namespace AuthService.Domain.Entities;
 public class User
 {
     public Guid Id { get; set; }
+
+    /// <summary>Title/salutation (Mr., Ms., Dr., ...) — optional, drawn from the admin-configurable
+    /// SalutationCatalog. Like Role, this is a fixed dropdown with an editable value list, not part of
+    /// UserFieldSchema.</summary>
+    public string? Salutation { get; set; }
+
     public required string Name { get; set; }
     public required string Email { get; set; }
     public string? PhoneNumber { get; set; }
@@ -37,6 +43,13 @@ public class User
     public DateTimeOffset UpdatedAt { get; set; }
     public Guid? CreatedBy { get; set; }
     public Guid? UpdatedBy { get; set; }
+
+    /// <summary>
+    /// Values for admin-defined custom fields (e.g. Aadhar Number) that aren't one of the fixed
+    /// core columns above — see UserFieldSchema. Stored as a jsonb object of fieldKey -> string value.
+    /// Null for a user with no custom field values set.
+    /// </summary>
+    public string? ExtraAttributes { get; set; }
 
     public ICollection<UserPermissionOverride> PermissionOverrides { get; set; } = new List<UserPermissionOverride>();
     public ICollection<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();

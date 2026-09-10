@@ -1,0 +1,127 @@
+.form { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+
+.errorBanner {
+  padding: 10px 12px;
+  border: 1px solid var(--omni-color-danger-200, #fecaca);
+  border-left: 3px solid #ef4444;
+  border-radius: var(--omni-radius-lg-minus);
+  background: var(--omni-color-danger-50, #fef2f2);
+  color: var(--omni-color-danger-700, #b91c1c);
+  font-size: var(--omni-font-size-sm);
+}
+
+.formGroup { display: flex; flex-direction: column; gap: 5px; }
+
+.formGroupRow2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+.formGroupRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  background: var(--omni-color-surface-alt);
+  border-radius: var(--omni-radius-md);
+}
+
+.label {
+  font-size: var(--omni-font-size-xs);
+  font-weight: var(--omni-font-weight-semibold);
+  color: var(--omni-color-text-primary);
+}
+
+.labelSm {
+  font-size: var(--omni-font-size-2xs-plus);
+  font-weight: var(--omni-font-weight-medium);
+  color: #64748b;
+}
+
+.hint {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--omni-font-size-2xs-plus);
+  color: #64748b;
+}
+
+.hintInline { font-size: var(--omni-font-size-2xs-plus); color: #64748b; display: block; margin-top: 2px; }
+
+.input,
+.inputMono,
+.select {
+  border: 1.5px solid #e2e8f0;
+  border-radius: var(--omni-radius-md);
+  padding: 8px 10px;
+  font-size: var(--omni-font-size-sm);
+  color: var(--omni-color-text-primary);
+  background: var(--omni-color-surface);
+  width: 100%;
+}
+
+.input:focus,
+.inputMono:focus,
+.select:focus {
+  outline: none;
+  border-color: var(--omni-color-primary-400, #60a5fa);
+}
+
+.inputMono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+
+.toggle { position: relative; display: inline-block; width: 38px; height: 22px; flex-shrink: 0; }
+.toggle input { opacity: 0; width: 0; height: 0; }
+.toggleTrack {
+  position: absolute; inset: 0; background: #cbd5e1; border-radius: 999px; transition: background 140ms ease;
+}
+.toggleThumb {
+  position: absolute; left: 2px; top: 2px; width: 18px; height: 18px; background: #fff; border-radius: 50%;
+  transition: transform 140ms ease; box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+.toggle input:checked + .toggleTrack { background: var(--omni-color-primary-600, #2563eb); }
+.toggle input:checked + .toggleTrack .toggleThumb { transform: translateX(16px); }
+.toggle input:disabled + .toggleTrack { opacity: 0.6; }
+
+.rulesSection { display: flex; flex-direction: column; gap: 10px; border-top: 1px solid #eaecf0; padding-top: 12px; }
+.rulesSectionHeader { display: flex; flex-direction: column; gap: 2px; }
+
+.ruleCard {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--omni-color-surface-alt);
+  border: 1px solid #eaecf0;
+  border-radius: var(--omni-radius-lg-minus);
+  padding: 10px 12px;
+}
+
+.ruleCardHeader { display: flex; align-items: center; justify-content: space-between; }
+.ruleName { font-size: var(--omni-font-size-sm); font-weight: var(--omni-font-weight-semibold); color: var(--omni-color-text-primary); }
+
+.removeRuleBtn {
+  background: none; border: none; padding: 5px; border-radius: var(--omni-radius-md); cursor: pointer;
+  color: var(--omni-color-text-muted); display: flex; align-items: center; justify-content: center;
+  transition: background 120ms ease, color 120ms ease;
+}
+.removeRuleBtn:hover { background: var(--omni-color-danger-50); color: var(--omni-color-danger-500); }
+
+.testerRow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.testerInput {
+  flex: 1;
+  min-width: 160px;
+  border: 1.5px dashed #cbd5e1;
+  border-radius: var(--omni-radius-md);
+  padding: 7px 10px;
+  font-size: var(--omni-font-size-xs);
+  background: var(--omni-color-surface);
+}
+.testerInput:focus { outline: none; border-color: var(--omni-color-primary-400, #60a5fa); border-style: solid; }
+
+.testerPass, .testerFail {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: var(--omni-font-size-2xs-plus);
+  font-weight: var(--omni-font-weight-semibold);
+  white-space: nowrap;
+}
+.testerPass { color: #15803d; }
+.testerFail { color: var(--omni-color-danger-600, #dc2626); }
+
+.addRuleRow { display: flex; }

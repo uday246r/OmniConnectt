@@ -504,6 +504,26 @@
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
 }
 
+/* Same field, no reserved icon gutter — for a field with no fixed icon (any custom field), so the
+   placeholder starts flush left instead of leaving an empty indent where an icon would have been. */
+.input {
+  width: 100%;
+  padding: 7px 11px;
+  background: var(--omni-color-surface);
+  border: 1.5px solid #e2e8f0;
+  border-radius: var(--omni-radius-md);
+  font-size: var(--omni-font-size-xs);
+  color: var(--omni-color-text-primary);
+  outline: none;
+  font-family: inherit;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.input:focus {
+  border-color: var(--omni-color-primary-600);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
 .fieldLeftIcon {
   position: absolute;
   left: 10px;

@@ -55,6 +55,7 @@ export function UsersPage() {
   const dataRevision = useDataRevision(TOPICS.users)
 
   const canCreate = isAdministrator || hasCapability('host.settings.users', 'Create')
+  const canEdit = isAdministrator || hasCapability('host.settings.users', 'Edit')
 
   const [pool, setPool] = useState<UserListItemDto[] | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -361,7 +362,14 @@ export function UsersPage() {
       label: '',
       priority: 'always',
       align: 'right',
-      render: (u) => <RowAction onClick={() => navigate(`/settings/users/${u.id}`)}>View</RowAction>,
+      render: (u) => (
+        <div style={{ display: 'inline-flex', gap: '8px', alignItems: 'center', justifyContent: 'flex-end' }}>
+          <RowAction onClick={() => navigate(`/settings/users/${u.id}`)}>View</RowAction>
+          {canEdit && (
+            <RowAction onClick={() => pushLayer({ type: 'user-form', userId: u.id })}>Edit</RowAction>
+          )}
+        </div>
+      ),
     },
   ]
 

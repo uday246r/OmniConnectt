@@ -15,6 +15,7 @@ export type AuthProviderValue = 'Local' | 'Google'
 
 export interface UserListItemDto {
   id: string
+  salutation: string | null
   name: string
   email: string
   phoneNumber: string | null
@@ -34,6 +35,7 @@ export interface PermissionOverrideDto {
 
 export interface UserDetailDto {
   id: string
+  salutation: string | null
   name: string
   email: string
   phoneNumber: string | null
@@ -47,6 +49,8 @@ export interface UserDetailDto {
   updatedAt: string
   permissionOverrides: PermissionOverrideDto[]
   authProvider: AuthProviderValue
+  /** Values for admin-defined custom fields (e.g. "aadharNumber") — see UserFieldSchema. */
+  customFields: Record<string, string> | null
 }
 
 /** authProvider defaults "Local" and is immutable after creation — see the backend DTO's doc comment. */
@@ -57,6 +61,10 @@ export interface CreateUserRequest {
   roleId?: string | null
   isActive?: boolean
   authProvider?: AuthProviderValue
+  /** Values for admin-defined custom fields from the current UserFieldSchema (e.g. "aadharNumber"). */
+  customFields?: Record<string, string> | null
+  /** Title/salutation (Mr., Ms., ...) — must be one of the current SalutationCatalog entries, or omitted. */
+  salutation?: string | null
 }
 
 /** Null for Google-provisioned accounts — there's no local password to show. */
@@ -79,6 +87,11 @@ export interface UpdateUserRequest {
    * that actually applies it.
    */
   isActive: boolean
+
+  /** Same as CreateUserRequest.customFields. */
+  customFields?: Record<string, string> | null
+  /** Same as CreateUserRequest.salutation. */
+  salutation?: string | null
 }
 
 export interface ListUsersParams {

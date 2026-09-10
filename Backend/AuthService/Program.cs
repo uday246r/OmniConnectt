@@ -87,6 +87,10 @@ builder.Services.AddScoped<SystemLogAppService>();
 // never the other way, or ApproveAsync's replay-through-the-original-method call would cycle.
 builder.Services.AddScoped<ApprovalGatingService>();
 builder.Services.AddScoped<UserAppService>();
+builder.Services.AddScoped<UserFieldSchemaAppService>();
+builder.Services.AddScoped<ValidationPresetAppService>();
+builder.Services.AddScoped<SalutationAppService>();
+builder.Services.AddScoped<AuthService.Infrastructure.Validation.UserSchemaValidator>();
 builder.Services.AddScoped<RoleAppService>();
 builder.Services.AddScoped<ApprovalAppService>();
 builder.Services.AddScoped<CheckerAssignmentAppService>();

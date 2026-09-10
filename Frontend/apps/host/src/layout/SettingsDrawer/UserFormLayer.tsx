@@ -18,20 +18,10 @@ import { Icon } from '../../shared/components/Icon/Icon'
 import { SkeletonBlock } from '../../shared/components/Skeleton'
 import { resolveIcon } from '../../shared/components/Icon/resolveIcon'
 import { toast } from '../../shared/stores/toastStore'
-import {
-  COUNTRY_PHONE_LIST,
-  splitDialCode,
-  validateCountryPhone,
-} from '@omniremit/ui/validation'
-import {
-  LIMITS,
-  required,
-  maxLength,
-  email as emailRule,
-  firstError,
-  isValid,
-  type FieldErrors,
-} from '../../shared/validation/rules'
+import { validateFields, type FieldDefinition } from '@omniremit/ui/validation'
+import { isValid } from '../../shared/validation/rules'
+import { userSchemaApi } from '../../features/settings-user-fields/api/userSchemaApi'
+import { salutationsApi } from '../../features/settings-user-fields/api/salutationsApi'
 import {
   groupsFromCatalog,
   columnsForRows,
@@ -44,10 +34,11 @@ import { TOPICS, invalidate } from '../../shared/stores/invalidationStore'
 import { Switch } from '@omniremit/ui'
 
 /*
- * Phone rules come from the shared package so the host, the remotes and (via the widened server
- * rules) the backends all judge a number the same way. This file previously carried its own copy of
- * the country table and validator, which is how the platform ended up with three incompatible
- * definitions of a valid phone number.
+ * Name/Email/Phone are no longer hardcoded here — they're the "core" entries of the admin-configurable
+ * UserFieldSchema (see Settings > Manage Fields), rendered by the generic field loop below alongside
+ * any custom fields (e.g. Aadhar Number) an admin has added. Their required-ness/validation rules come
+ * from that schema; only Role/Status stay hardcoded, since those are access-control concerns the
+ * schema deliberately never touches — see UserFieldSchema's doc comment on the backend.
  */
 
 interface UserFormLayerProps {
@@ -63,7 +54,6 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
   const refreshSession = useAuthStore((s) => s.refreshSession)
   // Gates which roles this operator may hand out — see filteredRoles.
   const isAdministrator = Boolean(useAuthStore((s) => s.user)?.isAdministrator)
-  const popLayer = useSettingsDrawerStore((s) => s.popLayer)
   const navigate = useNavigate()
 
   /*
@@ -94,36 +84,20 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
   const [pendingApproval, setPendingApproval] = useState<ApprovalPendingDto | null>(null)
   const [approvalConflict, setApprovalConflict] = useState<PendingApprovalConflict | null>(null)
 
-  // Step 1: Basic Fields
-  const [name, setName] = useState('')
-  const [email, setEmail] = useState('')
-  const [selectedCountryCode, setSelectedCountryCode] = useState('IN')
-  const [countryDropdownOpen, setCountryDropdownOpen] = useState(false)
-  const [countrySearch, setCountrySearch] = useState('')
-  const [nationalPhone, setNationalPhone] = useState('')
+  // Step 1: Basic Fields — schema-driven (see Settings > Manage Fields). fieldValues holds one entry
+  // per FieldDefinition key, core (name/email/phoneNumber) and custom alike.
+  const [fields, setFields] = useState<FieldDefinition[]>([])
+  const [fieldValues, setFieldValues] = useState<Record<string, string>>({})
+  const [salutationOptions, setSalutationOptions] = useState<string[]>([])
+  const [salutation, setSalutation] = useState('')
   const [roleId, setRoleId] = useState<string>('')
   const [isActive, setIsActive] = useState(true)
 
   const [roleDropdownOpen, setRoleDropdownOpen] = useState(false)
   const [roleSearch, setRoleSearch] = useState('')
 
-  const countryDropdownRef = useRef<HTMLDivElement>(null)
-  useClickOutside([countryDropdownRef], () => setCountryDropdownOpen(false), countryDropdownOpen)
-
   const roleDropdownRef = useRef<HTMLDivElement>(null)
   useClickOutside([roleDropdownRef], () => setRoleDropdownOpen(false), roleDropdownOpen)
-
-  const filteredCountries = useMemo(() => {
-    if (!countrySearch.trim()) return COUNTRY_PHONE_LIST
-    const q = countrySearch.toLowerCase().trim()
-    return COUNTRY_PHONE_LIST.filter(
-      (c) =>
-        c.name.toLowerCase().includes(q) ||
-        c.code.toLowerCase().includes(q) ||
-        c.dialCode.toLowerCase().includes(q) ||
-        c.dialCode.replace('+', '').includes(q),
-    )
-  }, [countrySearch])
 
   const [roles, setRoles] = useState<RoleListItemDto[]>([])
 
@@ -256,16 +230,23 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
 
     async function loadData() {
       try {
-        const [rolesRes, catalogRes, appsRes] = await Promise.all([
+        const [rolesRes, catalogRes, appsRes, schemaRes, salutationsRes] = await Promise.all([
           rolesApi.list(accessToken!, { pageSize: 100 }),
           permissionsApi.catalog(accessToken!),
           remoteAppsApi.list(accessToken!, { pageSize: 100 }),
+          userSchemaApi.get(accessToken!),
+          salutationsApi.get(accessToken!),
         ])
 
         if (cancelled) return
         setRoles(rolesRes.items)
         setCatalog(catalogRes)
         setRemoteApps(appsRes.items)
+        setSalutationOptions(salutationsRes.salutations)
+        const sortedFields = [...schemaRes.fields].sort((a, b) => a.order - b.order)
+        setFields(sortedFields)
+        // Every field starts blank; a userId load below overwrites core + custom values on top.
+        setFieldValues(Object.fromEntries(sortedFields.map((f) => [f.key, ''])))
 
         // Expand first remote app by default
         if (appsRes.items.length > 0) {
@@ -279,11 +260,14 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
           ])
 
           if (cancelled) return
-          setName(userRes.name)
-          setEmail(userRes.email)
-          const parsed = splitDialCode(userRes.phoneNumber ?? '')
-          setSelectedCountryCode(parsed.countryCode)
-          setNationalPhone(parsed.nationalNumber)
+          setFieldValues((prev) => ({
+            ...prev,
+            name: userRes.name,
+            email: userRes.email,
+            phoneNumber: userRes.phoneNumber ?? '',
+            ...(userRes.customFields ?? {}),
+          }))
+          setSalutation(userRes.salutation ?? '')
           setRoleId(userRes.roleId ?? '')
           setIsActive(userRes.isActive)
 
@@ -322,18 +306,10 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
     return roles.find((r) => r.id === roleId)
   }, [roles, roleId])
 
-  const selectedCountry = useMemo(() => {
-    return COUNTRY_PHONE_LIST.find((c) => c.code === selectedCountryCode) || COUNTRY_PHONE_LIST[0]
-  }, [selectedCountryCode])
-
-  const fullPhoneNumber = useMemo(() => {
-    if (!nationalPhone.trim()) return ''
-    return `${selectedCountry.dialCode} ${nationalPhone.trim()}`
-  }, [selectedCountry.dialCode, nationalPhone])
-
   // When changing role, pre-populate with the newly selected role's permissions
   const handleRoleChange = async (newRoleId: string) => {
     setRoleId(newRoleId)
+    setTouched((t) => ({ ...t, role: true }))
     if (!accessToken || !newRoleId) {
       setRolePermissions(new Set())
       setSelectedPermKeys(new Set())
@@ -435,22 +411,24 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
    * The server validates independently; these exist so a problem is attached to the field that caused
    * it while the cursor is still in it.
    */
-  const fieldErrors: FieldErrors<'name' | 'email' | 'phoneNumber'> = {
-    name: firstError(required(name, 'Full name'), maxLength(name, LIMITS.userName, 'Full name')),
-    email: firstError(required(email, 'Email address'), emailRule(email), maxLength(email, LIMITS.email, 'Email address')),
-    phoneNumber: firstError(validateCountryPhone(nationalPhone, selectedCountry)),
-  }
+  const fieldErrors = validateFields(fields, fieldValues)
+
+  // A role governs what the account can actually do, so leaving it unset ("No Role") is no longer an
+  // acceptable end state — it's still selectable from the dropdown (an admin may genuinely be deciding),
+  // but the wizard can't move past this step until something other than "No Role" is chosen.
+  const roleError = roleId ? undefined : 'Assign a role before continuing.'
 
   // Shown once a field is visited or a submit attempted, so the form does not greet the user in red.
   const [touched, setTouched] = useState<Record<string, boolean>>({})
   const [submitAttempted, setSubmitAttempted] = useState(false)
-  const showError = (field: keyof typeof fieldErrors) =>
-    touched[field] || submitAttempted ? fieldErrors[field] : undefined
+  const showError = (fieldKey: string) =>
+    touched[fieldKey] || submitAttempted ? fieldErrors[fieldKey] : undefined
+  const showRoleError = (touched.role || submitAttempted) && roleError
 
   const handleNextFromBasic = (e: FormEvent) => {
     e.preventDefault()
     setSubmitAttempted(true)
-    if (!isValid(fieldErrors)) {
+    if (!isValid(fieldErrors) || roleError) {
       setError(null)
       return
     }
@@ -471,7 +449,7 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
       return
     }
     setSubmitAttempted(true)
-    if (!isValid(fieldErrors)) {
+    if (!isValid(fieldErrors) || roleError) {
       setError(null)
       return
     }
@@ -485,9 +463,14 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
 
     try {
       const token = await ensureFreshAccessToken()
-      const payloadPhoneNumber = nationalPhone.trim()
-        ? `${selectedCountry.dialCode} ${nationalPhone.trim()}`
-        : null
+      const nameValue = (fieldValues.name ?? '').trim()
+      const emailValue = (fieldValues.email ?? '').trim()
+      const payloadPhoneNumber = (fieldValues.phoneNumber ?? '').trim() || null
+      // Every non-core field's value — Aadhar Number, etc. — travels separately from the fixed
+      // name/email/phoneNumber columns; see UserFieldSchema's "core vs custom" split.
+      const customFields = Object.fromEntries(
+        fields.filter((f) => !f.core).map((f) => [f.key, (fieldValues[f.key] ?? '').trim()]),
+      )
 
       if (isEdit && userId) {
         // Core fields and Extra Permissions travel in ONE call now — a checker reviews and approves
@@ -497,12 +480,14 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
           token,
           userId,
           {
-            name: name.trim(),
-            email: email.trim(),
+            name: nameValue,
+            email: emailValue,
             phoneNumber: payloadPhoneNumber,
             roleId: roleId || null,
             // The toggle's value now actually reaches the server; it was previously dropped here.
             isActive,
+            customFields,
+            salutation: salutation || null,
           },
           computedOverrides,
         )
@@ -518,17 +503,19 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
         // reload would show the change.
         void refreshSession()
         invalidate(TOPICS.users, TOPICS.approvals, TOPICS.kpis)
-        toast.success(`User '${name}' updated successfully.`)
+        toast.success(`User '${nameValue}' updated successfully.`)
         finish()
       } else {
         const res = await usersApi.create(
           token,
           {
-            name: name.trim(),
-            email: email.trim(),
+            name: nameValue,
+            email: emailValue,
             phoneNumber: payloadPhoneNumber,
             roleId: roleId || null,
             isActive,
+            customFields,
+            salutation: salutation || null,
           },
           computedOverrides,
         )
@@ -653,7 +640,7 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
         <button
           type="button"
           className={styles.closeBtn}
-          onClick={popLayer}
+          onClick={finish}
           aria-label="Close"
         >
           <Icon.X width={16} height={16} />
@@ -736,7 +723,7 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
             </div>
             <h3 className={styles.successTitle}>Request Submitted for Approval</h3>
             <p className={styles.successText}>
-              Creating <strong>{name}</strong> requires approval before the account exists.
+              Creating <strong>{[salutation, fieldValues.name].filter(Boolean).join(' ')}</strong> requires approval before the account exists.
               {pendingApproval.checkerName && pendingApproval.checkerName !== 'Unassigned'
                 ? ` It's been assigned to ${pendingApproval.checkerName}.`
                 : ''}{' '}
@@ -759,7 +746,7 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
             </div>
             <h3 className={styles.successTitle}>User Account Created!</h3>
             <p className={styles.successText}>
-              Share this temporary password securely with <strong>{createdResult.user.name}</strong> ({createdResult.user.email}). It will not be visible again once closed.
+              Share this temporary password securely with <strong>{[createdResult.user.salutation, createdResult.user.name].filter(Boolean).join(' ')}</strong> ({createdResult.user.email}). It will not be visible again once closed.
             </p>
             <div className={styles.tempPassBox}>
               <span className={styles.tempPassLabel}>Temporary Password</span>
@@ -782,156 +769,78 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
               <form id="basic-form" onSubmit={handleNextFromBasic} className={styles.formSection}>
                 <div className={styles.formCard}>
                   <h4 className={styles.formCardTitle}>Personal Information</h4>
+                  {/*
+                   * Rendered entirely from the admin-configurable UserFieldSchema (Settings > Manage
+                   * Fields) — Name/Email/Phone are its fixed "core" entries, and any custom field an
+                   * admin adds (Aadhar Number, etc.) appears here the same way, in the order they chose.
+                   * This replaced three hand-built inputs (including a country-code phone picker), so a
+                   * plain text field is what every field gets now, core or custom alike.
+                   */}
                   <div className={styles.fieldsGrid}>
+                    {/* Salutation — like Role, a fixed dropdown backed by an admin-editable value list
+                        (Settings > Manage Fields > Salutations), not part of UserFieldSchema itself. */}
                     <div className={styles.inputGroup}>
-                      <label className={styles.label}>
-                        Full Name <span className={styles.req}>*</span>
-                      </label>
-                      <div className={styles.inputIconWrap}>
-                        <input
-                          type="text"
-                          className={`${styles.inputWithIcon} ${showError('name') ? styles.inputInvalid : ''}`}
-                          placeholder="e.g. Jane Smith"
-                          value={name}
-                          maxLength={LIMITS.userName}
-                          aria-invalid={Boolean(showError('name'))}
-                          aria-describedby={showError('name') ? 'user-name-error' : undefined}
-                          onChange={(e) => setName(e.target.value)}
-                          onBlur={() => setTouched((t) => ({ ...t, name: true }))}
-                        />
-                        <Icon.Users width={16} height={16} className={styles.fieldLeftIcon} />
-                      </div>
-                      {showError('name') && (
-                        <span id="user-name-error" className={styles.fieldError} role="alert">
-                          {showError('name')}
-                        </span>
-                      )}
+                      <label className={styles.label}>Salutation</label>
+                      <select
+                        className={styles.select}
+                        value={salutation}
+                        onChange={(e) => setSalutation(e.target.value)}
+                      >
+                        <option value="">-- None --</option>
+                        {salutationOptions.map((s) => (
+                          <option key={s} value={s}>{s}</option>
+                        ))}
+                      </select>
                     </div>
 
-                    <div className={styles.inputGroup}>
-                      <label className={styles.label}>
-                        Email Address <span className={styles.req}>*</span>
-                      </label>
-                      <div className={styles.inputIconWrap}>
+                    {fields.map((field) => {
+                      // Only the three core fields have a fixed, recognisable icon. A custom field
+                      // (Aadhar Number, etc.) has no obvious icon to guess at, and reserving the icon's
+                      // gutter space anyway just leaves an empty dent and an oddly-indented placeholder
+                      // — so those get a plain input with no left padding instead.
+                      const fieldIcon =
+                        field.key === 'name' ? (
+                          <Icon.Users width={16} height={16} className={styles.fieldLeftIcon} />
+                        ) : field.key === 'email' ? (
+                          <Icon.FileText width={16} height={16} className={styles.fieldLeftIcon} />
+                        ) : field.key === 'phoneNumber' ? (
+                          <Icon.Activity width={16} height={16} className={styles.fieldLeftIcon} />
+                        ) : null
+
+                      const input = (
                         <input
-                          type="email"
-                          className={`${styles.inputWithIcon} ${showError('email') ? styles.inputInvalid : ''}`}
-                          placeholder="e.g. jane.smith@example.com"
-                          value={email}
-                          maxLength={LIMITS.email}
-                          aria-invalid={Boolean(showError('email'))}
-                          aria-describedby={showError('email') ? 'user-email-error' : undefined}
-                          onChange={(e) => setEmail(e.target.value)}
-                          onBlur={() => setTouched((t) => ({ ...t, email: true }))}
+                          type={field.dataType === 'email' ? 'email' : 'text'}
+                          className={`${fieldIcon ? styles.inputWithIcon : styles.input} ${showError(field.key) ? styles.inputInvalid : ''}`}
+                          placeholder={field.key === 'phoneNumber' ? 'e.g. +91 98765 43210' : `Enter ${field.label}`}
+                          value={fieldValues[field.key] ?? ''}
+                          aria-invalid={Boolean(showError(field.key))}
+                          aria-describedby={showError(field.key) ? `user-field-${field.key}-error` : undefined}
+                          onChange={(e) => setFieldValues((prev) => ({ ...prev, [field.key]: e.target.value }))}
+                          onBlur={() => setTouched((t) => ({ ...t, [field.key]: true }))}
                         />
-                        <Icon.FileText width={16} height={16} className={styles.fieldLeftIcon} />
-                      </div>
-                      {showError('email') && (
-                        <span id="user-email-error" className={styles.fieldError} role="alert">
-                          {showError('email')}
-                        </span>
-                      )}
-                    </div>
+                      )
 
-                    <div className={styles.inputGroupFull}>
-                      <label className={styles.label}>
-                        Phone Number <span className={styles.req}>*</span>
-                      </label>
-                      <div className={styles.phoneInputRow}>
-                        {/* Custom Searchable Country Code Dropdown */}
-                        <div className={styles.countryPickerWrap} ref={countryDropdownRef}>
-                          <button
-                            type="button"
-                            className={`${styles.countryPickerTrigger} ${countryDropdownOpen ? styles.countryPickerTriggerOpen : ''}`}
-                            onClick={() => {
-                              setCountryDropdownOpen(!countryDropdownOpen)
-                              if (!countryDropdownOpen) setCountrySearch('')
-                            }}
-                            aria-haspopup="listbox"
-                            aria-expanded={countryDropdownOpen}
-                            aria-label={`Selected country: ${selectedCountry.name}, code ${selectedCountry.dialCode}`}
-                          >
-                            <div className={styles.countryTriggerLeft}>
-                              <span>{selectedCountry.flag}</span>
-                              <span className={styles.countryTriggerDial}>{selectedCountry.dialCode}</span>
+                      return (
+                        <div key={field.key} className={styles.inputGroup}>
+                          <label className={styles.label}>
+                            {field.label} {field.required && <span className={styles.req}>*</span>}
+                          </label>
+                          {fieldIcon ? (
+                            <div className={styles.inputIconWrap}>
+                              {input}
+                              {fieldIcon}
                             </div>
-                            <Icon.ChevronDown
-                              width={12}
-                              height={12}
-                              className={`${styles.triggerChevron} ${countryDropdownOpen ? styles.triggerChevronOpen : ''}`}
-                            />
-                          </button>
-
-                          {countryDropdownOpen && (
-                            <div className={styles.countryDropdownMenu} role="listbox">
-                              <div className={styles.dropdownSearchWrap}>
-                                <input
-                                  type="text"
-                                  className={styles.dropdownSearchInput}
-                                  placeholder="Search country or code..."
-                                  value={countrySearch}
-                                  onChange={(e) => setCountrySearch(e.target.value)}
-                                  autoFocus
-                                />
-                                <Icon.Search width={12} height={12} className={styles.dropdownSearchIcon} />
-                              </div>
-
-                              <div className={styles.dropdownItemsList}>
-                                {filteredCountries.length === 0 ? (
-                                  <div className={styles.dropdownEmpty}>No countries match &quot;{countrySearch}&quot;</div>
-                                ) : (
-                                  filteredCountries.map((c) => {
-                                    const isSelected = c.code === selectedCountryCode
-                                    return (
-                                      <div
-                                        key={c.code}
-                                        className={`${styles.dropdownItem} ${isSelected ? styles.dropdownItemSelected : ''}`}
-                                        role="option"
-                                        aria-selected={isSelected}
-                                        onClick={() => {
-                                          setSelectedCountryCode(c.code)
-                                          setCountryDropdownOpen(false)
-                                          setCountrySearch('')
-                                          setTouched((t) => ({ ...t, phoneNumber: true }))
-                                        }}
-                                      >
-                                        <div className={styles.dropdownItemLeft}>
-                                          <span>{c.flag}</span>
-                                          <span className={styles.dropdownItemName} title={c.name}>
-                                            {c.name}
-                                          </span>
-                                        </div>
-                                        <span className={styles.dropdownItemDial}>{c.dialCode}</span>
-                                      </div>
-                                    )
-                                  })
-                                )}
-                              </div>
-                            </div>
+                          ) : (
+                            input
+                          )}
+                          {showError(field.key) && (
+                            <span id={`user-field-${field.key}-error`} className={styles.fieldError} role="alert">
+                              {showError(field.key)}
+                            </span>
                           )}
                         </div>
-
-                        <div className={styles.nationalPhoneWrap}>
-                          <input
-                            type="tel"
-                            className={`${styles.inputWithIcon} ${showError('phoneNumber') ? styles.inputInvalid : ''}`}
-                            placeholder={`e.g. ${selectedCountry.placeholder}`}
-                            value={nationalPhone}
-                            maxLength={LIMITS.phone}
-                            aria-invalid={Boolean(showError('phoneNumber'))}
-                            aria-describedby={showError('phoneNumber') ? 'user-phone-error' : undefined}
-                            onChange={(e) => setNationalPhone(e.target.value)}
-                            onBlur={() => setTouched((t) => ({ ...t, phoneNumber: true }))}
-                          />
-                          <Icon.Activity width={16} height={16} className={styles.fieldLeftIcon} />
-                        </div>
-                      </div>
-                      {showError('phoneNumber') && (
-                        <span id="user-phone-error" className={styles.fieldError} role="alert">
-                          {showError('phoneNumber')}
-                        </span>
-                      )}
-                    </div>
+                      )
+                    })}
                   </div>
                 </div>
 
@@ -940,7 +849,9 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
                   <div className={styles.fieldsGrid}>
                     {/* Searchable Role Dropdown */}
                     <div className={styles.inputGroupFull}>
-                      <label className={styles.label}>Assigned System Role</label>
+                      <label className={styles.label}>
+                        Assigned System Role <span className={styles.req}>*</span>
+                      </label>
                       <div className={styles.roleDropdownWrap} ref={roleDropdownRef}>
                         <button
                           type="button"
@@ -962,7 +873,7 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
                                 )}
                               </>
                             ) : (
-                              <span className={styles.triggerPlaceholder}>-- No Role (Inherit Standard Access) --</span>
+                              <span className={styles.triggerPlaceholder}>-- Select a Role --</span>
                             )}
                           </div>
                           <Icon.ChevronDown
@@ -999,7 +910,7 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
                                 }}
                               >
                                 <div className={styles.dropdownItemLeft}>
-                                  <span className={styles.dropdownName}>-- No Role (Inherit Standard Access) --</span>
+                                  <span className={styles.dropdownName}>No Role (No Access Until Assigned)</span>
                                 </div>
                                 {!roleId && (
                                   <Icon.CheckCircle width={14} height={14} className={styles.dropdownCheckIcon} />
@@ -1047,6 +958,12 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
                           </div>
                         )}
                       </div>
+
+                      {showRoleError && (
+                        <span className={styles.fieldError} role="alert">
+                          {roleError}
+                        </span>
+                      )}
 
                       {selectedRole?.isAdministrator && (
                         <div className={`${styles.adminRoleNotice} ${styles.ufl13}`} >
@@ -1406,11 +1323,11 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
                 <div className={styles.reviewCard}>
                   <div className={styles.reviewProfileHeader}>
                     <div className={styles.reviewAvatar}>
-                      {(name || email).charAt(0).toUpperCase()}
+                      {(fieldValues.name || fieldValues.email || '?').charAt(0).toUpperCase()}
                     </div>
                     <div className={styles.reviewProfileDetails}>
-                      <h4 className={styles.reviewProfileName}>{name}</h4>
-                      <span className={styles.reviewProfileEmail}>{email}</span>
+                      <h4 className={styles.reviewProfileName}>{[salutation, fieldValues.name].filter(Boolean).join(' ')}</h4>
+                      <span className={styles.reviewProfileEmail}>{fieldValues.email}</span>
                       <div className={styles.reviewPillsRow}>
                         <span className={styles.roleBadgePill}>
                           <Icon.ShieldCheck width={13} height={13} />
@@ -1427,7 +1344,7 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
                   <div className={styles.reviewMetaList}>
                     <div className={styles.reviewMetaItem}>
                       <span className={styles.reviewMetaLabel}>Phone Number</span>
-                      <span className={styles.reviewMetaVal}>{fullPhoneNumber || 'None provided'}</span>
+                      <span className={styles.reviewMetaVal}>{fieldValues.phoneNumber || 'None provided'}</span>
                     </div>
                     <div className={styles.reviewMetaItem}>
                       <span className={styles.reviewMetaLabel}>Administrator Privileges</span>
@@ -1435,6 +1352,14 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
                         {selectedRole?.isAdministrator ? 'Yes (Full Platform Admin)' : 'Standard User'}
                       </span>
                     </div>
+                    {/* Any admin-added custom field (Aadhar Number, etc.) — never Role/Status, which
+                        stay outside UserFieldSchema entirely. */}
+                    {fields.filter((f) => !f.core).map((f) => (
+                      <div key={f.key} className={styles.reviewMetaItem}>
+                        <span className={styles.reviewMetaLabel}>{f.label}</span>
+                        <span className={styles.reviewMetaVal}>{fieldValues[f.key] || 'None provided'}</span>
+                      </div>
+                    ))}
                   </div>
                 </div>
 
@@ -1502,7 +1427,7 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
           <div className={styles.bottomBar}>
             {currentStep === 'basic' && (
               <>
-                <button type="button" className={styles.cancelBtn} onClick={popLayer}>
+                <button type="button" className={styles.cancelBtn} onClick={finish}>
                   Cancel
                 </button>
                 <button

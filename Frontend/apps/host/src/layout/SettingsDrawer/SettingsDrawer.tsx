@@ -72,7 +72,12 @@ const canAccessApplications = isAdministrator || hasCapability('host.settings.ap
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && isOpen) {
         if (layerStack.length > 1) {
-          popLayer()
+          const current = layerStack[layerStack.length - 1]
+          if (current.type === 'user-form') {
+            close()
+          } else {
+            popLayer()
+          }
         } else {
           close()
         }
@@ -80,7 +85,7 @@ const canAccessApplications = isAdministrator || hasCapability('host.settings.ap
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [isOpen, layerStack.length, popLayer, close])
+  }, [isOpen, layerStack, popLayer, close])
 
   if (!isOpen) return null
 
@@ -179,6 +184,7 @@ const canAccessApplications = isAdministrator || hasCapability('host.settings.ap
                   <span>Checker Assignment</span>
                 </button>
               )}
+
             </div>
 
             {/* Tab Body */}

@@ -1,8 +1,9 @@
-import { useState, useMemo, type FormEvent } from 'react'
+import { useEffect, useState, useMemo, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../auth/store/authStore'
 import { useModuleRegistryStore } from '../../../shared/stores/moduleRegistryStore'
 import { usersApi } from '../../settings-users/api/usersApi'
+import { salutationsApi } from '../../settings-user-fields/api/salutationsApi'
 import { usePermissionCatalog } from '../../settings-users/hooks/usePermissionCatalog'
 import { PermissionMatrixTable } from '../../settings-users/components/PermissionMatrixTable/PermissionMatrixTable'
 import { isApprovalPending } from '../../approvals/api/approvalsApi'
@@ -50,16 +51,32 @@ export function ProfilePage() {
   const [activeTab, setActiveTab] = useState<DrawerTab>('profile')
 
   // Profile Form state
+  const [salutation, setSalutation] = useState(user?.salutation || '')
   const [name, setName] = useState(user?.name || '')
   const [email, setEmail] = useState(user?.email || '')
   const [phoneNumber, setPhoneNumber] = useState(user?.phoneNumber || '')
   const [savingProfile, setSavingProfile] = useState(false)
   const [profileError, setProfileError] = useState<string | null>(null)
+  const [salutationOptions, setSalutationOptions] = useState<string[]>([])
 
   // Toast
   const [toastMessage, setToastMessage] = useState<string | null>(null)
 
   const { catalog } = usePermissionCatalog()
+
+  useEffect(() => {
+    if (!accessToken) return
+    let cancelled = false
+    salutationsApi
+      .get(accessToken)
+      .then((res) => {
+        if (!cancelled) setSalutationOptions(res.salutations)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [accessToken])
 
   if (!user) return null
 
@@ -68,6 +85,7 @@ export function ProfilePage() {
   const initials = getUserInitials(user.name)
 
   function openDrawer(tab: DrawerTab = 'profile') {
+    setSalutation(user?.salutation || '')
     setName(user?.name || '')
     setEmail(user?.email || '')
     setPhoneNumber(user?.phoneNumber || '')
@@ -111,6 +129,7 @@ export function ProfilePage() {
         phoneNumber: phoneNumber.trim() || null,
         roleId: user.roleId,
         isActive: user.isActive,
+        salutation: salutation || null,
       })
 
       if (isApprovalPending(result)) {
@@ -193,7 +212,7 @@ export function ProfilePage() {
 
           <div className={styles.identityInfo}>
             <div className={styles.nameRow}>
-              <h2 className={styles.name}>{user.name}</h2>
+              <h2 className={styles.name}>{[user.salutation, user.name].filter(Boolean).join(' ')}</h2>
               {user.isAdministrator ? (
                 <span className={styles.superAdminChip}>
                   <Icon.Crown width={13} height={13} />
@@ -233,6 +252,11 @@ export function ProfilePage() {
           </div>
 
           <div className={styles.detailsList}>
+            <div className={styles.detailRow}>
+              <span className={styles.detailLabel}>Salutation</span>
+              <span className={styles.detailValue}>{user.salutation || 'Not set'}</span>
+            </div>
+
             <div className={styles.detailRow}>
               <span className={styles.detailLabel}>Full Name</span>
               <span className={styles.detailValue}>{user.name}</span>
@@ -403,6 +427,21 @@ export function ProfilePage() {
                       <span>{profileError}</span>
                     </div>
                   )}
+
+                  <div className={styles.fieldGroup}>
+                    <label className={styles.fieldLabel}>Salutation</label>
+                    <select
+                      className={styles.selectInput}
+                      value={salutation}
+                      onChange={(e) => setSalutation(e.target.value)}
+                      disabled={savingProfile}
+                    >
+                      <option value="">-- None --</option>
+                      {salutationOptions.map((s) => (
+                        <option key={s} value={s}>{s}</option>
+                      ))}
+                    </select>
+                  </div>
 
                   <Input
                     label="Full Name"

@@ -304,6 +304,7 @@ public class AuthAppService(
 
     private static CurrentUserDto ToCurrentUserDto(User user, PermissionClaimsResult permissions) => new(
         user.Id,
+        user.Salutation,
         user.Name,
         user.Email,
         user.PhoneNumber,

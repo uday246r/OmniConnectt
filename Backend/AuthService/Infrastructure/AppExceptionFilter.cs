@@ -17,6 +17,7 @@ public class AppExceptionFilter(ILogger<AppExceptionFilter> logger) : IException
             PendingApprovalConflictException ex => (StatusCodes.Status409Conflict, ex.Message),
             ConflictAppException ex => (StatusCodes.Status409Conflict, ex.Message),
             ValidationAppException ex => (StatusCodes.Status400BadRequest, ex.Message),
+            FieldValidationException ex => (StatusCodes.Status400BadRequest, ex.Message),
             ForbiddenAppException ex => (StatusCodes.Status403Forbidden, ex.Message),
             GoneAppException ex => (StatusCodes.Status410Gone, ex.Message),
 
@@ -51,6 +52,14 @@ public class AppExceptionFilter(ILogger<AppExceptionFilter> logger) : IException
         if (context.Exception is PendingApprovalConflictException conflict)
         {
             problem.Extensions["pendingRequest"] = conflict.Pending;
+        }
+
+        // Field-level breakdown for a dynamic (admin-defined) rule violation — same idea as
+        // ValidationProblemDetails.Errors for a static data-annotation failure, but for rules the DTO's
+        // attributes can't express because they come from UserFieldSchema at runtime.
+        if (context.Exception is FieldValidationException fieldValidation)
+        {
+            problem.Extensions["fieldErrors"] = fieldValidation.Errors;
         }
 
         context.Result = new ObjectResult(problem) { StatusCode = status };

@@ -8,6 +8,7 @@ export type AuthProvider = 'Local' | 'Google'
 
 export interface CurrentUserDto {
   id: string
+  salutation: string | null
   name: string
   email: string
   phoneNumber: string | null

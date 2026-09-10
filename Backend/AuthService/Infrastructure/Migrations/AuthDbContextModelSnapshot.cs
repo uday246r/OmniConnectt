@@ -644,6 +644,30 @@ namespace AuthService.Infrastructure.Migrations
                     b.ToTable("RolePermissions");
                 });
 
+            modelBuilder.Entity("AuthService.Domain.Entities.SalutationCatalog", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("SalutationsJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("SalutationCatalogs");
+                });
+
             modelBuilder.Entity("AuthService.Domain.Entities.SetPasswordInvite", b =>
                 {
                     b.Property<Guid>("Id")
@@ -787,6 +811,9 @@ namespace AuthService.Infrastructure.Migrations
                         .HasMaxLength(320)
                         .HasColumnType("character varying(320)");
 
+                    b.Property<string>("ExtraAttributes")
+                        .HasColumnType("jsonb");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
@@ -810,6 +837,10 @@ namespace AuthService.Infrastructure.Migrations
 
                     b.Property<Guid?>("RoleId")
                         .HasColumnType("uuid");
+
+                    b.Property<string>("Salutation")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -837,6 +868,30 @@ namespace AuthService.Infrastructure.Migrations
                     b.HasIndex("Status");
 
                     b.ToTable("Users");
+                });
+
+            modelBuilder.Entity("AuthService.Domain.Entities.UserFieldSchema", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("SchemaJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("UserFieldSchemas");
                 });
 
             modelBuilder.Entity("AuthService.Domain.Entities.UserPermissionOverride", b =>
@@ -875,6 +930,30 @@ namespace AuthService.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("UserPermissionOverrides");
+                });
+
+            modelBuilder.Entity("AuthService.Domain.Entities.ValidationPresetCatalog", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("PresetsJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("ValidationPresetCatalogs");
                 });
 
             modelBuilder.Entity("AuthService.Domain.Entities.ApprovalRequest", b =>

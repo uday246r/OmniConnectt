@@ -1,4 +1,4 @@
-import { Suspense, useEffect, useState, useCallback } from 'react'
+import { Suspense, useEffect, useState, useCallback, useRef } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 import { Sidebar } from '../Sidebar/Sidebar'
 import { Topbar, type TopbarSettingsAccess } from '../Topbar/Topbar'
@@ -53,13 +53,29 @@ export function AppShell({ appHealth, userName, settingsAccess, onLogout }: AppS
    * SettingsRoute opens it when a /settings/* URL is entered; this is the other half. It covers every
    * way of leaving — the close button and backdrop (which navigate to "/"), a sidebar link, and the
    * browser Back button — with one rule instead of each exit remembering to close the store itself.
+   *
+   * An override layer (e.g. UserFormLayer for Add/Edit User) can be opened from a non-drawer page
+   * such as /settings/users or /settings/users/:id. When the route hasn't changed, that layer was
+   * explicitly requested on this page and must not be dismissed immediately. If the user navigates
+   * away to another route, the drawer closes.
    */
   const closeDrawer = useSettingsDrawerStore((s) => s.close)
+  const layerStack = useSettingsDrawerStore((s) => s.layerStack)
+  const prevPathRef = useRef(location.pathname)
+
   useEffect(() => {
-    if (!isDrawerRoute(location.pathname) && drawerOpen) {
+    const routeChanged = prevPathRef.current !== location.pathname
+    prevPathRef.current = location.pathname
+
+    if (!drawerOpen) return
+
+    const isOverrideLayer = layerStack.length > 1
+    if (isOverrideLayer && !routeChanged) return
+
+    if (!isDrawerRoute(location.pathname)) {
       closeDrawer()
     }
-  }, [location.pathname, drawerOpen, closeDrawer])
+  }, [location.pathname, drawerOpen, layerStack.length, closeDrawer])
 
   // Prevent body scroll while mobile sidebar is overlaying the content
   useEffect(() => {

@@ -132,6 +132,12 @@ public static class AuthDbSeeder
             new HostNavItem { Id = Guid.NewGuid(), Key = "host.my-requests", Label = "My Requests", IconKey = "Clock", RoutePath = "/my-requests", SectionKey = "system", SortOrder = 20, RequiredFeatureKey = null, RequiredCapability = null },
             new HostNavItem { Id = Guid.NewGuid(), Key = "host.system.audit-logs", Label = "Audit Logs", IconKey = "FileText", RoutePath = "/system/audit-logs", SectionKey = "system", SortOrder = 30, RequiredFeatureKey = HostFeatureKeys.SystemAuditLogs, RequiredCapability = "View" },
             new HostNavItem { Id = Guid.NewGuid(), Key = "host.system.system-logs", Label = "System Logs", IconKey = "Terminal", RoutePath = "/system/system-logs", SectionKey = "system", SortOrder = 40, RequiredFeatureKey = HostFeatureKeys.SystemLogs, RequiredCapability = "View" },
+            // Moved out of the Settings drawer's tab strip into real, linkable pages alongside Audit
+            // Logs — both reuse the Users feature key, same reasoning as UserSchemaController/
+            // ValidationPresetsController/SalutationsController: managing the user-creation form is
+            // part of the Users capability, not a separate permission to seed and expose in Roles.
+            new HostNavItem { Id = Guid.NewGuid(), Key = "host.settings.fields", Label = "Manage Fields", IconKey = "FileText", RoutePath = "/settings/fields", SectionKey = "system", SortOrder = 50, RequiredFeatureKey = HostFeatureKeys.SettingsUsers, RequiredCapability = "View" },
+            new HostNavItem { Id = Guid.NewGuid(), Key = "host.settings.formats", Label = "Manage Formats", IconKey = "Key", RoutePath = "/settings/formats", SectionKey = "system", SortOrder = 60, RequiredFeatureKey = HostFeatureKeys.SettingsUsers, RequiredCapability = "View" },
         };
 
         var existingItems = await db.HostNavItems.Select(h => h.Key).ToListAsync(ct);

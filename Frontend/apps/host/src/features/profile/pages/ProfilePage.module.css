@@ -735,6 +735,20 @@
   color: #334155;
 }
 
+.selectInput {
+  width: 100%;
+  padding: 9px 11px;
+  background: var(--omni-color-surface);
+  border: 1.5px solid #e2e8f0;
+  border-radius: var(--omni-radius-md);
+  font-size: var(--omni-font-size-sm);
+  color: var(--omni-color-text-primary);
+  outline: none;
+  font-family: inherit;
+}
+.selectInput:focus { border-color: var(--omni-color-primary-400, #60a5fa); }
+.selectInput:disabled { opacity: 0.6; }
+
 .readOnlyRoleBox {
   display: flex;
   align-items: center;

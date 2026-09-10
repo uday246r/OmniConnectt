@@ -59,6 +59,12 @@ const SetPasswordPage = lazy(() =>
 const MyRequestsPage = lazy(() =>
   import('./features/approvals/pages/MyRequestsPage').then((m) => ({ default: m.MyRequestsPage })),
 )
+const ManageFieldsPage = lazy(() =>
+  import('./features/settings-user-fields/pages/ManageFieldsPage').then((m) => ({ default: m.ManageFieldsPage })),
+)
+const ManageFormatsPage = lazy(() =>
+  import('./features/settings-user-fields/pages/ManageFormatsPage').then((m) => ({ default: m.ManageFormatsPage })),
+)
 
 const SystemLogsPage = lazy(() => import('./features/system-logs/pages/SystemLogsPage').then((m) => ({ default: m.SystemLogsPage })))
 
@@ -71,6 +77,10 @@ const FEATURE_KEYS = {
   systemLogs: 'host.system.system-logs',
   approvals: 'host.system.approvals',
   checkerAssignment: 'host.system.checker-assignment',
+  // Reuses the Users feature key — managing which fields the Create/Edit User form collects is part
+  // of the same Users capability, not a separate permission (see UserSchemaController's own gating).
+  fields: 'host.settings.users',
+  formats: 'host.settings.users',
 } as const
 
 /**
@@ -590,6 +600,26 @@ function AppRoutes() {
                 }
               />
             </Route>
+
+            {/* Real pages, not drawer tabs — same reasoning as Users above. No /new or /:id: both
+                screens edit everything inline (a modal per field/format), so there's nothing a
+                sub-route would ever need to address. */}
+            <Route
+              path="fields"
+              element={
+                <RequireCapability featureKey={FEATURE_KEYS.fields}>
+                  <ManageFieldsPage />
+                </RequireCapability>
+              }
+            />
+            <Route
+              path="formats"
+              element={
+                <RequireCapability featureKey={FEATURE_KEYS.formats}>
+                  <ManageFormatsPage />
+                </RequireCapability>
+              }
+            />
 
             {(
               [

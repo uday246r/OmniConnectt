@@ -21,6 +21,7 @@ public record SetPasswordRequest(
 
 public record CurrentUserDto(
     Guid Id,
+    string? Salutation,
     string Name,
     string Email,
     string? PhoneNumber,

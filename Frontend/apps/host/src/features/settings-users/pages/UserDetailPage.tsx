@@ -8,6 +8,8 @@ import { ApiError } from '../../../shared/api/httpClient'
 import { Icon } from '../../../shared/components/Icon/Icon'
 import { toast } from '../../../shared/stores/toastStore'
 import { usersApi, type UserDetailDto } from '../api/usersApi'
+import { userSchemaApi } from '../../settings-user-fields/api/userSchemaApi'
+import type { FieldDefinition } from '@omniremit/ui/validation'
 import { rolesApi, type RoleDetailDto } from '../../settings-roles/api/rolesApi'
 import { isApprovalPending } from '../../approvals/api/approvalsApi'
 import { asPendingApprovalConflict, type PendingApprovalConflict } from '../../approvals/pendingConflict'
@@ -70,6 +72,9 @@ export function UserDetailPage() {
 
   const [detail, setDetail] = useState<UserDetailDto | null>(null)
   const [roleDetail, setRoleDetail] = useState<RoleDetailDto | null>(null)
+  // Labels for any admin-defined custom field (Aadhar Number, etc.) so the Profile tab can show them
+  // by name rather than raw dict keys — detail.customFields only carries fieldKey -> value.
+  const [customFieldDefs, setCustomFieldDefs] = useState<FieldDefinition[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [tab, setTab] = useState<DetailTab>('profile')
@@ -127,6 +132,23 @@ export function UserDetailPage() {
       cancelled = true
     }
   }, [accessToken, id, dataRevision])
+
+  useEffect(() => {
+    if (!accessToken) return
+    let cancelled = false
+    userSchemaApi
+      .get(accessToken)
+      .then((res) => {
+        if (cancelled) return
+        setCustomFieldDefs(res.fields.filter((f) => !f.core).sort((a, b) => a.order - b.order))
+      })
+      .catch(() => {
+        if (!cancelled) setCustomFieldDefs([])
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [accessToken])
 
   // A bounded pool (200), not this user's whole history — matching the Users list. Actor and date
   // range are narrow enough to push to the server; action/result/entity refine further client-side,
@@ -447,7 +469,7 @@ export function UserDetailPage() {
     <div className={styles.page}>
       <PageHeader
         icon={<Icon.User width={22} height={22} />}
-        title={detail.name}
+        title={[detail.salutation, detail.name].filter(Boolean).join(' ')}
         subtitle={detail.email}
         pill={
           <>
@@ -512,12 +534,24 @@ export function UserDetailPage() {
         <DetailSections>
           <DetailSection title="Identity">
             <DetailGrid>
+              <DetailField label="Salutation">{detail.salutation || EMPTY_VALUE}</DetailField>
               <DetailField label="Full Name" icon={<Icon.User width={15} height={15} />}>{detail.name}</DetailField>
               <DetailField label="Email" icon={<Icon.Mail width={15} height={15} />}>{detail.email}</DetailField>
               <DetailField label="Phone" mono>{detail.phoneNumber}</DetailField>
               <DetailField label="Auth Provider">{detail.authProvider}</DetailField>
             </DetailGrid>
           </DetailSection>
+          {customFieldDefs.length > 0 && (
+            <DetailSection title="Custom Fields">
+              <DetailGrid>
+                {customFieldDefs.map((f) => (
+                  <DetailField key={f.key} label={f.label}>
+                    {detail.customFields?.[f.key] || EMPTY_VALUE}
+                  </DetailField>
+                ))}
+              </DetailGrid>
+            </DetailSection>
+          )}
           <DetailSection title="Access">
             <DetailGrid>
               <DetailField label="Role" icon={<Icon.ShieldCheck width={15} height={15} />}>{detail.roleName ?? (detail.isAdministrator ? 'Administrator' : 'No Role')}</DetailField>

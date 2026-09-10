@@ -5,6 +5,7 @@ using AuthService.Domain.Entities;
 using AuthService.Domain.Enums;
 using AuthService.Infrastructure;
 using AuthService.Infrastructure.Security;
+using AuthService.Infrastructure.Validation;
 using Microsoft.EntityFrameworkCore;
 
 namespace AuthService.Application.Services;
@@ -12,7 +13,9 @@ namespace AuthService.Application.Services;
 public class UserAppService(
     AuthDbContext db, PasswordHasher passwordHasher, AuditLogAppService auditLog,
     IHttpContextAccessor httpContextAccessor, ApprovalGatingService gating,
-    SetPasswordInviteService invites, FineCapabilityService fineCapabilities)
+    SetPasswordInviteService invites, FineCapabilityService fineCapabilities,
+    UserFieldSchemaAppService fieldSchema, UserSchemaValidator schemaValidator,
+    ValidationPresetAppService validationPresets, SalutationAppService salutations)
 {
     private const string ServiceName = "AuthService";
 
@@ -127,6 +130,14 @@ public class UserAppService(
             throw new ValidationAppException($"Unknown authentication provider '{request.AuthProvider}'.");
         }
 
+        // Re-validates Name/Email/PhoneNumber against any extra rules an admin has layered onto them
+        // via UserFieldSchema, and every custom field — must happen before the Maker-Checker gate below
+        // (a request doomed to fail must never be submitted for approval), same reasoning as every
+        // other check above it.
+        var extraAttributesJson = await ValidateAndBuildExtraAttributesAsync(
+            request.Name.Trim(), email, request.PhoneNumber?.Trim(), request.CustomFields, ct);
+        var salutation = await ValidateSalutationAsync(request.Salutation, ct);
+
         await EnsureMayAssignRoleAsync(request.RoleId, actingUserId, ct);
 
         /*
@@ -147,7 +158,7 @@ public class UserAppService(
                 : await db.Roles.AsNoTracking().Where(r => r.Id == request.RoleId).Select(r => r.Name).FirstOrDefaultAsync(ct);
             var newSnapshot = new UserSnapshotDto(
                 request.Name.Trim(), email, request.PhoneNumber?.Trim(), request.RoleId, newRoleName,
-                request.IsActive, overrides, request.AuthProvider);
+                request.IsActive, overrides, request.AuthProvider, request.CustomFields, salutation);
             var pending = await gating.SubmitAsync(
                 ApprovalModuleKeys.Users, ApprovalActionKeys.Create, "User", null, request.Name.Trim(),
                 null, JsonSerializer.Serialize(newSnapshot), actingUserId.Value, ct,
@@ -165,9 +176,11 @@ public class UserAppService(
         var user = new User
         {
             Id = Guid.NewGuid(),
+            Salutation = salutation,
             Name = request.Name.Trim(),
             Email = email,
             PhoneNumber = request.PhoneNumber?.Trim(),
+            ExtraAttributes = extraAttributesJson,
             AuthProvider = authProvider,
             Status = request.IsActive ? UserStatus.Active : UserStatus.Inactive,
             RoleId = request.RoleId,
@@ -283,6 +296,21 @@ public class UserAppService(
             }
         }
 
+        // Re-validates Name/Email/PhoneNumber against any extra rules an admin has layered onto them
+        // via UserFieldSchema, and every custom field — must happen before the Maker-Checker gate
+        // below, same reasoning as CreateAsync.
+        //
+        // CustomFields is nullable, distinct from an empty dictionary, the same way Overrides is
+        // elsewhere in this file: null means this submission never touched custom fields at all (e.g.
+        // ProfilePage's self-service edit, which has no custom-field UI) and the existing values must
+        // survive untouched; an explicit dictionary — even {} — is the full replacement set. Collapsing
+        // "didn't touch custom fields" to "wipe them" would silently erase e.g. Aadhar Number the first
+        // time a user edited their own name from Profile.
+        var customFieldsForValidation = request.CustomFields ?? DeserializeExtraAttributes(user.ExtraAttributes);
+        var extraAttributesJson = await ValidateAndBuildExtraAttributesAsync(
+            request.Name.Trim(), email, request.PhoneNumber?.Trim(), customFieldsForValidation, ct);
+        var salutation = await ValidateSalutationAsync(request.Salutation, ct);
+
         await gating.EnsureActorIdentifiedAsync(ApprovalModuleKeys.Users, actingUserId, ct);
 
         if (!bypassApproval && actingUserId is not null && await gating.IsGatedAsync(ApprovalModuleKeys.Users, ct))
@@ -290,22 +318,25 @@ public class UserAppService(
             var existingOverrides = await LoadOverridesAsync(id, ct);
             var oldSnapshot = new UserSnapshotDto(
                 user.Name, user.Email, user.PhoneNumber, user.RoleId, user.Role?.Name,
-                user.Status == UserStatus.Active, existingOverrides);
+                user.Status == UserStatus.Active, existingOverrides,
+                CustomFields: DeserializeExtraAttributes(user.ExtraAttributes), Salutation: user.Salutation);
             var newRoleName = request.RoleId is null
                 ? null
                 : await db.Roles.AsNoTracking().Where(r => r.Id == request.RoleId).Select(r => r.Name).FirstOrDefaultAsync(ct);
             var newSnapshot = new UserSnapshotDto(
                 request.Name.Trim(), email, request.PhoneNumber?.Trim(), request.RoleId, newRoleName,
-                request.IsActive, overrides);
+                request.IsActive, overrides, CustomFields: customFieldsForValidation, Salutation: salutation);
             var pending = await gating.SubmitAsync(
                 ApprovalModuleKeys.Users, ApprovalActionKeys.Update, "User", id.ToString(), user.Name,
                 JsonSerializer.Serialize(oldSnapshot), JsonSerializer.Serialize(newSnapshot), actingUserId.Value, ct);
             return MutationResult<UserDetailDto>.PendingApproval(pending);
         }
 
+        user.Salutation = salutation;
         user.Name = request.Name.Trim();
         user.Email = email;
         user.PhoneNumber = request.PhoneNumber?.Trim();
+        user.ExtraAttributes = extraAttributesJson;
         user.RoleId = request.RoleId;
 
         /*
@@ -597,6 +628,80 @@ public class UserAppService(
         return await LoadOverridesAsync(userId, ct);
     }
 
+    /// <summary>
+    /// Validates request.Name/Email/PhoneNumber against any EXTRA rules the admin has layered onto
+    /// those core fields via UserFieldSchema (on top of the fixed required/max-length floor the DTO's
+    /// data annotations already enforce), validates every submitted custom field, and returns the
+    /// filtered custom-field JSON to store in User.ExtraAttributes. A key in <paramref name="customFields"/>
+    /// that isn't a currently-defined, non-core field is silently dropped rather than stored — an admin
+    /// removing a custom field from the schema must not resurrect it the next time someone edits an
+    /// unrelated user whose form still had the old value cached.
+    /// </summary>
+    private async Task<string?> ValidateAndBuildExtraAttributesAsync(
+        string name, string email, string? phoneNumber,
+        IReadOnlyDictionary<string, string>? customFields, CancellationToken ct)
+    {
+        var fields = await fieldSchema.GetFieldsAsync(ct);
+        var customPresets = await validationPresets.GetPresetsAsync(ct);
+
+        var values = new Dictionary<string, string?>
+        {
+            ["name"] = name,
+            ["email"] = email,
+            ["phoneNumber"] = phoneNumber,
+        };
+
+        var allowedCustomKeys = fields.Where(f => !f.Core).Select(f => f.Key).ToHashSet();
+        var extraAttributes = new Dictionary<string, string>();
+        if (customFields is not null)
+        {
+            foreach (var (key, value) in customFields)
+            {
+                if (!allowedCustomKeys.Contains(key))
+                {
+                    continue;
+                }
+
+                values[key] = value;
+                if (!string.IsNullOrWhiteSpace(value))
+                {
+                    extraAttributes[key] = value.Trim();
+                }
+            }
+        }
+
+        var errors = schemaValidator.Validate(fields, values, customPresets);
+        if (errors.Count > 0)
+        {
+            throw new FieldValidationException(errors);
+        }
+
+        return extraAttributes.Count > 0 ? JsonSerializer.Serialize(extraAttributes) : null;
+    }
+
+    /// <summary>Null/empty is always fine (Salutation is optional); a non-empty value must match one of
+    /// the admin-configured SalutationCatalog entries — a stray value from a stale client must not be
+    /// able to introduce a title the catalog no longer offers.</summary>
+    private async Task<string?> ValidateSalutationAsync(string? salutation, CancellationToken ct)
+    {
+        var trimmed = salutation?.Trim();
+        if (string.IsNullOrEmpty(trimmed))
+        {
+            return null;
+        }
+
+        var allowed = await salutations.GetSalutationsAsync(ct);
+        if (!allowed.Contains(trimmed, StringComparer.Ordinal))
+        {
+            throw new ValidationAppException($"'{trimmed}' is not a recognised salutation.");
+        }
+
+        return trimmed;
+    }
+
+    private static IReadOnlyDictionary<string, string>? DeserializeExtraAttributes(string? json) =>
+        string.IsNullOrEmpty(json) ? null : JsonSerializer.Deserialize<Dictionary<string, string>>(json);
+
     private Task<User?> FindWithRoleAsync(Guid id, CancellationToken ct) =>
         db.Users.Include(u => u.Role).FirstOrDefaultAsync(u => u.Id == id, ct);
 
@@ -609,13 +714,14 @@ public class UserAppService(
             .ToListAsync(ct);
 
     private static UserListItemDto ToListItemDto(User u) => new(
-        u.Id, u.Name, u.Email, u.PhoneNumber, u.RoleId, u.Role?.Name,
+        u.Id, u.Salutation, u.Name, u.Email, u.PhoneNumber, u.RoleId, u.Role?.Name,
         u.Role != null && u.Role.IsAdministrator, u.Status == UserStatus.Active, u.LastLoginAt, u.AuthProvider.ToString());
 
     private static UserDetailDto ToDetailDto(User u, IReadOnlyList<PermissionOverrideDto> overrides) => new(
-        u.Id, u.Name, u.Email, u.PhoneNumber, u.RoleId, u.Role?.Name,
+        u.Id, u.Salutation, u.Name, u.Email, u.PhoneNumber, u.RoleId, u.Role?.Name,
         u.Role != null && u.Role.IsAdministrator, u.Status == UserStatus.Active, u.MustChangePassword,
-        u.LastLoginAt, u.CreatedAt, u.UpdatedAt, overrides, u.AuthProvider.ToString());
+        u.LastLoginAt, u.CreatedAt, u.UpdatedAt, overrides, u.AuthProvider.ToString(),
+        DeserializeExtraAttributes(u.ExtraAttributes));
 
     private static NotFoundAppException NotFound(Guid id) => new($"User '{id}' was not found.");
 }

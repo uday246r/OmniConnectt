@@ -357,7 +357,8 @@ public class ApprovalAppService(
                 var createSnapshot = JsonSerializer.Deserialize<UserSnapshotDto>(request.NewDataJson)!;
                 var createUser = new CreateUserRequest(
                     createSnapshot.Name, createSnapshot.Email, createSnapshot.PhoneNumber ?? "",
-                    createSnapshot.RoleId, createSnapshot.IsActive, createSnapshot.AuthProvider ?? "Local");
+                    createSnapshot.RoleId, createSnapshot.IsActive, createSnapshot.AuthProvider ?? "Local",
+                    createSnapshot.CustomFields, createSnapshot.Salutation);
                 var createResult = await userAppService.CreateAsync(createUser, createSnapshot.Overrides, request.MakerId, ct, bypassApproval: true);
                 // Applied is always non-null here — bypassApproval:true means CreateAsync cannot take
                 // the gated branch. The password itself is null for a Google account, which has no
@@ -383,7 +384,8 @@ public class ApprovalAppService(
                     var updateSnapshot = JsonSerializer.Deserialize<UserSnapshotDto>(request.NewDataJson)!;
                     var updateUser = new UpdateUserRequest(
                         updateSnapshot.Name, updateSnapshot.Email, updateSnapshot.PhoneNumber ?? "",
-                        updateSnapshot.RoleId, updateSnapshot.IsActive);
+                        updateSnapshot.RoleId, updateSnapshot.IsActive, updateSnapshot.CustomFields,
+                        updateSnapshot.Salutation);
                     await userAppService.UpdateAsync(Guid.Parse(request.EntityId!), updateUser, updateSnapshot.Overrides, request.MakerId, ct, bypassApproval: true);
                 }
                 break;

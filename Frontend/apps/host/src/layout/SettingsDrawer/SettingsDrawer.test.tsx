@@ -16,6 +16,13 @@ vi.mock('./SettingsApplicationsTab', () => ({
 vi.mock('./SettingsCheckerAssignmentTab', () => ({
   SettingsCheckerAssignmentTab: () => <div data-testid="checker-tab">Checker Assignment Tab Content</div>,
 }))
+vi.mock('./UserFormLayer', () => ({
+  UserFormLayer: ({ userId }: { userId?: string }) => (
+    <div data-testid="user-form-layer">
+      User Form Content: {userId ? `Editing ${userId}` : 'Creating New User'}
+    </div>
+  ),
+}))
 
 function LocationTracker() {
   const location = useLocation()
@@ -163,5 +170,78 @@ describe('SettingsDrawer close button and backdrop click', () => {
 
     expect(useSettingsDrawerStore.getState().isOpen).toBe(false)
     expect(screen.getByTestId('current-location')).toHaveTextContent('/')
+  })
+})
+
+describe('SettingsDrawer user-form override layer and popLayer', () => {
+  beforeEach(() => {
+    sessionStorage.clear()
+    useAuthStore.setState({
+      user: {
+        id: 'admin-1',
+        name: 'Super Admin',
+        email: 'admin@omniremit.com',
+        isAdministrator: true,
+      },
+      status: 'authenticated',
+    })
+  })
+
+  it('renders user-form layer for Add User when pushed', () => {
+    useSettingsDrawerStore.setState({
+      isOpen: true,
+      activeTab: 'users',
+      layerStack: [{ type: 'root', tab: 'users' }, { type: 'user-form' }],
+      returnPath: '/settings/users',
+    })
+
+    renderDrawer('/settings/users')
+
+    expect(screen.getByTestId('user-form-layer')).toHaveTextContent('Creating New User')
+  })
+
+  it('renders user-form layer with userId for Edit User when pushed', () => {
+    useSettingsDrawerStore.setState({
+      isOpen: true,
+      activeTab: 'users',
+      layerStack: [{ type: 'root', tab: 'users' }, { type: 'user-form', userId: 'user-456' }],
+      returnPath: '/settings/users/user-456',
+    })
+
+    renderDrawer('/settings/users/user-456')
+
+    expect(screen.getByTestId('user-form-layer')).toHaveTextContent('Editing user-456')
+  })
+
+  it('closes drawer on Escape when user-form is active', async () => {
+    useSettingsDrawerStore.setState({
+      isOpen: true,
+      activeTab: 'users',
+      layerStack: [{ type: 'root', tab: 'users' }, { type: 'user-form' }],
+      returnPath: '/settings/users',
+    })
+
+    const user = userEvent.setup()
+    renderDrawer('/settings/users')
+
+    expect(screen.getByTestId('user-form-layer')).toBeInTheDocument()
+
+    await user.keyboard('{Escape}')
+
+    expect(useSettingsDrawerStore.getState().isOpen).toBe(false)
+  })
+
+  it('popLayer safely closes drawer when popping user-form down to users root', () => {
+    useSettingsDrawerStore.setState({
+      isOpen: true,
+      activeTab: 'users',
+      layerStack: [{ type: 'root', tab: 'users' }, { type: 'user-form' }],
+      returnPath: '/settings/users',
+    })
+
+    useSettingsDrawerStore.getState().popLayer()
+
+    // Since root tab is 'users' (which has no drawer panel), drawer should close rather than render empty
+    expect(useSettingsDrawerStore.getState().isOpen).toBe(false)
   })
 })

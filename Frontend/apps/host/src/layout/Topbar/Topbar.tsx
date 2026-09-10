@@ -58,6 +58,9 @@ export function Topbar({ userName, settingsAccess, onLogout, onMobileMenuToggle 
     settingsAccess?.users || settingsAccess?.roles || settingsAccess?.applications
   )
   const displayName = userName || user?.name || '—'
+  // Salutation prefixes the rendered text only — initials (getUserInitials(userName) below) stay
+  // derived from the plain name, or "Mr. John Doe" would initial to "MJ" instead of "JD".
+  const fullDisplayName = [user?.salutation, displayName].filter(Boolean).join(' ')
 
   return (
     <header className={styles.topbar}>
@@ -123,7 +126,7 @@ export function Topbar({ userName, settingsAccess, onLogout, onMobileMenuToggle 
             <span className={styles.avatar} aria-hidden="true">
               {getUserInitials(userName)}
             </span>
-            <span className={styles.userName}>{displayName}</span>
+            <span className={styles.userName}>{fullDisplayName}</span>
             <Icon.ChevronDown width={13} height={13} className={styles.userChevron} />
           </button>
 
@@ -136,7 +139,7 @@ export function Topbar({ userName, settingsAccess, onLogout, onMobileMenuToggle 
                   {getUserInitials(userName)}
                 </span>
                 <div className={styles.menuUserHeaderInfo}>
-                  <span className={styles.menuUserHeaderName}>{displayName}</span>
+                  <span className={styles.menuUserHeaderName}>{fullDisplayName}</span>
                   {/*
                     The user's ACTUAL role. This was the literal string "Platform Administrator" for
                     everyone — a View-only teller opened this menu and was told they were a platform

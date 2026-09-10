@@ -22,6 +22,9 @@ public class AuthDbContext(DbContextOptions<AuthDbContext> options) : DbContext(
     public DbSet<RemoteAppNavMetadata> RemoteAppNavMetadata => Set<RemoteAppNavMetadata>();
     public DbSet<NavSection> NavSections => Set<NavSection>();
     public DbSet<HostNavItem> HostNavItems => Set<HostNavItem>();
+    public DbSet<UserFieldSchema> UserFieldSchemas => Set<UserFieldSchema>();
+    public DbSet<ValidationPresetCatalog> ValidationPresetCatalogs => Set<ValidationPresetCatalog>();
+    public DbSet<SalutationCatalog> SalutationCatalogs => Set<SalutationCatalog>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -44,10 +47,12 @@ public class AuthDbContext(DbContextOptions<AuthDbContext> options) : DbContext(
             // undo it.
             entity.HasIndex(u => u.Email).IsUnique().HasFilter("\"IsDeleted\" = false");
             entity.Property(u => u.Name).HasMaxLength(200);
+            entity.Property(u => u.Salutation).HasMaxLength(20);
             entity.Property(u => u.Email).HasMaxLength(320);
             entity.Property(u => u.PhoneNumber).HasMaxLength(32);
             entity.Property(u => u.Status).HasConversion<string>().HasMaxLength(20);
             entity.Property(u => u.AuthProvider).HasConversion<string>().HasMaxLength(20);
+            entity.Property(u => u.ExtraAttributes).HasColumnType("jsonb");
 
             entity.HasOne(u => u.Role)
                 .WithMany(r => r.Users)
@@ -66,6 +71,21 @@ public class AuthDbContext(DbContextOptions<AuthDbContext> options) : DbContext(
             // IsDeleted is appended to EVERY Users query by the global filter above, so it is the
             // single most-touched predicate in this service.
             entity.HasIndex(u => u.IsDeleted);
+        });
+
+        modelBuilder.Entity<UserFieldSchema>(entity =>
+        {
+            entity.Property(s => s.SchemaJson).HasColumnType("jsonb");
+        });
+
+        modelBuilder.Entity<ValidationPresetCatalog>(entity =>
+        {
+            entity.Property(c => c.PresetsJson).HasColumnType("jsonb");
+        });
+
+        modelBuilder.Entity<SalutationCatalog>(entity =>
+        {
+            entity.Property(c => c.SalutationsJson).HasColumnType("jsonb");
         });
 
         modelBuilder.Entity<PermissionFeature>(entity =>

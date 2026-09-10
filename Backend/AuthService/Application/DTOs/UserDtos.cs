@@ -4,6 +4,7 @@ namespace AuthService.Application.DTOs;
 
 public record UserListItemDto(
     Guid Id,
+    string? Salutation,
     string Name,
     string Email,
     string? PhoneNumber,
@@ -18,6 +19,7 @@ public record PermissionOverrideDto(string FeatureKey, string Capability, string
 
 public record UserDetailDto(
     Guid Id,
+    string? Salutation,
     string Name,
     string Email,
     string? PhoneNumber,
@@ -30,7 +32,8 @@ public record UserDetailDto(
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
     IReadOnlyList<PermissionOverrideDto> PermissionOverrides,
-    string AuthProvider);
+    string AuthProvider,
+    IReadOnlyDictionary<string, string>? CustomFields = null);
 
 /*
  * Field validation lives here as data annotations, so [ApiController] rejects a bad request with a 400
@@ -69,7 +72,19 @@ public record CreateUserRequest(
 
     Guid? RoleId,
     bool IsActive = true,
-    string AuthProvider = "Local");
+    string AuthProvider = "Local",
+
+    /// <summary>
+    /// Values for admin-defined custom fields from the current UserFieldSchema (e.g. "aadharNumber") —
+    /// never Name/Email/PhoneNumber, which stay the typed properties above. Any key here that isn't a
+    /// currently-defined, non-core field is silently dropped rather than stored — see
+    /// UserAppService.ValidateAndBuildExtraAttributesAsync.
+    /// </summary>
+    IReadOnlyDictionary<string, string>? CustomFields = null,
+
+    /// <summary>Title/salutation (Mr., Ms., ...) — must match an entry in the current SalutationCatalog
+    /// if provided; null/empty is always allowed (optional field).</summary>
+    string? Salutation = null);
 
 /// <summary>Null for Google-provisioned accounts — there's no local password to hand back.</summary>
 /// <summary>
@@ -108,7 +123,13 @@ public record UpdateUserRequest(
     /// Defaults to true so an older client that omits the field cannot accidentally deactivate the
     /// account it is editing.
     /// </summary>
-    bool IsActive = true);
+    bool IsActive = true,
+
+    /// <summary>Same as CreateUserRequest.CustomFields.</summary>
+    IReadOnlyDictionary<string, string>? CustomFields = null,
+
+    /// <summary>Same as CreateUserRequest.Salutation.</summary>
+    string? Salutation = null);
 
 public record UpdateUserStatusRequest(bool IsActive);
 
@@ -149,4 +170,5 @@ public record CreateUserWithOverridesRequest(
 /// either snapshot silently turns every "didn't touch overrides" edit into a full wipe once it replays.
 public record UserSnapshotDto(
     string Name, string Email, string? PhoneNumber, Guid? RoleId, string? RoleName, bool IsActive,
-    IReadOnlyList<PermissionOverrideDto>? Overrides, string? AuthProvider = null);
+    IReadOnlyList<PermissionOverrideDto>? Overrides, string? AuthProvider = null,
+    IReadOnlyDictionary<string, string>? CustomFields = null, string? Salutation = null);

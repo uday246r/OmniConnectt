@@ -111,8 +111,12 @@ export const useSettingsDrawerStore = create<SettingsDrawerState>((set, get) => 
       }
       const newStack = state.layerStack.slice(0, -1)
       const top = newStack[newStack.length - 1]
+      const shouldClose =
+        top.type === 'root' &&
+        (top.tab === 'users' || (typeof window !== 'undefined' && !isDrawerRoute(window.location.pathname)))
       return {
-        layerStack: newStack,
+        isOpen: !shouldClose,
+        layerStack: shouldClose ? [{ type: 'root', tab: state.activeTab }] : newStack,
         activeTab: top.type === 'root' && top.tab ? top.tab : state.activeTab,
       }
     })
