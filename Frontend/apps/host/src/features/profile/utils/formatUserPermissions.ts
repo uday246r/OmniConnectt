@@ -1,5 +1,5 @@
 import type { PermissionFeatureDto } from '../../../shared/api/permissionsApi'
-import type { SidebarAppDto } from '../../../shared/api/moduleRegistryClient'
+import type { HealthEntryDto } from '../../settings-applications/api/remoteAppsApi'
 
 export type CapabilityTone =
   | 'view'
@@ -320,7 +320,7 @@ export function resolveVerbTone(verb: string): CapabilityTone {
 export function formatSinglePermission(
   rawPermission: string,
   catalog?: PermissionFeatureDto[],
-  registryApps?: SidebarAppDto[],
+  registryApps?: HealthEntryDto[],
 ): FormattedCapability {
   const [featureKey = '', capabilityKey = ''] = rawPermission.split(':')
   const isHost = featureKey.startsWith('host.') || featureKey === 'host'
@@ -460,7 +460,7 @@ export function formatSinglePermission(
 export function groupPermissionsByApp(
   permissions: string[],
   catalog?: PermissionFeatureDto[],
-  registryApps?: SidebarAppDto[],
+  registryApps?: HealthEntryDto[],
 ): AppPermissionGroup[] {
   if (!permissions || permissions.length === 0) return []
 

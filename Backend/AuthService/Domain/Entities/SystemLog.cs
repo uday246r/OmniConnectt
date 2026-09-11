@@ -12,7 +12,7 @@ public class SystemLog
     /// <summary>"Trace", "Debug", "Info", "Warning", "Error", "Critical"</summary>
     public required string Severity { get; set; }
 
-    /// <summary>Which service recorded this — "AuthService", "ModuleRegistry", etc.</summary>
+    /// <summary>Which service recorded this — "AuthService", "LeadService", etc.</summary>
     public required string ServiceName { get; set; }
 
     /// <summary>e.g. "TokenRefresh", "HealthCheck", "Database"</summary>

@@ -1,8 +1,16 @@
 # Adding a New Remote App
 
 How to stand up a new micro-frontend on OmniRemit without colliding with the host or any existing
-remote. Read this end to end before copying `Frontend/apps/employee_mf` — most of the steps exist
-because of a collision that has actually happened here.
+remote. Most of the steps exist because of a collision that has actually happened here.
+
+> ⚠️ **This document names files that no longer exist.** It was written against an
+> `employee_mf` / `EmployeeService` pair that has since been removed, and against a separate
+> `ModuleRegistry` service whose job now lives inside AuthService. Copy
+> **`Frontend/apps/customer360_mf`** (or `lead_mf`) instead — both are current, both are `.tsx`, and
+> both already follow the contract below. Wherever the text says ModuleRegistry fetches a remote's
+> `GET /permissions`, that is AuthService doing it now; nothing about the contract a remote must meet
+> has changed. The condensed, current version of that contract is in
+> [README.md](../README.md#contract-for-future-remote-apps).
 
 The host never needs rebuilding or redeploying to gain a new app. Everything below ends at an
 administrator pasting two URLs into **Setup → Applications**.

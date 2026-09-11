@@ -84,7 +84,7 @@ public class SystemLogAppServiceTests : IDisposable
     {
         await service.WriteAsync(new RecordSystemLogRequest("Error", "AuthService", "ERR_1", "Message 1"));
         await service.WriteAsync(new RecordSystemLogRequest("Warning", "AuthService", "WARN_1", "Message 2"));
-        await service.WriteAsync(new RecordSystemLogRequest("Info", "ModuleRegistry", "INFO_1", "Message 3"));
+        await service.WriteAsync(new RecordSystemLogRequest("Info", "LeadService", "INFO_1", "Message 3"));
 
         var errors = await service.ListAsync(1, 10, severity: "Error");
         Assert.Equal(1, errors.Total);
@@ -93,9 +93,9 @@ public class SystemLogAppServiceTests : IDisposable
         var authLogs = await service.ListAsync(1, 10, service: "AuthService");
         Assert.Equal(2, authLogs.Total);
 
-        var registryLogs = await service.ListAsync(1, 10, service: "ModuleRegistry");
-        Assert.Equal(1, registryLogs.Total);
-        Assert.Equal("INFO_1", registryLogs.Items[0].EventCode);
+        var leadLogs = await service.ListAsync(1, 10, service: "LeadService");
+        Assert.Equal(1, leadLogs.Total);
+        Assert.Equal("INFO_1", leadLogs.Items[0].EventCode);
     }
 
     [Fact]

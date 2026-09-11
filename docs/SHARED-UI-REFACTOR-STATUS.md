@@ -161,7 +161,7 @@ credentials.
 
 ## 4. Also changed (backend, unrelated to CSS)
 
-`AuthService`, `ModuleRegistry`, `Customer360Service` `Program.cs` — startup migration/seed is now
+`AuthService`, `Customer360Service` `Program.cs` — startup migration/seed is now
 wrapped in try/catch and logged, matching what `LeadService` already did. Previously an unreachable
 database (Azure firewall 40615, serverless auto-pause 40613) let the exception escape `Main` and
 killed the process, contradicting the stated design that each service boots and serves `/health`

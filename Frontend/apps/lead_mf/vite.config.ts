@@ -27,7 +27,7 @@ export default defineConfig(({ mode }) => {
     },
 
     server: {
-      // `true`, not the string '0.0.0.0': the string binds the IPv4 wildcard ONLY. ModuleRegistry's
+      // `true`, not the string '0.0.0.0': the string binds the IPv4 wildcard ONLY. AuthService's
       // background health prober is a .NET HttpClient resolving "localhost", which on this platform
       // sometimes tries ::1 first — with no IPv6 listener that attempt is refused, and if the IPv4
       // fallback doesn't complete inside the prober's 5s timeout the app flaps to "Unreachable" even
@@ -40,7 +40,7 @@ export default defineConfig(({ mode }) => {
     },
 
     preview: {
-      // `true`, not the string '0.0.0.0': the string binds the IPv4 wildcard ONLY. ModuleRegistry's
+      // `true`, not the string '0.0.0.0': the string binds the IPv4 wildcard ONLY. AuthService's
       // background health prober is a .NET HttpClient resolving "localhost", which on this platform
       // sometimes tries ::1 first — with no IPv6 listener that attempt is refused, and if the IPv4
       // fallback doesn't complete inside the prober's 5s timeout the app flaps to "Unreachable" even

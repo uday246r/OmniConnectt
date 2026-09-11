@@ -24,16 +24,6 @@
       "port": 5155
     },
     {
-      "name": "registry-dev",
-      "runtimeExecutable": "dotnet",
-      "runtimeArgs": [
-        "run",
-        "--project",
-        "Backend/ModuleRegistry"
-      ],
-      "port": 5200
-    },
-    {
       "name": "lead-service-dev",
       "runtimeExecutable": "dotnet",
       "runtimeArgs": [

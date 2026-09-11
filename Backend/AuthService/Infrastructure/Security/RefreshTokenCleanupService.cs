@@ -8,7 +8,7 @@ namespace AuthService.Infrastructure.Security;
 /// Periodically deletes refresh tokens that are past their retention window.
 /// <para>
 /// Nothing removed these rows before: every login and every rotation inserted one, and the table grew
-/// monotonically forever. Follows the same shape as ModuleRegistry's health probe — singleton service
+/// monotonically forever. Follows the same shape as the remote-app health probe — singleton service
 /// resolving a scoped DbContext per sweep, cancellation-guarded delays, and a broad catch so one bad
 /// sweep never takes the service down.
 /// </para>

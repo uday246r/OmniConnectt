@@ -6,9 +6,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 OmniRemit is an enterprise micro-frontend platform: a central **host** React app that authenticated
 users land in, which dynamically loads independently-deployed **remote** micro-frontends at runtime
-from a database-backed module registry — no remote is ever hard-coded into the host's build. Four
-.NET 10 backend services, one SQL Server database each; a pnpm-workspace frontend (host + two remotes
-+ a shared component library). Full architecture: [README.md](README.md). Local setup runbook (DB
+from a database-backed registry — no remote is ever hard-coded into the host's build. Three .NET 10
+backend services, one PostgreSQL database each; a pnpm-workspace frontend (host + two remotes + a
+shared component library). Full architecture: [README.md](README.md). Local setup runbook (DB
 provisioning, `.env` files, RS256 keys, first sign-in): [SETUP.md](SETUP.md) — do not re-derive that
 from scratch, follow it.
 
@@ -17,11 +17,16 @@ Frontend/apps/host              shell — login, sidebar, settings, approvals, a
 Frontend/apps/lead_mf            Lead Management remote (5002)
 Frontend/apps/customer360_mf     Customer 360 remote (5003)
 Frontend/packages/ui             @omniremit/ui — shared component library, workspace:* dep, NOT a Module Federation share
-Backend/AuthService               users/roles/permissions/JWT/maker-checker/audit hub (5155)
-Backend/ModuleRegistry             remote-app registry, health probing, sidebar feed (5200)
+Backend/AuthService               users/roles/permissions/JWT/maker-checker/audit hub, remote-app
+                                   registry, capability discovery, health probing, sidebar (5155)
 Backend/LeadService                 leads CRUD; path base /api/lead-service (5046)
 Backend/Customer360Service           customer profile/CRM proxy; no path base (5059)
 ```
+
+There was a fourth service, `ModuleRegistry` (port 5200), holding the remote-app registry in its own
+database and pushing capabilities into AuthService over HTTP. It has been **removed** and its whole
+job absorbed into AuthService — AuthDb is now the single source of truth for remote apps. If you find
+a reference to it, it is stale prose, not a live dependency.
 
 ## Commands
 
@@ -103,8 +108,12 @@ query it by `getAllByRole('combobox')[n]` (documented index) rather than `{ name
 AuthService issues RS256-signed JWTs; every other service verifies with the public key only, never
 issues its own. The permission catalog is **dynamic per feature**, not a fixed enum: each host feature
 and each registered remote declares its own capability set (`PermissionFeatureCapability`), and a
-remote's set is learned by ModuleRegistry fetching that remote's own `GET /permissions` on
-registration/resync and pushing the result into AuthService. `[RequirePermission(featureKey, capability)]`
+remote's set is learned by `RemoteAppAppService` fetching that remote's own `GET /permissions` on
+registration/resync (`RemoteCapabilityDiscoveryClient`, a v1→v4 ladder) and handing it to
+`PermissionCatalogAppService`. **Null vs empty is load-bearing there**: a null capability/module list
+means "the remote could not be read" and the stored set is left alone, while an empty list is a real
+answer and deactivates it — collapse the two and one unreachable remote revokes every permission it
+grants. `[RequirePermission(featureKey, capability)]`
 (host) / `[RequiresCapability(...)]` (remotes) read the JWT's `perms` claim — administrators bypass
 per-capability checks entirely. AuthService is also the **maker-checker hub**: a mutation gated for a
 module goes through `ApprovalGatingService` instead of applying immediately, is stored as one flat
@@ -162,8 +171,24 @@ remote stays independently buildable. Read `docs/SHARED-UI-REFACTOR-STATUS.md` b
 in this repo; it documents the traps that typecheck and build cannot catch (e.g. a remote rendering
 unstyled because it's missing the `tokens.css` import).
 
+### Remote-app registration (`Backend/AuthService/Application/Services/RemoteAppAppService.cs`)
+Setup → Applications writes a `RemoteApp` row keyed on the `PermissionFeature` it belongs to — one
+table, primary key = foreign key, so "a feature with no registration" is unrepresentable rather than
+merely unlikely. **`DisplayName` and `SidebarOrder` live on the feature, not on `RemoteApp`**; keeping
+a second copy is what produced the old "a display-order edit must ALSO be pushed for the app it
+displaced" bug class. The sidebar is served by `GET /api/navigation` alone; `/api/remote-apps/health`
+is a separate feed because health is rewritten on a probe interval while the tree is cached.
+
+### Scaling past one instance
+`IPlatformCache` and `IDistributedLock` (`Infrastructure/Caching`, `Infrastructure/Locking`) back the
+navigation catalog, the fine-grained capability sets and the health-probe leader election. Both have
+an in-memory implementation, which is the **no-configuration default and correct on one instance**.
+Set `ConnectionStrings:Redis` and the Redis pair is registered instead, along with a SignalR
+backplane. Do not reintroduce a direct `IMemoryCache` dependency in an app service — that is what made
+a two-replica deploy serve stale sidebars.
+
 ## Known stale docs
 `docs/ADDING-A-REMOTE-APP.md` still references an earlier `employee_mf`/`EmployeeService` topology that
 no longer exists. `docs/DEPLOYMENT.md` and `docs/PERFORMANCE-AND-INFRA.md` carry banners marking which
-parts predate the Postgres→SQL Server migration. Don't treat any of the three as current without
-checking against the actual code first.
+parts predate the SQL Server→Postgres migration, and both still describe the retired ModuleRegistry
+service. Don't treat any of the three as current without checking against the actual code first.

@@ -2,7 +2,7 @@ namespace AuthService.Options;
 
 /// <summary>
 /// Bound from the "Jwt" config section. Access tokens are signed RS256 — AuthService holds both
-/// keys, ModuleRegistry (see its own JwtOptions) is only ever given the public one.
+/// keys; every other service is only ever given the public one.
 /// PEM values are expected with literal "\n" sequences (the common env-var-safe encoding for
 /// multi-line PEM content) and are unescaped before parsing — see Security/RsaKeyLoader.
 /// </summary>

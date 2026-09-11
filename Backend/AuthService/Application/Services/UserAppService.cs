@@ -20,7 +20,7 @@ public class UserAppService(
     private const string ServiceName = "AuthService";
 
     // AuthService writes User audit rows in-process, so the current HttpContext IS the real
-    // end-user's own request — no service-to-service hop in between, unlike ModuleRegistry/
+    // end-user's own request — no service-to-service hop in between, unlike LeadService/
     // EmployeeService/LeadService, which have to capture and forward these explicitly.
     private string? SourceIp => httpContextAccessor.HttpContext?.Connection.RemoteIpAddress?.ToString();
     private string? UserAgent => httpContextAccessor.HttpContext?.Request.Headers.UserAgent.ToString();
@@ -362,7 +362,7 @@ public class UserAppService(
 
         // This edit can move the user to a different role, which changes every capability they inherit
         // — so it counts even though no permission row was touched here.
-        fineCapabilities.Invalidate(user.Id);
+        await fineCapabilities.InvalidateAsync(user.Id, ct);
 
         // Bundled from the same submission as the core-field edit — see UpdateUserWithOverridesRequest's
         // doc comment. Applied AFTER the core fields commit, same ordering the ungated path always used
@@ -623,7 +623,7 @@ public class UserAppService(
         await db.SaveChangesAsync(ct);
 
         // This user's overrides changed and nobody else's did, so the targeted eviction is enough.
-        fineCapabilities.Invalidate(userId);
+        await fineCapabilities.InvalidateAsync(userId, ct);
 
         return await LoadOverridesAsync(userId, ct);
     }

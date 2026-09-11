@@ -1,15 +1,22 @@
 # Deploying OmniRemit
 
-> ⚠️ **This document is stale in two respects.** It was written when the platform used Neon Postgres
-> and still had an EmployeeService. The database is now **Microsoft SQL Server** (EF Core provider
-> `Microsoft.EntityFrameworkCore.SqlServer`), and EmployeeService and its `employee_mf` remote have
-> been removed. The live services are AuthService, ModuleRegistry, LeadService and
-> Customer360Service. The deployment *mechanics* below — Render, Vercel, DNS, cookie and CORS
-> configuration — are still accurate; substitute SQL Server for Postgres and the four current
-> services for the three listed. For local development see [SETUP.md](../SETUP.md).
+> ⚠️ **Parts of this document are stale.** It was written against an older topology that had an
+> EmployeeService and a separate ModuleRegistry service, and at one point described a move to SQL
+> Server that was subsequently reversed.
+>
+> What is true now: the database is **PostgreSQL** (EF Core provider
+> `Npgsql.EntityFrameworkCore.PostgreSQL`); the live services are **AuthService, LeadService and
+> Customer360Service**; EmployeeService, `employee_mf` and **ModuleRegistry** are all gone —
+> ModuleRegistry's job (remote-app registration, capability discovery, health probing) now lives
+> inside AuthService, and `render.yaml` is the authoritative deployment definition.
+>
+> The deployment *mechanics* below — Render, Vercel, DNS, cookie and CORS configuration — are still
+> accurate; substitute Postgres for SQL Server and the three current services for whatever count a
+> given section names. For local development see [SETUP.md](../SETUP.md).
 
 Target topology: **Vercel projects** for the host and each remote, and **Render web services** for
-the backends, with a managed **SQL Server** database per service.
+the backends, with a managed **PostgreSQL** database per service, plus an optional **Redis** instance
+once AuthService runs on more than one replica (see `render.yaml`).
 
 Everything below assumes a domain you control, with all five components on subdomains of it. That is
 not cosmetic — see [Why one parent domain](#why-one-parent-domain).

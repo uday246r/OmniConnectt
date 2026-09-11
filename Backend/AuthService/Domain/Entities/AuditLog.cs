@@ -3,7 +3,7 @@ namespace AuthService.Domain.Entities;
 /// <summary>
 /// One platform-wide audit entry. AuthService is the single sink every service writes to (directly
 /// in-process for its own User/Role mutations, or via the internal API-key-protected endpoint for
-/// everyone else — ModuleRegistry, EmployeeService, any future remote's backend) so "show me every
+/// everyone else — LeadService, Customer360Service, any future remote's backend) so "show me every
 /// audit, host or remote" is one query against one table, not a fan-out across services.
 /// </summary>
 public class AuditLog
@@ -11,7 +11,7 @@ public class AuditLog
     public Guid Id { get; set; }
     public DateTimeOffset OccurredAt { get; set; }
 
-    /// <summary>Which service recorded this — "AuthService", "ModuleRegistry", "EmployeeService", etc.</summary>
+    /// <summary>Which service recorded this — "AuthService", "LeadService", "Customer360Service", etc.</summary>
     public required string ServiceName { get; set; }
 
     public Guid? ActorUserId { get; set; }

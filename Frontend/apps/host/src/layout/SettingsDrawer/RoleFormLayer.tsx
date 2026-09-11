@@ -5,7 +5,7 @@ import { rolesApi, type RolePermissionGrantDto, type RoleUserDto } from '../../f
 import { isApprovalPending, type ApprovalPendingDto } from '../../features/approvals/api/approvalsApi'
 import { asPendingApprovalConflict, type PendingApprovalConflict } from '../../features/approvals/pendingConflict'
 import { PendingApprovalDialog } from '../../features/approvals/components/PendingApprovalDialog'
-import { remoteAppsApi, type RemoteAppDto } from '../../features/settings-applications/api/remoteAppsApi'
+import { useNavigationStore } from '../../shared/stores/navigationStore'
 import { useSettingsDrawerStore } from '../../shared/stores/settingsDrawerStore'
 import { Icon } from '../../shared/components/Icon/Icon'
 import { SkeletonBlock } from '../../shared/components/Skeleton'
@@ -55,7 +55,7 @@ export function RoleFormLayer({ roleId, initialTab }: RoleFormLayerProps) {
 
   // Data
   const [catalog, setCatalog] = useState<PermissionFeatureDto[]>([])
-  const [remoteApps, setRemoteApps] = useState<RemoteAppDto[]>([])
+
   const [assignedUsers, setAssignedUsers] = useState<RoleUserDto[]>([])
   const [assignedUsersTotal, setAssignedUsersTotal] = useState(0)
   const [userSearch, setUserSearch] = useState('')
@@ -70,18 +70,15 @@ export function RoleFormLayer({ roleId, initialTab }: RoleFormLayerProps) {
 
     async function loadData() {
       try {
-        const [catalogRes, appsRes] = await Promise.all([
-          permissionsApi.catalog(accessToken!),
-          remoteAppsApi.list(accessToken!, { pageSize: 100 }),
-        ])
+        const catalogRes = await permissionsApi.catalog(accessToken!)
 
         if (cancelled) return
         setCatalog(catalogRes)
-        setRemoteApps(appsRes.items)
 
-        // Expand first remote app by default
-        if (appsRes.items.length > 0) {
-          setExpandedApps({ [`remote.${appsRes.items[0].key}`]: true })
+        // Expand the first remote app by default.
+        const firstApp = groupsFromCatalog(catalogRes, 'RemoteApp')[0]
+        if (firstApp) {
+          setExpandedApps({ [firstApp.feature.key]: true })
         }
 
         if (roleId) {
@@ -172,39 +169,43 @@ export function RoleFormLayer({ roleId, initialTab }: RoleFormLayerProps) {
   )
 
   /*
-   * One group per remote application, joined to its registry row for status and icon.
+   * One group per remote application, driven entirely by the CATALOG.
    *
-   * Driven by the CATALOG, not by the remote-apps list. The previous version iterated registered apps
-   * and fabricated a single "Base Access" row against the parent key `remote.employee` — which
-   * declares no capabilities at all — so saving emitted `remote.employee:View` and the server rightly
-   * answered "'remote.employee' does not declare a 'View' capability."
+   * It used to be joined against the remote-apps admin list as well, for an icon and a status badge.
+   * That made the role editor require `host.settings.applications:View` — so an administrator who
+   * could edit roles but not manage applications got a 403 that emptied the whole apps accordion,
+   * and adding a `.catch()` would only have made the emptiness silent. Roles and applications are
+   * separate permissions on purpose; editing one must not require the other.
+   *
+   * The filter that went with it is gone too, and nothing replaces it: `permissionsApi.catalog`
+   * defaults to `activeOnly`, and disabling or deleting an app deactivates its permission feature,
+   * so a withdrawn app is already absent here. The status badge could only ever have read "Active".
+   *
+   * The icon comes from the navigation tree, which every authenticated user already has loaded. It
+   * only covers apps this caller can see, so it degrades to the default for the rest — which is the
+   * right trade for a decoration.
    */
+  const navSections = useNavigationStore((s) => s.sections)
+
   const appGroups = useMemo(
     () =>
       groupsFromCatalog(catalog, 'RemoteApp').map((group) => ({
         ...group,
-        app: remoteApps.find((a) => `remote.${a.key}` === group.feature.key),
+        iconKey: navSections
+          .flatMap((s) => s.items)
+          .find((n) => n.kind === 'remote-app' && n.key === group.feature.key)?.iconKey ?? null,
       })),
-    [catalog, remoteApps],
+    [catalog, navSections],
   )
 
-  /*
-   * A feature with no matching `app` record is a deleted/orphaned remote app whose PermissionFeature
-   * row is stale in AuthService's catalog (pending a resync) — same reasoning as UserFormLayer's
-   * accordion filter. Must never be shown as assignable, whether it's gone entirely or just Disabled.
-   */
-  const visibleAppGroups = useMemo(
-    () => appGroups.filter(({ app }) => app && app.status !== 'Disabled'),
-    [appGroups],
-  )
+  const visibleAppGroups = appGroups
 
   const filteredAppGroups = useMemo(() => {
     if (!appSearch.trim()) return visibleAppGroups
     const q = appSearch.toLowerCase().trim()
-    return visibleAppGroups.filter(({ feature, rows, app }) => {
+    return visibleAppGroups.filter(({ feature, rows }) => {
       if (feature.displayName.toLowerCase().includes(q)) return true
       if (feature.key.toLowerCase().includes(q)) return true
-      if (app?.displayName?.toLowerCase().includes(q)) return true
       if (rows.some((r) => r.label.toLowerCase().includes(q) || r.key.toLowerCase().includes(q))) return true
       return false
     })
@@ -920,9 +921,9 @@ export function RoleFormLayer({ roleId, initialTab }: RoleFormLayerProps) {
                 )}
 
                 {filteredAppGroups.map((group) => {
-                  const { feature, rows, columns, app } = group
+                  const { feature, rows, columns, iconKey } = group
                   const isExpanded = Boolean(expandedApps[feature.key])
-                  const AppIcon = resolveIcon(app?.iconKey)
+                  const AppIcon = resolveIcon(iconKey)
                   const grantedCount = permissions.filter((p) =>
                     rows.some((r) => r.key === p.featureKey),
                   ).length
@@ -957,12 +958,6 @@ export function RoleFormLayer({ roleId, initialTab }: RoleFormLayerProps) {
                         <div className={styles.accordionRightMeta}>
                           {grantedCount > 0 && (
                             <span className={styles.grantCountBadge}>{grantedCount} granted</span>
-                          )}
-                          {app && (
-                            <span className={styles.activeBadge}>
-                              <span className={styles.badgeDot} />
-                              {app.status}
-                            </span>
                           )}
                           {isExpanded ? (
                             <Icon.ChevronUp width={18} height={18} className={styles.chevron} />

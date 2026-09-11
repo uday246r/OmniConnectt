@@ -2,19 +2,97 @@ using AuthService.Application.DTOs;
 using AuthService.Domain.Entities;
 using AuthService.Domain.Enums;
 using AuthService.Infrastructure;
+using AuthService.Infrastructure.Seed;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Caching.Memory;
+using AuthService.Infrastructure.Caching;
 
 namespace AuthService.Application.Services;
 
 /// <summary>
-/// Read side (the Role editor's per-feature Features/Capabilities matrix, permission gating) plus
-/// the internal write side that the Module Registry service calls to keep RemoteApp-sourced features
-/// — and their own dynamically-declared capabilities — in sync. See
-/// Controllers/InternalController.cs for the API-key-gated HTTP surface over this.
+/// Read side (the Role editor's per-feature Features/Capabilities matrix, the profile screen's
+/// readable permission list, permission gating) plus the write side that keeps RemoteApp-sourced
+/// features — and their own dynamically-declared capabilities — in step with what each remote
+/// declares.
 /// </summary>
-public class PermissionCatalogAppService(AuthDbContext db, IMemoryCache cache, FineCapabilityService fineCapabilities)
+/// <remarks>
+/// The write side used to be reached over HTTP, from a separate Module Registry service holding its
+/// own copy of every capability set. It is now called directly by <see cref="RemoteAppAppService"/>,
+/// which is what allows the null-versus-empty contract below to replace that copy.
+/// </remarks>
+public class PermissionCatalogAppService(AuthDbContext db, IPlatformCache cache, FineCapabilityService fineCapabilities)
 {
+    /// <summary>
+    /// Drops the cached navigation catalog. For a change that alters what the sidebar RENDERS without
+    /// touching the permission catalog at all — putting an app into Maintenance, for instance, where
+    /// the feature and its capabilities are untouched but the row must now show a notice.
+    /// </summary>
+    public Task InvalidateNavigationAsync(CancellationToken ct = default) =>
+        cache.RemoveAsync(NavigationAppService.CatalogCacheKey, ct);
+
+    /// <summary>
+    /// The catalog as one particular caller is allowed to see it.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The unscoped overload lets any authenticated user enumerate every feature, sub-module and
+    /// capability the platform contains — the exact inventory <see cref="Navigation.NavigationTreeBuilder"/>
+    /// goes out of its way not to leak, where a row the caller may not use is omitted entirely rather
+    /// than rendered as a disabled hint. One endpoint quietly undid the other.
+    /// </para>
+    /// <para>
+    /// Gating the endpoint outright is the wrong fix: the profile screen reads the catalog for EVERY
+    /// user, to turn "remote.lead:View" into something readable. So the response is scoped instead.
+    /// A caller who can edit users or roles gets everything, because those editors exist to grant what
+    /// the caller does not personally hold. Everyone else gets only the features they hold something
+    /// on, which is all their own profile ever renders.
+    /// </para>
+    /// </remarks>
+    /// <param name="heldPermissions">
+    /// The caller's effective permissions — the JWT's <c>perms</c> claim UNION their fine-grained set.
+    /// The union matters: a user whose only grant on an app is a dashboard widget holds nothing in the
+    /// claim, and scoping on the claim alone would hide that app from their own profile.
+    /// </param>
+    public async Task<IReadOnlyList<PermissionFeatureDto>> GetCatalogForCallerAsync(
+        bool activeOnly,
+        IReadOnlySet<string> heldPermissions,
+        bool isAdministrator,
+        CancellationToken ct = default)
+    {
+        var full = await GetCatalogAsync(activeOnly, ct);
+
+        var seesEverything = isAdministrator
+            || Holds(heldPermissions, AuthDbSeeder.HostFeatureKeys.SettingsUsers, "View")
+            || Holds(heldPermissions, AuthDbSeeder.HostFeatureKeys.SettingsRoles, "View");
+
+        if (seesEverything)
+        {
+            return full;
+        }
+
+        // A parent survives if the caller holds anything on it OR on one of its children — the same
+        // two-prefix rule the sidebar uses, and for the same reason: a sub-module permission
+        // ("remote.lead.lead:View") does not start with "remote.lead:".
+        return full
+            .Select(f => f with
+            {
+                Children = f.Children.Where(c => HoldsAnythingOn(heldPermissions, c.Key)).ToList(),
+            })
+            .Where(f => HoldsAnythingOn(heldPermissions, f.Key) || f.Children.Count > 0)
+            .ToList();
+    }
+
+    private static bool Holds(IReadOnlySet<string> permissions, string featureKey, string capability) =>
+        permissions.Contains($"{featureKey}:{capability}");
+
+    private static bool HoldsAnythingOn(IReadOnlySet<string> permissions, string featureKey) =>
+        permissions.Any(p =>
+            p.StartsWith($"{featureKey}:", StringComparison.OrdinalIgnoreCase) ||
+            p.StartsWith($"{featureKey}.", StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>
+    /// The whole catalog, unscoped. For internal callers (the checker-assignment module list, the
+    /// remote-app resync) — never for an endpoint that answers a user directly.
+    /// </summary>
     public async Task<IReadOnlyList<PermissionFeatureDto>> GetCatalogAsync(bool activeOnly, CancellationToken ct = default)
     {
         var query = db.PermissionFeatures.AsNoTracking().Include(f => f.Capabilities).AsQueryable();
@@ -46,64 +124,69 @@ public class PermissionCatalogAppService(AuthDbContext db, IMemoryCache cache, F
     /// Upserts a RemoteApp feature, its sub-modules (as child features), and reconciles every
     /// capability set involved — declared capabilities upserted, undeclared ones deactivated. Idempotent.
     /// </summary>
+    /// <param name="capabilities">
+    /// <b>Null means the remote said nothing</b> and the stored set is left exactly as it is; an empty
+    /// list is a real answer and deactivates them. See <see cref="UpsertPermissionFeatureRequest"/>.
+    /// </param>
+    /// <param name="modules">
+    /// Same rule: null leaves every existing sub-module alone, including the stale-child sweep below.
+    /// </param>
     public async Task UpsertRemoteAppFeatureAsync(
         string key,
         string displayName,
         int sortOrder,
-        IReadOnlyList<UpsertCapabilityRequest> capabilities,
+        IReadOnlyList<UpsertCapabilityRequest>? capabilities,
         IReadOnlyList<UpsertModuleRequest>? modules = null,
-        CancellationToken ct = default,
-        string? iconKey = null,
-        string? manifestUrl = null,
-        string? containerName = null,
-        string? status = null,
-        string? maintenanceMessage = null)
+        CancellationToken ct = default)
     {
         var now = DateTimeOffset.UtcNow;
         var parent = await UpsertFeatureRowAsync(key, displayName, sortOrder, capabilities, parentId: null, now, ct);
 
-        await UpsertNavMetadataAsync(parent.Id, iconKey, manifestUrl, containerName, status, maintenanceMessage, now, ct);
-
-        var incomingModules = modules ?? [];
-        var childKeys = incomingModules.Select(m => $"{key}.{m.Key}").ToHashSet(StringComparer.Ordinal);
-
-        foreach (var module in incomingModules)
+        // Null modules: the remote had nothing to say, so neither the child upserts nor the sweep
+        // below should run. Treating null as an empty list here is what used to let one unreachable
+        // remote deactivate every sub-module it owns — and every role grant on them with it.
+        if (modules is not null)
         {
-            var child = await UpsertFeatureRowAsync(
-                $"{key}.{module.Key}", module.DisplayName, module.SortOrder, module.Capabilities, parent.Id, now, ct);
+            var childKeys = modules.Select(m => $"{key}.{m.Key}").ToHashSet(StringComparer.Ordinal);
 
-            await ReplaceNavItemsAsync(child.Id, module.Nav, ct);
-        }
+            foreach (var module in modules)
+            {
+                var child = await UpsertFeatureRowAsync(
+                    $"{key}.{module.Key}", module.DisplayName, module.SortOrder, module.Capabilities, parent.Id, now, ct);
 
-        // A sub-module the remote no longer declares is DEACTIVATED, never deleted — deleting it
-        // would orphan every RolePermission still pointing at it, and those rows are the record of
-        // what an administrator actually granted. Deactivated features drop out of the Role editor
-        // and out of the JWT, which is the intended effect, while the history survives.
-        var staleChildren = await db.PermissionFeatures
-            .Where(f => f.ParentFeatureId == parent.Id && f.IsActive)
-            .ToListAsync(ct);
+                await ReplaceNavItemsAsync(child.Id, module.Nav, ct);
+            }
 
-        foreach (var stale in staleChildren.Where(c => !childKeys.Contains(c.Key)))
-        {
-            stale.IsActive = false;
-            stale.UpdatedAt = now;
+            // A sub-module the remote no longer declares is DEACTIVATED, never deleted — deleting it
+            // would orphan every RolePermission still pointing at it, and those rows are the record of
+            // what an administrator actually granted. Deactivated features drop out of the Role editor
+            // and out of the JWT, which is the intended effect, while the history survives.
+            var staleChildren = await db.PermissionFeatures
+                .Where(f => f.ParentFeatureId == parent.Id && f.IsActive)
+                .ToListAsync(ct);
+
+            foreach (var stale in staleChildren.Where(c => !childKeys.Contains(c.Key)))
+            {
+                stale.IsActive = false;
+                stale.UpdatedAt = now;
+            }
         }
 
         await db.SaveChangesAsync(ct);
 
         // A resynced remote's new pages should appear in the sidebar on the next request, not after
         // the catalog cache happens to expire.
-        cache.Remove(NavigationAppService.CatalogCacheKey);
+        await cache.RemoveAsync(NavigationAppService.CatalogCacheKey, ct);
 
         // A sync can deactivate a capability, which withdraws it from everyone at once. Leaving the
         // cached sets in place would keep serving a capability the catalog no longer has.
-        fineCapabilities.InvalidateAll();
+        await fineCapabilities.InvalidateAllAsync(ct);
     }
 
     /// <summary>
     /// Fully replaces a feature's sidebar rows — but only when the caller actually supplied some.
     /// <para>
-    /// A null <paramref name="nav"/> means the Module Registry had nothing to say: an older remote
+    /// A null <paramref name="nav"/> means the remote had nothing to say: an older remote
     /// that predates navigation, or one that was unreachable when the sync ran. Clearing rows in that
     /// case would empty a working sidebar every time a remote hiccuped. An empty list is different —
     /// it is a positive statement that this module has no rows, and it clears them.
@@ -135,57 +218,12 @@ public class PermissionCatalogAppService(AuthDbContext db, IMemoryCache cache, F
         }));
     }
 
-    /// <summary>
-    /// Creates or updates the replicated render metadata for a remote-app feature. No-ops when the
-    /// caller supplied no manifest URL — that is a host feature, or an older Module Registry that
-    /// does not send render metadata, and neither should clear what is already stored.
-    /// </summary>
-    private async Task UpsertNavMetadataAsync(
-        Guid featureId,
-        string? iconKey,
-        string? manifestUrl,
-        string? containerName,
-        string? status,
-        string? maintenanceMessage,
-        DateTimeOffset now,
-        CancellationToken ct)
-    {
-        if (string.IsNullOrWhiteSpace(manifestUrl))
-        {
-            return;
-        }
-
-        var existing = await db.RemoteAppNavMetadata.FirstOrDefaultAsync(m => m.FeatureId == featureId, ct);
-
-        if (existing is null)
-        {
-            db.RemoteAppNavMetadata.Add(new RemoteAppNavMetadata
-            {
-                FeatureId = featureId,
-                IconKey = iconKey,
-                ManifestUrl = manifestUrl,
-                ContainerName = containerName,
-                Status = status ?? "Active",
-                MaintenanceMessage = maintenanceMessage,
-                UpdatedAt = now,
-            });
-            return;
-        }
-
-        existing.IconKey = iconKey;
-        existing.ManifestUrl = manifestUrl;
-        existing.ContainerName = containerName;
-        existing.Status = status ?? "Active";
-        existing.MaintenanceMessage = maintenanceMessage;
-        existing.UpdatedAt = now;
-    }
-
     /// <summary>Creates or updates one feature row and fully replaces its capabilities. Does not save.</summary>
     private async Task<PermissionFeature> UpsertFeatureRowAsync(
         string key,
         string displayName,
         int sortOrder,
-        IReadOnlyList<UpsertCapabilityRequest> capabilities,
+        IReadOnlyList<UpsertCapabilityRequest>? capabilities,
         Guid? parentId,
         DateTimeOffset now,
         CancellationToken ct)
@@ -217,7 +255,11 @@ public class PermissionCatalogAppService(AuthDbContext db, IMemoryCache cache, F
             existing.UpdatedAt = now;
         }
 
-        ReconcileCapabilities(existing, capabilities);
+        // Null means the remote said nothing about its capabilities, so the stored set stands.
+        if (capabilities is not null)
+        {
+            ReconcileCapabilities(existing, capabilities);
+        }
 
         return existing;
     }
@@ -320,7 +362,18 @@ public class PermissionCatalogAppService(AuthDbContext db, IMemoryCache cache, F
 
         existing.IsActive = false;
         existing.UpdatedAt = DateTimeOffset.UtcNow;
+
+        // A deactivated feature drops out of the sidebar and stops being grantable, but only once the
+        // two caches that answer those questions are told. Without these the app stayed in the
+        // navigation tree for up to the catalog TTL and its non-Api capabilities stayed live in the
+        // fine-grained sets for another — so "Disable" appeared to do nothing for a minute.
+        //
+        // The delete path happened to be covered, because it followed up with a full resync. Plain
+        // Disable had no such accident behind it.
         await db.SaveChangesAsync(ct);
+
+        await cache.RemoveAsync(NavigationAppService.CatalogCacheKey, ct);
+        await fineCapabilities.InvalidateAllAsync(ct);
     }
 
     /// <summary>Full recovery resync: upserts every feature+capability-set in <paramref name="features"/> as active, deactivates any RemoteApp feature not present in the list.</summary>
@@ -338,9 +391,7 @@ public class PermissionCatalogAppService(AuthDbContext db, IMemoryCache cache, F
             // Named `ct:` — UpsertRemoteAppFeatureAsync gained a `modules` parameter before the
             // cancellation token, so a positional call would silently bind `ct` to `modules`.
             await UpsertRemoteAppFeatureAsync(
-                incoming.Key, incoming.DisplayName, incoming.SortOrder, incoming.Capabilities, incoming.Modules, ct: ct,
-                iconKey: incoming.IconKey, manifestUrl: incoming.ManifestUrl, containerName: incoming.ContainerName,
-                status: incoming.Status, maintenanceMessage: incoming.MaintenanceMessage);
+                incoming.Key, incoming.DisplayName, incoming.SortOrder, incoming.Capabilities, incoming.Modules, ct: ct);
         }
 
         var now = DateTimeOffset.UtcNow;

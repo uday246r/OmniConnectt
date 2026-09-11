@@ -10,7 +10,7 @@ namespace AuthService.Application.Services;
 /// <summary>
 /// The single sink every service's audit trail lands in. AuthService writes its own User/Role
 /// mutations directly (in-process, see UserAppService/RoleAppService) — no HTTP round-trip needed
-/// since it's the same process. Everyone else (ModuleRegistry, EmployeeService, any future remote's
+/// since it's the same process. Everyone else (LeadService, Customer360Service, any future remote's
 /// backend) posts here via the internal API-key-protected endpoint. One table, one query, whether
 /// the action happened in the host or a remote app.
 /// </summary>

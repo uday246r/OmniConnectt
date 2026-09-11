@@ -9,7 +9,7 @@ namespace Customer360Service.Tests;
 
 /// <summary>
 /// The <c>/permissions</c> payload — this service's declaration of what can be granted, and the only
-/// thing ModuleRegistry and AuthService know about it.
+/// thing AuthService knows about it.
 /// </summary>
 /// <remarks>
 /// Everything downstream is derived from this: the permission catalog, the Role editor's checkboxes,

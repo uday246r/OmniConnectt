@@ -7,7 +7,7 @@ namespace backend.Infrastructure
     /// Customer360Service's own database — new as of this feature. Everything this service used to
     /// persist (audit trail) lived only in a local file with no schema; this is the first real,
     /// admin-editable, durable table set it owns, following the same EF Core + Npgsql pattern
-    /// ModuleRegistry already uses (see ModuleRegistryDbContext).
+    /// AuthService already uses (see AuthDbContext).
     /// </summary>
     public class Customer360DbContext(DbContextOptions<Customer360DbContext> options) : DbContext(options)
     {
@@ -46,7 +46,7 @@ namespace backend.Infrastructure
                 entity.Property(a => a.CustomerId).HasMaxLength(150);
                 entity.Property(a => a.Field).HasMaxLength(200);
                 // Reads are always newest-first, paged, and often filtered by Action — same access
-                // pattern ModuleRegistry's own audit-adjacent indexes are built around.
+                // pattern AuthService's own audit-adjacent indexes are built around.
                 entity.HasIndex(a => a.Timestamp);
                 entity.HasIndex(a => a.Action);
             });

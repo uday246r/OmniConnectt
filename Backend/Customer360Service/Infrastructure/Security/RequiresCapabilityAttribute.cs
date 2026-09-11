@@ -14,7 +14,7 @@ namespace backend.Infrastructure.Security;
 public class RequiresCapabilityAttribute : Attribute, IAsyncAuthorizationFilter
 {
     /// <summary>
-    /// Root PermissionFeatureKey when registered in ModuleRegistry with Key = "customer360".
+    /// Root PermissionFeatureKey when registered under Setup > Applications with Key = "customer360".
     /// </summary>
     public const string FeatureKey = "remote.customer360";
 
@@ -43,8 +43,7 @@ public class RequiresCapabilityAttribute : Attribute, IAsyncAuthorizationFilter
         }
 
         /*
-         * Administrator bypass — ONE claim, checked exactly, matching EmployeeService, AuthService and
-         * ModuleRegistry.
+         * Administrator bypass — ONE claim, checked exactly, matching AuthService.
          *
          * This previously accepted claim aliases, ANY claim whose type merely *contains* "role" with a
          * value of Admin/SuperAdmin/Administrator, and user.IsInRole(...). That made a full

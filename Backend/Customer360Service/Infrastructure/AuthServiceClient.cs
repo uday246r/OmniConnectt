@@ -8,7 +8,7 @@ namespace backend.Infrastructure;
 /// <summary>
 /// This service's first-ever connection to AuthService's internal surface — previously Customer360Service
 /// kept its own local audit trail entirely (see AuditRepository.cs) and had no cross-service plumbing at
-/// all. Mirrors LeadService's/ModuleRegistry's own AuthServiceClient shape exactly: pushes central
+/// all. Mirrors LeadService's own AuthServiceClient shape exactly: pushes central
 /// platform audit-log entries (best-effort, failures logged not thrown) and — Phase 2 — checks/submits
 /// Maker-Checker gating for Field Settings mutations (hard-fail; see IsGatedAsync's own doc comment).
 /// </summary>

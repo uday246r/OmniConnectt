@@ -4,6 +4,7 @@ using AuthService.Application.Services;
 using AuthService.Domain.Entities;
 using AuthService.Domain.Enums;
 using AuthService.Infrastructure;
+using AuthService.Infrastructure.Caching;
 using AuthService.Infrastructure.Seed;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
@@ -35,7 +36,7 @@ public class CheckerAssignmentBulkTests : IDisposable
 
         db = new AuthDbContext(options);
 
-        var memory = new MemoryCache(new MemoryCacheOptions());
+        var memory = new MemoryPlatformCache(new MemoryCache(new MemoryCacheOptions()));
         // No HttpContext here by design: these tests exercise the service outside a request, which
         // AuditLogAppService already supports — ResolveCorrelationId falls back to a fresh Guid and
         // SeedCorrelationId no-ops when HttpContext is null.

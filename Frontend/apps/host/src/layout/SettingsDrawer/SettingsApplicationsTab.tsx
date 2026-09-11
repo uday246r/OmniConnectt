@@ -4,7 +4,8 @@ import { remoteAppsApi, type RemoteAppDto, type RemoteAppStatus } from '../../fe
 import { isApprovalPending } from '../../features/approvals/api/approvalsApi'
 import { useSettingsDrawerStore } from '../../shared/stores/settingsDrawerStore'
 import { useDebouncedValue } from '../../shared/hooks/useDebouncedValue'
-import { useModuleRegistryStore } from '../../shared/stores/moduleRegistryStore'
+import { useNavigationStore } from '../../shared/stores/navigationStore'
+import { useRemoteHealthStore } from '../../shared/stores/remoteHealthStore'
 import { Icon } from '../../shared/components/Icon/Icon'
 import { SkeletonAppCard } from '../../shared/components/Skeleton'
 import { ApiError } from '../../shared/api/httpClient'
@@ -104,9 +105,10 @@ export function SettingsApplicationsTab() {
         return
       }
       toast.success(`Application '${deletedName}' removed successfully.`)
-      // The sidebar lists registered apps, so it has to be refreshed or the removed app lingers
-      // there until the next full page load.
-      void useModuleRegistryStore.getState().fetchForSidebar(accessToken)
+      // The sidebar is rendered from the navigation tree, so that is what has to be refreshed or the
+      // removed app lingers there until the next full page load.
+      void useNavigationStore.getState().fetch(accessToken)
+      void useRemoteHealthStore.getState().fetch(accessToken)
       if (apps.length === 1 && page > 1) setPage((p) => p - 1)
       else invalidate(TOPICS.applications, TOPICS.approvals, TOPICS.kpis)
     } catch (err) {
@@ -162,7 +164,8 @@ export function SettingsApplicationsTab() {
       toast.success(`Application '${appName}' status updated to ${newStatus}.`)
       // The sidebar has to be refreshed too: an app moved to Maintenance must stop being navigable
       // immediately, without waiting for a page reload.
-      void useModuleRegistryStore.getState().fetchForSidebar(accessToken)
+      void useNavigationStore.getState().fetch(accessToken)
+      void useRemoteHealthStore.getState().fetch(accessToken)
       invalidate(TOPICS.applications, TOPICS.approvals, TOPICS.kpis)
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Could not update this application.')

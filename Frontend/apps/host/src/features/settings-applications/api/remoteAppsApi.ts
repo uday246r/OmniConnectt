@@ -3,14 +3,36 @@ import { apiFetch } from '../../../shared/api/httpClient'
 import type { PagedResult } from '../../settings-users/api/usersApi'
 import type { ApprovalPendingDto } from '../../approvals/api/approvalsApi'
 
-const base = env.moduleRegistryUrl
+const base = env.authServiceUrl
 
 export type RemoteAppStatus = 'Active' | 'Maintenance' | 'Disabled'
 
-export interface CapabilityDto {
+/** Reachability of a remote app, as last observed by AuthService's background probe. */
+export type RemoteAppHealth = 'Unknown' | 'Healthy' | 'Unreachable'
+
+/**
+ * One row of the health feed.
+ *
+ * It carries `displayName` as well as `key` because the shell uses this single feed for two jobs:
+ * the sidebar's "not responding" badge and the dashboard panel, and turning a raw permission string
+ * like `remote.lead:View` into readable text on the profile and user-detail screens. A second
+ * endpoint returning a near-duplicate list of apps used to serve the latter.
+ */
+export interface HealthEntryDto {
   key: string
   displayName: string
+  health: RemoteAppHealth
+  lastCheckedAt: string | null
+  error: string | null
 }
+
+/**
+ * Upper bound on how long the shell waits for a health poll.
+ *
+ * A refused connection settles on its own, but a server that accepts the socket and then stalls does
+ * not — and an un-deadlined poll on a timer would pile up pending requests indefinitely.
+ */
+const HEALTH_TIMEOUT_MS = 8000
 
 export interface RemoteAppDto {
   id: string
@@ -23,7 +45,6 @@ export interface RemoteAppDto {
   maintenanceMessage: string | null
   permissionFeatureKey: string
   permissionsSourceUrl: string | null
-  capabilities: CapabilityDto[]
   createdAt: string
   updatedAt: string
 }
@@ -102,4 +123,25 @@ export const remoteAppsApi = {
 
   resyncPermissions: (accessToken: string) =>
     apiFetch<{ resyncedCount: number }>(`${base}/api/remote-apps/resync-permissions`, { method: 'POST', accessToken }),
+
+  /**
+   * Last observed reachability of every app the caller can see. Any authenticated user — filtered
+   * server-side to what their token grants, so it reveals nothing the sidebar does not.
+   */
+  health: (accessToken: string, signal?: AbortSignal) =>
+    apiFetch<HealthEntryDto[]>(`${base}/api/remote-apps/health`, {
+      accessToken,
+      signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(HEALTH_TIMEOUT_MS)]) : AbortSignal.timeout(HEALTH_TIMEOUT_MS),
+    }),
+
+  /**
+   * Asks the server to probe the remotes NOW rather than return what its last background sweep
+   * stored. Throttled server-side, so holding down refresh cannot become a probe storm.
+   */
+  refreshHealth: (accessToken: string, signal?: AbortSignal) =>
+    apiFetch<HealthEntryDto[]>(`${base}/api/remote-apps/health/refresh`, {
+      method: 'POST',
+      accessToken,
+      signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(HEALTH_TIMEOUT_MS)]) : AbortSignal.timeout(HEALTH_TIMEOUT_MS),
+    }),
 }

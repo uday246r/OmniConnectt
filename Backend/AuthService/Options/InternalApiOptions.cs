@@ -1,7 +1,7 @@
 namespace AuthService.Options;
 
 /// <summary>
-/// Bound from the "Internal" config section. The shared static key ModuleRegistry must present
+/// Bound from the "Internal" config section. The shared static key the other backend services must present
 /// (via the X-Internal-Api-Key header) when pushing permission-feature upserts/deactivations.
 /// A v1 simplification, not a substitute for mTLS/OAuth client-credentials in a hardened deployment.
 /// </summary>

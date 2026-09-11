@@ -7,7 +7,7 @@ namespace LeadManagement.Api.Controllers;
 
 /// <summary>
 /// Dynamic permissions and navigation discovery for LeadService.
-/// ModuleRegistry fetches this during app registration / resync to populate AuthService's
+/// AuthService fetches this during app registration / resync to populate AuthService's
 /// PermissionFeatures catalog, and now also the navigation rows the host sidebar renders.
 /// </summary>
 /// <remarks>
@@ -18,7 +18,7 @@ namespace LeadManagement.Api.Controllers;
 ///   v4 — capabilities carry `description` and `type`, and the manifest contributes ones no endpoint
 ///        guards (this one). `type` defaults to "Api" when absent, which is what every earlier
 ///        generation meant.
-/// ModuleRegistry synthesises a nav row per module when `nav` is absent, so an un-upgraded remote
+/// AuthService synthesises a nav row per module when `nav` is absent, so an un-upgraded remote
 /// still gets a correct sidebar, just with default icons.
 /// </remarks>
 [ApiController]
@@ -33,7 +33,7 @@ public class PermissionsController(ILogger<PermissionsController> logger) : Cont
 
         foreach (var module in modules.Where(m => LeadNavigationManifest.Find(m.Key) is null))
         {
-            // Not fatal — ModuleRegistry will synthesise a row — but it means a page appears in the
+            // Not fatal — AuthService will synthesise a row — but it means a page appears in the
             // sidebar with a raw module key for a label and a default icon, which is always a
             // mistake rather than a decision.
             logger.LogWarning(

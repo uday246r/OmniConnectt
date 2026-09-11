@@ -10,6 +10,8 @@ import styles from './AuditLogDetailDrawer.module.css'
 
 const SERVICE_TONES: Record<string, BadgeTone> = {
   AuthService: 'primary',
+  // Retired service. Kept because audit rows it wrote before the migration are still in the table
+  // and must still render with a tone rather than falling through to the default.
   ModuleRegistry: 'info',
   LeadService: 'warning',
   Customer360Service: 'success',

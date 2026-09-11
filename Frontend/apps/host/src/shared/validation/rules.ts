@@ -10,7 +10,7 @@ import { validateFullPhone } from '@omniremit/ui/validation'
  * the form never accepts a value the column cannot store.
  */
 
-/** Column limits, mirroring AuthDbContext / ModuleRegistryDbContext / AppDbContext. */
+/** Column limits, mirroring AuthDbContext / AppDbContext. */
 export const LIMITS = {
   userName: 200,
   email: 320,
@@ -26,7 +26,7 @@ export const LIMITS = {
 } as const
 
 /** Application keys become Module Federation container names and permission-key roots. See below. */
-const APP_KEY_SHAPE = /^[a-z][a-z0-9-]*$/
+const APP_KEY_SHAPE = /^[a-z][a-z0-9-]{1,49}$/
 
 export type FieldErrors<T extends string> = Partial<Record<T, string>>
 
@@ -144,7 +144,7 @@ export function appKey(value: string | null | undefined): string | undefined {
   if (missing) return missing
   return APP_KEY_SHAPE.test(value!.trim())
     ? undefined
-    : 'Use lowercase letters, digits and hyphens only, starting with a letter (e.g. employee-portal).'
+    : 'Application key must be 2-50 characters, start with a lowercase letter, and contain only lowercase letters, digits and hyphens.'
 }
 
 /** Non-negative, and within what a decimal(18,2) column can hold. */

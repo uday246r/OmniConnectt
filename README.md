@@ -2,11 +2,11 @@
 
 Enterprise micro-frontend platform. A central **host** application (React 19.2 + Vite + Module
 Federation 2.0) that authenticated users land in, which dynamically loads independently-deployed
-**remote** micro-frontend apps at runtime from a database-backed module registry — no remote is ever
+**remote** micro-frontend apps at runtime from a database-backed registry — no remote is ever
 hard-coded into the host's build.
 
 **New to this repo?** Start with [SETUP.md](SETUP.md) — the step-by-step runbook for cloning,
-installing, provisioning your own SQL Server databases and getting everything running locally.
+installing, provisioning your own PostgreSQL databases and getting everything running locally.
 
 ## Repo layout
 
@@ -18,7 +18,7 @@ OmniRemit/
 │   ├── apps/customer360_mf      Customer 360 remote (5003)
 │   ├── packages/ui              @omniremit/ui — shared component library
 │   └── packages/federation-config
-├── Backend/                 OmniRemit.slnx — four .NET 10 services, one SQL Server database each
+├── Backend/                 OmniRemit.slnx — three .NET 10 services, one PostgreSQL database each
 └── docs/                    deployment, adding a remote app, performance, shared-UI handoff
 ```
 
@@ -30,7 +30,6 @@ OmniRemit/
 | `Frontend/apps/lead_mf` | Lead Management remote micro-frontend | 5002 |
 | `Frontend/apps/customer360_mf` | Customer 360 remote micro-frontend | 5003 |
 | `Backend/AuthService` | Users, roles, dynamic permission catalog, JWT auth, maker-checker approvals, platform audit log, global search | 5155 |
-| `Backend/ModuleRegistry` | Registered remote apps, status/maintenance, health probing, sidebar feed | 5200 |
 | `Backend/LeadService` | Leads CRUD, lead field config, dashboard, audit; path base `/api/lead-service` | 5046 |
 | `Backend/Customer360Service` | Customer profile, contacts, products, interactions, field config, audit; **no** path base | 5059 |
 
@@ -41,15 +40,14 @@ of the solution.
 
 - Node.js v24, pnpm 9+ (`corepack enable` picks up the version pinned in `Frontend/package.json`)
 - .NET SDK 10
-- **SQL Server** — four databases (`OmniConnect_Auth`, `OmniConnect_ModuleRegistry`,
-  `OmniConnect_Lead`, `OmniConnect_Customer360`), one per service. Local SQL Server / LocalDB /
-  SQL Server in Docker all work.
-  For local development against `localhost` with Windows Authentication, the connection strings are
-  already set in each service's `appsettings.Development.json` — a trusted connection carries no
-  password, so it is safe to commit, and that file is only read when
-  `ASPNETCORE_ENVIRONMENT=Development`. Every other environment supplies `ConnectionStrings__*` as
-  environment variables, which outrank that file. **No secret-bearing connection string is ever
-  committed.**
+- **PostgreSQL 14+** — three databases (`omniconnect_auth`, `omniconnect_lead`,
+  `omniconnect_customer360`), one per service. Local, Docker or a hosted instance all work.
+  Every `ConnectionStrings:*` entry in every `appsettings.json` is deliberately **blank**; the value
+  comes from each service's gitignored `.env` and nowhere else. **No secret-bearing connection string
+  is ever committed** — see the Known limitations section for the history behind that rule.
+- **Redis** — optional, and only for running AuthService on more than one instance. Leave
+  `ConnectionStrings__Redis` blank and the service uses in-memory caching, an in-process lock and no
+  SignalR backplane, which is correct for a single instance.
 
 ## First-time setup
 
@@ -72,10 +70,6 @@ git-ignored; only `.env.example` files are committed.
 
 ```bash
 dotnet run --project Backend/AuthService
-```
-
-```bash
-dotnet run --project Backend/ModuleRegistry
 ```
 
 ```bash
@@ -113,16 +107,16 @@ On first run against an empty AuthDb, AuthService seeds the built-in permission 
 roles (Super Admin, Admin, Manager, Agent, Normal User, Read Only User) and one bootstrap Super
 Admin account:
 
-> `superadmin@omniconnect.com` / `Admin@123456`
+> `superadmin@omniconnect.com` / a random password printed once in the startup log
 
-⚠️ **This is a fixed credential committed in `AuthDbSeeder.cs`, and the account is _not_ flagged
-`MustChangePassword`** — nothing forces a change. Change the password immediately after first
-sign-in, and never deploy an environment that still has it.
+The password is generated per install and only its hash is stored, so **copy it out of the log before
+you lose it**. The account is flagged `MustChangePassword` and the global `MustChangePasswordFilter`
+holds it to the change-password endpoint until you replace it.
 
 ### Generating the RS256 key pair
 
 Access tokens are signed RS256. Generate a key pair once and put both values in
-`Backend/AuthService/.env`; put only the **public** key in the other three services' `.env` files —
+`Backend/AuthService/.env`; put only the **public** key in the other two services' `.env` files —
 they validate tokens locally and never issue or forge them:
 
 ```bash
@@ -139,14 +133,15 @@ sequences — every service unescapes that automatically (see `RsaKeyLoader`/`Pr
 ## Contract for future remote apps
 
 See [docs/ADDING-A-REMOTE-APP.md](docs/ADDING-A-REMOTE-APP.md) for the full walkthrough. In short,
-any remote registered in the Module Registry must:
+any remote registered under Setup > Applications must:
 
 1. Build with `@module-federation/vite` (via `@omniremit/federation-config`) and publish an
    `mf-manifest.json` — that single URL is all an admin needs to paste into Setup → Applications.
 2. Expose its root component as `./App` — the host always calls `loadRemote("<key>/App")`.
 3. Use a **globally unique Module Federation container name** (`lead_mf`, `customer360_mf`, …).
-   ModuleRegistry reads it from the fetched manifest and rejects a collision at registration time.
-   Note that the container name is not the same thing as the RemoteApp `Key`.
+   AuthService reads it from the fetched manifest and rejects a collision at registration time, with
+   a unique index behind that check. Note that the container name is not the same thing as the
+   RemoteApp `Key`.
 4. Never import the host's global CSS. Style with its own CSS Modules, and import
    `@omniremit/ui/tokens.css` in `App.tsx` before `./index.css` so it is also styled standalone.
 5. Treat `react` / `react-dom` as federation-shared singletons matching the host's versions.
@@ -160,9 +155,10 @@ any remote registered in the Module Registry must:
    it, and gate each mutating action with `[RequiresCapability("...")]` reading the JWT's `perms`
    claim (reference implementations:
    `Backend/LeadService/Infrastructure/Security/RequiresCapabilityAttribute.cs` and the matching one
-   in `Customer360Service`). ModuleRegistry fetches that endpoint on save/resync and pushes the
-   result into AuthService's catalog — adding a capability there is enough for it to appear in the
-   host's Role editor.
+   in `Customer360Service`). AuthService fetches that endpoint on save/resync and reconciles the
+   result into its catalog — adding a capability there is enough for it to appear in the host's Role
+   editor. A remote that cannot be reached keeps whatever it last declared; it is never read as
+   "declares nothing".
 
 ## What's built
 
@@ -176,10 +172,12 @@ any remote registered in the Module Registry must:
   platform audit log: host mutations write directly, other services write through an internal
   API-key-protected endpoint, so host and remote audits land in one table. Unhandled errors return
   safe, consistent `ProblemDetails` JSON.
-- **ModuleRegistry** — RemoteApps CRUD, Active/Maintenance/Disabled status with an admin-authored
-  maintenance message, background reachability probing of each `ManifestUrl`, the `for-sidebar` feed
-  the host consumes, and the resync-permissions recovery endpoint. Validates JWTs with AuthService's
-  public key only.
+- **Remote-app registry** (inside AuthService) — RemoteApps CRUD, Active/Maintenance/Disabled status
+  with an admin-authored maintenance message, capability discovery from each remote's own
+  `GET /permissions`, background reachability probing of each `ManifestUrl`, and the
+  resync-permissions recovery endpoint. This was a separate `ModuleRegistry` service with its own
+  database that pushed results into AuthService over HTTP; absorbing it made AuthDb the single source
+  of truth and removed the window in which the two could disagree.
 - **LeadService** — Leads CRUD, lead field configuration, dashboard aggregates and audit, behind
   `[RequiresCapability]` gating and maker-checker approval replay. Served under path base
   `/api/lead-service`.
@@ -191,25 +189,24 @@ any remote registered in the Module Registry must:
   Module Federation runtime loader with zero build-time remotes, a topbar gear settings drawer
   surfacing exactly the Users / Roles / Applications screens the signed-in user can reach, Approval
   Center and My Requests, System → Audit Logs, global search, skeleton loading throughout, every
-  route code-split, CSS Modules only (no Tailwind/CSS-in-JS), Zustand for auth and registry state.
+  route code-split, CSS Modules only (no Tailwind/CSS-in-JS), Zustand for auth, navigation and health state.
 - **`@omniremit/ui`** — the shared component library (`Frontend/packages/ui`), consumed by all three
   apps as a pnpm `workspace:*` dependency. **Deliberately not** a Module Federation `exposes` and not
   an MF shared singleton: the host keeps declaring zero build-time remotes and remotes stay
   independently buildable. See [docs/SHARED-UI-REFACTOR-STATUS.md](docs/SHARED-UI-REFACTOR-STATUS.md)
   — required reading before touching any CSS in this repo.
 - **`lead_mf` / `customer360_mf`** — two real remotes built to the contract above. Neither is seeded
-  into ModuleRegistry; an admin registers each by pasting its `mf-manifest.json` URL into
+  as a remote app; an admin registers each by pasting its `mf-manifest.json` URL into
   Setup → Applications.
 
 ## Known limitations
 
 - Service-to-service auth is a shared static API key (`Internal__ApiKey`), not mTLS or OAuth
   client-credentials — a documented v1 simplification.
-- `Backend/LeadService/.env.example` previously shipped a **real `AuthService__InternalApiKey` value
-  committed into the repo**. It has been blanked, but the value remains in git history — treat that
-  key as compromised and rotate it in any environment that used it.
-- The bootstrap Super Admin password is a fixed constant in `AuthDbSeeder.cs`, not a generated
-  one-time secret. It is no longer written to the startup log, but it is still a known constant.
+- Several `appsettings.json` files previously shipped **live database connection strings and a real
+  `Internal__ApiKey`, committed into the repo**. They have been blanked — every one of those values
+  now comes from each service's `.env` — but they remain in git history. **Treat all of them as
+  compromised and rotate them**: the four database passwords and the internal API key.
 - There is no CI pipeline. (Tests do exist: 180 backend across four xUnit projects, 160 frontend
   across the host, both remotes and `@omniremit/ui`.)
 - `docs/ADDING-A-REMOTE-APP.md` still describes the earlier `employee_mf` / `EmployeeService`

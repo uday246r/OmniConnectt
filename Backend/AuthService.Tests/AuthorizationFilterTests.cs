@@ -5,6 +5,7 @@ using AuthService.Application.DTOs;
 using AuthService.Application.Services;
 using AuthService.Domain.Entities;
 using AuthService.Infrastructure;
+using AuthService.Infrastructure.Caching;
 using AuthService.Infrastructure.Security;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -42,7 +43,7 @@ public class AuthorizationFilterTests : IDisposable
 
         db = new AuthDbContext(options);
 
-        var memory = new MemoryCache(new MemoryCacheOptions());
+        var memory = new MemoryPlatformCache(new MemoryCache(new MemoryCacheOptions()));
         fine = new FineCapabilityService(db, memory);
         catalog = new PermissionCatalogAppService(db, memory, fine);
 

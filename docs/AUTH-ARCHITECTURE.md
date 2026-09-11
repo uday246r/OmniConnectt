@@ -2,6 +2,25 @@
 
 A step-by-step map of how authentication and authorization work across the OmniRemit host + remote micro-frontend architecture, with exact file references, organized as a buildable tutorial: what exists, where it lives, why it was built that way, and how to reproduce the same design in a new system. Covers three layers: (1) backend authentication (AuthService), (2) backend authorization/RBAC, (3) frontend + module-federation wiring.
 
+> ⚠️ **Two topology changes postdate this document; the concepts are unchanged.**
+>
+> 1. **`ModuleRegistry` no longer exists.** Wherever this document describes it fetching a remote's
+>    `GET /permissions` and **pushing** the result into AuthService over an internal API-key-protected
+>    HTTP call, that is now an in-process call inside AuthService itself
+>    (`RemoteAppAppService` → `RemoteCapabilityDiscoveryClient` → `PermissionCatalogAppService`).
+>    AuthDb is the single source of truth for remote apps. The permission *model* — dynamic per-feature
+>    capabilities, the Api-vs-fine-grained delivery split, the `perms` claim — is exactly as described.
+>
+>    One rule worth adding: capability discovery distinguishes **null from empty**. Null means the
+>    remote could not be read and the stored capability set is left alone; an empty list is a positive
+>    answer and deactivates it. Collapsing the two would let one unreachable remote revoke every
+>    permission it grants.
+>
+> 2. **`EmployeeService` / `employee_mf` were removed.** Sections using them as the worked example
+>    describe a real design; substitute `lead` / `LeadService` or `customer360` / `Customer360Service`.
+>
+> Line-number references throughout have drifted. Trust the file names, verify the lines.
+
 ---
 
 ## 0. The big picture

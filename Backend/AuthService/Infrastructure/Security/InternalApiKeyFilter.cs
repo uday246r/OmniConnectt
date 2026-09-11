@@ -8,7 +8,7 @@ using Microsoft.Extensions.Options;
 namespace AuthService.Infrastructure.Security;
 
 /// <summary>
-/// Guards the /internal endpoints ModuleRegistry calls to sync the permission catalog. Not JWT auth —
+/// Guards the /internal endpoints the other backend services call. Not JWT auth —
 /// a static shared secret compared against the X-Internal-Api-Key header.
 /// </summary>
 /// <remarks>
@@ -22,7 +22,7 @@ namespace AuthService.Infrastructure.Security;
 /// response latency across many requests. That is a standard finding against a shared-secret endpoint
 /// and cheap to eliminate.
 /// </remarks>
-public class InternalApiKeyFilter(IOptions<InternalApiOptions> options) : IAsyncAuthorizationFilter
+public class InternalApiKeyFilter(IOptions<InternalApiOptions> options, ILogger<InternalApiKeyFilter> logger) : IAsyncAuthorizationFilter
 {
     private const string HeaderName = "X-Internal-Api-Key";
 
@@ -45,9 +45,16 @@ public class InternalApiKeyFilter(IOptions<InternalApiOptions> options) : IAsync
         var provided = context.HttpContext.Request.Headers[HeaderName].ToString().Trim();
         if (!FixedTimeEquals(provided, expected))
         {
+            // The lengths go to a Debug log, never to the response. Returning them to the caller
+            // handed an attacker the secret's length for free — the exact thing FixedTimeEquals below
+            // hashes both inputs to avoid leaking.
+            logger.LogDebug(
+                "Rejected an internal API call: key length {ProvidedLength}, expected {ExpectedLength}.",
+                provided.Length, expected.Length);
+
             context.Result = new UnauthorizedObjectResult(new ProblemDetails
             {
-                Title = $"Missing or invalid internal API key. ExpectedLen={expected.Length}, ProvidedLen={provided.Length}",
+                Title = "Missing or invalid internal API key.",
                 Status = StatusCodes.Status401Unauthorized,
             });
         }

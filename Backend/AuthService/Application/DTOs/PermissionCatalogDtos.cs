@@ -66,20 +66,27 @@ public record UpsertModuleRequest(
     IReadOnlyList<UpsertCapabilityRequest> Capabilities,
     IReadOnlyList<UpsertNavItemRequest>? Nav = null);
 
+/// <summary>
+/// One remote app's whole permission surface, as discovered from its own <c>GET /permissions</c>.
+/// </summary>
+/// <param name="Capabilities">
+/// Null and empty mean different things, exactly as they do for <see cref="UpsertModuleRequest.Nav"/>.
+/// Null is "the remote said nothing" — it was unreachable, or answered something this platform could
+/// not read — and the stored capability set is left untouched. Empty is a real answer: this feature
+/// grants nothing directly, and its capabilities are deactivated.
+/// <para>
+/// The distinction is load-bearing, not tidiness. Without it a remote restarting mid-deploy looks
+/// identical to a remote that has withdrawn every permission it grants, and one hiccup during a
+/// resync deactivates capabilities that every role still references.
+/// </para>
+/// </param>
+/// <param name="Modules">
+/// Same rule. Null leaves every existing sub-module alone, including the sweep that deactivates
+/// sub-modules the remote no longer declares.
+/// </param>
 public record UpsertPermissionFeatureRequest(
     string Key,
     string DisplayName,
     int SortOrder,
-    IReadOnlyList<UpsertCapabilityRequest> Capabilities,
-    IReadOnlyList<UpsertModuleRequest>? Modules = null,
-    // Remote-app render metadata, replicated so the navigation tree is one database read. All
-    // nullable: a host feature has none, and an older Module Registry sends none.
-    string? IconKey = null,
-    string? ManifestUrl = null,
-    string? ContainerName = null,
-    string? Status = null,
-    string? MaintenanceMessage = null);
-
-public record DeactivatePermissionFeatureRequest(string Key);
-
-public record ResyncPermissionFeaturesRequest(IReadOnlyList<UpsertPermissionFeatureRequest> Features);
+    IReadOnlyList<UpsertCapabilityRequest>? Capabilities,
+    IReadOnlyList<UpsertModuleRequest>? Modules = null);

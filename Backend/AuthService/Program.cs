@@ -5,6 +5,9 @@ using AuthService.Application.Events;
 using AuthService.Application.Services;
 using AuthService.Hubs;
 using AuthService.Infrastructure;
+using AuthService.Infrastructure.Caching;
+using AuthService.Infrastructure.Locking;
+using AuthService.Infrastructure.Remotes;
 using AuthService.Infrastructure.Email;
 using AuthService.Infrastructure.Security;
 using AuthService.Infrastructure.Seed;
@@ -16,6 +19,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using StackExchange.Redis;
 
 foreach (var path in new[] {
     Path.Combine(AppContext.BaseDirectory, ".env"),
@@ -104,7 +108,69 @@ builder.Services.AddScoped<SearchAppService>();
 builder.Services.AddMemoryCache();
 builder.Services.AddScoped<NavigationAppService>();
 
-builder.Services.AddSignalR();
+/*
+ * Redis, when configured — and only then.
+ *
+ * Leaving ConnectionStrings:Redis blank keeps this service exactly as it was: in-memory caching, an
+ * in-process lock, and no SignalR backplane. That is the right default for a single instance and for
+ * every local checkout, which is why it needs no configuration at all to run.
+ *
+ * Set it and three things become correct across replicas at once: a role edit on one instance evicts
+ * the navigation catalog every instance reads, an approval decision reaches a client connected to a
+ * different instance, and the remote-app health sweep runs on ONE instance instead of every instance
+ * probing every remote.
+ */
+var redisConnectionString = builder.Configuration.GetConnectionString("Redis");
+var usingRedis = !string.IsNullOrWhiteSpace(redisConnectionString);
+
+var signalR = builder.Services.AddSignalR();
+
+if (usingRedis)
+{
+    // AbortOnConnectFail=false for the same reason the DbContext is registered with a placeholder
+    // connection string: an unreachable dependency at boot must degrade the service, not crash it
+    // into a restart loop. The multiplexer reconnects on its own.
+    var redisOptions = ConfigurationOptions.Parse(redisConnectionString!);
+    redisOptions.AbortOnConnectFail = false;
+    var multiplexer = ConnectionMultiplexer.Connect(redisOptions);
+
+    builder.Services.AddSingleton<IConnectionMultiplexer>(multiplexer);
+    builder.Services.AddStackExchangeRedisCache(options =>
+        options.ConnectionMultiplexerFactory = () => Task.FromResult<IConnectionMultiplexer>(multiplexer));
+
+    builder.Services.AddSingleton<IPlatformCache, RedisPlatformCache>();
+    builder.Services.AddSingleton<IDistributedLock, RedisDistributedLock>();
+
+    // One multiplexer for all three uses, rather than three connections to the same server.
+    signalR.AddStackExchangeRedis(options =>
+    {
+        options.ConnectionFactory = _ => Task.FromResult<IConnectionMultiplexer>(multiplexer);
+        options.Configuration.ChannelPrefix = RedisChannel.Literal("omniremit");
+    });
+}
+else
+{
+    builder.Services.AddSingleton<IPlatformCache, MemoryPlatformCache>();
+    builder.Services.AddSingleton<IDistributedLock, InProcessLock>();
+}
+
+// Remote micro-frontend registration, absorbed from the retired ModuleRegistry service.
+builder.Services.Configure<RemoteHealthOptions>(builder.Configuration.GetSection(RemoteHealthOptions.SectionName));
+
+// Short, and read here rather than inside the client, because a hung remote must not stall a sweep:
+// N unreachable apps on the default 100-second timeout would hold the sweep for minutes.
+var probeTimeout = builder.Configuration.GetValue<TimeSpan?>($"{RemoteHealthOptions.SectionName}:ProbeTimeout")
+    ?? TimeSpan.FromSeconds(5);
+builder.Services.AddHttpClient<RemoteManifestClient>(c => c.Timeout = probeTimeout);
+builder.Services.AddHttpClient<RemoteCapabilityDiscoveryClient>(c => c.Timeout = TimeSpan.FromSeconds(10));
+
+builder.Services.AddScoped<RemoteAppAppService>();
+
+// Singleton so the background sweep and the on-demand refresh endpoint share one set of
+// consecutive-failure counters — two tallies would disagree about whether an app is really down.
+builder.Services.AddSingleton<RemoteHealthProber>();
+builder.Services.AddHostedService<RemoteAppHealthProbeService>();
+
 builder.Services.AddSingleton<KpiCoalescerService>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<KpiCoalescerService>());
 builder.Services.AddSingleton<IPlatformEventPublisher, SignalRPlatformEventPublisher>();
@@ -343,6 +409,11 @@ else
         var db = scope.ServiceProvider.GetRequiredService<AuthDbContext>();
         await db.Database.MigrateAsync();
         await AuthDbSeeder.SeedAsync(db, app.Logger);
+
+        // Runs after AuthDbSeeder because it reads the permission features that seeder creates.
+        // Restores what the ModuleRegistry absorption migration could not carry across, and reports
+        // anything left needing an administrator's attention.
+        await RemoteAppSeeder.SeedAsync(db, app.Logger);
     }
     catch (Exception ex)
     {
@@ -371,12 +442,24 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
+// Only when Redis is absent. This warning used to fire unconditionally, so once a backplane WAS
+// configured it kept reporting a problem that no longer existed — and a warning that is always wrong
+// is a warning nobody reads.
 var instanceCountStr = builder.Configuration["INSTANCE_COUNT"] ?? Environment.GetEnvironmentVariable("INSTANCE_COUNT") ?? Environment.GetEnvironmentVariable("WEB_CONCURRENCY");
-if (int.TryParse(instanceCountStr, out var instanceCount) && instanceCount > 1)
+if (!usingRedis && int.TryParse(instanceCountStr, out var instanceCount) && instanceCount > 1)
 {
     app.Logger.LogWarning(
-        "Instance count is {InstanceCount} but no SignalR Redis backplane is configured. Group broadcasts (approvals/audit) will only reach connections on the sending instance.",
+        "Instance count is {InstanceCount} but ConnectionStrings:Redis is not set. Without it this "
+            + "service is only correct on ONE instance: group broadcasts (approvals/audit) reach only "
+            + "the sending instance, the navigation and capability caches are per-process so a "
+            + "permission change is served stale by the others, and every instance probes every "
+            + "remote app independently.",
         instanceCount);
+}
+else if (usingRedis)
+{
+    app.Logger.LogInformation(
+        "Redis is configured: SignalR backplane, shared caches and single-writer health probing are active.");
 }
 
 if (app.Environment.IsDevelopment())

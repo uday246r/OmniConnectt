@@ -16,6 +16,13 @@ public static class ApprovalModuleKeys
 {
     public const string Users = AuthService.Infrastructure.Seed.AuthDbSeeder.HostFeatureKeys.SettingsUsers;
     public const string Roles = AuthService.Infrastructure.Seed.AuthDbSeeder.HostFeatureKeys.SettingsRoles;
+
+    /// <summary>
+    /// Registering, editing, disabling or removing a remote app. Gated in-process like the two above
+    /// since registration moved into this service — it was previously a remote module, replayed by
+    /// POSTing back to the Module Registry.
+    /// </summary>
+    public const string Applications = AuthService.Infrastructure.Seed.AuthDbSeeder.HostFeatureKeys.SettingsApplications;
 }
 
 public static class ApprovalActionKeys

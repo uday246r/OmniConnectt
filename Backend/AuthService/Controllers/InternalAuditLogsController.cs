@@ -7,7 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace AuthService.Controllers;
 
 /// <summary>
-/// Generic audit-log ingestion for every OTHER service (ModuleRegistry, EmployeeService, any future
+/// Generic audit-log ingestion for every OTHER service (LeadService, Customer360Service, any future
 /// remote's backend) — the same shared static API key as the permission-feature sync endpoints, not
 /// end-user JWTs. AuthService writes its own User/Role audit entries in-process, see
 /// UserAppService/RoleAppService; this is only for everyone else.

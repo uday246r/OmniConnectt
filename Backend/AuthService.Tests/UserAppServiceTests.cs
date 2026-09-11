@@ -5,6 +5,7 @@ using AuthService.Application.Services;
 using AuthService.Domain.Entities;
 using AuthService.Domain.Enums;
 using AuthService.Infrastructure;
+using AuthService.Infrastructure.Caching;
 using AuthService.Infrastructure.Email;
 using AuthService.Infrastructure.Security;
 using AuthService.Infrastructure.Validation;
@@ -53,7 +54,7 @@ public class UserAppServiceTests : IDisposable
             db, new NoOpEmailSender(), passwordHasher,
             MsOptions.Create(new SmtpOptions()), MsOptions.Create(new PasswordPolicyOptions()),
             NullLogger<SetPasswordInviteService>.Instance);
-        var fineCapabilities = new FineCapabilityService(db, new MemoryCache(new MemoryCacheOptions()));
+        var fineCapabilities = new FineCapabilityService(db, new MemoryPlatformCache(new MemoryCache(new MemoryCacheOptions())));
         var fieldSchema = new UserFieldSchemaAppService(db);
         var schemaValidator = new UserSchemaValidator();
         var validationPresets = new ValidationPresetAppService(db);

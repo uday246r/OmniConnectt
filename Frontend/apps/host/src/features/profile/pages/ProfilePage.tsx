@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../auth/store/authStore'
-import { useModuleRegistryStore } from '../../../shared/stores/moduleRegistryStore'
+import { useRemoteHealthStore } from '../../../shared/stores/remoteHealthStore'
 import { usersApi } from '../../settings-users/api/usersApi'
 import { salutationsApi } from '../../settings-user-fields/api/salutationsApi'
 import { usePermissionCatalog } from '../../settings-users/hooks/usePermissionCatalog'
@@ -44,7 +44,7 @@ export function ProfilePage() {
   const accessToken = useAuthStore((s) => s.accessToken)
   const fineCapabilities = useAuthStore((s) => s.fineCapabilities)
   const refreshSession = useAuthStore((s) => s.refreshSession)
-  const registryApps = useModuleRegistryStore((s) => s.apps)
+  const registryApps = useRemoteHealthStore((s) => s.entries)
 
   // Drawer state
   const [drawerOpen, setDrawerOpen] = useState(false)

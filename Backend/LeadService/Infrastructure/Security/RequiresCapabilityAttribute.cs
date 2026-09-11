@@ -13,7 +13,7 @@ namespace LeadManagement.Api.Infrastructure.Security;
 public class RequiresCapabilityAttribute : Attribute, IAsyncAuthorizationFilter
 {
     /// <summary>
-    /// Root PermissionFeatureKey when registered in ModuleRegistry with Key = "lead".
+    /// Root PermissionFeatureKey when registered under Setup > Applications with Key = "lead".
     /// </summary>
     public const string FeatureKey = "remote.lead";
 
@@ -43,8 +43,7 @@ public class RequiresCapabilityAttribute : Attribute, IAsyncAuthorizationFilter
 
 
         /*
-         * Administrator bypass — ONE claim, checked exactly, matching EmployeeService, AuthService and
-         * ModuleRegistry.
+         * Administrator bypass — ONE claim, checked exactly, matching AuthService.
          *
          * This previously also accepted `admin`/`isAdministrator` claim aliases and, worse,
          * `user.IsInRole("Admin"|"SuperAdmin"|"Administrator")`. IsInRole matches any claim whose type

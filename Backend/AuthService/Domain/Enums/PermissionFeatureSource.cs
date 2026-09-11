@@ -2,7 +2,7 @@ namespace AuthService.Domain.Enums;
 
 /// <summary>
 /// Where a permission-catalog entry came from. Host features are seeded once at startup;
-/// RemoteApp features are pushed in at runtime by the Module Registry service whenever an
+/// RemoteApp features are written at runtime by RemoteAppAppService whenever an
 /// admin registers/updates/removes a remote app — never hardcoded here.
 /// </summary>
 public enum PermissionFeatureSource

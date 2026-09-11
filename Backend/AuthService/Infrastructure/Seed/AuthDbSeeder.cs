@@ -8,7 +8,7 @@ namespace AuthService.Infrastructure.Seed;
 /// <summary>
 /// Bootstraps a brand-new AuthDb with the host's own permission catalog (the features the host
 /// application itself owns, each with its own small fixed capability set — everything else in the
-/// catalog arrives later, pushed in by the Module Registry service as remote apps get registered,
+/// catalog arrives later, written by RemoteAppAppService as remote apps get registered,
 /// each declaring its own dynamic capability set) and a starter set of built-in roles + one Super
 /// Admin account so there is a way to log in on day one.
 ///
@@ -412,7 +412,10 @@ public static class AuthDbSeeder
         CancellationToken ct)
     {
         const string bootstrapEmail = "superadmin@omniconnect.com";
-        const string bootstrapPassword = "Admin@123456";
+        // Generated, never a literal. A password committed to source is the same password on every
+        // install of this platform, so anyone who has read the repository holds the founding
+        // credential of every deployment that was not hardened after first boot.
+        var bootstrapPassword = TemporaryPasswordGenerator.Generate();
 
         if (await db.Users.AnyAsync(ct))
         {
@@ -436,7 +439,9 @@ public static class AuthDbSeeder
             PasswordHash = string.Empty,
             Status = UserStatus.Active,
             RoleId = superAdminRole.Id,
-            MustChangePassword = false,
+            // MustChangePasswordFilter is registered globally, so this account can reach nothing but
+            // the change-password endpoint until the generated password is replaced.
+            MustChangePassword = true,
             CreatedAt = now,
             UpdatedAt = now,
         };
@@ -445,12 +450,14 @@ public static class AuthDbSeeder
         db.Users.Add(user);
         await db.SaveChangesAsync(ct);
 
-        // The password is deliberately not logged. Logs are aggregated, shipped and retained far
-        // more widely than the database is, so a credential written here outlives the machine it
-        // was printed on. It is a fixed value documented in SETUP.md, so nothing is unrecoverable.
-        logger.LogInformation(
-            "Seeded default Super Admin account. Email: {Email}. The bootstrap password is documented "
-                + "in SETUP.md — sign in and change it before exposing this instance to anyone else.",
-            bootstrapEmail);
+        // Printed ONCE, at first-run seeding only, and unrecoverable afterwards — only the hash is
+        // stored. Logs do travel further than the database, which is the cost of this approach; a
+        // per-install random secret that reaches one log is still strictly better than a constant
+        // that reaches everyone holding the repository.
+        logger.LogWarning(
+            "Seeded the bootstrap Super Admin account.\n  Email:    {Email}\n  Password: {Password}\n"
+                + "This is printed once and cannot be recovered. Sign in, change it immediately, and "
+                + "clear it from your terminal scrollback.",
+            bootstrapEmail, bootstrapPassword);
     }
 }

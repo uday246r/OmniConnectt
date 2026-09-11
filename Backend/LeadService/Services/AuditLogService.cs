@@ -120,7 +120,7 @@ namespace LeadManagement.Api.Services
             var totalRecords = await q.CountAsync();
 
             /*
-             * A real cap, at the same 100 AuthService and ModuleRegistry enforce.
+             * A real cap, at the same 100 AuthService enforces.
              *
              * This previously read "if pageSize is <= 0 or > 1000, set it to totalRecords" — the
              * opposite of a limit: asking for an absurd page size returned the ENTIRE table, so one

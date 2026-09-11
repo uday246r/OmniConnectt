@@ -12,7 +12,7 @@ public record AccessTokenResult(string Token, DateTimeOffset ExpiresAt);
 
 /// <summary>
 /// Issues short-lived RS256 access tokens. AuthService is the only service that ever touches the
-/// private key; the public key is what ModuleRegistry (and AuthService itself, for its own
+/// private key; the public key is what the other services (and AuthService itself, for its own
 /// [Authorize] endpoints) validates incoming tokens against.
 /// </summary>
 public class JwtTokenService(IOptions<JwtOptions> options)

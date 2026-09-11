@@ -103,10 +103,10 @@ export function DashboardPage() {
   const [stats, setStats] = useState<DashboardStatsDto | null>(null)
   const [apps, setApps] = useState<RemoteAppDto[]>([])
   const [error, setError] = useState<string | null>(null)
-  // ModuleRegistry unreachable. Distinct from "zero apps registered" — the card must not print 0,
+  // The applications call failed. Distinct from "zero apps registered" — the card must not print 0,
   // which would read as a real count taken from a healthy service.
   const [appsUnavailable, setAppsUnavailable] = useState(false)
-  // Real per-app reachability from the registry probe. Drives the System Status card, which used
+  // Real per-app reachability from the background probe. Drives the System Status card, which used
   // to be hardcoded.
   const [health, setHealth] = useState<HealthEntryDto[] | null>(null)
   const [recentLogs, setRecentLogs] = useState<AuditLogDto[]>([])
@@ -132,16 +132,14 @@ export function DashboardPage() {
         const [statsRes, appsRes, logsRes, healthRes] = await Promise.all([
           dashboardApi.stats(accessToken!, signal),
           /*
-           * Guarded like its neighbours, because it talks to a DIFFERENT service.
+           * Guarded like its neighbours, and still worth it now that every call here goes to one
+           * service: a Promise.all rejects as a whole, so one failing endpoint would take the others
+           * down with it. That is how this page once reported "0 users, 0 roles" while the server was
+           * up and answering both correctly. Reporting zero users to a bank operator because one
+           * unrelated card could not load is a wrong fact, not a missing one.
            *
-           * This call goes to ModuleRegistry; stats goes to AuthService. Unguarded inside a
-           * Promise.all, a ModuleRegistry outage rejected the whole batch, so setStats never ran and
-           * every card kept its initial 0 — the page reported "0 users, 0 roles" while AuthService was
-           * up and answering correctly. Reporting zero users to a bank operator because an unrelated
-           * service is down is a wrong fact, not a missing one.
-           *
-           * `null` (not an empty list) marks unreachable, so the card can distinguish "the registry is
-           * down" from "no applications are registered".
+           * `null` (not an empty list) marks "could not load", so the card can distinguish that from
+           * "no applications are registered".
            */
           remoteAppsApi.list(accessToken!, { pageSize: 12 }, signal).catch(() => null),
           auditLogsApi.list(accessToken!, { pageSize: 6 }, signal).catch(() => ({ items: [], total: 0 })),

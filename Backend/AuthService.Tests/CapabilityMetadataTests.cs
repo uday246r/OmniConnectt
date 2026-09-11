@@ -3,6 +3,7 @@ using AuthService.Application.Services;
 using AuthService.Domain.Entities;
 using AuthService.Domain.Enums;
 using AuthService.Infrastructure;
+using AuthService.Infrastructure.Caching;
 using AuthService.Infrastructure.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
@@ -30,7 +31,7 @@ public class CapabilityMetadataTests : IDisposable
 
         db = new AuthDbContext(options);
 
-        var memory = new MemoryCache(new MemoryCacheOptions());
+        var memory = new MemoryPlatformCache(new MemoryCache(new MemoryCacheOptions()));
         fine = new FineCapabilityService(db, memory);
         catalog = new PermissionCatalogAppService(db, memory, fine);
     }
@@ -283,7 +284,7 @@ public class CapabilityMetadataTests : IDisposable
             Effect = PermissionEffect.Revoke,
         });
         await db.SaveChangesAsync();
-        fine.InvalidateAll();
+        await fine.InvalidateAllAsync();
 
         Assert.Empty(await fine.GetForUserAsync(user.Id));
     }
@@ -355,7 +356,7 @@ public class CapabilityMetadataTests : IDisposable
 
         user.IsDeleted = true;
         await db.SaveChangesAsync();
-        fine.InvalidateAll();
+        await fine.InvalidateAllAsync();
 
         Assert.Empty(await fine.GetForUserAsync(user.Id));
     }

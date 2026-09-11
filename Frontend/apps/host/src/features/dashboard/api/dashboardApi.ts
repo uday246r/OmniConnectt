@@ -1,6 +1,6 @@
 import { env } from '../../../config/env'
 import { apiFetch } from '../../../shared/api/httpClient'
-import { moduleRegistryClient, type HealthEntryDto } from '../../../shared/api/moduleRegistryClient'
+import { remoteAppsApi, type HealthEntryDto } from '../../settings-applications/api/remoteAppsApi'
 
 const base = env.authServiceUrl
 
@@ -50,8 +50,8 @@ export const dashboardApi = {
   stats: (accessToken: string, signal?: AbortSignal) =>
     apiFetch<DashboardStatsDto>(`${base}/api/dashboard/stats`, { accessToken, signal }),
 
-  /** Real reachability per registered remote app, as last recorded by ModuleRegistry's background probe. */
-  health: (accessToken: string, signal?: AbortSignal) => moduleRegistryClient.health(accessToken, signal),
+  /** Real reachability per registered remote app, as last recorded by AuthService's background probe. */
+  health: (accessToken: string, signal?: AbortSignal) => remoteAppsApi.health(accessToken, signal),
 
   /**
    * Reachability, re-probed now.
@@ -59,8 +59,8 @@ export const dashboardApi = {
    * The System Status card is the most prominent health readout in the product, so it should not be
    * showing a value that could be a whole sweep interval old — that is precisely how a recovered app
    * ended up still reported as "Degraded" no matter how many times the page was refreshed. The
-   * registry throttles this, so calling it on every dashboard mount is safe.
+   * server throttles this, so calling it on every dashboard mount is safe.
    */
   refreshHealth: (accessToken: string, signal?: AbortSignal) =>
-    moduleRegistryClient.refreshHealth(accessToken, signal),
+    remoteAppsApi.refreshHealth(accessToken, signal),
 }

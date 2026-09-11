@@ -2,7 +2,7 @@ using AuthService.Domain.Entities;
 using AuthService.Domain.Enums;
 using AuthService.Infrastructure;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Caching.Memory;
+using AuthService.Infrastructure.Caching;
 
 namespace AuthService.Application.Services;
 
@@ -25,7 +25,7 @@ namespace AuthService.Application.Services;
 /// has to, and a test asserts they agree.
 /// </para>
 /// </remarks>
-public class FineCapabilityService(AuthDbContext db, IMemoryCache cache)
+public class FineCapabilityService(AuthDbContext db, IPlatformCache cache)
 {
     /// <summary>
     /// Short enough that a revoked capability stops working almost immediately, long enough that a
@@ -35,6 +35,9 @@ public class FineCapabilityService(AuthDbContext db, IMemoryCache cache)
     private static readonly TimeSpan CacheDuration = TimeSpan.FromSeconds(60);
 
     private const string VersionKey = "fine-capabilities:version";
+
+    /// <summary>Shape version of the cached payload. See NavigationAppService.CatalogCacheKey.</summary>
+    private const string KeyPrefix = "fine-capabilities:v1";
 
     /// <summary>
     /// Bumped whenever a change could affect more than one user, and folded into every cache key.
@@ -46,9 +49,7 @@ public class FineCapabilityService(AuthDbContext db, IMemoryCache cache)
     /// than the cache saves. Changing the key prefix instead retires every entry at once; the orphans
     /// are never read again and fall out on their own expiry.
     /// </remarks>
-    private long Version => cache.GetOrCreate(VersionKey, _ => 0L);
-
-    private string CacheKey(Guid userId) => $"fine-capabilities:{Version}:{userId}";
+    private static string CacheKey(long version, Guid userId) => $"{KeyPrefix}:{version}:{userId}";
 
     /// <summary>
     /// Every fine-grained permission string the user holds, as <c>{featureKey}:{capability}</c> —
@@ -56,24 +57,32 @@ public class FineCapabilityService(AuthDbContext db, IMemoryCache cache)
     /// </summary>
     public async Task<IReadOnlyList<string>> GetForUserAsync(Guid userId, CancellationToken ct = default)
     {
-        if (cache.TryGetValue(CacheKey(userId), out IReadOnlyList<string>? cached) && cached is not null)
+        var version = await cache.GetVersionAsync(VersionKey, ct);
+        var key = CacheKey(version, userId);
+
+        var cached = await cache.GetAsync<IReadOnlyList<string>>(key, ct);
+        if (cached is not null)
         {
             return cached;
         }
 
         var resolved = await ResolveAsync(userId, ct);
-        cache.Set(CacheKey(userId), resolved, CacheDuration);
+        await cache.SetAsync(key, resolved, CacheDuration, ct);
         return resolved;
     }
 
-    /// <summary>Drops one user's cached set. For a change that affects only that user's overrides.</summary>
-    public void Invalidate(Guid userId) => cache.Remove(CacheKey(userId));
+    /// <summary>Drops one user’s cached set. For a change that affects only that user’s overrides.</summary>
+    public async Task InvalidateAsync(Guid userId, CancellationToken ct = default)
+    {
+        var version = await cache.GetVersionAsync(VersionKey, ct);
+        await cache.RemoveAsync(CacheKey(version, userId), ct);
+    }
 
     /// <summary>
     /// Retires every cached set. For a role edit or a catalog sync, which can change the answer for
     /// users this call has no way to enumerate.
     /// </summary>
-    public void InvalidateAll() => cache.Set(VersionKey, Version + 1);
+    public Task InvalidateAllAsync(CancellationToken ct = default) => cache.BumpVersionAsync(VersionKey, ct);
 
     private async Task<IReadOnlyList<string>> ResolveAsync(Guid userId, CancellationToken ct)
     {

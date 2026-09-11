@@ -19,7 +19,7 @@ public class AuthDbContext(DbContextOptions<AuthDbContext> options) : DbContext(
     public DbSet<CheckerAssignment> CheckerAssignments => Set<CheckerAssignment>();
     public DbSet<SetPasswordInvite> SetPasswordInvites => Set<SetPasswordInvite>();
     public DbSet<FeatureNavItem> FeatureNavItems => Set<FeatureNavItem>();
-    public DbSet<RemoteAppNavMetadata> RemoteAppNavMetadata => Set<RemoteAppNavMetadata>();
+    public DbSet<RemoteApp> RemoteApps => Set<RemoteApp>();
     public DbSet<NavSection> NavSections => Set<NavSection>();
     public DbSet<HostNavItem> HostNavItems => Set<HostNavItem>();
     public DbSet<UserFieldSchema> UserFieldSchemas => Set<UserFieldSchema>();
@@ -125,22 +125,41 @@ public class AuthDbContext(DbContextOptions<AuthDbContext> options) : DbContext(
             entity.Property(n => n.RequiredCapability).HasMaxLength(50);
         });
 
-        modelBuilder.Entity<RemoteAppNavMetadata>(entity =>
+        modelBuilder.Entity<RemoteApp>(entity =>
         {
-            // Keyed by FeatureId rather than an Id of its own: exactly one metadata row per feature,
-            // enforced by the primary key instead of an index that could be forgotten.
-            entity.HasKey(m => m.FeatureId);
+            // Keyed by FeatureId rather than an Id of its own: exactly one registration per remote-app
+            // feature, enforced by the primary key instead of an index that could be forgotten.
+            entity.HasKey(a => a.FeatureId);
 
-            entity.HasOne(m => m.Feature)
+            entity.HasOne(a => a.Feature)
                 .WithMany()
-                .HasForeignKey(m => m.FeatureId)
+                .HasForeignKey(a => a.FeatureId)
                 .OnDelete(DeleteBehavior.Cascade);
 
-            entity.Property(m => m.IconKey).HasMaxLength(100);
-            entity.Property(m => m.ManifestUrl).HasMaxLength(2048);
-            entity.Property(m => m.ContainerName).HasMaxLength(200);
-            entity.Property(m => m.Status).HasMaxLength(20);
-            entity.Property(m => m.MaintenanceMessage).HasMaxLength(2000);
+            entity.HasIndex(a => a.Key).IsUnique();
+
+            // The Module Federation container name is a GLOBAL identifier in the browser: two remotes
+            // sharing one overwrite each other's container at runtime, producing a bewildering "the
+            // wrong app rendered" bug. Key's uniqueness cannot catch it — "lead" and "lead_mf" are
+            // different values. Filtered because the column is null until the first successful
+            // manifest probe.
+            entity.HasIndex(a => a.ContainerName).IsUnique().HasFilter("\"ContainerName\" IS NOT NULL");
+
+            // The admin list and the health feed both filter on Status.
+            entity.HasIndex(a => a.Status);
+
+            entity.Property(a => a.Key).HasMaxLength(100);
+            entity.Property(a => a.IconKey).HasMaxLength(100);
+            entity.Property(a => a.ManifestUrl).HasMaxLength(2048);
+            entity.Property(a => a.ContainerName).HasMaxLength(200);
+            entity.Property(a => a.MaintenanceMessage).HasMaxLength(2000);
+            entity.Property(a => a.PermissionsSourceUrl).HasMaxLength(2048);
+            entity.Property(a => a.LastHealthError).HasMaxLength(1000);
+
+            // Stored as text, not an int: a status read straight out of the database should say what
+            // it means, and these two enums are read by hand during an incident more than by any code.
+            entity.Property(a => a.Status).HasConversion<string>().HasMaxLength(20);
+            entity.Property(a => a.Health).HasConversion<string>().HasMaxLength(20);
         });
 
         modelBuilder.Entity<NavSection>(entity =>

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useAuthStore } from '../../auth/store/authStore'
-import { useModuleRegistryStore } from '../../../shared/stores/moduleRegistryStore'
+import { useRemoteHealthStore } from '../../../shared/stores/remoteHealthStore'
 import { useSettingsDrawerStore } from '../../../shared/stores/settingsDrawerStore'
 import { TOPICS, invalidate, useDataRevision } from '../../../shared/stores/invalidationStore'
 import { ApiError } from '../../../shared/api/httpClient'
@@ -60,7 +60,7 @@ export function UserDetailPage() {
   const isAdministrator = Boolean(useAuthStore((s) => s.user)?.isAdministrator)
   const hasCapability = useAuthStore((s) => s.hasCapability)
   const currentUserId = useAuthStore((s) => s.user?.id)
-  const registryApps = useModuleRegistryStore((s) => s.apps)
+  const registryApps = useRemoteHealthStore((s) => s.entries)
   const pushLayer = useSettingsDrawerStore((s) => s.pushLayer)
   const dataRevision = useDataRevision(TOPICS.users)
   const { catalog } = usePermissionCatalog()

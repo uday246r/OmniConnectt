@@ -87,7 +87,7 @@ namespace backend.Controllers
              * single request for pageSize=1000000 makes the database materialise the whole table into
              * memory - a trivially cheap request that is expensive to serve, which is the shape of an
              * accidental (or deliberate) denial of service. 100 matches the cap AuthService and
-             * ModuleRegistry already enforce.
+             * AuthService already enforces.
              */
             pageNumber = Math.Max(pageNumber, 1);
             pageSize = Math.Clamp(pageSize, 1, 100);

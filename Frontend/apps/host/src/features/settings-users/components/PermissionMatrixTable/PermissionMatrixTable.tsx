@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { ColumnFilter, FilterBar, useDebouncedValue, type ActiveFilter, type ColumnFilterOption } from '@omniremit/ui'
 import { Icon } from '../../../../shared/components/Icon/Icon'
 import type { PermissionFeatureDto } from '../../../../shared/api/permissionsApi'
-import type { SidebarAppDto } from '../../../../shared/api/moduleRegistryClient'
+import type { HealthEntryDto } from '../../../settings-applications/api/remoteAppsApi'
 import { groupPermissionsByApp } from '../../../profile/utils/formatUserPermissions'
 import styles from './PermissionMatrixTable.module.css'
 
@@ -48,7 +48,7 @@ export interface PermissionMatrixTableProps {
   /** Flat "featureKey:Capability" strings — the caller computes these (the logged-in user's own session permissions, or another user's merged role + override set). Ignored when `isAdministrator` is true. */
   permissions: string[]
   catalog: PermissionFeatureDto[]
-  registryApps: SidebarAppDto[]
+  registryApps: HealthEntryDto[]
   isAdministrator: boolean
   roleName?: string | null
 }

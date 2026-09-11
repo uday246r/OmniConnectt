@@ -7,7 +7,7 @@ import { RequirePasswordChange } from './features/auth/components/RequirePasswor
 import { useSilentRefresh } from './features/auth/hooks/useSilentRefresh'
 import { usePlatformConnection } from './shared/realtime/usePlatformConnection'
 import { useAuthStore } from './features/auth/store/authStore'
-import { useModuleRegistryStore } from './shared/stores/moduleRegistryStore'
+import { useRemoteHealthStore } from './shared/stores/remoteHealthStore'
 import { useNavigationStore } from './shared/stores/navigationStore'
 import { isDrawerRoute, useSettingsDrawerStore, type SettingsTab } from './shared/stores/settingsDrawerStore'
 import { RouteFallback } from './shared/components/RouteFallback/RouteFallback'
@@ -312,12 +312,9 @@ function AuthenticatedShell() {
     setReturnPath(`${shellLocation.pathname}${shellLocation.search}`)
   }, [shellLocation.pathname, shellLocation.search, setReturnPath])
 
-  const registryStatus = useModuleRegistryStore((s) => s.status)
-  const registryApps = useModuleRegistryStore((s) => s.apps)
-  const fetchForSidebar = useModuleRegistryStore((s) => s.fetchForSidebar)
-
-  // The sidebar is now rendered entirely from this tree. Same one-shot-on-idle discipline as the
-  // registry fetch below it, and for the same reason.
+  // The sidebar is rendered entirely from this tree, and it is the only source of it. A second feed
+  // listing the same apps used to sit alongside this one; the two answered the same question with
+  // two different permission filters, and could disagree.
   const navStatus = useNavigationStore((s) => s.status)
   const fetchNavigation = useNavigationStore((s) => s.fetch)
 
@@ -330,61 +327,34 @@ function AuthenticatedShell() {
       })
   }, [accessToken, navStatus, ensureFreshAccessToken, fetchNavigation])
 
+  const healthEntries = useRemoteHealthStore((s) => s.entries)
+  const healthStatus = useRemoteHealthStore((s) => s.status)
+  const refetchHealth = useRemoteHealthStore((s) => s.refetch)
+
   useEffect(() => {
-    if (!accessToken) return
-    /*
-     * Fetch ONCE per session, on 'idle' only.
-     *
-     * Retrying on 'error' here was a retry storm, not resilience. The store sets 'error' with an empty
-     * app list when the registry is unreachable; `registryStatus` is an effect dependency, so the
-     * effect re-ran, saw `error && apps.length === 0`, and fetched again — which set 'loading', which
-     * re-ran the effect, forever. Against a downed ModuleRegistry that is an unbounded request loop
-     * (netstat showed three simultaneous connection attempts), and because the sidebar renders
-     * skeletons whenever status is 'loading', the APPS section sat on grey placeholders through every
-     * cycle instead of showing the error state that was already written for it.
-     *
-     * Hammering a service that is down is also precisely what stops it coming back up. One attempt,
-     * then the error state, whose copy already tells the user to refresh.
-     */
-    if (registryStatus === 'idle') {
-      void ensureFreshAccessToken()
-        .then(fetchForSidebar)
-        .catch(() => {
-          // ensureFreshAccessToken already routes to /login via authStore on failure
-        })
-    }
-  }, [accessToken, registryStatus, ensureFreshAccessToken, fetchForSidebar])
-
-  const refetchHealth = useModuleRegistryStore((s) => s.refetchHealth)
+    if (!accessToken || healthStatus !== 'idle') return
+    void refetchHealth()
+  }, [accessToken, healthStatus, refetchHealth])
 
   /*
-   * Periodic self-correction for the one-shot fetch above.
-   *
-   * The fetch above deliberately only runs once per session — see its comment. That means a remote
-   * app that happened to be down at that single moment (e.g. still starting up) stayed badged
-   * "Unreachable" for the rest of the session with no way to self-correct short of a full reload.
-   * This polls the lightweight health-only endpoint instead of re-running the fetch above, so it
-   * only ever merges `health`/`lastHealthCheckAt` into the existing apps array and never touches
-   * `status` — it can't trigger the 'loading' skeleton this file (line ~182) and RemoteAppPage both
-   * render whenever status is 'idle' or 'loading'.
-   */
-  /*
-   * The cadence is adaptive, for the same reason the registry's own sweep is: while everything is
+   * The cadence is adaptive, for the same reason the server's own sweep is: while everything is
    * green there is nothing to watch for and a minute is plenty, but while an app is showing as
    * anything other than healthy the poll interval IS how long a wrong answer stays on screen. A flat
    * 60s meant an app that had already come back up kept its warning badge for up to a minute.
+   *
+   * Health is polled rather than folded into the navigation tree because it is rewritten on a probe
+   * interval while the tree is cached — baking one into the other would serve a stale status from a
+   * cache with no reason to expire when a probe lands.
    */
-  const hasUnsettledApp = useModuleRegistryStore((s) =>
-    s.apps.some((a) => a.health !== undefined && a.health !== 'Healthy'),
-  )
+  const hasUnsettledApp = useRemoteHealthStore((s) => s.entries.some((e) => e.health !== 'Healthy'))
 
   useEffect(() => {
     if (!accessToken) return
     const period = hasUnsettledApp ? 10_000 : 60_000
     const interval = setInterval(() => {
       // Force an actual re-probe while something looks wrong: the plain read returns whatever the
-      // registry's background sweep last stored, which is exactly the stale value we are trying to
-      // move past. When all is well, the cheap cached read is fine.
+      // background sweep last stored, which is exactly the stale value we are trying to move past.
+      // When all is well, the cheap stored read is fine.
       void refetchHealth(hasUnsettledApp)
     }, period)
     return () => clearInterval(interval)
@@ -400,9 +370,8 @@ function AuthenticatedShell() {
   // flags from the client, because the navigation tree already applied those same permissions
   // server-side. Deciding visibility twice, in two languages, is how the two drift apart.
 
-  // Health is keyed by app for the sidebar's "not responding" badge. It stays a separate feed from
-  // the navigation tree because the registry rewrites it on a probe interval.
-  const appHealth = Object.fromEntries(registryApps.map((a) => [a.key, a.health]))
+  // Keyed by app for the sidebar's "not responding" badge.
+  const appHealth = Object.fromEntries(healthEntries.map((e) => [e.key, e.health]))
 
   return (
     <AppShell

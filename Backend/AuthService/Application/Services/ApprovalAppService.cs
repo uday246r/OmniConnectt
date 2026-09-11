@@ -19,7 +19,8 @@ namespace AuthService.Application.Services;
 /// </summary>
 public class ApprovalAppService(
     AuthDbContext db, AuditLogAppService auditLog, UserAppService userAppService, RoleAppService roleAppService,
-    RemoteApprovalCallbackClient callbackClient, SecretProtector secretProtector, IPlatformEventPublisher events)
+    RemoteAppAppService remoteAppService, RemoteApprovalCallbackClient callbackClient,
+    SecretProtector secretProtector, IPlatformEventPublisher events)
 {
     private const string ServiceName = "AuthService";
 
@@ -414,6 +415,59 @@ public class ApprovalAppService(
 
             case (ApprovalModuleKeys.Roles, ApprovalActionKeys.Delete):
                 await roleAppService.DeleteAsync(Guid.Parse(request.EntityId!), request.MakerId, ct, bypassApproval: true);
+                break;
+
+            /*
+             * Remote-app registration. In-process since the Module Registry was absorbed, so these sit
+             * ABOVE the default case and never touch RemoteReplayGuard.
+             *
+             * That is deliberate, and the guard's own comment explains why: it exists because an HTTP
+             * POST to another service's database is outside this transaction's rollback, so a retried
+             * execution strategy would apply the mutation twice. These calls are inside the
+             * transaction, are rolled back with it, and therefore MUST re-run on a retry. Placing them
+             * under `default:` would let the guard skip the replay on the second attempt and leave the
+             * request marked Approved with nothing applied.
+             *
+             * NewDataJson is always the flat RemoteAppSnapshotDto — never a live request DTO — so the
+             * diff pane and the replay read the same shape. Adding a field means updating the snapshot,
+             * both places that build it, and the reconstruction below together.
+             */
+            case (ApprovalModuleKeys.Applications, ApprovalActionKeys.Create):
+            {
+                var snapshot = JsonSerializer.Deserialize<RemoteAppSnapshotDto>(request.NewDataJson)!;
+                await remoteAppService.CreateAsync(
+                    new CreateRemoteAppRequest(
+                        snapshot.Key, snapshot.DisplayName, snapshot.IconKey, snapshot.ManifestUrl,
+                        snapshot.PermissionsSourceUrl, snapshot.SidebarOrder),
+                    request.MakerId, request.MakerName, ct, bypassApproval: true);
+                break;
+            }
+
+            case (ApprovalModuleKeys.Applications, ApprovalActionKeys.Update):
+            {
+                var snapshot = JsonSerializer.Deserialize<RemoteAppSnapshotDto>(request.NewDataJson)!;
+                await remoteAppService.UpdateAsync(
+                    Guid.Parse(request.EntityId!),
+                    new UpdateRemoteAppRequest(
+                        snapshot.DisplayName, snapshot.IconKey, snapshot.ManifestUrl,
+                        snapshot.PermissionsSourceUrl, snapshot.SidebarOrder),
+                    request.MakerId, request.MakerName, ct, bypassApproval: true);
+                break;
+            }
+
+            case (ApprovalModuleKeys.Applications, ApprovalActionKeys.Enable):
+            case (ApprovalModuleKeys.Applications, ApprovalActionKeys.Disable):
+            {
+                var snapshot = JsonSerializer.Deserialize<RemoteAppSnapshotDto>(request.NewDataJson)!;
+                await remoteAppService.UpdateStatusAsync(
+                    Guid.Parse(request.EntityId!), snapshot.Status, snapshot.MaintenanceMessage,
+                    request.MakerId, request.MakerName, ct, bypassApproval: true);
+                break;
+            }
+
+            case (ApprovalModuleKeys.Applications, ApprovalActionKeys.Delete):
+                await remoteAppService.DeleteAsync(
+                    Guid.Parse(request.EntityId!), request.MakerId, request.MakerName, ct, bypassApproval: true);
                 break;
 
             // Every module AuthService doesn't own in-process (i.e. every remote-registered module —

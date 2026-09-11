@@ -5,7 +5,7 @@ namespace AuthService.Domain.Entities;
 /// <summary>
 /// One row per grantable "feature" in the permission matrix (e.g. "host.settings.users",
 /// "remote.whatsapp-console"). Host features are seeded at startup; RemoteApp features are
-/// upserted by the Module Registry service's internal client whenever an admin registers,
+/// upserted by RemoteAppAppService whenever an admin registers,
 /// edits, or removes a remote app — this table is the single source of truth the Role editor
 /// (Features/Capabilities matrix) and the JWT permission claims are both built from.
 /// </summary>
@@ -50,7 +50,7 @@ public class PermissionFeature
     /// The set of capabilities THIS feature actually grants — dynamic per feature, not a fixed
     /// global list. Host features declare their own small fixed set at seed time; RemoteApp
     /// features get theirs from whatever the remote's own discovery endpoint reports (see
-    /// ModuleRegistry's PermissionsSourceUrl), so a remote adding a new action just shows up here
+    /// RemoteApp.PermissionsSourceUrl), so a remote adding a new action just shows up here
     /// next sync, nothing hardcoded on this side.
     /// </summary>
     public ICollection<PermissionFeatureCapability> Capabilities { get; set; } = new List<PermissionFeatureCapability>();

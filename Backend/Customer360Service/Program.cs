@@ -27,7 +27,7 @@ var builder = WebApplication.CreateBuilder(args);
 // ---------------------------------------------------------------------------
 // Database — this service's own Postgres DB (field-visibility/masking config, audit trail). New as
 // of this feature; previously this service had no database at all. Falls back to an "unconfigured"
-// placeholder connection string rather than throwing, matching ModuleRegistry's pattern, so the
+// placeholder connection string rather than throwing, matching AuthService's pattern, so the
 // service still boots (CRM-proxy endpoints keep working) even before the DB is wired up.
 // ---------------------------------------------------------------------------
 var connectionString = builder.Configuration.GetConnectionString("Customer360Db");
@@ -88,7 +88,7 @@ builder.Services.AddHttpClient<FineCapabilityClient>(client => client.Timeout = 
 // ---------------------------------------------------------------------------
 // CORS Policy
 // ---------------------------------------------------------------------------
-// Reads Cors:AllowedOrigins, matching AuthService/ModuleRegistry/EmployeeService/LeadService exactly
+// Reads Cors:AllowedOrigins, matching AuthService/LeadService exactly
 // — this service previously used a differently-named flat "AllowedOrigins" key, computed it into
 // `corsOrigins`, and then never used that variable: the actual policy was
 // SetIsOriginAllowed(_ => true), i.e. any origin, regardless of what was configured. Fail-closed
@@ -153,7 +153,7 @@ builder.Services.AddAuthorization();
 // ---------------------------------------------------------------------------
 var app = builder.Build();
 
-// First middleware, matching AuthService/ModuleRegistry/EmployeeService: behind a TLS-terminating
+// First middleware, matching AuthService/LeadService: behind a TLS-terminating
 // proxy the real scheme and client IP arrive only as X-Forwarded-* headers. KnownNetworks/KnownProxies
 // are cleared because the platform assigns the proxy address dynamically; safe only because this
 // container is reachable solely via that proxy.

@@ -237,8 +237,10 @@ export function ApplicationFormLayer({ appId }: ApplicationFormLayerProps) {
 
         toast.success(`Application '${displayName}' registered successfully.`)
       }
-      const { useModuleRegistryStore } = await import('../../shared/stores/moduleRegistryStore')
-      void useModuleRegistryStore.getState().fetchForSidebar(token)
+      // The sidebar is rendered from the navigation tree, so that is what has to be refreshed —
+      // otherwise a newly registered app does not appear until the next full page load.
+      const { useNavigationStore } = await import('../../shared/stores/navigationStore')
+      void useNavigationStore.getState().fetch(token)
       invalidate(TOPICS.applications, TOPICS.approvals, TOPICS.kpis)
       useSettingsDrawerStore.getState().resetToRoot('applications')
     } catch (err: any) {

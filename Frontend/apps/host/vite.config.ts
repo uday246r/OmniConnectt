@@ -5,7 +5,7 @@ import { hostFederationConfig } from '@omniremit/federation-config'
 
 // This app is a Module Federation 2.0 *host* with zero build-time remotes. Every remote app is
 // registered at runtime (see src/shared/federation/remoteLoader.ts) from a manifest URL fetched
-// from the Module Registry API — nothing about which remotes exist is known at build time.
+// from AuthService's remote-app API — nothing about which remotes exist is known at build time.
 //
 // The shared-dependency set deliberately lives in @omniremit/federation-config, not inline here:
 // the host and every remote must agree on it exactly, and a copy-pasted block drifts. See that
@@ -25,7 +25,7 @@ export default defineConfig({
   server: {
     port: 5173,
     // Fail loudly if 5173 is taken instead of silently rebinding to another port — a silent
-    // fallback breaks CORS (AuthService/ModuleRegistry only allow http://localhost:5173) in a way
+    // fallback breaks CORS (AuthService only allows http://localhost:5173) in a way
     // that's confusing to diagnose from the browser alone.
     strictPort: true,
   },

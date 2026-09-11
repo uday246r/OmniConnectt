@@ -10,7 +10,7 @@ import { rolesApi, type RoleListItemDto } from '../../features/settings-roles/ap
 import { isApprovalPending, type ApprovalPendingDto } from '../../features/approvals/api/approvalsApi'
 import { asPendingApprovalConflict, type PendingApprovalConflict } from '../../features/approvals/pendingConflict'
 import { PendingApprovalDialog } from '../../features/approvals/components/PendingApprovalDialog'
-import { remoteAppsApi, type RemoteAppDto } from '../../features/settings-applications/api/remoteAppsApi'
+import { useNavigationStore } from '../../shared/stores/navigationStore'
 import { permissionsApi, type PermissionFeatureDto } from '../../shared/api/permissionsApi'
 import { useSettingsDrawerStore } from '../../shared/stores/settingsDrawerStore'
 import { useClickOutside } from '../../shared/hooks/useClickOutside'
@@ -130,7 +130,7 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
   const [rolePermissions, setRolePermissions] = useState<Set<string>>(new Set())
   const [selectedPermKeys, setSelectedPermKeys] = useState<Set<string>>(new Set())
   const [catalog, setCatalog] = useState<PermissionFeatureDto[]>([])
-  const [remoteApps, setRemoteApps] = useState<RemoteAppDto[]>([])
+
   const [expandedApps, setExpandedApps] = useState<Record<string, boolean>>({})
   const [permSearch, setPermSearch] = useState('')
 
@@ -142,13 +142,25 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
   const hostGroups = useMemo(() => groupsFromCatalog(catalog, 'Host'), [catalog])
   const hostColumns = useMemo(() => columnsForRows(hostGroups.flatMap((g) => g.rows)), [hostGroups])
 
+  /*
+   * Driven entirely by the CATALOG. It used to be joined against the remote-apps admin list for an
+   * icon and a status badge, which made this editor require `host.settings.applications:View` — so an
+   * administrator who could manage users but not applications got a 403 that emptied the whole apps
+   * accordion. Users and applications are separate permissions on purpose.
+   *
+   * The icon comes from the navigation tree, already loaded for every authenticated user.
+   */
+  const navSections = useNavigationStore((s) => s.sections)
+
   const appGroups = useMemo(
     () =>
       groupsFromCatalog(catalog, 'RemoteApp').map((group) => ({
         ...group,
-        app: remoteApps.find((a) => `remote.${a.key}` === group.feature.key),
+        iconKey: navSections
+          .flatMap((s) => s.items)
+          .find((n) => n.kind === 'remote-app' && n.key === group.feature.key)?.iconKey ?? null,
       })),
-    [catalog, remoteApps],
+    [catalog, navSections],
   )
 
   const hostPermissions = useMemo(
@@ -230,10 +242,9 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
 
     async function loadData() {
       try {
-        const [rolesRes, catalogRes, appsRes, schemaRes, salutationsRes] = await Promise.all([
+        const [rolesRes, catalogRes, schemaRes, salutationsRes] = await Promise.all([
           rolesApi.list(accessToken!, { pageSize: 100 }),
           permissionsApi.catalog(accessToken!),
-          remoteAppsApi.list(accessToken!, { pageSize: 100 }),
           userSchemaApi.get(accessToken!),
           salutationsApi.get(accessToken!),
         ])
@@ -241,16 +252,16 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
         if (cancelled) return
         setRoles(rolesRes.items)
         setCatalog(catalogRes)
-        setRemoteApps(appsRes.items)
         setSalutationOptions(salutationsRes.salutations)
         const sortedFields = [...schemaRes.fields].sort((a, b) => a.order - b.order)
         setFields(sortedFields)
         // Every field starts blank; a userId load below overwrites core + custom values on top.
         setFieldValues(Object.fromEntries(sortedFields.map((f) => [f.key, ''])))
 
-        // Expand first remote app by default
-        if (appsRes.items.length > 0) {
-          setExpandedApps({ [`remote.${appsRes.items[0].key}`]: true, host: true })
+        // Expand the first remote app by default.
+        const firstApp = groupsFromCatalog(catalogRes, 'RemoteApp')[0]
+        if (firstApp) {
+          setExpandedApps({ [firstApp.feature.key]: true, host: true })
         }
 
         if (userId) {
@@ -1168,24 +1179,20 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
                     </div>
                   )}
 
-                  {/* Remote Apps Accordions — rows and columns come from the catalog. A feature with
-                      no matching `app` record is a deleted/orphaned remote app whose PermissionFeature
-                      row is stale in AuthService's catalog (pending a resync) — it must never be
-                      assignable, so `!app` has to be EXCLUDED here, not kept. The previous condition
-                      (`!app || app.status !== 'Disabled'`) had this backwards: it kept every deleted
-                      app's permissions while only correctly hiding ones still registered but Disabled. */}
+                  {/* Remote Apps Accordions — rows and columns come from the catalog, which is
+                      fetched with activeOnly. Disabling or deleting an app deactivates its permission
+                      feature, so a withdrawn app is already absent here and needs no second filter. */}
                   {appGroups
-                    .filter(({ app }) => app && app.status !== 'Disabled')
                     .filter(
                       ({ feature }) =>
                         !permSearch ||
                         feature.displayName.toLowerCase().includes(permSearch.toLowerCase()) ||
                         feature.key.toLowerCase().includes(permSearch.toLowerCase()),
                     )
-                    .map(({ feature, rows, columns, app }) => {
+                    .map(({ feature, rows, columns, iconKey }) => {
                       const isExpanded = Boolean(expandedApps[feature.key])
                       const appPerms = getAppPermissions(feature.key)
-                      const AppIcon = resolveIcon(app?.iconKey)
+                      const AppIcon = resolveIcon(iconKey)
 
                       return (
                         <div key={feature.key} className={styles.accordionCard}>
@@ -1223,12 +1230,6 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
                                 />
                                 <span>Select All</span>
                               </label>
-                              {app && (
-                                <span className={styles.activeBadgeSmall}>
-                                  <span className={styles.badgeDotGreen} />
-                                  {app.status}
-                                </span>
-                              )}
                               {isExpanded ? (
                                 <Icon.ChevronUp width={18} height={18} className={styles.chevron} />
                               ) : (

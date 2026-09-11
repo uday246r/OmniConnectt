@@ -3,6 +3,7 @@ using AuthService.Application.Services;
 using AuthService.Domain.Entities;
 using AuthService.Domain.Enums;
 using AuthService.Infrastructure;
+using AuthService.Infrastructure.Caching;
 using AuthService.Infrastructure.Seed;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
@@ -34,7 +35,7 @@ public class StaleGrantReportTests : IDisposable
 
         db = new AuthDbContext(options);
 
-        var memory = new MemoryCache(new MemoryCacheOptions());
+        var memory = new MemoryPlatformCache(new MemoryCache(new MemoryCacheOptions()));
         fine = new FineCapabilityService(db, memory);
         catalog = new PermissionCatalogAppService(db, memory, fine);
     }

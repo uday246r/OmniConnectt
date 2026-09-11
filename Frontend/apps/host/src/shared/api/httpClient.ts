@@ -83,7 +83,7 @@ function refreshOnce(): Promise<string> {
 }
 
 /**
- * Thin fetch wrapper shared by every API client (AuthService, ModuleRegistry). Always sends
+ * Thin fetch wrapper shared by every API client (AuthService). Always sends
  * credentials so the httpOnly refresh cookie travels with same-site requests, JSON-encodes a
  * plain object body, and throws ApiError with the server's ProblemDetails title on non-2xx so
  * callers can branch on `.status` instead of re-parsing responses everywhere.

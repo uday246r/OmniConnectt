@@ -7,7 +7,7 @@ export type IconComponent = (typeof Icon)[keyof typeof Icon]
  *
  * Remote applications were being rendered with a hardcoded Users icon everywhere they appeared — the
  * sidebar, the role editor's application accordions, the applications list — so a Helpdesk app and
- * an Inventory app looked identical, despite the module registry already storing an icon key per
+ * an Inventory app looked identical, despite the platform already storing an icon key per
  * app. This is the one place that mapping happens.
  *
  * The key is operator-supplied data, so an unrecognised or absent value must not crash the render:

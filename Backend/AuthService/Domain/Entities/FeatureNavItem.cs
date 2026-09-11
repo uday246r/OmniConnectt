@@ -10,7 +10,7 @@ namespace AuthService.Domain.Entities;
 /// from each pair.
 /// </para>
 /// <para>
-/// Replicated from the remote's own declaration through the Module Registry sync. Rows are fully
+/// Replicated from the remote's own declaration by the capability sync. Rows are fully
 /// replaced when a remote reports its navigation and left untouched when it does not, so a remote
 /// that is briefly unreachable keeps its sidebar rather than losing it.
 /// </para>

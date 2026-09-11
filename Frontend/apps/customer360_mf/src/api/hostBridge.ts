@@ -26,7 +26,6 @@ export interface OmniRemitHostBridge {
    */
   apiBaseUrls?: {
     authService: string;
-    moduleRegistry: string;
   };
 }
 
@@ -86,7 +85,7 @@ export const C360_SUBMODULE_CONTACT = 'remote.customer360.contact';
 export const C360_SUBMODULE_AUDIT = 'remote.customer360.audit';
 // Matches Backend/Customer360Service/Controllers/FieldConfigController.cs's
 // [RequiresCapability("fieldsettings", ...)] — PermissionsController on that service discovers this
-// automatically by reflection, so nothing needs registering by hand on the host/ModuleRegistry side.
+// automatically by reflection, so nothing needs registering by hand on the host side.
 export const C360_SUBMODULE_FIELD_SETTINGS = 'remote.customer360.fieldsettings';
 
 // Capability checks

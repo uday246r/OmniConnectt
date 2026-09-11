@@ -130,7 +130,7 @@ public class RoleAppService(
         await db.SaveChangesAsync(ct);
         // A role's grants just changed, and every user holding it is affected. Their cached
         // fine-grained sets have to go, and this service cannot enumerate who they are.
-        fineCapabilities.InvalidateAll();
+        await fineCapabilities.InvalidateAllAsync(ct);
 
         await WriteAuditAsync(actingUserId, "role.created", role.Id, $"Created role '{role.Name}'", role.Name, ct);
 
@@ -215,7 +215,7 @@ public class RoleAppService(
         await db.SaveChangesAsync(ct);
         // A role's grants just changed, and every user holding it is affected. Their cached
         // fine-grained sets have to go, and this service cannot enumerate who they are.
-        fineCapabilities.InvalidateAll();
+        await fineCapabilities.InvalidateAllAsync(ct);
 
         await WriteAuditAsync(actingUserId, "role.updated", role.Id, $"Updated role '{role.Name}' — permissions modified", role.Name, ct);
 
@@ -320,7 +320,7 @@ public class RoleAppService(
         await db.SaveChangesAsync(ct);
         // A role's grants just changed, and every user holding it is affected. Their cached
         // fine-grained sets have to go, and this service cannot enumerate who they are.
-        fineCapabilities.InvalidateAll();
+        await fineCapabilities.InvalidateAllAsync(ct);
 
         await WriteAuditAsync(actingUserId, "role.deleted", id, $"Deleted role '{role.Name}'", role.Name, ct);
         return null;

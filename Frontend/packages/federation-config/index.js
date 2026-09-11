@@ -76,7 +76,7 @@ export const REMOTE_ENTRY_MODULE = './App'
  *
  * @param {string} name Module Federation container name. MUST be globally unique across all remote
  *   apps — it becomes a global identifier in the browser, and two remotes sharing one will overwrite
- *   each other. ModuleRegistry enforces this at registration time by reading the built manifest.
+ *   each other. AuthService enforces this at registration time by reading the built manifest, and a unique
  * @param {string} entry Path to the component module exposed as `./App`.
  * @param {string[]} [uses] Extra singletons this remote imports, on top of react/react-dom.
  *
@@ -105,7 +105,7 @@ export function remoteFederationConfig(name, entry, uses = []) {
  * Builds the federation options for the host.
  *
  * The host declares ZERO build-time remotes on purpose: every remote is registered at runtime from a
- * manifest URL stored in the Module Registry database, so which remotes exist is not knowable at
+ * manifest URL stored in AuthDb, so which remotes exist is not knowable at
  * build time and adding one never requires rebuilding the host.
  *
  * `provides` defaults to react/react-dom only, and that default is load-bearing — MEASURED, not

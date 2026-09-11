@@ -29,7 +29,7 @@ function relativeTime(iso: string | null): string | null {
 /**
  * Live reachability of every registered remote app.
  *
- * Everything here is a real probe result recorded by ModuleRegistry's background health service —
+ * Everything here is a real probe result recorded by AuthService's background health service —
  * nothing is inferred from whether a request happened to succeed, and an app that has not been
  * probed yet reports "Not checked yet" rather than being coloured green or red on a guess.
  *

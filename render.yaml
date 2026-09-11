@@ -1,13 +1,13 @@
-# Render Blueprint — the three OmniRemit backend services.
+# Render Blueprint — the OmniRemit AuthService.
 #
 # Create once via Render Dashboard -> New -> Blueprint, pointed at this repo. Render then reads this
 # file on every push to main and keeps the services in sync.
 #
 # WHY A BLUEPRINT RATHER THAN `render services create`:
 # the CLI has no flag for dockerfilePath / dockerContext, and these services need a build context
-# (Backend/) different from where their Dockerfile lives. AuthService.csproj and
-# ModuleRegistry.csproj inherit TargetFramework from Backend/Directory.Build.props, so a context of
-# the service folder fails with NETSDK1013 ("TargetFramework value ''").
+# (Backend/) different from where its Dockerfile lives. AuthService.csproj inherits TargetFramework
+# from Backend/Directory.Build.props, so a context of the service folder fails with NETSDK1013
+# ("TargetFramework value ''").
 #
 # SECRETS: every value marked `sync: false` is NOT stored here. Render prompts for it in the
 # dashboard on first apply, and the value lives only in Render. Never commit a connection string,
@@ -62,39 +62,27 @@ services:
         sync: false
       - key: Internal__ApiKey
         sync: false
+      # Wired to the instance below. The CODE treats this as optional — blank means in-memory
+      # caches, an in-process lock and no SignalR backplane, which is correct on one instance — but a
+      # deployed environment should have it, because without it a second replica serves a stale
+      # sidebar after every permission change, real-time approval events reach only the instance that
+      # sent them, and every instance probes every remote app independently.
+      # Delete both this key and the service below to run deliberately single-instance.
+      - key: ConnectionStrings__Redis
+        fromService:
+          type: redis
+          name: omniremit-redis
+          property: connectionString
 
   # ─────────────────────────────────────────────────────────────────────────────
-  - type: web
-    name: omniremit-registry
-    runtime: docker
+  # Backplane + shared cache for omniremit-auth. See the ConnectionStrings__Redis
+  # note above for exactly what it buys.
+  - type: redis
+    name: omniremit-redis
     plan: free
     region: singapore
-    branch: main
-    dockerfilePath: ./Backend/ModuleRegistry/Dockerfile
-    dockerContext: ./Backend
-    healthCheckPath: /health
-    autoDeploy: true
-    buildFilter:
-      paths:
-        - Backend/**
-        - render.yaml
-    envVars:
-      - key: ASPNETCORE_ENVIRONMENT
-        value: Production
-      - key: Jwt__Issuer
-        value: omniremit-auth-service
-      - key: Jwt__Audience
-        value: omniremit-host
-      - key: Cors__AllowedOrigins__0
-        sync: false
-      - key: ConnectionStrings__RegistryDb
-        sync: false
-      # Public key only — this service verifies tokens, it never issues them.
-      - key: Jwt__SigningKeyPublic
-        sync: false
-      # Base URL of omniremit-auth, filled in once that service has its onrender.com address.
-      - key: AuthService__BaseUrl
-        sync: false
-      # Must equal AuthService's Internal__ApiKey.
-      - key: AuthService__InternalApiKey
-        sync: false
+    # Cache entries are all disposable and TTL'd; evicting the least-recently-used under pressure is
+    # correct here, and every consumer already handles a miss by rebuilding from the database.
+    maxmemoryPolicy: allkeys-lru
+    # Reachable only from inside the Render private network — never from the public internet.
+    ipAllowList: []

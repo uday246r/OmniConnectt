@@ -22,7 +22,7 @@ public record AuditLogDto(
     string? Page,
     string? ActionCategory);
 
-/// <summary>What any service (ModuleRegistry, EmployeeService, LeadService, any future remote's backend) posts to record one audit entry.</summary>
+/// <summary>What any other service (LeadService, Customer360Service, any future remote's backend) posts to record one audit entry.</summary>
 public record RecordAuditLogRequest(
     string ServiceName,
     Guid? ActorUserId,
