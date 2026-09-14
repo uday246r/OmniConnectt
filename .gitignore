@@ -1,41 +1,69 @@
-# --- Node / pnpm ---
+# --- Node / pnpm / Frontend ---
 node_modules/
-Frontend/**/dist/
-Frontend/**/.vite/
-Frontend/**/dist-ssr/
+**/node_modules/
+dist/
+**/dist/
+.vite/
+**/.vite/
+dist-ssr/
+**/dist-ssr/
+*.tsbuildinfo
+**/*.tsbuildinfo
 pnpm-lock.yaml.bak
+package-lock.json
 *.local
 
-# --- Env files (never commit real secrets) ---
+# --- Environment files & Secrets (never commit credentials) ---
 .env
 .env.*
+**/.env
+**/.env.*
 !.env.example
-!*/.env.example
+!**/.env.example
 
-# --- .NET ---
-Backend/**/bin/
-Backend/**/obj/
+# --- .NET & Backend ---
+bin/
+**/bin/
+obj/
+**/obj/
+publish/
+**/publish/
 Backend/**/*.user
-Backend/**/publish/
+Backend/*.Tests/bin/
+Backend/*.Tests/obj/
+**/TestResults/
 
-# --- Editors / OS ---
+# --- Database & Local Storage ---
+*.db
+*.db-shm
+*.db-wal
+**/*.db
+Backend/**/AppData/Uploads/
+**/AppData/Uploads/
+**/uploads/
+
+# --- Editors & OS ---
 .vs/
 .vscode/*
 !.vscode/extensions.json
+!.vscode/launch.json
+!.vscode/tasks.json
 .idea/
 *.swp
+*.suo
+*.ntvs*
+*.njsproj
 .DS_Store
 Thumbs.db
 
 # --- Logs ---
 *.log
+**/*.log
 npm-debug.log*
 pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
-# Code-analysis tool output and local scratch builds — regenerable, never committed.
+# --- Scratch & Diagnostics ---
 graphify-out/
 scratch/
-
-# .NET test output
-Backend/*.Tests/bin/
-Backend/*.Tests/obj/

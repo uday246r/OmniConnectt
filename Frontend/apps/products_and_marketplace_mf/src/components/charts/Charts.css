@@ -1,0 +1,172 @@
+.pm-chart-wrap {
+  position: relative;
+  width: 100%;
+}
+
+.pm-line-chart {
+  width: 100%;
+  height: auto;
+  display: block;
+  overflow: visible;
+}
+
+.pm-chart-gridline {
+  stroke: #f1f5f9;
+  stroke-width: 1;
+}
+
+.pm-chart-x-labels {
+  display: flex;
+  justify-content: space-between;
+  padding: 0 16px;
+  margin-top: 8px;
+}
+
+.pm-chart-x-labels span {
+  font-size: 11px;
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+.pm-chart-x-labels span.active {
+  color: #2563eb;
+  font-weight: 700;
+}
+
+.pm-chart-tooltip {
+  position: absolute;
+  transform: translate(-50%, -130%);
+  background: #0f172a;
+  color: #ffffff;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  white-space: nowrap;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  z-index: 10;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.18);
+}
+
+.pm-chart-tooltip strong {
+  font-size: 11px;
+  color: #93c5fd;
+}
+
+/* Donut Chart */
+.pm-donut-wrap {
+  position: relative;
+  width: fit-content;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.pm-donut {
+  display: block;
+}
+
+.pm-donut-center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.pm-donut-center strong {
+  font-size: 24px;
+  font-weight: 800;
+  color: #0f172a;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.pm-donut-center span {
+  font-size: 11px;
+  color: #94a3b8;
+  font-weight: 600;
+  margin-top: 3px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* Donut Legend */
+.pm-donut-legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
+.pm-donut-legend li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 5px 8px;
+  border-radius: 8px;
+  transition: background 130ms ease, transform 130ms ease;
+  cursor: default;
+}
+
+.pm-donut-legend li:hover {
+  background: #f8fafc;
+  transform: translateX(2px);
+}
+
+.pm-donut-legend-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+
+.pm-donut-legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.pm-donut-legend-label {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: #334155;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pm-donut-legend-value {
+  font-size: 12px;
+  font-weight: 700;
+  color: #0f172a;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.pm-donut-legend-pct {
+  color: #64748b;
+  font-weight: 500;
+  margin-left: 4px;
+}
+
+.pm-donut-row {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  min-height: 180px;
+}
+

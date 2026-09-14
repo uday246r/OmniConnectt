@@ -1,0 +1,12 @@
+bin/
+obj/
+*.user
+*.db
+*.db-shm
+*.db-wal
+AppData/Uploads/
+
+# Local database configuration and secrets - never commit this.
+.env
+.env.*
+!.env.example

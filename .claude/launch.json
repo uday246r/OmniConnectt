@@ -66,6 +66,28 @@
         "dev"
       ],
       "port": 5003
+    },
+    {
+      "name": "products-service-dev",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": [
+        "run",
+        "--project",
+        "Backend/ProductsService"
+      ],
+      "port": 5266
+    },
+    {
+      "name": "products-mf-dev",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "-C",
+        "Frontend",
+        "--filter",
+        "products-mf",
+        "dev"
+      ],
+      "port": 5004
     }
   ]
 }

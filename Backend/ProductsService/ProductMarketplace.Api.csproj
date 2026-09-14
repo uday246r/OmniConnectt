@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <!--
+      This is the single entry point for the backend: it sits at the root of the backend folder so
+      `dotnet build` and `dotnet run` work there with no arguments. The clean-architecture layers live
+      under src/ and are consumed as project references below, so the SDK's default source globbing
+      must not reach into them - otherwise their .cs and .json files would be compiled into this
+      project as well as their own.
+    -->
+    <DefaultItemExcludes>$(DefaultItemExcludes);src\**</DefaultItemExcludes>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="DotNetEnv" Version="3.2.0" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.5" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.4">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="10.2.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="src\ProductMarketplace.Domain\ProductMarketplace.Domain.csproj" />
+    <ProjectReference Include="src\ProductMarketplace.Application\ProductMarketplace.Application.csproj" />
+    <ProjectReference Include="src\ProductMarketplace.Infrastructure\ProductMarketplace.Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -5,4 +5,5 @@
   <Project Path="AuthService.Tests/AuthService.Tests.csproj" />
   <Project Path="LeadService.Tests/LeadService.Tests.csproj" />
   <Project Path="Customer360Service.Tests/Customer360Service.Tests.csproj" />
+  <Project Path="ProductsService/ProductMarketplace.Api.csproj" />
 </Solution>
