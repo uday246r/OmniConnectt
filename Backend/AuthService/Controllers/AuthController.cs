@@ -133,7 +133,7 @@ public class AuthController(
 
         try
         {
-            var result = await authAppService.RefreshAsync(rawToken, ClientIp(), ct);
+            var result = await authAppService.RefreshAsync(rawToken, ClientIp(), UserAgent(), ct);
             SetRefreshCookie(result.RefreshToken, result.RefreshExpiresAt);
             return Ok(new RefreshResponse(result.AccessToken, result.ExpiresAt, result.User));
         }
@@ -157,7 +157,7 @@ public class AuthController(
         var rawToken = Request.Cookies[_cookieOptions.RefreshCookieName];
         if (!string.IsNullOrEmpty(rawToken))
         {
-            await authAppService.LogoutAsync(rawToken, ct);
+            await authAppService.LogoutAsync(rawToken, ClientIp(), UserAgent(), ct);
         }
 
         ClearRefreshCookie();

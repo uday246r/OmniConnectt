@@ -1,5 +1,7 @@
 import { env } from '../../../config/env'
 import { apiFetch } from '../../../shared/api/httpClient'
+import { hostDownloadCsv } from '../../../shared/api/exportCsv'
+import type { CsvDownloadResult } from '@omniremit/ui'
 import type { PagedResult } from '../../settings-users/api/usersApi'
 
 const base = env.authServiceUrl
@@ -80,15 +82,39 @@ export interface RevealTempPasswordResponse {
   userEmail: string
 }
 
+/** The Approval Center's dropdown options, under the filters already applied. */
+export interface ApprovalFacetsDto {
+  modules: string[]
+  actions: string[]
+  makers: string[]
+  checkers: string[]
+}
+
 export interface ListApprovalsParams {
   page?: number
   pageSize?: number
   module?: string
-  status?: ApprovalStatus
+  /** One status, or several comma-separated — `'Approved,Rejected'` is the Processed tab. */
+  status?: ApprovalStatus | `${ApprovalStatus},${ApprovalStatus}`
+  action?: ApprovalAction
   makerId?: string
+  /** Case-insensitive substrings, matched by the server — these were browser-side filters over 200 rows. */
+  makerName?: string
+  checkerName?: string
+  entityLabel?: string
+  /** `'decided'` orders by decision time, newest first. */
+  sortBy?: 'requested' | 'decided'
   assignedToMe?: boolean
+  /** Bounds on when the request was RAISED. */
   from?: string
   to?: string
+  /**
+   * Bounds on when it was DECIDED. Server-side now — the Approval Center offered this filter and
+   * applied it in the browser over the page it had already fetched, so "approved last week" meant
+   * "approved last week, among the rows that happened to be loaded".
+   */
+  decidedFrom?: string
+  decidedTo?: string
 }
 
 function buildQuery(params: object) {
@@ -103,6 +129,24 @@ function buildQuery(params: object) {
 export const approvalsApi = {
   list: (accessToken: string, params: ListApprovalsParams = {}, signal?: AbortSignal) =>
     apiFetch<PagedResult<ApprovalRequestListItemDto>>(`${base}/api/approvals${buildQuery(params)}`, { accessToken, signal }),
+
+  /** Distinct modules, actions, makers and checkers under the same filters the list is given. */
+  facets: (accessToken: string, params: ListApprovalsParams = {}, signal?: AbortSignal) =>
+    apiFetch<ApprovalFacetsDto>(`${base}/api/approvals/facets${buildQuery(params)}`, { accessToken, signal }),
+
+  /**
+   * The approval queue as a CSV file.
+   *
+   * New. This is the platform's record of every gated change and who decided it, and it was the only
+   * log-shaped screen with no export at all — producing evidence of a period's approvals meant
+   * taking screenshots.
+   */
+  exportCsv: (accessToken: string | null, params: ListApprovalsParams = {}): Promise<CsvDownloadResult> =>
+    hostDownloadCsv(
+      `${base}/api/approvals/export${buildQuery(params)}`,
+      accessToken,
+      `approvals-${new Date().toISOString().slice(0, 10)}.csv`,
+    ),
 
   /** "My Requests" — the maker's own submissions, regardless of whether they hold Approval Center access. */
   listMine: (

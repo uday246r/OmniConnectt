@@ -26,7 +26,7 @@ public class InternalApiKeyFilter(IOptions<InternalApiOptions> options, ILogger<
 {
     private const string HeaderName = "X-Internal-Api-Key";
 
-    public Task OnAuthorizationAsync(AuthorizationFilterContext context)
+    public async Task OnAuthorizationAsync(AuthorizationFilterContext context)
     {
         var expected = options.Value.ApiKey?.Trim() ?? string.Empty;
 
@@ -39,7 +39,7 @@ public class InternalApiKeyFilter(IOptions<InternalApiOptions> options, ILogger<
                 Status = StatusCodes.Status503ServiceUnavailable,
             })
             { StatusCode = StatusCodes.Status503ServiceUnavailable };
-            return Task.CompletedTask;
+            return;
         }
 
         var provided = context.HttpContext.Request.Headers[HeaderName].ToString().Trim();
@@ -57,9 +57,23 @@ public class InternalApiKeyFilter(IOptions<InternalApiOptions> options, ILogger<
                 Title = "Missing or invalid internal API key.",
                 Status = StatusCodes.Status401Unauthorized,
             });
-        }
 
-        return Task.CompletedTask;
+            /*
+             * Audited, unlike the Debug log above.
+             *
+             * This key is the one credential that lets a caller submit an approval request as any
+             * user, name any callback URL for AuthService to POST to, and write audit rows for any
+             * service. A sustained run of rejections against it is the clearest sign available that
+             * something is trying to reach the internal surface, and until now the only record was a
+             * Debug line nobody collects.
+             *
+             * The row carries the path and the caller's address. It never carries the supplied key or
+             * its length — the whole comparison above exists to avoid leaking exactly that.
+             */
+            await AuthorizationAudit.RecordDeniedAsync(
+                context, "authz.internal_key_rejected", "internal:api-key",
+                "The X-Internal-Api-Key header was missing or did not match");
+        }
     }
 
     /// <summary>

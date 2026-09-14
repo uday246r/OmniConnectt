@@ -2,11 +2,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useAuthStore } from '../../auth/store/authStore'
 import { TOPICS, useDataRevision } from '../../../shared/stores/invalidationStore'
-import { ActorCell, Badge, DataTable, EMPTY_VALUE, FilterBar, PageHeader, Pagination, ResponsiveRows, RowAction, RowsPerPage, formatAuditTimestamp, readStoredPageSize, sanitizeFilterInput, filterTypeBlockedMessage, useCommittedFilter, type ActiveFilter, type CommittedFilter } from '@omniremit/ui'
+import { ActorCell, Badge, CsvExportError, DataTable, DateRangeColumnFilter, DateRangeFilterButton, EMPTY_DATE_RANGE, EMPTY_VALUE, FilterBar, PageHeader, Pagination, ResponsiveRows, RowAction, RowsPerPage, describeDateRange, describeTruncation, formatAuditTimestamp, isDateRangeActive, readStoredPageSize, resolveDateRange, sanitizeFilterInput, filterTypeBlockedMessage, useCommittedFilter, type ActiveFilter, type CommittedFilter, type DateRangeValue } from '@omniremit/ui'
 import { PermissionGate } from '../../../shared/components/PermissionGate/PermissionGate'
 import { ApiError } from '../../../shared/api/httpClient'
 import { useDebouncedValue } from '../../../shared/hooks/useDebouncedValue'
-import { auditLogsApi, type AuditLogDto, type AuditLogSummaryDto } from '../api/auditLogsApi'
+import { auditLogsApi, type AuditLogDto, type AuditLogFacetsDto, type AuditLogSummaryDto, type ListAuditLogsParams } from '../api/auditLogsApi'
 import { formatActionLabel, actionChipClass, formatIpv4 } from '../utils/auditLogFormatting'
 import { Icon } from '../../../shared/components/Icon/Icon'
 import { AuditLogDetailDrawer, serviceTone, parseUserAgent } from '../components/AuditLogDetailDrawer/AuditLogDetailDrawer'
@@ -18,103 +18,6 @@ const DEFAULT_PAGE_SIZE = 10
 
 /* Audit timestamps come from @omniremit/ui so the two remotes render the same shape. */
 const formatTimestamp = formatAuditTimestamp
-
-type DateFilterMode = 'all' | 'today' | 'yesterday' | 'week' | 'month' | 'custom'
-
-const DATE_RANGES: { key: DateFilterMode; label: string }[] = [
-  { key: 'all', label: 'All Time' },
-  { key: 'today', label: 'Today' },
-  { key: 'yesterday', label: 'Yesterday' },
-  { key: 'week', label: 'Last 7 Days' },
-  { key: 'month', label: 'Last 30 Days' },
-]
-
-/** An empty time falls back to the start/end of that day, so a date-only custom range still behaves as a whole-day bound. */
-function computeRangeWithCustom(
-  preset: DateFilterMode,
-  customFrom?: string,
-  customTo?: string,
-  customFromTime?: string,
-  customToTime?: string,
-): { from?: string; to?: string } {
-  if (preset === 'custom') {
-    // No trailing Z: interpreted in the operator's own local time, matching what they typed —
-    // "9am to 5pm" means their own 9-to-5, not UTC's.
-    return {
-      from: customFrom ? new Date(`${customFrom}T${customFromTime || '00:00'}:00`).toISOString() : undefined,
-      to: customTo ? new Date(`${customTo}T${customToTime || '23:59'}:59`).toISOString() : undefined,
-    }
-  }
-  const now = new Date()
-  switch (preset) {
-    case 'today': {
-      const start = new Date(now)
-      start.setHours(0, 0, 0, 0)
-      return { from: start.toISOString() }
-    }
-    case 'yesterday': {
-      const start = new Date(now)
-      start.setDate(start.getDate() - 1)
-      start.setHours(0, 0, 0, 0)
-      const end = new Date(start)
-      end.setHours(23, 59, 59, 999)
-      return { from: start.toISOString(), to: end.toISOString() }
-    }
-    case 'week': {
-      const start = new Date(now)
-      start.setDate(start.getDate() - 7)
-      return { from: start.toISOString() }
-    }
-    case 'month': {
-      const start = new Date(now)
-      start.setDate(start.getDate() - 30)
-      return { from: start.toISOString() }
-    }
-    default:
-      return {}
-  }
-}
-
-function matchesDateRange(
-  dateStr: string | null | undefined,
-  preset: DateFilterMode,
-  customFrom?: string,
-  customTo?: string,
-  customFromTime?: string,
-  customToTime?: string,
-): boolean {
-  if (preset === 'all') return true
-  if (!dateStr) return false
-  const d = new Date(dateStr)
-  if (isNaN(d.getTime())) return false
-
-  if (preset === 'custom') {
-    const { from, to } = computeRangeWithCustom(preset, customFrom, customTo, customFromTime, customToTime)
-    if (from && d < new Date(from)) return false
-    if (to && d > new Date(to)) return false
-    return true
-  }
-  const now = new Date()
-  if (preset === 'today') {
-    return d.toDateString() === now.toDateString()
-  }
-  if (preset === 'yesterday') {
-    const y = new Date(now)
-    y.setDate(y.getDate() - 1)
-    return d.toDateString() === y.toDateString()
-  }
-  if (preset === 'week') {
-    const w = new Date(now)
-    w.setDate(w.getDate() - 7)
-    return d >= w
-  }
-  if (preset === 'month') {
-    const m = new Date(now)
-    m.setDate(m.getDate() - 30)
-    return d >= m
-  }
-  return true
-}
 
 const TAB_IDS = {
   loginErrors: 'login-errors',
@@ -152,16 +55,8 @@ export function AuditLogsPage() {
   // Popover state
   const [activeHeaderFilter, setActiveHeaderFilter] = useState<string | null>(null)
 
-  // Date Filter
-  const [dateRange, setDateRange] = useState<DateFilterMode>('all')
-  const [customFrom, setCustomFrom] = useState('')
-  const [customTo, setCustomTo] = useState('')
-  const [customFromTime, setCustomFromTime] = useState('')
-  const [customToTime, setCustomToTime] = useState('')
-  const [customDraftFrom, setCustomDraftFrom] = useState('')
-  const [customDraftTo, setCustomDraftTo] = useState('')
-  const [customDraftFromTime, setCustomDraftFromTime] = useState('')
-  const [customDraftToTime, setCustomDraftToTime] = useState('')
+  // The shared date range — one value replacing nine pieces of state and two local helpers.
+  const [dateRange, setDateRange] = useState<DateRangeValue>(EMPTY_DATE_RANGE)
 
   /*
    * Actor, Record, IP and Device are free-text popovers where the box used to BE the filter: every
@@ -216,8 +111,8 @@ export function AuditLogsPage() {
   }
   const [resultFilter, setResultFilter] = useState<'' | 'Success' | 'Failure'>('')
 
-  // In-memory cached pool to extract available unique options with 0 extra API calls
-  const [cachedPool, setCachedPool] = useState<AuditLogDto[]>([])
+  /** The bounded columns' options, from the server, under the filters already applied. */
+  const [facets, setFacets] = useState<AuditLogFacetsDto | null>(null)
 
   // Debounced TYPED text — these feed the recommendation lists only. What the table is filtered by
   // is `actorFilter.applied` / `recordFilter.applied` / `ipFilter.applied` / `deviceFilter.applied`, which change on commit.
@@ -235,38 +130,38 @@ export function AuditLogsPage() {
   const [refreshKey, setRefreshKey] = useState(0)
   const [exporting, setExporting] = useState(false)
 
+  /*
+   * The rows currently on screen, used ONLY to suggest values for the four unbounded columns —
+   * actor, record, IP and device. A DISTINCT over actor names or addresses is a full table scan, so
+   * those cannot be faceted the way the bounded columns are.
+   *
+   * The honest trade, and it is the inverse of what this page used to do: the SUGGESTIONS narrow to
+   * what is on screen, while the FILTER is server-side and complete. Before, the suggestions looked
+   * complete and the filter was not.
+   */
+  const suggestionPool = logs ?? []
+
+  /*
+   * Opening the drawer no longer writes an audit row.
+   *
+   * It used to POST an "audit_log.details_viewed" event, but expanding a row the browser already
+   * holds is not a backend event — nothing is fetched, nothing is authorized, and the row said only
+   * that a client claimed to have opened a drawer. Audit rows are now written exclusively by the
+   * service performing an action, from the verified token; a trail the browser can write into is
+   * not evidence of anything.
+   */
   const handleOpenDetail = useCallback((log: AuditLogDto) => {
     setViewingLog(log)
-    if (accessToken) {
-      const app = log.sourceApplication || log.serviceName
-      const label = log.entityLabel || (log.module && log.page ? `${log.module} — ${log.page}` : log.page || formatActionLabel(log.action))
-      auditLogsApi
-        .recordActivity(accessToken, {
-          page: 'audit-logs',
-          module: 'System',
-          sourceApplication: 'Host',
-          action: 'audit_log.details_viewed',
-          actionCategory: 'ViewDetails',
-          entityType: 'AuditLog',
-          entityId: log.id,
-          entityLabel: `${app} — ${formatActionLabel(log.action)}`,
-          details: `Viewed details for audit log ${log.id} (${formatActionLabel(log.action)} on ${app} - ${label})`,
-        })
-        .catch(() => {})
-    }
-  }, [accessToken])
+  }, [])
   const dataRevision = useDataRevision(TOPICS.auditLogs)
   const prevDepsRef = useRef<unknown[] | null>(null)
 
-  const range = useMemo(
-    () => computeRangeWithCustom(dateRange, customFrom, customTo, customFromTime, customToTime),
-    [dateRange, customFrom, customTo, customFromTime, customToTime],
-  )
+  const range = useMemo(() => resolveDateRange(dateRange), [dateRange])
 
   /*
    * Zero extra API call: unique actors from the rows already loaded.
    *
-   * This list did not narrow as you typed — it was built from `cachedPool` alone, with the search
+   * This list did not narrow as you typed — it was built from `suggestionPool` alone, with the search
    * box's value absent from the dependency array, so "Known Actors" stayed identical no matter what
    * was in the box next to it. Typing a name is exactly when you most want it to shrink to that
    * name. Empty box still shows everything, which is the browse affordance the section is for, and
@@ -274,7 +169,7 @@ export function AuditLogsPage() {
    */
   const availableActors = useMemo(() => {
     const map = new Map<string, { id: string; name: string }>()
-    for (const r of cachedPool) {
+    for (const r of suggestionPool) {
       const name = r.actorName || r.actorUserId
       if (name) map.set(name.toLowerCase(), { id: r.actorUserId || r.id, name })
     }
@@ -284,7 +179,7 @@ export function AuditLogsPage() {
     if (!debouncedActor.trim()) return list
     const q = debouncedActor.toLowerCase().trim()
     return list.filter((a) => a.name.toLowerCase().includes(q))
-  }, [cachedPool, debouncedActor, actorFilter.applied])
+  }, [suggestionPool, debouncedActor, actorFilter.applied])
 
   /*
    * Services, actions and sign-in methods actually present in the loaded rows — nothing else.
@@ -298,27 +193,29 @@ export function AuditLogsPage() {
    * ACTION_LABELS is still the raw→friendly mapping used by formatActionLabel; it is just no longer
    * treated as a list of things to offer.
    */
+  /*
+   * The bounded columns' options come from the server now, not from the rows on screen.
+   *
+   * Deriving them client-side worked only because the page pre-fetched 200 rows; with genuine
+   * paging a ten-row page would offer a ten-value dropdown. And even with the pre-fetch the lists
+   * ignored the OTHER active filters, so the Action dropdown happily offered actions that the chosen
+   * Application had already excluded — pick one and get an empty table.
+   *
+   * The facets endpoint answers under the same filter set the table is showing, so every option it
+   * offers returns at least one row.
+   */
   const availableServices = useMemo(() => {
-    const set = new Set<string>()
-    for (const r of cachedPool) {
-      const app = r.sourceApplication || r.serviceName
-      if (app) set.add(app)
-    }
-    const list = Array.from(set).sort((a, b) => a.localeCompare(b))
+    const list = [...(facets?.services ?? [])].sort((a, b) => a.localeCompare(b))
     // Narrowed by the SEARCH BOX (serviceSearch), not by the applied filter (`service`) — these are
     // two different things here, unlike the actor/IP/device popovers where the box is the filter.
     if (!debouncedServiceSearch.trim()) return list
     const q = debouncedServiceSearch.toLowerCase().trim()
     return list.filter((s) => s.toLowerCase().includes(q))
-  }, [cachedPool, debouncedServiceSearch])
+  }, [facets, debouncedServiceSearch])
 
   const availableActions = useMemo(() => {
-    const set = new Set<string>()
-    for (const r of cachedPool) {
-      if (r.action) set.add(r.action)
-    }
-
-    const entries = Array.from(set).map((a) => ({ raw: a, label: formatActionLabel(a) }))
+    // From the facets endpoint, under the same filters the table is showing.
+    const entries = (facets?.actions ?? []).map((a) => ({ raw: a.action, label: formatActionLabel(a.action) }))
 
     /*
      * Several distinct actions share one friendly label: formatActionLabel falls back to the last
@@ -347,20 +244,17 @@ export function AuditLogsPage() {
     if (!actionSearch.trim()) return list
     const q = actionSearch.toLowerCase()
     return list.filter((a) => a.label.toLowerCase().includes(q) || a.raw.toLowerCase().includes(q))
-  }, [cachedPool, actionSearch])
+  }, [facets, actionSearch])
 
-  const availableAuthMethods = useMemo(() => {
-    const set = new Set<string>()
-    for (const r of cachedPool) {
-      if (r.authMethod) set.add(r.authMethod)
-    }
-    return Array.from(set).sort((a, b) => a.localeCompare(b))
-  }, [cachedPool])
+  const availableAuthMethods = useMemo(
+    () => [...(facets?.authMethods ?? [])].sort((a, b) => a.localeCompare(b)),
+    [facets],
+  )
 
   // Zero extra API call: extract unique IPv4 addresses
   const availableIps = useMemo(() => {
     const set = new Set<string>()
-    for (const r of cachedPool) {
+    for (const r of suggestionPool) {
       if (r.sourceIp) {
         const clean = formatIpv4(r.sourceIp)
         if (clean && clean !== '—') set.add(clean)
@@ -370,7 +264,7 @@ export function AuditLogsPage() {
     if (!debouncedIp.trim()) return list
     const q = debouncedIp.toLowerCase().trim()
     return list.filter((ip) => ip.toLowerCase().includes(q))
-  }, [cachedPool, debouncedIp, ipFilter.applied])
+  }, [suggestionPool, debouncedIp, ipFilter.applied])
 
   /*
    * Zero extra API call: unique records touched, for the RECORD column's popover.
@@ -381,7 +275,7 @@ export function AuditLogsPage() {
    */
   const availableEntities = useMemo(() => {
     const set = new Set<string>()
-    for (const r of cachedPool) {
+    for (const r of suggestionPool) {
       const label = r.entityLabel || (r.module && r.page ? `${r.module} — ${r.page}` : r.page) || r.entityType
       if (label) set.add(label)
     }
@@ -389,13 +283,13 @@ export function AuditLogsPage() {
     if (!debouncedEntity.trim()) return list
     const q = debouncedEntity.toLowerCase().trim()
     return list.filter((e) => e.toLowerCase().includes(q))
-  }, [cachedPool, debouncedEntity, recordFilter.applied])
+  }, [suggestionPool, debouncedEntity, recordFilter.applied])
 
   // Zero extra API call: extract unique browser and OS / device options
   const availableDevices = useMemo(() => {
     const browserSet = new Set<string>()
     const osSet = new Set<string>()
-    for (const r of cachedPool) {
+    for (const r of suggestionPool) {
       if (r.userAgent) {
         const parsed = parseUserAgent(r.userAgent)
         if (parsed) {
@@ -424,7 +318,7 @@ export function AuditLogsPage() {
       browsers: filterList(browsers),
       oses: filterList(oses),
     }
-  }, [cachedPool, debouncedDevice, deviceFilter.applied])
+  }, [suggestionPool, debouncedDevice, deviceFilter.applied])
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -469,6 +363,54 @@ export function AuditLogsPage() {
     void loadSummary()
   }, [loadSummary, dataRevision])
 
+  /**
+   * Every filter this screen applies, as the query parameters the server understands.
+   *
+   * One builder shared by the list, the summary, the facets and the export — which is the point.
+   * The export used to assemble its own subset and silently dropped the IP, device and sign-in
+   * method filters, so the CSV answered a different question from the table it was launched from.
+   */
+  const buildFilterParams = useCallback((): ListAuditLogsParams => ({
+    service: service || undefined,
+    action: actionFilter || TAB_ACTION_FILTER[activeTab],
+    result:
+      resultFilter ||
+      (activeTab === TAB_IDS.loginErrors ? 'Failure' : activeTab === TAB_IDS.loginSuccesses ? 'Success' : undefined),
+    actorName: actorFilter.applied || undefined,
+    entityId: recordFilter.applied || undefined,
+    authMethod: authMethodFilter || undefined,
+    sourceIp: ipFilter.applied || undefined,
+    device: deviceFilter.applied || undefined,
+    correlationId: correlationId || undefined,
+    ...range,
+  }), [
+    service, actionFilter, activeTab, resultFilter, actorFilter.applied, recordFilter.applied,
+    authMethodFilter, ipFilter.applied, deviceFilter.applied, correlationId, range,
+  ])
+
+  /*
+   * The bounded columns' dropdown options, recomputed whenever the filter set changes.
+   *
+   * Deliberately keyed on the SAME builder the table uses, so the options always describe the rows
+   * the table is currently able to show. A failure here empties the dropdowns rather than the table:
+   * facets are an affordance, and losing them must not look like losing the data.
+   */
+  useEffect(() => {
+    if (!accessToken) return
+    let cancelled = false
+    auditLogsApi
+      .facets(accessToken, buildFilterParams())
+      .then((f) => {
+        if (!cancelled) setFacets(f)
+      })
+      .catch(() => {
+        if (!cancelled) setFacets(null)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [accessToken, buildFilterParams, dataRevision, refreshKey])
+
   useEffect(() => {
     if (!accessToken) return
     let cancelled = false
@@ -476,8 +418,7 @@ export function AuditLogsPage() {
     const activeDeps = [
       page, pageSize, service, activeTab, actionFilter,
       resultFilter, authMethodFilter, actorFilter.applied, recordFilter.applied,
-      ipFilter.applied, deviceFilter.applied, range, dateRange, customFrom, customTo,
-      customFromTime, customToTime, refreshKey, correlationId,
+      ipFilter.applied, deviceFilter.applied, range, dateRange, refreshKey, correlationId,
     ]
 
     const activeDepsChanged =
@@ -494,99 +435,33 @@ export function AuditLogsPage() {
 
     async function load() {
       try {
-        const effectiveAction = actionFilter || TAB_ACTION_FILTER[activeTab]
-        const effectiveResult = resultFilter || (activeTab === TAB_IDS.loginErrors ? 'Failure' : activeTab === TAB_IDS.loginSuccesses ? 'Success' : undefined)
+        /*
+         * Every filter is a query parameter now, and paging is the server's.
+         *
+         * This used to ask for `page: 1, pageSize: 200` unconditionally and then do eight filter
+         * passes and a `.slice()` in the browser. Two things followed, both invisible from the
+         * screen. Nothing older than the newest 200 matching rows could be reached at all — a search
+         * for an actor whose activity was last week simply returned nothing, indistinguishable from
+         * "this person did nothing". And `total` counted the filtered 200-row sample, so the pager
+         * confidently described a corpus that was not the corpus.
+         *
+         * The filters that were client-only — actor, record, IP, device, sign-in method — are the
+         * reason the pre-fetch existed. They are all server-side predicates now; see AuditLogFilter.
+         */
+        const params = buildFilterParams()
 
         const result = await auditLogsApi.list(accessToken!, {
-          page: 1,
-          pageSize: 200,
-          service: service || undefined,
-          action: effectiveAction,
-          result: effectiveResult,
-          correlationId: correlationId || undefined,
-          ...range,
+          ...params,
+          // One operation is shown whole, oldest first, never split across pages — its later steps
+          // would otherwise disappear behind "page 2" of a story that is only a handful of rows long.
+          ...(correlationId
+            ? { page: 1, pageSize: 100, sortDir: 'asc' as const }
+            : { page, pageSize }),
         })
         if (cancelled) return
 
-        let allItems = result.items
-
-        // Update cached pool (capped at 2000 entries to bound memory growth)
-        setCachedPool((prev) => {
-          const map = new Map<string, AuditLogDto>()
-          for (const item of prev) map.set(item.id, item)
-          for (const item of allItems) map.set(item.id, item)
-          const list = Array.from(map.values())
-          return list.length > 2000 ? list.slice(-2000) : list
-        })
-
-        // Client-side precision filtering
-        if (dateRange === 'custom') {
-          allItems = allItems.filter((r) => matchesDateRange(r.occurredAt, dateRange, customFrom, customTo, customFromTime, customToTime))
-        }
-        if (actorFilter.applied) {
-          const q = actorFilter.applied.toLowerCase()
-          allItems = allItems.filter((r) =>
-            (r.actorName && r.actorName.toLowerCase().includes(q)) ||
-            (r.actorUserId && r.actorUserId.toLowerCase().includes(q))
-          )
-        }
-        if (service) {
-          const s = service.toLowerCase()
-          allItems = allItems.filter((r) =>
-            (r.sourceApplication && r.sourceApplication.toLowerCase() === s) ||
-            (r.serviceName && r.serviceName.toLowerCase() === s)
-          )
-        }
-        if (recordFilter.applied) {
-          const q = recordFilter.applied.toLowerCase()
-          allItems = allItems.filter((r) =>
-            (r.entityType && r.entityType.toLowerCase().includes(q)) ||
-            (r.entityLabel && r.entityLabel.toLowerCase().includes(q)) ||
-            (r.page && r.page.toLowerCase().includes(q)) ||
-            (r.module && r.module.toLowerCase().includes(q)) ||
-            (r.entityId && r.entityId.toLowerCase().includes(q))
-          )
-        }
-        if (authMethodFilter) {
-          allItems = allItems.filter((r) => r.authMethod?.toLowerCase() === authMethodFilter.toLowerCase())
-        }
-        if (ipFilter.applied) {
-          const q = ipFilter.applied.toLowerCase()
-          allItems = allItems.filter((r) => {
-            const raw = r.sourceIp?.toLowerCase() || ''
-            const formatted = formatIpv4(r.sourceIp).toLowerCase()
-            return raw.includes(q) || formatted.includes(q)
-          })
-        }
-        if (deviceFilter.applied) {
-          const q = deviceFilter.applied.toLowerCase()
-          allItems = allItems.filter((r) => {
-            if (!r.userAgent) return false
-            const raw = r.userAgent.toLowerCase()
-            const parsed = parseUserAgent(r.userAgent)
-            const browser = parsed?.browser.toLowerCase() || ''
-            const os = parsed?.os.toLowerCase() || ''
-            return raw.includes(q) || browser.includes(q) || os.includes(q)
-          })
-        }
-        if (resultFilter) {
-          allItems = allItems.filter((r) => r.result === resultFilter)
-        }
-
-        // Scoped to one operation: show the whole story, oldest first, never truncated to a page —
-        // an operation's few events would otherwise lose their later steps behind "page 2".
-        if (correlationId) {
-          const chronological = [...allItems].sort(
-            (a, b) => new Date(a.occurredAt).getTime() - new Date(b.occurredAt).getTime(),
-          )
-          setLogs(chronological)
-          setTotal(chronological.length)
-        } else {
-          const totalCount = allItems.length
-          const start = (page - 1) * pageSize
-          setLogs(allItems.slice(start, start + pageSize))
-          setTotal(totalCount)
-        }
+        setLogs(result.items)
+        setTotal(result.total)
       } catch (err) {
         if (cancelled) return
         setError(err instanceof ApiError ? err.message : 'Could not load audit logs.')
@@ -599,39 +474,35 @@ export function AuditLogsPage() {
     return () => {
       cancelled = true
     }
-  }, [
-    accessToken, page, pageSize, service, activeTab, actionFilter,
-    resultFilter, authMethodFilter, actorFilter.applied, recordFilter.applied,
-    ipFilter.applied, deviceFilter.applied, range, dateRange, customFrom, customTo,
-    customFromTime, customToTime, refreshKey, correlationId,
-    dataRevision,
-  ])
+  }, [accessToken, page, pageSize, buildFilterParams, correlationId, refreshKey, dataRevision])
 
-  // Changing the filter or page size invalidates the page number.
+  // Changing the filter or page size invalidates the page number. One dependency now, because
+  // buildFilterParams already closes over every filter there is.
   useEffect(() => {
     setPage(1)
-  }, [
-    activeTab, dateRange, customFrom, customTo, customFromTime, customToTime, service,
-    actionFilter, resultFilter, authMethodFilter, actorFilter.applied,
-    recordFilter.applied, ipFilter.applied, deviceFilter.applied, pageSize, correlationId,
-  ])
+  }, [buildFilterParams, pageSize])
 
+  /**
+   * Exports exactly what is on screen.
+   *
+   * @remarks
+   * It sends the same {@link buildFilterParams} the table sends, which it did not before: the
+   * previous version assembled its own subset and silently omitted the IP, device and sign-in
+   * method filters, so a CSV taken from a filtered view answered a broader question than the view
+   * did — and said nothing about it.
+   */
   async function handleExport() {
     if (!accessToken) return
     setExporting(true)
     setError(null)
     try {
-      await auditLogsApi.exportCsv(accessToken, {
-        service: service || undefined,
-        action: actionFilter || TAB_ACTION_FILTER[activeTab],
-        result: resultFilter || (activeTab === TAB_IDS.loginErrors ? 'Failure' : activeTab === TAB_IDS.loginSuccesses ? 'Success' : undefined),
-        actorName: actorFilter.applied || undefined,
-        correlationId: correlationId || undefined,
-        entityId: recordFilter.applied || undefined,
-        ...range,
-      })
+      const result = await auditLogsApi.exportCsv(accessToken, buildFilterParams())
+
+      // A capped export is a warning, not a success. The file used to arrive holding the newest
+      // 10,000 rows of a larger match with nothing to say so.
+      setError(describeTruncation(result))
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Could not export audit logs.')
+      setError(err instanceof CsvExportError ? err.message : 'Could not export audit logs.')
     } finally {
       setExporting(false)
     }
@@ -649,15 +520,7 @@ export function AuditLogsPage() {
     ipFilter.clear()
     deviceFilter.clear()
     setResultFilter('')
-    setDateRange('all')
-    setCustomFrom('')
-    setCustomTo('')
-    setCustomFromTime('')
-    setCustomToTime('')
-    setCustomDraftFrom('')
-    setCustomDraftTo('')
-    setCustomDraftFromTime('')
-    setCustomDraftToTime('')
+    setDateRange(EMPTY_DATE_RANGE)
     clearCorrelationId()
   }
 
@@ -679,30 +542,9 @@ export function AuditLogsPage() {
         }
         subtitle="Comprehensive real-time log of authentication events and administrative platform activities."
         actions={
-          <div className={styles.dateRangeGroup} role="group" aria-label="Date range">
-          {DATE_RANGES.map((r) => (
-            <button
-              key={r.key}
-              type="button"
-              className={r.key === dateRange ? styles.dateRangeActive : styles.dateRangeButton}
-              onClick={() => {
-                setDateRange(r.key)
-                if (r.key !== 'custom') {
-                  setCustomFrom('')
-                  setCustomTo('')
-                  setCustomFromTime('')
-                  setCustomToTime('')
-                  setCustomDraftFrom('')
-                  setCustomDraftTo('')
-                  setCustomDraftFromTime('')
-                  setCustomDraftToTime('')
-                }
-              }}
-            >
-              {r.label}
-            </button>
-          ))}
-          </div>
+          /* The shared control, replacing a preset button group that duplicated the Time column's
+             own popover and disagreed with the two other log screens about what a range means. */
+          <DateRangeFilterButton label="Date Range" value={dateRange} onChange={setDateRange} />
         }
       />
 
@@ -828,20 +670,11 @@ export function AuditLogsPage() {
           the shared one, so every table in the platform can show what it is filtered by. */}
       <FilterBar
         filters={[
-          dateRange !== 'all' && {
+          isDateRangeActive(dateRange) && {
             key: 'time',
             label: 'Time',
-            value:
-              dateRange === 'custom'
-                ? `${customFrom ? `${customFrom}${customFromTime ? ` ${customFromTime}` : ''}` : '…'} to ${customTo ? `${customTo}${customToTime ? ` ${customToTime}` : ''}` : '…'}`
-                : (DATE_RANGES.find((d) => d.key === dateRange)?.label ?? dateRange),
-            onRemove: () => {
-              setDateRange('all')
-              setCustomFrom('')
-              setCustomTo('')
-              setCustomFromTime('')
-              setCustomToTime('')
-            },
+            value: describeDateRange(dateRange),
+            onRemove: () => setDateRange(EMPTY_DATE_RANGE),
           },
           service && { key: 'service', label: 'Service', value: service, onRemove: () => setService('') },
           actorFilter.applied && { key: 'actor', label: 'Performed By', value: `"${actorFilter.applied}"`, onRemove: () => actorFilter.clear() },
@@ -885,107 +718,15 @@ export function AuditLogsPage() {
                     key: 'time',
                     label: 'TIME',
                     priority: 'always',
+                    // The shared control, replacing ~100 lines of hand-rolled popover that duplicated
+                    // the header's own preset row and had to be kept in step with it by hand.
                     header: (
-                      <th className={styles.thFilterable}>
-                        <button
-                          type="button"
-                          className={`${styles.thFilterBtn} ${dateRange !== 'all' ? styles.thFilterBtnActive : ''}`}
-                          onClick={() => setActiveHeaderFilter((c) => (c === 'time' ? null : 'time'))}
-                        >
-                          <span>TIME</span>
-                          <Icon.ChevronDown width={12} height={12} className={`${styles.filterIcon} ${activeHeaderFilter === 'time' ? styles.filterIconActive : ''}`} />
-                          {dateRange !== 'all' && <span className={styles.filterDot} />}
-                        </button>
-                        {activeHeaderFilter === 'time' && (
-                          <div className={styles.filterPopover}>
-                            <div className={styles.popoverHeader}>
-                              <span className={styles.popoverTitle}>Filter Time</span>
-                              {dateRange !== 'all' && (
-                                <button
-                                  type="button"
-                                  className={styles.popoverClearBtn}
-                                  onClick={() => {
-                                    setDateRange('all')
-                                    setCustomFrom('')
-                                    setCustomTo('')
-                                    setCustomFromTime('')
-                                    setCustomToTime('')
-                                    setCustomDraftFrom('')
-                                    setCustomDraftTo('')
-                                    setCustomDraftFromTime('')
-                                    setCustomDraftToTime('')
-                                  }}
-                                >
-                                  Reset
-                                </button>
-                              )}
-                            </div>
-                            <div className={styles.popoverList}>
-                              {DATE_RANGES.map((r) => (
-                                <button
-                                  key={r.key}
-                                  type="button"
-                                  className={`${styles.popoverItem} ${dateRange === r.key ? styles.popoverItemActive : ''}`}
-                                  onClick={() => { setDateRange(r.key); setActiveHeaderFilter(null) }}
-                                >
-                                  <span>{r.label}</span>
-                                </button>
-                              ))}
-                            </div>
-                            <div className={styles.popoverDivider} />
-                            <div className={styles.customDateSection}>
-                              <span className={styles.customDateLabel}>Custom Range</span>
-                              <div className={styles.customDateRow}>
-                                <input
-                                  type="date"
-                                  className={styles.dateInput}
-                                  value={customDraftFrom || customFrom}
-                                  onChange={(e) => setCustomDraftFrom(e.target.value)}
-                                />
-                                <input
-                                  type="time"
-                                  className={styles.dateInput}
-                                  value={customDraftFromTime || customFromTime}
-                                  disabled={!(customDraftFrom || customFrom)}
-                                  onChange={(e) => setCustomDraftFromTime(e.target.value)}
-                                />
-                              </div>
-                              <div className={styles.customDateRow}>
-                                <span className={styles.alp1}>to</span>
-                              </div>
-                              <div className={styles.customDateRow}>
-                                <input
-                                  type="date"
-                                  className={styles.dateInput}
-                                  value={customDraftTo || customTo}
-                                  onChange={(e) => setCustomDraftTo(e.target.value)}
-                                />
-                                <input
-                                  type="time"
-                                  className={styles.dateInput}
-                                  value={customDraftToTime || customToTime}
-                                  disabled={!(customDraftTo || customTo)}
-                                  onChange={(e) => setCustomDraftToTime(e.target.value)}
-                                />
-                              </div>
-                              <button
-                                type="button"
-                                className={styles.applyDateBtn}
-                                onClick={() => {
-                                  setCustomFrom(customDraftFrom)
-                                  setCustomTo(customDraftTo)
-                                  setCustomFromTime(customDraftFromTime)
-                                  setCustomToTime(customDraftToTime)
-                                  setDateRange('custom')
-                                  setActiveHeaderFilter(null)
-                                }}
-                              >
-                                Apply Custom Range
-                              </button>
-                            </div>
-                          </div>
-                        )}
-                      </th>
+                      <DateRangeColumnFilter
+                        key="time"
+                        label="TIME"
+                        value={dateRange}
+                        onChange={setDateRange}
+                      />
                     ),
                     render: (log) => <span className={styles.timeCell}>{formatTimestamp(log.occurredAt)}</span>,
                   },
@@ -1315,107 +1056,15 @@ export function AuditLogsPage() {
                     key: 'time',
                     label: 'TIME',
                     priority: 'always',
+                    // The same shared control the other tab's Time column uses — the two hand-rolled
+                    // popovers this replaces were near-identical copies that had to be edited together.
                     header: (
-                      <th className={styles.thFilterable}>
-                        <button
-                          type="button"
-                          className={`${styles.thFilterBtn} ${dateRange !== 'all' ? styles.thFilterBtnActive : ''}`}
-                          onClick={() => setActiveHeaderFilter((c) => (c === 'time' ? null : 'time'))}
-                        >
-                          <span>TIME</span>
-                          <Icon.ChevronDown width={12} height={12} className={`${styles.filterIcon} ${activeHeaderFilter === 'time' ? styles.filterIconActive : ''}`} />
-                          {dateRange !== 'all' && <span className={styles.filterDot} />}
-                        </button>
-                        {activeHeaderFilter === 'time' && (
-                          <div className={styles.filterPopover}>
-                            <div className={styles.popoverHeader}>
-                              <span className={styles.popoverTitle}>Filter Time</span>
-                              {dateRange !== 'all' && (
-                                <button
-                                  type="button"
-                                  className={styles.popoverClearBtn}
-                                  onClick={() => {
-                                    setDateRange('all')
-                                    setCustomFrom('')
-                                    setCustomTo('')
-                                    setCustomFromTime('')
-                                    setCustomToTime('')
-                                    setCustomDraftFrom('')
-                                    setCustomDraftTo('')
-                                    setCustomDraftFromTime('')
-                                    setCustomDraftToTime('')
-                                  }}
-                                >
-                                  Reset
-                                </button>
-                              )}
-                            </div>
-                            <div className={styles.popoverList}>
-                              {DATE_RANGES.map((r) => (
-                                <button
-                                  key={r.key}
-                                  type="button"
-                                  className={`${styles.popoverItem} ${dateRange === r.key ? styles.popoverItemActive : ''}`}
-                                  onClick={() => { setDateRange(r.key); setActiveHeaderFilter(null) }}
-                                >
-                                  <span>{r.label}</span>
-                                </button>
-                              ))}
-                            </div>
-                            <div className={styles.popoverDivider} />
-                            <div className={styles.customDateSection}>
-                              <span className={styles.customDateLabel}>Custom Range</span>
-                              <div className={styles.customDateRow}>
-                                <input
-                                  type="date"
-                                  className={styles.dateInput}
-                                  value={customDraftFrom || customFrom}
-                                  onChange={(e) => setCustomDraftFrom(e.target.value)}
-                                />
-                                <input
-                                  type="time"
-                                  className={styles.dateInput}
-                                  value={customDraftFromTime || customFromTime}
-                                  disabled={!(customDraftFrom || customFrom)}
-                                  onChange={(e) => setCustomDraftFromTime(e.target.value)}
-                                />
-                              </div>
-                              <div className={styles.customDateRow}>
-                                <span className={styles.alp1}>to</span>
-                              </div>
-                              <div className={styles.customDateRow}>
-                                <input
-                                  type="date"
-                                  className={styles.dateInput}
-                                  value={customDraftTo || customTo}
-                                  onChange={(e) => setCustomDraftTo(e.target.value)}
-                                />
-                                <input
-                                  type="time"
-                                  className={styles.dateInput}
-                                  value={customDraftToTime || customToTime}
-                                  disabled={!(customDraftTo || customTo)}
-                                  onChange={(e) => setCustomDraftToTime(e.target.value)}
-                                />
-                              </div>
-                              <button
-                                type="button"
-                                className={styles.applyDateBtn}
-                                onClick={() => {
-                                  setCustomFrom(customDraftFrom)
-                                  setCustomTo(customDraftTo)
-                                  setCustomFromTime(customDraftFromTime)
-                                  setCustomToTime(customDraftToTime)
-                                  setDateRange('custom')
-                                  setActiveHeaderFilter(null)
-                                }}
-                              >
-                                Apply Custom Range
-                              </button>
-                            </div>
-                          </div>
-                        )}
-                      </th>
+                      <DateRangeColumnFilter
+                        key="time"
+                        label="TIME"
+                        value={dateRange}
+                        onChange={setDateRange}
+                      />
                     ),
                     render: (log) => <span className={styles.timeCell}>{formatTimestamp(log.occurredAt)}</span>,
                   },

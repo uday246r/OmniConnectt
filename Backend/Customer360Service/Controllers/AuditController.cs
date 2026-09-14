@@ -1,75 +1,46 @@
 using System;
-using System.Collections.Generic;
-using System.Security.Claims;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using backend.Data;
+using backend.Infrastructure;
+using backend.Infrastructure.Audit;
 using backend.Infrastructure.Security;
 using backend.Models;
 
 namespace backend.Controllers
 {
-    /*
-     * NOTE the capability attributes are per-ACTION here, not on the class.
-     *
-     * Reading the audit trail and writing to it are different privileges with different audiences.
-     * A class-level [RequiresCapability("audit","View")] made the POST — a write — enforce a read
-     * permission, so anyone who could read the trail could also forge entries into it, and (because
-     * method attributes ADD to class attributes rather than replacing them) there was no way to give
-     * the write its own rule without also demanding the read.
-     */
+    /// <summary>
+    /// Reading this service's audit trail.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// There is deliberately no write endpoint here any more. <c>POST /v1/audit</c> used to let the
+    /// browser record what it claimed to have just done — the action, the description, the customer
+    /// and the outcome all came from the request body. It was justified at the time by "there is no
+    /// coherent 'this user lacks permission to be audited'", which is true, and beside the point: the
+    /// problem was never authorization, it was that a trail the client writes records only what the
+    /// client chooses to admit to. An omitted call left no gap to notice.
+    /// </para>
+    /// <para>
+    /// Entries are now written by the endpoints that actually serve the work, through
+    /// <see cref="backend.Infrastructure.Audit.Customer360AuditWriter"/>, so a row exists if and only
+    /// if the request really happened.
+    /// </para>
+    /// </remarks>
     [Authorize]
     [ApiController]
     [Route("v1")]
     public class AuditController : ControllerBase
     {
         private readonly AuditRepository _auditRepository;
+        private readonly Customer360AuditWriter _audit;
 
-        public AuditController(AuditRepository auditRepository)
+        public AuditController(AuditRepository auditRepository, Customer360AuditWriter audit)
         {
             _auditRepository = auditRepository;
-        }
-
-        /*
-         * POST /v1/audit — the client recording what it just did (viewing a profile, revealing a
-         * masked field). Authenticated, but deliberately NOT gated on a capability.
-         *
-         * There is no coherent "this user lacks permission to be audited": every caller of this
-         * endpoint is a user who has just exercised access they already hold, and the whole value of
-         * the trail depends on that record being written unconditionally. Gating it would mean a
-         * missing grant silently produces gaps in the audit history — the one failure mode an audit
-         * system must not have.
-         *
-         * What actually protects it is that the actor is taken from the verified token and nowhere
-         * else (see GetAuthenticatedUser), so a caller can record THAT they acted but never WHO acted.
-         */
-        [HttpPost("audit")]
-        [HttpPost("auditlog")]
-        public async Task<IActionResult> CreateAuditLog([FromBody] AuditLogInput input)
-        {
-            var staffUser = GetAuthenticatedUser();
-
-            var auditLog = new AuditLog
-            {
-                User = staffUser,
-                Action = input.Action ?? "VIEW",
-                Description = input.Description ?? string.Empty,
-                Status = input.Status ?? "Success",
-                CustomerName = input.Customer,
-                CustomerType = input.CustomerType,
-                CustomerId = input.CustomerId,
-                Field = input.Field,
-                Timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
-            };
-
-            await _auditRepository.AddAsync(auditLog);
-
-            return Ok(new
-            {
-                status = 200,
-                message = "Audit log recorded successfully."
-            });
+            _audit = audit;
         }
 
         // GET /v1/audit — reading the trail IS gated; it exposes every staff member's activity.
@@ -77,22 +48,29 @@ namespace backend.Controllers
         [HttpGet("auditlog")]
         [RequiresCapability("audit", "View")]
         public async Task<IActionResult> GetAuditLogs(
-            [FromQuery] string? search,
-            [FromQuery] string? action,
+            [FromQuery] AuditQuery filter,
+            // Inclusive instants, named and shaped exactly as AuthService's audit and system-log
+            // endpoints name them, so one date-range control in the shared UI drives every log screen
+            // on the platform. This service accepted no date filter at all until Timestamp stopped
+            // being local-wall-clock text — see Models/AuditLog.Timestamp. They arrive on `filter`,
+            // with status, actor, customer and description — see AuditQuery.
             [FromQuery] int pageNumber = 1,
-            [FromQuery] int pageSize = 10)
+            [FromQuery] int pageSize = 10,
+            CancellationToken ct = default)
         {
             /*
              * Clamp server-side. pageSize arrives straight from the query string, so without this a
              * single request for pageSize=1000000 makes the database materialise the whole table into
              * memory - a trivially cheap request that is expensive to serve, which is the shape of an
-             * accidental (or deliberate) denial of service. 100 matches the cap AuthService and
-             * AuthService already enforces.
+             * accidental (or deliberate) denial of service. 100 matches the cap AuthService enforces.
+             *
+             * The export path deliberately does NOT come through here: it has its own, much larger
+             * cap and reports when it hits it, rather than quietly serving a hundredth of the answer.
              */
             pageNumber = Math.Max(pageNumber, 1);
             pageSize = Math.Clamp(pageSize, 1, 100);
 
-            var (logs, totalCount) = await _auditRepository.GetAsync(search, action, pageNumber, pageSize);
+            var (logs, totalCount) = await _auditRepository.GetAsync(filter, pageNumber, pageSize, ct);
             int totalPages = (int)Math.Ceiling((double)totalCount / pageSize);
             if (totalPages < 1) totalPages = 1;
 
@@ -100,59 +78,70 @@ namespace backend.Controllers
             {
                 status = 200,
                 data = logs,
-                pageNumber = pageNumber,
-                pageSize = pageSize,
-                totalCount = totalCount,
-                totalPages = totalPages
+                pageNumber,
+                pageSize,
+                totalCount,
+                totalPages
             });
         }
 
         /// <summary>
-        /// Who to attribute this entry to — read from the VERIFIED token and nowhere else.
-        ///
-        /// This previously preferred an "X-Staff-User" request header over the JWT, so any caller
-        /// could attribute a fabricated entry to any colleague they cared to name. An audit trail
-        /// whose actor is client-supplied is worse than no audit trail: it reads as authoritative
-        /// while being trivially forgeable, and the fabricated rows are indistinguishable from real
-        /// ones after the fact.
-        ///
-        /// The old "Admin User" catch-all is gone too — it silently mislabelled entries as an
-        /// administrator's when no claim resolved. An unattributable entry now says so plainly.
+        /// The current filtered result set as a CSV file.
         /// </summary>
-        private string GetAuthenticatedUser()
+        /// <remarks>
+        /// <para>
+        /// New, and it replaces something that never worked as advertised. The CSV was built in the
+        /// browser after re-fetching with <c>pageSize=1000</c> — which the list endpoint clamps to
+        /// 100 — so "export everything" has always meant "export at most a hundred rows", silently,
+        /// with a filename that said otherwise.
+        /// </para>
+        /// <para>
+        /// Gated twice: <c>audit:View</c> because an export is a read of the trail, and
+        /// <c>export.csv</c> because taking a copy off the platform is a separate decision from being
+        /// able to read it on screen. The manifest used to describe that second capability as "a UI
+        /// gate, not a data boundary" — true while the file was assembled client-side from rows the
+        /// caller already held, and no longer true now the server assembles it.
+        /// </para>
+        /// </remarks>
+        [HttpGet("audit/export")]
+        [RequiresCapability("audit", "View")]
+        [RequiresFineCapability("audit", "export.csv")]
+        public async Task<IActionResult> ExportAuditLogs(
+            [FromQuery] AuditQuery filter,
+            CancellationToken ct = default)
         {
-            // Short claim names, not the long-form ClaimTypes.* URIs. Program.cs sets
-            // `options.MapInboundClaims = false`, which stops the JWT handler remapping "name" and
-            // "email" onto their legacy WS-Security URIs — so ClaimTypes.Name never matched anything
-            // and EVERY audit row fell through to the subject id, rendering as
-            // "User 60892301-eded-47ce-be0b-09a5823bc2bc" instead of the person's name.
-            var nameClaim = User.FindFirst(JwtClaimTypes.Name)?.Value;
-            if (!string.IsNullOrEmpty(nameClaim) && nameClaim != "omniconnect-app")
+            const int maxRows = 10_000;
+
+            var matched = await _auditRepository.CountAsync(filter, ct);
+            var rows = await _auditRepository.GetForExportAsync(filter, maxRows, ct);
+
+            var csv = new CsvBuilder(
+                "Timestamp", "User", "Action", "Description", "Status",
+                "CustomerName", "CustomerType", "CustomerId", "Field");
+
+            foreach (var log in rows)
             {
-                return nameClaim;
+                csv.AppendRow(
+                    // Round-trip format with a real offset. The whole reason this column had to be
+                    // migrated off text was that "yyyy-MM-dd HH:mm:ss" says nothing about which zone
+                    // it was recorded in; writing that same ambiguity into an export would undo it.
+                    log.Timestamp.ToUniversalTime().ToString("O"),
+                    log.User, log.Action, log.Description, log.Status,
+                    log.CustomerName, log.CustomerType, log.CustomerId, log.Field);
             }
 
-            var emailClaim = User.FindFirst(JwtClaimTypes.Email)?.Value;
-            if (!string.IsNullOrEmpty(emailClaim))
-            {
-                return emailClaim;
-            }
+            var export = new CsvExport(csv.ToString(), rows.Count, matched, maxRows);
+            ExportHeaders.Apply(Response, export);
 
-            // The subject id is the last resort that is still genuinely the caller. Naming it as an
-            // id rather than a person keeps the row honest about what is actually known.
-            var subClaim = User.FindFirst(JwtClaimTypes.Subject)?.Value;
-            return !string.IsNullOrEmpty(subClaim) ? $"User {subClaim}" : "Unattributed";
+            await _audit.WriteAsync(
+                action: "EXPORT",
+                centralAction: "customer360.audit_log.exported",
+                description: $"Exported {export.RowCount} audit row(s)" +
+                             (export.Truncated ? $" of {export.MatchCount} matching — the export limit of {export.RowLimit} was reached" : "") +
+                             $". Filters: {filter.Describe()}.",
+                module: "Audit Logs", page: "audit-logs", actionCategory: "Export", ct: ct);
+
+            return File(export.ToBytes(), "text/csv", $"customer360-audit-logs-{DateTimeOffset.UtcNow:yyyyMMdd-HHmmss}.csv");
         }
-    }
-
-    public class AuditLogInput
-    {
-        public string? Action { get; set; }
-        public string? Customer { get; set; }
-        public string? CustomerType { get; set; }
-        public string? Field { get; set; }
-        public string? Status { get; set; }
-        public string? Description { get; set; }
-        public string? CustomerId { get; set; }
     }
 }

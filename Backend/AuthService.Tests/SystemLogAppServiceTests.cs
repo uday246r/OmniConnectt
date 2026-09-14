@@ -121,9 +121,9 @@ public class SystemLogAppServiceTests : IDisposable
 
         var csv = await service.ExportCsvAsync();
         Assert.NotNull(csv);
-        Assert.Contains("Time,Severity,Service,Module,Environment", csv);
-        Assert.Contains("ERR_1", csv);
-        Assert.Contains("Error message content", csv);
+        Assert.Contains("Time,Severity,Service,Module,Environment", csv.Content);
+        Assert.Contains("ERR_1", csv.Content);
+        Assert.Contains("Error message content", csv.Content);
     }
 
     [Fact]
@@ -206,7 +206,7 @@ public class SystemLogAppServiceTests : IDisposable
 
         var csv = await service.ExportCsvAsync(correlationId: corrId);
         Assert.NotNull(csv);
-        Assert.Contains("ERR_1", csv);
-        Assert.DoesNotContain("INFO_1", csv);
+        Assert.Contains("ERR_1", csv.Content);
+        Assert.DoesNotContain("INFO_1", csv.Content);
     }
 }

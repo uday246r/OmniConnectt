@@ -270,31 +270,11 @@ export default function Customer360() {
 
   const [revealed, setRevealed] = useState<Record<string, boolean>>({});
 
-  const handleToggleReveal = async (fieldKey: string, fieldLabel: string, realVal: string) => {
+  // Writes no audit entry — see useFieldReveal for why an unmask the server never sees is not an
+  // auditable event, and what it would take to make it one.
+  const handleToggleReveal = (fieldKey: string, _fieldLabel: string, realVal: string) => {
     if (!realVal || realVal.trim() === '' || realVal.toLowerCase() === 'null') return;
-    const isRevealing = !revealed[fieldKey];
-    setRevealed(prev => ({ ...prev, [fieldKey]: isRevealing }));
-
-    if (isRevealing) {
-      // `profile` is typed as the CustomerProfile union, but every real call site of this function
-      // (the four corporate signatory/TIN/phone reveal buttons) only ever fires with a corporate
-      // profile loaded, matching the hardcoded "Non-Individual" label below — narrow explicitly rather
-      // than reading `.organizationName`/`.brn` off the union, which TypeScript correctly can't allow.
-      const corpProfile = profile as CorporateProfile | null;
-      try {
-        await api.logAudit({
-          action: "VIEW_SENSITIVE_DATA",
-          customerName: corpProfile?.organizationName || "Unknown",
-          customerType: "Non-Individual",
-          field: fieldLabel,
-          status: "Success",
-          description: `Viewed ${fieldLabel} for customer '${corpProfile?.organizationName || "Unknown"}'`,
-          customerId: corpProfile?.brn || ""
-        });
-      } catch (err) {
-        console.error("Failed to log view sensitive data audit:", err);
-      }
-    }
+    setRevealed(prev => ({ ...prev, [fieldKey]: !prev[fieldKey] }));
   };
 
   useEffect(() => {
@@ -465,32 +445,20 @@ export default function Customer360() {
           label: loadedProfile.fullName || searchVal,
         });
 
-        // Log success
-        await api.logAudit({
-          action: "SEARCH",
-          customerName: loadedProfile.fullName || searchVal,
-          customerType: "Individual",
-          status: "Success",
-          description: `Searched for '${searchVal}' by ${searchIdType}`,
-          customerId: loadedProfile.nationalId || searchVal
-        }).catch(e => console.error("Search audit error:", e));
+        /*
+         * The lookup is audited by Customer360Service's ProfileController, which served it — this
+         * used to fire a second, client-authored row for the same event. The server-side row is the
+         * one that can be trusted (its actor comes from the verified token, and it is written whether
+         * or not this code path chooses to report), and unlike this one it also exists when the
+         * lookup finds nothing, which is the case an audit trail most needs.
+         */
       }
 
     } catch (err) {
       const error = err as ApiError;
       const idLabel = idTypeToFriendlyLabel(searchIdType, searchSubtype);
       setSearchError(getFriendlyErrorMessage(error, 'individual-search', error?.status === 400 ? idLabel : ''));
-
-      // Log failure
-      await api.logAudit({
-        action: "SEARCH",
-        customerName: searchVal,
-        customerType: "Individual",
-        status: "Failed",
-        description: `Failed search for '${searchVal}' by ${searchIdType}`,
-        customerId: searchVal
-      }).catch(e => console.error("Search audit error:", e));
-
+      // The failed lookup is recorded server-side by the endpoint that refused it.
     } finally {
       setLoadingSearch(false);
     }
@@ -516,32 +484,14 @@ export default function Customer360() {
           label: loadedProfile.organizationName || corpSearchVal,
         });
 
-        // Log success
-        await api.logAudit({
-          action: "SEARCH",
-          customerName: loadedProfile.organizationName || corpSearchVal,
-          customerType: "Non-Individual",
-          status: "Success",
-          description: `Searched for '${corpSearchVal}' by ${corpSearchType}`,
-          customerId: loadedProfile.brn || corpSearchVal
-        }).catch(e => console.error("Search audit error:", e));
+        // Audited server-side by ProfileController — see the individual search above.
       }
 
     } catch (err) {
       const error = err as ApiError;
       const idLabel = idTypeToFriendlyLabel(corpSearchType);
       setCorpSearchError(getFriendlyErrorMessage(error, 'corporate-search', error?.status === 400 ? idLabel : ''));
-
-      // Log failure
-      await api.logAudit({
-        action: "SEARCH",
-        customerName: corpSearchVal,
-        customerType: "Non-Individual",
-        status: "Failed",
-        description: `Failed search for '${corpSearchVal}' by ${corpSearchType}`,
-        customerId: corpSearchVal
-      }).catch(e => console.error("Search audit error:", e));
-
+      // The failed lookup is recorded server-side by the endpoint that refused it.
     } finally {
       setLoadingCorpSearch(false);
     }

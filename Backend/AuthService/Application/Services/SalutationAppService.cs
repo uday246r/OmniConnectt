@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 namespace AuthService.Application.Services;
 
 /// <summary>CRUD for the admin-configurable salutation list — see SalutationCatalog's doc comment.</summary>
-public class SalutationAppService(AuthDbContext db)
+public class SalutationAppService(AuthDbContext db, AuditLogAppService auditLog)
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
@@ -52,6 +52,20 @@ public class SalutationAppService(AuthDbContext db)
         }
 
         await db.SaveChangesAsync(ct);
+
+        // The smallest of the three admin catalogs, and the only one whose whole value fits in the
+        // record — so the row carries the actual list rather than a summary of it.
+        var actorName = actingUserId is null
+            ? null
+            : await db.Users.AsNoTracking().Where(u => u.Id == actingUserId).Select(u => u.Name).FirstOrDefaultAsync(ct);
+
+        await auditLog.WriteHostAsync(
+            actingUserId, actorName, "salutation_catalog.updated",
+            AuditLogAppService.Modules.UserSchema, AuditLogAppService.Categories.Configuration,
+            entityType: "SalutationCatalog", entityId: row.Id.ToString(), entityLabel: "Salutations",
+            details: $"Saved the salutation list (version {row.Version}) — {cleaned.Count} entr{(cleaned.Count == 1 ? "y" : "ies")}: {string.Join(", ", cleaned)}.",
+            ct: ct);
+
         return new SalutationCatalogDto(cleaned, row.Version, row.UpdatedAt);
     }
 

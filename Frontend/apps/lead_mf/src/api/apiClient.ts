@@ -1,7 +1,7 @@
 import { getAccessToken, ensureFreshAccessToken, isRunningInHost } from './hostBridge';
 import type { LeadFieldConfig } from '../config/fieldControlRegistry';
 
-const API_BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL || 'http://localhost:5046/api/lead-service';
+export const API_BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL || 'http://localhost:5046/api/lead-service';
 
 export interface ApiResponse<T> {
   success: boolean;
@@ -377,8 +377,17 @@ export const apiClient = {
     search?: string;
     actionType?: string;
     entityId?: string;
-    startDate?: string;
-    endDate?: string;
+    /**
+     * Inclusive ISO 8601 instants, named the way every other log endpoint on the platform names
+     * them — the endpoint's old `startDate`/`endDate` were date-only strings that discarded the time
+     * of day, and nothing had ever sent them because no UI here offered a date filter.
+     */
+    from?: string;
+    to?: string;
+    /** Name or role, case-insensitive substring. */
+    actor?: string;
+    /** 'SUCCESS' or 'FAILED'. */
+    status?: string;
   }): Promise<PagedResult<any>> => {
     try {
       const query = new URLSearchParams();
@@ -387,8 +396,10 @@ export const apiClient = {
       if (params.search) query.append('search', params.search);
       if (params.actionType) query.append('actionType', params.actionType);
       if (params.entityId) query.append('entityId', params.entityId);
-      if (params.startDate) query.append('startDate', params.startDate);
-      if (params.endDate) query.append('endDate', params.endDate);
+      if (params.from) query.append('from', params.from);
+      if (params.to) query.append('to', params.to);
+      if (params.actor) query.append('actor', params.actor);
+      if (params.status) query.append('status', params.status);
 
       const res = await fetchWithAuth(`${API_BASE_URL}/api/auditlogs?${query.toString()}`);
       if (!res.ok) {

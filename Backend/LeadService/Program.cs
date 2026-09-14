@@ -3,6 +3,7 @@ using DotNetEnv;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.AspNetCore.HttpOverrides;
 using LeadManagement.Api.Data;
 using LeadManagement.Api.Infrastructure;
 using LeadManagement.Api.Infrastructure.Security;
@@ -77,6 +78,7 @@ builder.Services.AddHealthChecks().AddDbContextCheck<ApplicationDbContext>("data
 
 // Application Services & Clients
 builder.Services.AddScoped<IMasterDataService, MasterDataService>();
+builder.Services.AddScoped<AuditActorContext>();
 builder.Services.AddScoped<IAuditLogService, AuditLogService>();
 builder.Services.AddScoped<ILeadService, LeadService>();
 builder.Services.AddScoped<LeadFieldConfigService>();
@@ -100,14 +102,19 @@ builder.Services.AddCors(options =>
             policy.WithOrigins(allowedOrigins)
                   .AllowAnyHeader()
                   .AllowAnyMethod()
-                  .AllowCredentials();
+                  .AllowCredentials()
+                  // Without this the CSV export still downloads, but the browser cannot read the
+                  // row-count headers — so a truncated file arrives with no warning, which is the
+                  // exact failure those headers exist to prevent.
+                  .WithExposedHeaders(LeadManagement.Api.Infrastructure.ExportHeaders.All);
         }
         else
         {
             policy.SetIsOriginAllowed(_ => true)
                   .AllowAnyHeader()
                   .AllowAnyMethod()
-                  .AllowCredentials();
+                  .AllowCredentials()
+                  .WithExposedHeaders(LeadManagement.Api.Infrastructure.ExportHeaders.All);
         }
     });
 });
@@ -151,6 +158,26 @@ builder.Services
 builder.Services.AddAuthorization();
 
 var app = builder.Build();
+
+/*
+ * MUST run before anything that reads the client address.
+ *
+ * This service had no forwarded-headers handling at all, alone among the three — so behind a proxy
+ * Connection.RemoteIpAddress is the PROXY's address, and that is what every audit row this service
+ * wrote recorded as the actor's origin. An audit trail whose source IP is the infrastructure's is
+ * not merely unhelpful, it is wrong in a way that looks right.
+ *
+ * KnownNetworks/KnownProxies are cleared because the platform assigns the proxy address dynamically,
+ * which is safe only while this container is reachable solely through that proxy — the same
+ * reasoning, and the same caveat, as AuthService and Customer360Service already carry.
+ */
+var forwardedHeaders = new ForwardedHeadersOptions
+{
+    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto,
+};
+forwardedHeaders.KnownNetworks.Clear();
+forwardedHeaders.KnownProxies.Clear();
+app.UseForwardedHeaders(forwardedHeaders);
 
 // Service path base for remote integration
 app.UsePathBase("/api/lead-service");

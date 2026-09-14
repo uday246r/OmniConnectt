@@ -66,9 +66,8 @@ namespace backend.Migrations
                         .HasColumnType("character varying(20)")
                         .HasJsonPropertyName("status");
 
-                    b.Property<string>("Timestamp")
-                        .IsRequired()
-                        .HasColumnType("text")
+                    b.Property<DateTimeOffset>("Timestamp")
+                        .HasColumnType("timestamp with time zone")
                         .HasJsonPropertyName("timestamp");
 
                     b.Property<string>("User")
@@ -76,6 +75,10 @@ namespace backend.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
                         .HasJsonPropertyName("user");
+
+                    b.Property<Guid?>("UserId")
+                        .HasColumnType("uuid")
+                        .HasJsonPropertyName("userId");
 
                     b.HasKey("Id");
 

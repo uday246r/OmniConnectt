@@ -203,7 +203,11 @@ builder.Services.AddCors(options =>
         policy.WithOrigins(allowedOrigins)
             .AllowAnyHeader()
             .AllowAnyMethod()
-            .AllowCredentials(); // required: refresh token travels as an httpOnly cookie
+            .AllowCredentials() // required: refresh token travels as an httpOnly cookie
+            // Without this the CSV exports still download, but the browser cannot read the row-count
+            // headers — so a truncated file arrives with no warning, which is the exact failure those
+            // headers exist to prevent.
+            .WithExposedHeaders(AuthService.Infrastructure.ExportHeaders.All);
     });
 });
 

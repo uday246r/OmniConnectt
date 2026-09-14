@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { Building2, Phone, DollarSign, Eye, EyeOff } from '@omniremit/ui/icons';
 import type { CorporateProfile, ContactDetail } from '../types/api';
 import { maskPhone, maskTIN } from '../utils/masking';
-import { api } from '../services/api';
 import styles from './CompanyOverview.module.css';
 import { formatValue } from '../shared/formatValue';
 
@@ -16,26 +15,11 @@ export default function CompanyOverview({ profile, contactInfo }: CompanyOvervie
 
   const [revealed, setRevealed] = useState<Record<string, boolean>>({});
 
-  const handleToggleReveal = async (fieldKey: string, fieldLabel: string, realVal: string) => {
+  // Writes no audit entry — see useFieldReveal for why an unmask the server never sees is not an
+  // auditable event, and what it would take to make it one.
+  const handleToggleReveal = (fieldKey: string, _fieldLabel: string, realVal: string) => {
     if (!realVal || realVal.trim() === '' || realVal.toLowerCase() === 'null') return;
-    const isRevealing = !revealed[fieldKey];
-    setRevealed(prev => ({ ...prev, [fieldKey]: isRevealing }));
-
-    if (isRevealing) {
-      try {
-        await api.logAudit({
-          action: "VIEW_SENSITIVE_DATA",
-          customerName: profile.organizationName || "Unknown",
-          customerType: "Non-Individual",
-          field: fieldLabel,
-          status: "Success",
-          description: `Viewed ${fieldLabel} for customer '${profile.organizationName || "Unknown"}'`,
-          customerId: profile.brn || ""
-        });
-      } catch (err) {
-        console.error("Failed to log view sensitive data audit:", err);
-      }
-    }
+    setRevealed(prev => ({ ...prev, [fieldKey]: !prev[fieldKey] }));
   };
 
   const formatAddress = (val: unknown): string => {

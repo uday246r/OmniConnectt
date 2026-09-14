@@ -94,11 +94,21 @@ describe('systemLogsApi', () => {
     expect(callUrl).toContain('environment=Production')
   })
 
+  /*
+   * A real Response rather than a hand-shaped object literal. The export now goes through the shared
+   * download helper, which reads status and headers as well as the body — and the headers are the
+   * whole point of the change, since they are how a capped export announces itself.
+   */
+  function csvResponse(headers: Record<string, string> = {}) {
+    return new Response('time,severity\n', {
+      status: 200,
+      headers: { 'Content-Type': 'text/csv', ...headers },
+    })
+  }
+
   it('sends correlationId to export endpoint', async () => {
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
-      ok: true,
-      blob: async () => new Blob(['time,severity'], { type: 'text/csv' }),
-    } as unknown as Response)
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(csvResponse())
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
 
     await systemLogsApi.exportCsv('dummy-token', {
       correlationId: 'trace-abc',
@@ -108,5 +118,25 @@ describe('systemLogsApi', () => {
     const callUrl = fetchSpy.mock.calls[0][0] as string
     expect(callUrl).toContain('correlationId=trace-abc')
     expect(callUrl).toContain('severity=Error')
+  })
+
+  /**
+   * The export used to return void, so a truncated file was indistinguishable from a complete one at
+   * every layer above it. The page now warns instead of reporting success.
+   */
+  it('reports back when the server capped the export', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      csvResponse({
+        'X-Export-Row-Count': '10000',
+        'X-Export-Match-Count': '24318',
+        'X-Export-Truncated': 'true',
+      }),
+    )
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+
+    const result = await systemLogsApi.exportCsv('dummy-token', {})
+
+    expect(result.truncated).toBe(true)
+    expect(result.matchCount).toBe(24318)
   })
 })

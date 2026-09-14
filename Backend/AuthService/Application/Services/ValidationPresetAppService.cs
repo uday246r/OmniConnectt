@@ -10,7 +10,7 @@ using Microsoft.EntityFrameworkCore;
 namespace AuthService.Application.Services;
 
 /// <summary>CRUD for the admin-defined "Manage Formats" catalog — see ValidationPresetCatalog's doc comment.</summary>
-public class ValidationPresetAppService(AuthDbContext db)
+public class ValidationPresetAppService(AuthDbContext db, AuditLogAppService auditLog)
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
@@ -70,6 +70,28 @@ public class ValidationPresetAppService(AuthDbContext db)
         }
 
         await db.SaveChangesAsync(ct);
+
+        /*
+         * Worth auditing for a reason specific to this catalog: an unrecognised preset id FAILS OPEN
+         * everywhere in the validation system, deliberately, so that renaming or deleting a preset
+         * can never block every submission on a field that references it. The cost of that choice is
+         * that deleting a preset silently stops the rule it encoded from being enforced — the field
+         * keeps its reference, validation quietly passes, and nothing anywhere reports it.
+         *
+         * This row is the only trace such a change leaves, which is why it names the preset keys.
+         */
+        var actorName = actingUserId is null
+            ? null
+            : await db.Users.AsNoTracking().Where(u => u.Id == actingUserId).Select(u => u.Name).FirstOrDefaultAsync(ct);
+
+        await auditLog.WriteHostAsync(
+            actingUserId, actorName, "validation_preset_catalog.updated",
+            AuditLogAppService.Modules.UserSchema, AuditLogAppService.Categories.Configuration,
+            entityType: "ValidationPresetCatalog", entityId: row.Id.ToString(), entityLabel: "Validation formats",
+            details: $"Saved the admin-defined validation formats (version {row.Version}) — {request.Presets.Count} preset(s): " +
+                     $"{string.Join(", ", request.Presets.Select(p => $"{p.Key} ({p.Kind})"))}.",
+            ct: ct);
+
         return new ValidationPresetCatalogDto(request.Presets, row.Version, row.UpdatedAt);
     }
 

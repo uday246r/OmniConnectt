@@ -1,6 +1,18 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
   <ItemGroup>
+    <!--
+      The approval engine's selection logic — ResolveEligibleCheckerIdsAsync, TrySelectCheckerAsync,
+      ReassignPendingRequestsForDepartingCheckerAsync — is `internal` because only two app services
+      may call it, not because it is unimportant. It is in fact the part of Maker-Checker most worth
+      testing directly: who is eligible to approve what, and what happens to a queue when its checker
+      leaves. Testing it only through the public submit path would mean asserting on a chosen checker
+      rather than on the candidate set that produced them.
+    -->
+    <InternalsVisibleTo Include="AuthService.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Google.Apis.Auth" Version="1.75.0" />
     <PackageReference Include="MailKit" Version="4.17.0" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.9" />

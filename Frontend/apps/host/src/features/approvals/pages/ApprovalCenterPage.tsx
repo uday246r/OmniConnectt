@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useAuthStore } from '../../auth/store/authStore'
-import { Badge, DataTable, EMPTY_VALUE, PageHeader, Pagination, ResponsiveRows, RowAction, RowsPerPage, readStoredPageSize, sanitizeFilterInput, filterTypeBlockedMessage, useCommittedFilter, type BadgeTone, type CommittedFilter } from '@omniremit/ui'
+import { Badge, Button, CsvExportError, DataTable, DateRangeColumnFilter, DateRangeFilterButton, EMPTY_DATE_RANGE, EMPTY_VALUE, PageHeader, Pagination, ResponsiveRows, RowAction, RowsPerPage, describeDateRange, describeTruncation, isDateRangeActive, readStoredPageSize, resolveDateRange, sanitizeFilterInput, filterTypeBlockedMessage, useCommittedFilter, type BadgeTone, type CommittedFilter, type DateRangeValue } from '@omniremit/ui'
+import { PermissionGate } from '../../../shared/components/PermissionGate/PermissionGate'
 import { SkeletonBlock } from '../../../shared/components/Skeleton'
 import { ApiError } from '../../../shared/api/httpClient'
 import { useDebouncedValue } from '../../../shared/hooks/useDebouncedValue'
@@ -10,6 +11,8 @@ import {
   type ApprovalRequestDetailDto,
   type ApprovalSummaryDto,
   type ApprovalStatus,
+  type ApprovalFacetsDto,
+  type ListApprovalsParams,
 } from '../api/approvalsApi'
 import { useApprovalRequests } from '../hooks/useApprovalRequests'
 import { Icon } from '../../../shared/components/Icon/Icon'
@@ -398,90 +401,13 @@ const TAB_STATUS_FILTER: Record<TabId, ApprovalStatus | undefined> = {
   [TAB_IDS.all]: undefined,
 }
 
-type DateFilterMode = 'all' | 'today' | 'yesterday' | 'week' | 'month' | 'custom'
-
-const DATE_RANGES: { key: DateFilterMode; label: string }[] = [
-  { key: 'all', label: 'All Time' },
-  { key: 'today', label: 'Today' },
-  { key: 'yesterday', label: 'Yesterday' },
-  { key: 'week', label: 'Last 7 Days' },
-  { key: 'month', label: 'Last 30 Days' },
-]
-
-function computeRangeWithCustom(preset: DateFilterMode, customFrom?: string, customTo?: string): { from?: string; to?: string } {
-  if (preset === 'custom') {
-    return {
-      from: customFrom ? new Date(customFrom + 'T00:00:00.000Z').toISOString() : undefined,
-      to: customTo ? new Date(customTo + 'T23:59:59.999Z').toISOString() : undefined,
-    }
-  }
-  const now = new Date()
-  switch (preset) {
-    case 'today': {
-      const start = new Date(now)
-      start.setHours(0, 0, 0, 0)
-      return { from: start.toISOString() }
-    }
-    case 'yesterday': {
-      const start = new Date(now)
-      start.setDate(start.getDate() - 1)
-      start.setHours(0, 0, 0, 0)
-      const end = new Date(start)
-      end.setHours(23, 59, 59, 999)
-      return { from: start.toISOString(), to: end.toISOString() }
-    }
-    case 'week': {
-      const start = new Date(now)
-      start.setDate(start.getDate() - 7)
-      return { from: start.toISOString() }
-    }
-    case 'month': {
-      const start = new Date(now)
-      start.setDate(start.getDate() - 30)
-      return { from: start.toISOString() }
-    }
-    default:
-      return {}
-  }
-}
-
-function matchesDateRange(dateStr: string | null | undefined, preset: DateFilterMode, customFrom?: string, customTo?: string): boolean {
-  if (preset === 'all') return true
-  if (!dateStr) return false
-  const d = new Date(dateStr)
-  if (isNaN(d.getTime())) return false
-
-  if (preset === 'custom') {
-    if (customFrom && d < new Date(customFrom + 'T00:00:00.000Z')) return false
-    if (customTo && d > new Date(customTo + 'T23:59:59.999Z')) return false
-    return true
-  }
-  const now = new Date()
-  if (preset === 'today') {
-    return d.toDateString() === now.toDateString()
-  }
-  if (preset === 'yesterday') {
-    const y = new Date(now)
-    y.setDate(y.getDate() - 1)
-    return d.toDateString() === y.toDateString()
-  }
-  if (preset === 'week') {
-    const w = new Date(now)
-    w.setDate(w.getDate() - 7)
-    return d >= w
-  }
-  if (preset === 'month') {
-    const m = new Date(now)
-    m.setDate(m.getDate() - 30)
-    return d >= m
-  }
-  return true
-}
-
 /**
  * The centralized Approval Center — one source of truth across the whole platform (Phase 1: Users and
  * Roles; every future gated module lands in this same table, same page, no separate flow per module).
  */
+/** The feature key this page's own capabilities hang off. */
+const FEATURE = 'host.system.approvals'
+
 export function ApprovalCenterPage() {
   const accessToken = useAuthStore((s) => s.accessToken)
   const currentUserId = useAuthStore((s) => s.user?.id)
@@ -491,19 +417,19 @@ export function ApprovalCenterPage() {
   const [pageSize, setPageSize] = useState(() => readStoredPageSize('host.approvals', DEFAULT_PAGE_SIZE))
   const [activeHeaderFilter, setActiveHeaderFilter] = useState<string | null>(null)
 
-  // Requested date filter
-  const [dateRange, setDateRange] = useState<DateFilterMode>('all')
-  const [customFrom, setCustomFrom] = useState('')
-  const [customTo, setCustomTo] = useState('')
-  const [customDraftFrom, setCustomDraftFrom] = useState('')
-  const [customDraftTo, setCustomDraftTo] = useState('')
-
-  // Decided date filter
-  const [decidedRange, setDecidedRange] = useState<DateFilterMode>('all')
-  const [decidedCustomFrom, setDecidedCustomFrom] = useState('')
-  const [decidedCustomTo, setDecidedCustomTo] = useState('')
-  const [decidedDraftFrom, setDecidedDraftFrom] = useState('')
-  const [decidedDraftTo, setDecidedDraftTo] = useState('')
+  /*
+   * Two ranges, both on the shared control.
+   *
+   * The pair this replaces had two problems. Its custom range resolved against UTC while every other
+   * screen resolved against local time, so the same dates typed here selected a different window —
+   * at UTC+8, "12 Sep" meant 08:00 on the 12th to 07:59 on the 13th. And the Decided range was
+   * applied in the browser, over the page already fetched, so it only ever searched the rows that
+   * happened to be loaded; it is a real query parameter now.
+   */
+  const [requestedRange, setRequestedRange] = useState<DateRangeValue>(EMPTY_DATE_RANGE)
+  const [decidedRange, setDecidedRange] = useState<DateRangeValue>(EMPTY_DATE_RANGE)
+  const [exporting, setExporting] = useState(false)
+  const [exportNotice, setExportNotice] = useState<string | null>(null)
 
   // Module filter with live search. Its options come from the loaded rows — see availableModules.
   const [module, setModule] = useState('')
@@ -551,24 +477,28 @@ export function ApprovalCenterPage() {
   // Status filter ('Pending' | 'Approved' | 'Rejected' | '')
   const [statusFilter, setStatusFilter] = useState<'' | 'Pending' | 'Approved' | 'Rejected'>('')
 
-  // In-memory cache pool to derive unique makers, checkers, and modules with 0 extra API calls
-  const [cachedPool, setCachedPool] = useState<ApprovalRequestListItemDto[]>([])
+  /*
+   * Module, maker and checker options, from the server under the filters already applied.
+   *
+   * These were derived from an in-memory pool of every row the page had fetched. With the page
+   * fetching one page at a time that pool would shrink to ten rows, and even before it could only
+   * offer names that happened to be loaded — a maker whose requests were all older than the newest
+   * 200 was absent from the list and unfindable by picking.
+   */
+  const [facets, setFacets] = useState<ApprovalFacetsDto | null>(null)
 
   // Debounced TYPED text — feeds the recommendation lists only. The table reads `.applied`.
   const debouncedMaker = useDebouncedValue(makerFilter.query, 200)
   const debouncedEntity = useDebouncedValue(recordFilter.query, 200)
   const debouncedChecker = useDebouncedValue(checkerFilter.query, 200)
 
-  const range = useMemo(() => computeRangeWithCustom(dateRange, customFrom, customTo), [dateRange, customFrom, customTo])
+  // Resolved where the request is built, never stored — a stored "Last 7 Days" would freeze.
+  const range = useMemo(() => resolveDateRange(requestedRange), [requestedRange])
+  const decided = useMemo(() => resolveDateRange(decidedRange), [decidedRange])
 
   /*
-   * Zero extra API call: unique makers and checkers from the rows already loaded.
-   *
-   * Neither list narrowed as you typed — both were built from `cachedPool` alone, with the search
-   * box's value absent from the dependency array, so "Known Makers" / "Known Checkers" showed the
-   * same names no matter what was in the box beside them. They read as a browse list that was
-   * ignoring you. Empty box still lists everyone, which is what the section is for; typing now
-   * shrinks it, in step with the table (both read the same debounced value).
+   * Known makers and checkers narrow as you type, in step with the table (both read the same
+   * debounced value). An empty box lists everyone, which is what the section is for.
    */
   const narrowByName = <T extends { name: string }>(list: T[], query: string, applied: string) => {
     const withoutApplied = applied
@@ -578,61 +508,29 @@ export function ApprovalCenterPage() {
     return q ? withoutApplied.filter((x) => x.name.toLowerCase().includes(q)) : withoutApplied
   }
 
-  const availableMakers = useMemo(() => {
-    const map = new Map<string, { id: string; name: string }>()
-    for (const r of cachedPool) {
-      if (r.makerName) map.set(r.makerName.toLowerCase(), { id: r.makerId, name: r.makerName })
-    }
-    return narrowByName(Array.from(map.values()), debouncedMaker, makerFilter.applied)
-  }, [cachedPool, debouncedMaker, makerFilter.applied])
+  const availableMakers = useMemo(
+    () => narrowByName((facets?.makers ?? []).map((name) => ({ id: name, name })), debouncedMaker, makerFilter.applied),
+    [facets, debouncedMaker, makerFilter.applied],
+  )
 
-  const availableCheckers = useMemo(() => {
-    const map = new Map<string, { id: string; name: string }>()
-    for (const r of cachedPool) {
-      if (r.checkerName) map.set(r.checkerName.toLowerCase(), { id: r.checkerId, name: r.checkerName })
-    }
-    return narrowByName(Array.from(map.values()), debouncedChecker, checkerFilter.applied)
-  }, [cachedPool, debouncedChecker, checkerFilter.applied])
+  const availableCheckers = useMemo(
+    () => narrowByName((facets?.checkers ?? []).map((name) => ({ id: name, name })), debouncedChecker, checkerFilter.applied),
+    [facets, debouncedChecker, checkerFilter.applied],
+  )
 
   /*
-   * Records awaiting or holding a decision, for the RECORD column. This popover offered a bare text
-   * box and nothing else, so filtering it required already knowing what a record was called —
-   * the same gap the Maker and Checker columns had, minus even the ignored list.
-   */
-  const availableEntities = useMemo(() => {
-    const set = new Set<string>()
-    for (const r of cachedPool) {
-      if (r.entityLabel) set.add(r.entityLabel)
-    }
-    const list = Array.from(set).sort((a, b) => a.localeCompare(b)).filter((e) => e !== recordFilter.applied)
-    const q = debouncedEntity.toLowerCase().trim()
-    return q ? list.filter((e) => e.toLowerCase().includes(q)) : list
-  }, [cachedPool, debouncedEntity, recordFilter.applied])
-
-  /*
-   * Module filter options, derived from the rows on this page and nothing else.
-   *
-   * This used to seed the list from GET /api/checker-assignments/modules — the platform's ENTIRE
-   * permission catalog — and then merge in whatever the data contained. That cost a request (and a
-   * catalog query server-side) on every visit purely to fill a dropdown, and it listed every module
-   * in the host whether or not a single approval request had ever been raised against it, so most
-   * options returned nothing. Filtering a column should only ever offer values that column actually
-   * holds.
+   * Module filter options: only modules that at least one request under the current filters belongs
+   * to. (This once listed the platform's entire permission catalog, so most options returned
+   * nothing.)
    */
   const availableModules = useMemo(() => {
-    const map = new Map<string, string>()
-    for (const r of cachedPool) {
-      if (r.module && !map.has(r.module)) {
-        map.set(r.module, formatModuleName(r.module))
-      }
-    }
-    const list = Array.from(map.entries())
-      .map(([key, label]) => ({ key, label }))
+    const list = (facets?.modules ?? [])
+      .map((key) => ({ key, label: formatModuleName(key) }))
       .sort((a, b) => a.label.localeCompare(b.label))
     if (!moduleSearch.trim()) return list
     const q = moduleSearch.toLowerCase()
     return list.filter((m) => m.label.toLowerCase().includes(q) || m.key.toLowerCase().includes(q))
-  }, [cachedPool, moduleSearch])
+  }, [facets, moduleSearch])
 
   const [summary, setSummary] = useState<ApprovalSummaryDto | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
@@ -681,100 +579,81 @@ export function ApprovalCenterPage() {
     void loadSummary()
   }, [loadSummary, dataRevision])
 
+  /**
+   * Every filter on this screen, as the query parameters the server applies.
+   *
+   * One builder for the table, the dropdown options and the export. The table used to fetch the
+   * newest 200 requests per status (two requests for Processed, merged in the browser), then filter
+   * action, maker, checker, record and assignment client-side and page the remainder — so anything
+   * outside those 200 could not be found, and the export, which could only send what the server
+   * understood, answered a broader question than the table.
+   */
+  const buildFilterParams = useCallback((): ListApprovalsParams => {
+    const tabStatus = activeTab === TAB_IDS.processed ? 'Approved,Rejected' : TAB_STATUS_FILTER[activeTab]
+    return {
+      module: module || undefined,
+      status: statusFilter || tabStatus,
+      action: (actionFilter || undefined) as ListApprovalsParams['action'],
+      makerName: makerFilter.applied || undefined,
+      checkerName: checkerFilter.applied || undefined,
+      entityLabel: recordFilter.applied || undefined,
+      assignedToMe: assignedToMeOnly || undefined,
+      sortBy: activeTab === TAB_IDS.processed ? 'decided' : undefined,
+      from: range.from,
+      to: range.to,
+      decidedFrom: decided.from,
+      decidedTo: decided.to,
+    }
+  }, [
+    activeTab, module, statusFilter, actionFilter, makerFilter.applied, checkerFilter.applied,
+    recordFilter.applied, assignedToMeOnly, range.from, range.to, decided.from, decided.to,
+  ])
+
   const fetcher = useCallback(
     async (token: string, signal?: AbortSignal) => {
-      let allItems: ApprovalRequestListItemDto[] = []
-
-      // If statusFilter is explicitly set to 'Approved' or 'Rejected', query that directly:
-      const effectiveStatus = statusFilter || TAB_STATUS_FILTER[activeTab]
-
-      if (effectiveStatus === 'Approved') {
-        const res = await approvalsApi.list(token, {
-          page: 1, pageSize: 200, module: module || undefined, status: 'Approved',
-          assignedToMe: assignedToMeOnly || undefined, from: range.from, to: range.to,
-        }, signal)
-        allItems = res.items
-      } else if (effectiveStatus === 'Rejected') {
-        const res = await approvalsApi.list(token, {
-          page: 1, pageSize: 200, module: module || undefined, status: 'Rejected',
-          assignedToMe: assignedToMeOnly || undefined, from: range.from, to: range.to,
-        }, signal)
-        allItems = res.items
-      } else if (activeTab === TAB_IDS.processed && !statusFilter) {
-        const [approved, rejected] = await Promise.all([
-          approvalsApi.list(token, {
-            page: 1, pageSize: 200, module: module || undefined, status: 'Approved',
-            assignedToMe: assignedToMeOnly || undefined, from: range.from, to: range.to,
-          }, signal),
-          approvalsApi.list(token, {
-            page: 1, pageSize: 200, module: module || undefined, status: 'Rejected',
-            assignedToMe: assignedToMeOnly || undefined, from: range.from, to: range.to,
-          }, signal),
-        ])
-        allItems = [...approved.items, ...rejected.items].sort(
-          (a, b) => new Date(b.decidedAt ?? b.requestedAt).getTime() - new Date(a.decidedAt ?? a.requestedAt).getTime(),
-        )
-      } else {
-        const res = await approvalsApi.list(token, {
-          page: 1, pageSize: 200, module: module || undefined,
-          status: effectiveStatus,
-          assignedToMe: assignedToMeOnly || undefined,
-          from: range.from, to: range.to,
-        }, signal)
-        allItems = res.items
-      }
-
-      // Merge into in-memory cache pool so unique makers, checkers, and modules are always up to date
-      setCachedPool((prev) => {
-        const map = new Map<string, ApprovalRequestListItemDto>()
-        for (const item of prev) map.set(item.id, item)
-        for (const item of allItems) map.set(item.id, item)
-        return Array.from(map.values())
-      })
-
-      // Client-side precision filtering
-      if (statusFilter) {
-        allItems = allItems.filter((r) => r.status === statusFilter)
-      }
-      if (assignedToMeOnly && currentUserId) {
-        allItems = allItems.filter((r) => r.checkerId === currentUserId)
-      }
-      if (actionFilter) {
-        allItems = allItems.filter((r) => r.action === actionFilter)
-      }
-      if (makerFilter.applied) {
-        allItems = allItems.filter((r) => r.makerName?.toLowerCase().includes(makerFilter.applied.toLowerCase()))
-      }
-      if (checkerFilter.applied) {
-        allItems = allItems.filter((r) => r.checkerName?.toLowerCase().includes(checkerFilter.applied.toLowerCase()))
-      }
-      if (recordFilter.applied) {
-        allItems = allItems.filter((r) => r.entityLabel?.toLowerCase().includes(recordFilter.applied.toLowerCase()))
-      }
-      if (decidedRange !== 'all') {
-        allItems = allItems.filter((r) => matchesDateRange(r.decidedAt, decidedRange, decidedCustomFrom, decidedCustomTo))
-      }
-
-      const totalCount = allItems.length
-      const start = (page - 1) * pageSize
-      return { items: allItems.slice(start, start + pageSize), total: totalCount }
+      const res = await approvalsApi.list(token, { ...buildFilterParams(), page, pageSize }, signal)
+      return { items: res.items, total: res.total }
     },
-    [
-      activeTab, page, pageSize, module, actionFilter, assignedToMeOnly,
-      makerFilter.applied, recordFilter.applied, checkerFilter.applied, statusFilter,
-      range.from, range.to, decidedRange, decidedCustomFrom, decidedCustomTo, currentUserId,
-    ],
+    [buildFilterParams, page, pageSize],
   )
+
+  useEffect(() => {
+    if (!accessToken) return
+    const controller = new AbortController()
+    approvalsApi
+      .facets(accessToken, buildFilterParams(), controller.signal)
+      .then(setFacets)
+      .catch(() => {
+        // An aborted or failed facets call empties the dropdowns, never the table.
+        if (!controller.signal.aborted) setFacets(null)
+      })
+    return () => controller.abort()
+  }, [accessToken, buildFilterParams, dataRevision, refreshKey])
   const { items, total, error } = useApprovalRequests(
     accessToken,
     fetcher,
     [
       activeTab, page, pageSize, module, actionFilter, assignedToMeOnly,
       makerFilter.applied, recordFilter.applied, checkerFilter.applied, statusFilter,
-      refreshKey, range.from, range.to, decidedRange, decidedCustomFrom, decidedCustomTo,
+      refreshKey, range.from, range.to, decided.from, decided.to,
     ],
     [dataRevision],
   )
+
+  /*
+   * Record suggestions come from the rows on screen. A record label is unbounded free text, so a
+   * DISTINCT over it is not a dropdown the server should build; the SUGGESTIONS narrow to this page
+   * while the FILTER itself is server-side and complete. Enter applies anything typed.
+   */
+  const availableEntities = useMemo(() => {
+    const set = new Set<string>()
+    for (const r of items ?? []) {
+      if (r.entityLabel) set.add(r.entityLabel)
+    }
+    const list = Array.from(set).sort((a, b) => a.localeCompare(b)).filter((e) => e !== recordFilter.applied)
+    const q = debouncedEntity.toLowerCase().trim()
+    return q ? list.filter((e) => e.toLowerCase().includes(q)) : list
+  }, [items, debouncedEntity, recordFilter.applied])
 
   // Handler for the page-size preset or custom selection
   useEffect(() => {
@@ -782,7 +661,7 @@ export function ApprovalCenterPage() {
   }, [
     activeTab, module, actionFilter, assignedToMeOnly,
     makerFilter.applied, recordFilter.applied, checkerFilter.applied, statusFilter,
-    dateRange, customFrom, customTo, decidedRange, decidedCustomFrom, decidedCustomTo,
+    requestedRange, decidedRange,
     pageSize,
   ])
 
@@ -872,21 +751,33 @@ export function ApprovalCenterPage() {
     setCheckerSearchBlocked(false)
     setAssignedToMeOnly(false)
     setStatusFilter('')
-    setDateRange('all')
-    setCustomFrom('')
-    setCustomTo('')
-    setCustomDraftFrom('')
-    setCustomDraftTo('')
-    setDecidedRange('all')
-    setDecidedCustomFrom('')
-    setDecidedCustomTo('')
-    setDecidedDraftFrom('')
-    setDecidedDraftTo('')
+    setRequestedRange(EMPTY_DATE_RANGE)
+    setDecidedRange(EMPTY_DATE_RANGE)
+  }
+
+  /**
+   * Exports the approval queue exactly as it is currently filtered — the same
+   * {@link buildFilterParams} the table sends, every filter included.
+   */
+  async function handleExport() {
+    if (!accessToken) return
+    setExporting(true)
+    setExportNotice(null)
+    try {
+      const result = await approvalsApi.exportCsv(accessToken, buildFilterParams())
+      setExportNotice(describeTruncation(result))
+    } catch (err) {
+      setExportNotice(
+        err instanceof CsvExportError ? err.message : 'The approval queue could not be exported.',
+      )
+    } finally {
+      setExporting(false)
+    }
   }
 
   const hasActiveFilters = Boolean(
     module || actionFilter || makerFilter.applied || recordFilter.applied || checkerFilter.applied || assignedToMeOnly ||
-    dateRange !== 'all' || decidedRange !== 'all' || statusFilter
+    isDateRangeActive(requestedRange) || isDateRangeActive(decidedRange) || statusFilter
   )
 
   return (
@@ -904,25 +795,34 @@ export function ApprovalCenterPage() {
         }
         subtitle="Review and decide on pending administrative requests across the platform."
         actions={
-          <div className={styles.dateRangeGroup} role="group" aria-label="Quick date range">
-          {DATE_RANGES.map((r) => (
-            <button
-              key={r.key}
-              type="button"
-              className={r.key === dateRange ? styles.dateRangeActive : styles.dateRangeButton}
-              onClick={() => {
-                setDateRange(r.key)
-                if (r.key !== 'custom') {
-                  setCustomFrom('')
-                  setCustomTo('')
-                  setCustomDraftFrom('')
-                  setCustomDraftTo('')
-                }
-              }}
-            >
-              {r.label}
-            </button>
-          ))}
+          <div className={styles.headerActions}>
+            {/* The shared control, replacing a hand-rolled preset row that anchored its custom
+                range to UTC while every other screen anchored to local time. */}
+            <DateRangeFilterButton
+              label="Requested"
+              value={requestedRange}
+              onChange={setRequestedRange}
+            />
+            {/*
+              The export this page never had.
+
+              The Approval Center is the platform's record of every gated change and who decided it,
+              and it was the only log-shaped screen with no export at all — producing evidence of a
+              period's approvals meant taking screenshots. Gated on a capability of its own, because
+              reading the queue on screen and carrying a copy of it off the platform are different
+              decisions.
+            */}
+            <PermissionGate featureKey={FEATURE} capability="Export">
+              <Button
+                type="button"
+                variant="onHeader"
+                onClick={handleExport}
+                disabled={exporting}
+                leadingIcon={<Icon.Download width={15} height={15} />}
+              >
+                {exporting ? 'Exporting…' : 'Export CSV'}
+              </Button>
+            </PermissionGate>
           </div>
         }
       />
@@ -1024,26 +924,26 @@ export function ApprovalCenterPage() {
         </div>
       </div>
 
+      {exportNotice && (
+        <div className={styles.exportNotice} role="status">{exportNotice}</div>
+      )}
+
       {/* Active filters chip banner */}
       {hasActiveFilters && (
         <div className={styles.activeFiltersBar}>
           <span className={styles.activeFiltersLabel}>Filters:</span>
-          {dateRange !== 'all' && (
+          {isDateRangeActive(requestedRange) && (
             <span className={styles.filterChip}>
-              <span>
-                Requested: {dateRange === 'custom' ? `${customFrom || '…'} to ${customTo || '…'}` : (DATE_RANGES.find((d) => d.key === dateRange)?.label ?? dateRange)}
-              </span>
-              <button type="button" className={styles.filterChipRemove} onClick={() => { setDateRange('all'); setCustomFrom(''); setCustomTo('') }} aria-label="Remove requested date filter">
+              <span>Requested: {describeDateRange(requestedRange)}</span>
+              <button type="button" className={styles.filterChipRemove} onClick={() => setRequestedRange(EMPTY_DATE_RANGE)} aria-label="Remove requested date filter">
                 <Icon.X width={12} height={12} />
               </button>
             </span>
           )}
-          {decidedRange !== 'all' && (
+          {isDateRangeActive(decidedRange) && (
             <span className={styles.filterChip}>
-              <span>
-                Decided: {decidedRange === 'custom' ? `${decidedCustomFrom || '…'} to ${decidedCustomTo || '…'}` : (DATE_RANGES.find((d) => d.key === decidedRange)?.label ?? decidedRange)}
-              </span>
-              <button type="button" className={styles.filterChipRemove} onClick={() => { setDecidedRange('all'); setDecidedCustomFrom(''); setDecidedCustomTo('') }} aria-label="Remove decided date filter">
+              <span>Decided: {describeDateRange(decidedRange)}</span>
+              <button type="button" className={styles.filterChipRemove} onClick={() => setDecidedRange(EMPTY_DATE_RANGE)} aria-label="Remove decided date filter">
                 <Icon.X width={12} height={12} />
               </button>
             </span>
@@ -1131,73 +1031,15 @@ export function ApprovalCenterPage() {
                   key: 'requested',
                   label: 'REQUESTED',
                   priority: 'always',
+                  // The shared control, replacing ~65 lines of hand-rolled popover that duplicated
+                  // the header button group above it and disagreed with it about custom ranges.
                   header: (
-                    <th className={styles.thFilterable}>
-                      <button
-                        type="button"
-                        className={`${styles.thFilterBtn} ${dateRange !== 'all' ? styles.thFilterBtnActive : ''}`}
-                        onClick={() => setActiveHeaderFilter((c) => (c === 'requested' ? null : 'requested'))}
-                      >
-                        <span>REQUESTED</span>
-                        <Icon.ChevronDown width={12} height={12} className={`${styles.filterIcon} ${activeHeaderFilter === 'requested' ? styles.filterIconActive : ''}`} />
-                        {dateRange !== 'all' && <span className={styles.filterDot} />}
-                      </button>
-                      {activeHeaderFilter === 'requested' && (
-                        <div className={styles.filterPopover}>
-                          <div className={styles.popoverHeader}>
-                            <span className={styles.popoverTitle}>Requested Date</span>
-                            {dateRange !== 'all' && (
-                              <button type="button" className={styles.popoverClearBtn} onClick={() => { setDateRange('all'); setCustomFrom(''); setCustomTo(''); setCustomDraftFrom(''); setCustomDraftTo('') }}>
-                                Reset
-                              </button>
-                            )}
-                          </div>
-                          <div className={styles.popoverList}>
-                            {DATE_RANGES.map((r) => (
-                              <button
-                                key={r.key}
-                                type="button"
-                                className={`${styles.popoverItem} ${dateRange === r.key ? styles.popoverItemActive : ''}`}
-                                onClick={() => { setDateRange(r.key); setActiveHeaderFilter(null) }}
-                              >
-                                <span>{r.label}</span>
-                              </button>
-                            ))}
-                          </div>
-                          <div className={styles.popoverDivider} />
-                          <div className={styles.customDateSection}>
-                            <span className={styles.customDateLabel}>Custom Range</span>
-                            <div className={styles.customDateRow}>
-                              <input
-                                type="date"
-                                className={styles.dateInput}
-                                value={customDraftFrom || customFrom}
-                                onChange={(e) => setCustomDraftFrom(e.target.value)}
-                              />
-                              <span className={styles.rangeSeparator}>to</span>
-                              <input
-                                type="date"
-                                className={styles.dateInput}
-                                value={customDraftTo || customTo}
-                                onChange={(e) => setCustomDraftTo(e.target.value)}
-                              />
-                            </div>
-                            <button
-                              type="button"
-                              className={styles.applyDateBtn}
-                              onClick={() => {
-                                setCustomFrom(customDraftFrom)
-                                setCustomTo(customDraftTo)
-                                setDateRange('custom')
-                                setActiveHeaderFilter(null)
-                              }}
-                            >
-                              Apply Custom Range
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                    </th>
+                    <DateRangeColumnFilter
+                      key="requested"
+                      label="REQUESTED"
+                      value={requestedRange}
+                      onChange={setRequestedRange}
+                    />
                   ),
                   render: (r) => <span className={styles.timeCell}>{formatDateOnly(r.requestedAt)}</span>,
                 },
@@ -1602,73 +1444,15 @@ export function ApprovalCenterPage() {
                   key: 'decided',
                   label: 'DECIDED',
                   priority: 'low',
+                  // Now a server-side filter, not a client-side one over the fetched page — so
+                  // "decided last week" finally reaches requests this page has not loaded.
                   header: (
-                    <th className={styles.thFilterable}>
-                      <button
-                        type="button"
-                        className={`${styles.thFilterBtn} ${decidedRange !== 'all' ? styles.thFilterBtnActive : ''}`}
-                        onClick={() => setActiveHeaderFilter((c) => (c === 'decided' ? null : 'decided'))}
-                      >
-                        <span>DECIDED</span>
-                        <Icon.ChevronDown width={12} height={12} className={`${styles.filterIcon} ${activeHeaderFilter === 'decided' ? styles.filterIconActive : ''}`} />
-                        {decidedRange !== 'all' && <span className={styles.filterDot} />}
-                      </button>
-                      {activeHeaderFilter === 'decided' && (
-                        <div className={`${styles.filterPopover} ${styles.popoverRight}`}>
-                          <div className={styles.popoverHeader}>
-                            <span className={styles.popoverTitle}>Decided Date</span>
-                            {decidedRange !== 'all' && (
-                              <button type="button" className={styles.popoverClearBtn} onClick={() => { setDecidedRange('all'); setDecidedCustomFrom(''); setDecidedCustomTo(''); setDecidedDraftFrom(''); setDecidedDraftTo('') }}>
-                                Reset
-                              </button>
-                            )}
-                          </div>
-                          <div className={styles.popoverList}>
-                            {DATE_RANGES.map((r) => (
-                              <button
-                                key={r.key}
-                                type="button"
-                                className={`${styles.popoverItem} ${decidedRange === r.key ? styles.popoverItemActive : ''}`}
-                                onClick={() => { setDecidedRange(r.key); setActiveHeaderFilter(null) }}
-                              >
-                                <span>{r.label}</span>
-                              </button>
-                            ))}
-                          </div>
-                          <div className={styles.popoverDivider} />
-                          <div className={styles.customDateSection}>
-                            <span className={styles.customDateLabel}>Custom Range</span>
-                            <div className={styles.customDateRow}>
-                              <input
-                                type="date"
-                                className={styles.dateInput}
-                                value={decidedDraftFrom || decidedCustomFrom}
-                                onChange={(e) => setDecidedDraftFrom(e.target.value)}
-                              />
-                              <span className={styles.rangeSeparator}>to</span>
-                              <input
-                                type="date"
-                                className={styles.dateInput}
-                                value={decidedDraftTo || decidedCustomTo}
-                                onChange={(e) => setDecidedDraftTo(e.target.value)}
-                              />
-                            </div>
-                            <button
-                              type="button"
-                              className={styles.applyDateBtn}
-                              onClick={() => {
-                                setDecidedCustomFrom(decidedDraftFrom)
-                                setDecidedCustomTo(decidedDraftTo)
-                                setDecidedRange('custom')
-                                setActiveHeaderFilter(null)
-                              }}
-                            >
-                              Apply Custom Range
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                    </th>
+                    <DateRangeColumnFilter
+                      key="decided"
+                      label="DECIDED"
+                      value={decidedRange}
+                      onChange={setDecidedRange}
+                    />
                   ),
                   render: (r) => (
                     <span className={styles.timeCell}>

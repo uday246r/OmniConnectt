@@ -239,7 +239,11 @@ public class UserAppService(
         var auditDetail = inviteEmailed
             ? $"Created {user.Email} (set-password invite emailed)"
             : $"Created {user.Email}";
-        await auditLog.WriteAsync(ServiceName, actingUserId, actorName, "user.created", "User", user.Id.ToString(), auditDetail, SourceIp, userAgent: UserAgent, entityLabel: user.Name, ct: ct);
+        await auditLog.WriteHostAsync(
+            actingUserId, actorName, "user.created",
+            AuditLogAppService.Modules.Users, AuditLogAppService.Categories.Crud,
+            entityType: "User", entityId: user.Id.ToString(), details: auditDetail,
+            entityLabel: user.Name, sourceIp: SourceIp, userAgent: UserAgent, ct: ct);
 
         return MutationResult<CreateUserResponse>.Ok(new CreateUserResponse(ToDetailDto(saved, savedOverrides), tempPassword, inviteEmailed));
     }
@@ -332,6 +336,25 @@ public class UserAppService(
             return MutationResult<UserDetailDto>.PendingApproval(pending);
         }
 
+        /*
+         * Captured before the assignments below, so the audit row can say WHAT changed.
+         *
+         * "Updated alice@example.com" was the entire record of an edit. It could not distinguish a
+         * corrected phone number from a move onto the administrator role, which is the difference
+         * between routine housekeeping and a privilege escalation — and the role change in particular
+         * left no trace anywhere, because moving a user between roles touches no permission row and so
+         * never appeared in any grant diff either.
+         */
+        var previousFields = new Dictionary<string, string?>
+        {
+            ["salutation"] = user.Salutation,
+            ["name"] = user.Name,
+            ["email"] = user.Email,
+            ["phoneNumber"] = user.PhoneNumber,
+            ["role"] = user.Role?.Name ?? (user.RoleId?.ToString() ?? "(none)"),
+            ["customFields"] = user.ExtraAttributes,
+        };
+
         user.Salutation = salutation;
         user.Name = request.Name.Trim();
         user.Email = email;
@@ -373,15 +396,49 @@ public class UserAppService(
         }
 
         var actorName = await ResolveActorNameAsync(actingUserId, ct);
-        await auditLog.WriteAsync(ServiceName, actingUserId, actorName, "user.updated", "User", user.Id.ToString(), $"Updated {user.Email}", SourceIp, userAgent: UserAgent, entityLabel: user.Name, ct: ct);
+
+        var newRoleNameForAudit = request.RoleId is null
+            ? "(none)"
+            : await db.Roles.AsNoTracking().Where(r => r.Id == request.RoleId).Select(r => r.Name).FirstOrDefaultAsync(ct)
+              ?? request.RoleId.ToString();
+
+        var currentFields = new Dictionary<string, string?>
+        {
+            ["salutation"] = user.Salutation,
+            ["name"] = user.Name,
+            ["email"] = user.Email,
+            ["phoneNumber"] = user.PhoneNumber,
+            ["role"] = newRoleNameForAudit,
+            ["customFields"] = user.ExtraAttributes,
+        };
+
+        // Values, not just field names. "email changed" leaves a reviewer to go looking for what it
+        // used to be; by the time they look, the old value only exists in this row.
+        var fieldChanges = previousFields
+            .Where(kv => !string.Equals(kv.Value, currentFields[kv.Key], StringComparison.Ordinal))
+            .Select(kv => $"{kv.Key}: '{kv.Value ?? "(empty)"}' → '{currentFields[kv.Key] ?? "(empty)"}'")
+            .ToList();
+
+        await auditLog.WriteHostAsync(
+            actingUserId, actorName, "user.updated",
+            AuditLogAppService.Modules.Users, AuditLogAppService.Categories.Crud,
+            entityType: "User", entityId: user.Id.ToString(), entityLabel: user.Name,
+            details: fieldChanges.Count == 0
+                // Reached when the only thing that moved was the status or the overrides, both of
+                // which get their own rows. Saying so is more useful than an unqualified "Updated".
+                ? $"Saved {user.Email} — no core field changed."
+                : $"Updated {user.Email} — {string.Join("; ", fieldChanges)}.",
+            sourceIp: SourceIp, userAgent: UserAgent, ct: ct);
 
         if (statusChanged)
         {
-            await auditLog.WriteAsync(
-                ServiceName, actingUserId, actorName,
+            await auditLog.WriteHostAsync(
+                actingUserId, actorName,
                 request.IsActive ? "user.activated" : "user.deactivated",
-                "User", user.Id.ToString(),
-                $"{user.Email} was {(request.IsActive ? "activated" : "deactivated")}.", SourceIp, userAgent: UserAgent, entityLabel: user.Name, ct: ct);
+                AuditLogAppService.Modules.Users, AuditLogAppService.Categories.Crud,
+                entityType: "User", entityId: user.Id.ToString(), entityLabel: user.Name,
+                details: $"{user.Email} was {(request.IsActive ? "activated" : "deactivated")}.",
+                sourceIp: SourceIp, userAgent: UserAgent, ct: ct);
         }
 
         var savedOverrides = await LoadOverridesAsync(id, ct);
@@ -427,7 +484,12 @@ public class UserAppService(
         await db.SaveChangesAsync(ct);
 
         var actorName = await ResolveActorNameAsync(actingUserId, ct);
-        await auditLog.WriteAsync(ServiceName, actingUserId, actorName, isActive ? "user.activated" : "user.deactivated", "User", user.Id.ToString(), $"{(isActive ? "Activated" : "Deactivated")} {user.Email}", SourceIp, userAgent: UserAgent, entityLabel: user.Name, ct: ct);
+        await auditLog.WriteHostAsync(
+            actingUserId, actorName, isActive ? "user.activated" : "user.deactivated",
+            AuditLogAppService.Modules.Users, AuditLogAppService.Categories.Crud,
+            entityType: "User", entityId: user.Id.ToString(),
+            details: $"{(isActive ? "Activated" : "Deactivated")} {user.Email}",
+            entityLabel: user.Name, sourceIp: SourceIp, userAgent: UserAgent, ct: ct);
 
         var overrides = await LoadOverridesAsync(id, ct);
         return MutationResult<UserDetailDto>.Ok(ToDetailDto(user, overrides));
@@ -470,7 +532,11 @@ public class UserAppService(
         await db.SaveChangesAsync(ct);
 
         var actorName = await ResolveActorNameAsync(actingUserId, ct);
-        await auditLog.WriteAsync(ServiceName, actingUserId, actorName, "user.deleted", "User", user.Id.ToString(), $"Deleted {user.Email}", SourceIp, userAgent: UserAgent, entityLabel: user.Name, ct: ct);
+        await auditLog.WriteHostAsync(
+            actingUserId, actorName, "user.deleted",
+            AuditLogAppService.Modules.Users, AuditLogAppService.Categories.Crud,
+            entityType: "User", entityId: user.Id.ToString(), details: $"Deleted {user.Email}",
+            entityLabel: user.Name, sourceIp: SourceIp, userAgent: UserAgent, ct: ct);
         return null;
     }
 
@@ -583,6 +649,22 @@ public class UserAppService(
         var now = DateTimeOffset.UtcNow;
         var requested = resolved.ToDictionary(r => (r.FeatureId, r.Capability), r => r.Effect);
 
+        // Feature keys for everything this call touches, so the audit row names permissions the way
+        // the Role editor and the JWT do rather than by an opaque FeatureId. One lookup for the union
+        // of the existing and requested sets — the requested half is already in `features` above, but
+        // the EXISTING half may reference features this request never mentioned.
+        var touchedFeatureIds = existing.Select(r => r.FeatureId)
+            .Concat(resolved.Select(r => r.FeatureId))
+            .Distinct()
+            .ToList();
+        var featureKeyById = await db.PermissionFeatures.AsNoTracking()
+            .Where(f => touchedFeatureIds.Contains(f.Id))
+            .ToDictionaryAsync(f => f.Id, f => f.Key, ct);
+        string KeyOf(Guid featureId) => featureKeyById.GetValueOrDefault(featureId, featureId.ToString());
+
+        var addedOverrides = new List<PermissionChangeDto>();
+        var removedOverrides = new List<PermissionChangeDto>();
+
         foreach (var row in existing)
         {
             if (requested.TryGetValue((row.FeatureId, row.Capability), out var effect))
@@ -591,12 +673,18 @@ public class UserAppService(
                 // deleting and re-adding the same unique key.
                 if (row.Effect != effect)
                 {
+                    // A flip is recorded as both halves. "Revoke became Grant" is a privilege
+                    // ESCALATION on that capability, and collapsing it to a single "changed" line
+                    // would hide the direction, which is the only part that matters.
+                    removedOverrides.Add(new PermissionChangeDto(KeyOf(row.FeatureId), row.Capability, row.Effect.ToString()));
+                    addedOverrides.Add(new PermissionChangeDto(KeyOf(row.FeatureId), row.Capability, effect.ToString()));
                     row.Effect = effect;
                 }
             }
             else
             {
                 db.UserPermissionOverrides.Remove(row);
+                removedOverrides.Add(new PermissionChangeDto(KeyOf(row.FeatureId), row.Capability, row.Effect.ToString()));
             }
         }
 
@@ -618,12 +706,46 @@ public class UserAppService(
                 CreatedAt = now,
                 CreatedBy = actingUserId,
             });
+            addedOverrides.Add(new PermissionChangeDto(KeyOf(featureId), capability, effect.ToString()));
         }
 
         await db.SaveChangesAsync(ct);
 
         // This user's overrides changed and nobody else's did, so the targeted eviction is enough.
         await fineCapabilities.InvalidateAsync(userId, ct);
+
+        /*
+         * This wrote no audit row at all until now, on either the direct or the replay path.
+         *
+         * A per-user override is the sharpest privilege instrument in the system: it grants or revokes
+         * one capability for one person, outside their role, and it is exactly how an exception gets
+         * made permanently and quietly. The trail recorded the role edits around it and stayed silent
+         * about this — so "who gave this account Delete on Users, and when?" was unanswerable whenever
+         * the answer was an override rather than a role.
+         *
+         * Written after SaveChanges so it only records changes that actually committed, and skipped
+         * entirely when the diff is empty: a Save that re-sent an unchanged set is not an event.
+         */
+        var diff = new PermissionDiffDto(addedOverrides, removedOverrides);
+        if (!diff.IsEmpty)
+        {
+            var subject = await db.Users.AsNoTracking()
+                .Where(u => u.Id == userId)
+                .Select(u => new { u.Name, u.Email })
+                .FirstOrDefaultAsync(ct);
+            var actorName = actingUserId is null
+                ? null
+                : await db.Users.AsNoTracking().Where(u => u.Id == actingUserId).Select(u => u.Name).FirstOrDefaultAsync(ct);
+
+            await auditLog.WriteHostAsync(
+                actingUserId, actorName, "user.permission_overrides_replaced",
+                AuditLogAppService.Modules.Users, AuditLogAppService.Categories.Crud,
+                entityType: "UserPermissionOverrides", entityId: userId.ToString(),
+                entityLabel: subject?.Email ?? subject?.Name,
+                details: diff.ToDetails(
+                    $"Changed per-user permission overrides for {subject?.Name ?? "a user"} — {diff.Summarise()}."),
+                sourceIp: SourceIp, userAgent: UserAgent, ct: ct);
+        }
 
         return await LoadOverridesAsync(userId, ct);
     }

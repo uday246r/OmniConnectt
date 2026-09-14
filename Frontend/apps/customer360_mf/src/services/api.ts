@@ -19,7 +19,7 @@ import type {
 } from '../types/api';
 import { getAccessToken, ensureFreshAccessToken, getCurrentUser, isRunningInHost } from '../api/hostBridge';
 
-const API_BASE_URL: string = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5059';
+export const API_BASE_URL: string = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5059';
 
 // ---------------------------------------------------------------------------
 // Response envelopes
@@ -45,26 +45,17 @@ export class ApiError extends Error {
   }
 }
 
-function getLoggedInUser(): string {
-  const hostUser = getCurrentUser();
-  if (hostUser?.name) return hostUser.name;
-
-  try {
-    const rawUser = sessionStorage.getItem('username') || localStorage.getItem('username');
-    if (rawUser) return rawUser;
-    
-    const userObjStr = sessionStorage.getItem('user') || localStorage.getItem('user');
-    if (userObjStr) {
-      const userObj = JSON.parse(userObjStr);
-      if (userObj && userObj.name) return userObj.name;
-      if (userObj && userObj.username) return userObj.username;
-    }
-  } catch (e) {
-    // ignore
-  }
-  return 'Admin User';
-}
-
+/*
+ * `getLoggedInUser()` and the 'X-Staff-User' header it fed are gone.
+ *
+ * The header named who an audit entry should be attributed to, read from a browser-side guess that
+ * fell back through sessionStorage, localStorage and finally the literal string 'Admin User'. The
+ * backend stopped trusting it some time ago — AuditController's actor now comes from the verified
+ * token and nowhere else — but this kept sending it, so the request still carried a field that read
+ * like an identity claim and was in fact whatever this tab happened to have in storage.
+ *
+ * Nothing replaces it. The token already says who the caller is.
+ */
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   let token: string | null = null;
 
@@ -80,7 +71,6 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    'X-Staff-User': getLoggedInUser(),
     ...(options.headers as Record<string, string> | undefined),
   };
 
@@ -204,27 +194,43 @@ export const api = {
     request(`/v1/product/willwriting?nric=${encodeURIComponent(nric)}&accountNo=${encodeURIComponent(accountNo)}`),
 
   // Audit Logs
-  getAuditLogs: (params: { search?: string; action?: string; pageNumber?: number; pageSize?: number } = {}): Promise<PaginatedEnvelope<AuditLog>> => {
+  getAuditLogs: (params: {
+    search?: string; action?: string; pageNumber?: number; pageSize?: number; from?: string; to?: string;
+    /** 'SUCCESS' or 'FAILED'. */ status?: string;
+    /** Stored actor text or actor id, case-insensitive. */ actor?: string;
+    /** Customer name or id, case-insensitive substring. */ customer?: string;
+    description?: string;
+  } = {}): Promise<PaginatedEnvelope<AuditLog>> => {
     const query = new URLSearchParams();
     if (params.search) query.append('search', params.search);
     if (params.action) query.append('action', params.action);
+    if (params.status) query.append('status', params.status);
+    if (params.actor) query.append('actor', params.actor);
+    if (params.customer) query.append('customer', params.customer);
+    if (params.description) query.append('description', params.description);
     if (params.pageNumber) query.append('pageNumber', params.pageNumber.toString());
     if (params.pageSize) query.append('pageSize', params.pageSize.toString());
+    // Inclusive ISO 8601 instants. This service accepted no date filter at all until its timestamp
+    // column stopped being local-wall-clock text — see Models/AuditLog.Timestamp on the server.
+    if (params.from) query.append('from', params.from);
+    if (params.to) query.append('to', params.to);
     return request(`/v1/audit?${query.toString()}`);
   },
 
-  createAuditLog: (data: Partial<AuditLog>): Promise<ApiEnvelope<void>> =>
-    request('/v1/audit', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
-
-  // Alias — several call sites across this app were written against `logAudit`, a method that has
-  // never existed on this object. Every one of those calls threw `TypeError: api.logAudit is not a
-  // function`, silently (they're all wrapped in try/catch that only logs to the console), so every
-  // "viewed sensitive data" / "searched" audit entry for this app has never actually been written.
-  // Aliasing here fixes every call site in one place instead of renaming each one individually.
-  logAudit(data: Partial<AuditLog>): Promise<ApiEnvelope<void>> {
-    return this.createAuditLog(data);
-  },
+  /*
+   * There is deliberately no `createAuditLog`/`logAudit` here, and no `POST /v1/audit` behind them.
+   *
+   * The browser used to tell the server what to record: the action, the description, the customer
+   * and the outcome all came from this object's argument. Two things were wrong with that beyond
+   * the obvious. A client can omit an action it would rather not record, and the gap is invisible
+   * afterwards. And an entry written from the browser can only attest to what the browser did — a
+   * "viewed sensitive data" row recorded a local unmask of a value already on the page, an event
+   * the server never saw and cannot corroborate.
+   *
+   * Customer360Service now records profile lookups itself, from the endpoint that serves them.
+   * The masked-field reveal has no server-side counterpart to record, because unmasking happens
+   * entirely in this tab over data already fetched; making it auditable would mean masking
+   * server-side and adding a real reveal request, which is a change to the 360 data contract and
+   * not something to fake with a client-written row in the meantime.
+   */
 };

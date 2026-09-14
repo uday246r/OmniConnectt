@@ -9,6 +9,54 @@ namespace AuthService.Infrastructure.Security;
 public record IssuedRefreshToken(string RawToken, DateTimeOffset ExpiresAt);
 
 /// <summary>
+/// Why a rotation did not produce a new token.
+/// </summary>
+/// <remarks>
+/// <see cref="RefreshTokenService.RotateAsync"/> used to return a plain null for every one of these,
+/// which meant the caller could not tell an ordinary expiry — a user coming back the next morning —
+/// from <see cref="Reused"/>, which is the single strongest signal of token theft this system has
+/// and the one event that revokes every session the victim holds. That happened silently, leaving
+/// the user abruptly signed out everywhere with nothing in the audit trail to explain it. Naming the
+/// outcomes is what lets the caller record the difference.
+/// </remarks>
+public enum RefreshFailureReason
+{
+    /// <summary>No row matches the presented token. Either fabricated, or from a session already purged.</summary>
+    Unknown,
+
+    /// <summary>
+    /// A token that had already been rotated away was presented again. Either the legitimate holder
+    /// replayed a stale cookie, or someone else is using a copy — indistinguishable from here, so it
+    /// is treated as theft and every active token for the user is revoked.
+    /// </summary>
+    Reused,
+
+    /// <summary>Past its sliding expiry.</summary>
+    Expired,
+
+    /// <summary>Past the session's absolute deadline, which rotation never extends.</summary>
+    SessionEnded,
+}
+
+/// <summary>
+/// The outcome of a rotation: exactly one of a new token or a reason it was refused.
+/// </summary>
+public readonly record struct RotateResult(
+    User? User, IssuedRefreshToken? NewToken, RefreshFailureReason? Failure, Guid? AffectedUserId, int SessionsRevoked)
+{
+    public bool Succeeded => NewToken is not null;
+
+    public static RotateResult Success(User user, IssuedRefreshToken token) => new(user, token, null, user.Id, 0);
+
+    /// <param name="affectedUserId">
+    /// Known even on failure whenever the token matched a row, which is what lets a reuse event be
+    /// attributed to the account it endangers rather than logged anonymously.
+    /// </param>
+    public static RotateResult Failed(RefreshFailureReason reason, Guid? affectedUserId = null, int sessionsRevoked = 0) =>
+        new(null, null, reason, affectedUserId, sessionsRevoked);
+}
+
+/// <summary>
 /// Manages the refresh-token lifecycle backing the httpOnly cookie: issue, rotate-on-use, and
 /// reuse detection. Only a SHA-256 hash of the raw token is ever persisted — the raw value exists
 /// only in the cookie sent to the browser and is never written to logs or the database.
@@ -64,7 +112,7 @@ public class RefreshTokenService(AuthDbContext db, IOptions<JwtOptions> jwtOptio
     /// (a strong signal of token theft/reuse), every active refresh token for that user is revoked
     /// as a precaution.
     /// </summary>
-    public async Task<(User User, IssuedRefreshToken NewToken)?> RotateAsync(string rawToken, string? createdByIp, CancellationToken ct = default)
+    public async Task<RotateResult> RotateAsync(string rawToken, string? createdByIp, CancellationToken ct = default)
     {
         var hash = Hash(rawToken);
         var existing = await db.RefreshTokens
@@ -74,18 +122,20 @@ public class RefreshTokenService(AuthDbContext db, IOptions<JwtOptions> jwtOptio
 
         if (existing is null)
         {
-            return null;
+            return RotateResult.Failed(RefreshFailureReason.Unknown);
         }
 
         if (existing.RevokedAt is not null)
         {
-            await RevokeAllForUserAsync(existing.UserId, ct);
-            return null;
+            // Reported back rather than swallowed: this is the one refusal that also destroys every
+            // other session the user holds, and the caller is what turns that into an audit row.
+            var revoked = await RevokeAllForUserAsync(existing.UserId, ct);
+            return RotateResult.Failed(RefreshFailureReason.Reused, existing.UserId, revoked);
         }
 
         if (existing.ExpiresAt <= DateTimeOffset.UtcNow || existing.User is null)
         {
-            return null;
+            return RotateResult.Failed(RefreshFailureReason.Expired, existing.UserId);
         }
 
         // The session's hard deadline. ExpiresAt is already clamped to never exceed this, so the
@@ -93,7 +143,7 @@ public class RefreshTokenService(AuthDbContext db, IOptions<JwtOptions> jwtOptio
         // the cap existed, whose ExpiresAt was not clamped.
         if (existing.AbsoluteExpiresAt <= DateTimeOffset.UtcNow)
         {
-            return null;
+            return RotateResult.Failed(RefreshFailureReason.SessionEnded, existing.UserId);
         }
 
         var next = await IssueAsync(existing.UserId, createdByIp, existing, ct);
@@ -103,7 +153,27 @@ public class RefreshTokenService(AuthDbContext db, IOptions<JwtOptions> jwtOptio
         existing.ReplacedByTokenId = newTokenEntity.Id;
         await db.SaveChangesAsync(ct);
 
-        return (existing.User, next);
+        return RotateResult.Success(existing.User, next);
+    }
+
+    /// <summary>
+    /// Who a raw refresh token belongs to, or null if it matches nothing.
+    ///
+    /// Exists so a sign-out can be attributed. The logout endpoint is deliberately
+    /// <c>[AllowAnonymous]</c> — a caller whose access token has already expired must still be able
+    /// to end their session — so there is no <c>sub</c> claim to read, and the cookie is the only
+    /// thing linking the request to an account. Resolving it here keeps hashing knowledge in the one
+    /// class that owns it.
+    /// </summary>
+    public async Task<(Guid UserId, string? Name)?> FindOwnerAsync(string rawToken, CancellationToken ct = default)
+    {
+        var hash = Hash(rawToken);
+        var owner = await db.RefreshTokens.AsNoTracking()
+            .Where(t => t.TokenHash == hash)
+            .Select(t => new { t.UserId, t.User!.Name })
+            .FirstOrDefaultAsync(ct);
+
+        return owner is null ? null : (owner.UserId, owner.Name);
     }
 
     public async Task RevokeAsync(string rawToken, CancellationToken ct = default)
@@ -149,7 +219,8 @@ public class RefreshTokenService(AuthDbContext db, IOptions<JwtOptions> jwtOptio
         return doomed.Count;
     }
 
-    private async Task RevokeAllForUserAsync(Guid userId, CancellationToken ct)
+    /// <summary>Returns how many sessions were ended, so the caller can say so in the audit record.</summary>
+    private async Task<int> RevokeAllForUserAsync(Guid userId, CancellationToken ct)
     {
         var active = await db.RefreshTokens
             .Where(t => t.UserId == userId && t.RevokedAt == null)
@@ -164,6 +235,8 @@ public class RefreshTokenService(AuthDbContext db, IOptions<JwtOptions> jwtOptio
         {
             await db.SaveChangesAsync(ct);
         }
+
+        return active.Count;
     }
 
     private static string GenerateRawToken() => Convert.ToBase64String(RandomNumberGenerator.GetBytes(64))

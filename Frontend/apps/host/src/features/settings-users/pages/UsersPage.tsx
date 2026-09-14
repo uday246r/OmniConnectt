@@ -7,7 +7,6 @@ import { TOPICS, useDataRevision } from '../../../shared/stores/invalidationStor
 import { ApiError } from '../../../shared/api/httpClient'
 import { Icon } from '../../../shared/components/Icon/Icon'
 import { usersApi, type UserListItemDto } from '../api/usersApi'
-import { DateTimeRangeFilter, type DateTimeRangeValue } from '../../../shared/components/DateTimeRangeFilter/DateTimeRangeFilter'
 import {
   ActorCell,
   Badge,
@@ -28,6 +27,12 @@ import {
   type ColumnFilterOption,
   type ResponsiveColumn,
   type SearchFieldSuggestion,
+  DateRangeColumnFilter,
+  EMPTY_DATE_RANGE,
+  describeDateRange,
+  isDateRangeActive,
+  resolveDateRange,
+  type DateRangeValue,
 } from '@omniremit/ui'
 import styles from './UsersPage.module.css'
 
@@ -63,7 +68,10 @@ export function UsersPage() {
   const [mobileFilter, setMobileFilter] = useState('')
   const [roleFilter, setRoleFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
-  const [lastLoginRange, setLastLoginRange] = useState<DateTimeRangeValue>({})
+  const [lastLoginRange, setLastLoginRange] = useState<DateRangeValue>(EMPTY_DATE_RANGE)
+  // Resolved at the point of use rather than stored, so a preset like "Last 7 Days" keeps meaning
+  // the last seven days on a page left open overnight.
+  const lastLoginBounds = useMemo(() => resolveDateRange(lastLoginRange), [lastLoginRange])
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(() => readStoredPageSize('host.users', 10))
   const [refreshKey, setRefreshKey] = useState(0)
@@ -215,8 +223,8 @@ export function UsersPage() {
     const needle = debouncedName.trim().toLowerCase()
     // Phone numbers carry formatting (+91, spaces) the operator won't type — compare digits only.
     const mobileDigits = debouncedMobile.replace(/\D/g, '')
-    const fromMs = lastLoginRange.from ? new Date(lastLoginRange.from).getTime() : undefined
-    const toMs = lastLoginRange.to ? new Date(lastLoginRange.to).getTime() : undefined
+    const fromMs = lastLoginBounds.from ? new Date(lastLoginBounds.from).getTime() : undefined
+    const toMs = lastLoginBounds.to ? new Date(lastLoginBounds.to).getTime() : undefined
     const quickNeedle = debouncedQuickSearch.trim().toLowerCase()
 
     return pool.filter((u) => {
@@ -264,11 +272,11 @@ export function UsersPage() {
       value: statusFilter === 'active' ? 'Active' : 'Inactive',
       onRemove: () => setStatusFilter(''),
     },
-    (lastLoginRange.from || lastLoginRange.to) && {
+    isDateRangeActive(lastLoginRange) && {
       key: 'lastLogin',
       label: 'Last Login',
-      value: `${lastLoginRange.from ? formatDateTime(lastLoginRange.from) : '…'} → ${lastLoginRange.to ? formatDateTime(lastLoginRange.to) : '…'}`,
-      onRemove: () => setLastLoginRange({}),
+      value: describeDateRange(lastLoginRange),
+      onRemove: () => setLastLoginRange(EMPTY_DATE_RANGE),
     },
   ].filter(Boolean) as ActiveFilter[]
 
@@ -354,7 +362,7 @@ export function UsersPage() {
       key: 'lastLogin',
       label: 'Last Login',
       priority: 'low',
-      header: <DateTimeRangeFilter label="Last Login" value={lastLoginRange} onChange={setLastLoginRange} />,
+      header: <DateRangeColumnFilter label="Last Login" value={lastLoginRange} onChange={setLastLoginRange} />,
       render: (u) => formatDateTime(u.lastLoginAt),
     },
     {
@@ -434,7 +442,7 @@ export function UsersPage() {
           setMobileFilter('')
           setRoleFilter('')
           setStatusFilter('')
-          setLastLoginRange({})
+          setLastLoginRange(EMPTY_DATE_RANGE)
         }}
       />
 

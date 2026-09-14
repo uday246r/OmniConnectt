@@ -1,5 +1,6 @@
 using AuthService.Application.DTOs;
 using AuthService.Application.Services;
+using AuthService.Infrastructure;
 using AuthService.Infrastructure.Security;
 using AuthService.Infrastructure.Seed;
 using Microsoft.AspNetCore.Authorization;
@@ -16,25 +17,72 @@ namespace AuthService.Controllers;
 [ApiController]
 [Route("api/approvals")]
 [Authorize]
-public class ApprovalsController(ApprovalAppService approvals) : ControllerBase
+public class ApprovalsController(ApprovalAppService approvals, AuditLogAppService auditLog) : ControllerBase
 {
     private const string Feature = AuthDbSeeder.HostFeatureKeys.SystemApprovals;
 
     [HttpGet]
     [RequirePermission(Feature, "View")]
     public async Task<ActionResult<PagedResult<ApprovalRequestListItemDto>>> List(
+        [FromQuery] ApprovalFilter filter,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 25,
-        [FromQuery] string? module = null,
-        [FromQuery] string? status = null,
-        [FromQuery] Guid? makerId = null,
         [FromQuery] bool assignedToMe = false,
-        [FromQuery] DateTimeOffset? from = null,
-        [FromQuery] DateTimeOffset? to = null,
         CancellationToken ct = default)
     {
-        var checkerId = assignedToMe ? CurrentUserId() : null;
-        return Ok(await approvals.ListAsync(Math.Max(page, 1), Math.Clamp(pageSize, 1, 100), module, status, makerId, checkerId, from, to, ct));
+        return Ok(await approvals.ListAsync(
+            Math.Max(page, 1), Math.Clamp(pageSize, 1, 100), Scope(filter, assignedToMe), ct));
+    }
+
+    /// <summary>
+    /// The Approval Center's dropdown options, under the filters already applied.
+    /// </summary>
+    [HttpGet("facets")]
+    [RequirePermission(Feature, "View")]
+    public async Task<ActionResult<ApprovalFacetsDto>> Facets(
+        [FromQuery] ApprovalFilter filter, [FromQuery] bool assignedToMe = false, CancellationToken ct = default)
+        => Ok(await approvals.FacetsAsync(Scope(filter, assignedToMe), ct));
+
+    /// <summary>
+    /// Applies "assigned to me" from the caller's own identity, and discards any checker id the query
+    /// string tried to supply — the queue a caller sees is never someone else's by naming them.
+    /// </summary>
+    private ApprovalFilter Scope(ApprovalFilter filter, bool assignedToMe) =>
+        filter with { CheckerId = assignedToMe ? CurrentUserId() : null };
+
+    /// <summary>
+    /// The current filtered approval queue as a CSV file.
+    /// </summary>
+    /// <remarks>
+    /// New. The Approval Center is the platform's record of every gated change and who decided it,
+    /// and it was the only log-shaped screen with no export at all.
+    /// </remarks>
+    [HttpGet("export")]
+    [RequirePermission(Feature, "Export")]
+    public async Task<IActionResult> Export(
+        [FromQuery] ApprovalFilter filter,
+        [FromQuery] bool assignedToMe = false,
+        CancellationToken ct = default)
+    {
+        filter = Scope(filter, assignedToMe);
+        var export = await approvals.ExportCsvAsync(filter, ct);
+
+        ExportHeaders.Apply(Response, export);
+
+        await auditLog.WriteHostAsync(
+            CurrentUserId(), CurrentUserName(), "approval.exported",
+            AuditLogAppService.Modules.Approvals, AuditLogAppService.Categories.Export,
+            entityType: "ApprovalRequest", entityLabel: "Approval queue",
+            details: $"Exported {export.RowCount} approval request(s)" +
+                     (export.Truncated
+                         ? $" of {export.MatchCount} matching — the export limit of {export.RowLimit} was reached"
+                         : "") +
+                     $". {filter.Describe()}",
+            sourceIp: HttpContext.Connection.RemoteIpAddress?.ToString(),
+            userAgent: Request.Headers.UserAgent.ToString() is { Length: > 0 } ua ? ua : null,
+            page: "approvals", ct: ct);
+
+        return File(export.ToBytes(), "text/csv", $"approvals-{DateTimeOffset.UtcNow:yyyyMMdd-HHmmss}.csv");
     }
 
     /// <summary>
@@ -49,7 +97,9 @@ public class ApprovalsController(ApprovalAppService approvals) : ControllerBase
     {
         var currentUserId = CurrentUserId();
         if (currentUserId is null) return Unauthorized();
-        return Ok(await approvals.ListAsync(Math.Max(page, 1), Math.Clamp(pageSize, 1, 100), module: null, status, makerId: currentUserId, checkerId: null, from: null, to: null, ct));
+        return Ok(await approvals.ListAsync(
+            Math.Max(page, 1), Math.Clamp(pageSize, 1, 100),
+            new ApprovalFilter { Status = status, MakerId = currentUserId }, ct));
     }
 
     [HttpGet("{id:guid}")]
@@ -103,6 +153,9 @@ public class ApprovalsController(ApprovalAppService approvals) : ControllerBase
         var sub = User.FindFirst(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub)?.Value;
         return Guid.TryParse(sub, out var id) ? id : null;
     }
+
+    private string? CurrentUserName() =>
+        User.FindFirst("name")?.Value ?? User.FindFirst("email")?.Value;
 
     /// <summary>
     /// Super Admin bypass predicate for the Maker-Checker gate. Deliberately the strict single-claim

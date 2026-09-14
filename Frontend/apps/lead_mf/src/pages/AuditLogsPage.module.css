@@ -91,3 +91,18 @@
 
 /* "Inspect" row action — hover was a JS handler, now CSS. */
 
+
+/* A capped or refused export. Warning-toned rather than error-toned: the file usually did download,
+   it just is not the whole answer, and saying so plainly is the entire point of the message. */
+.exportNotice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding: 10px 14px;
+  background: var(--omni-color-warning-50, #fffbeb);
+  border: 1px solid var(--omni-color-warning-200, #fde68a);
+  border-radius: var(--omni-radius-md);
+  font-size: var(--omni-font-size-xs);
+  color: var(--omni-color-warning-800, #92400e);
+}

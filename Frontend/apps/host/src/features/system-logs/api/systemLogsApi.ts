@@ -1,5 +1,7 @@
 import { env } from '../../../config/env'
-import { apiFetch, ApiError } from '../../../shared/api/httpClient'
+import { apiFetch } from '../../../shared/api/httpClient'
+import { hostDownloadCsv } from '../../../shared/api/exportCsv'
+import type { CsvDownloadResult } from '@omniremit/ui'
 import type { PagedResult } from '../../settings-users/api/usersApi'
 
 const base = env.authServiceUrl
@@ -67,31 +69,18 @@ export const systemLogsApi = {
   summary: (accessToken: string, params: DateRangeParams = {}) =>
     apiFetch<SystemLogSummaryDto>(`${base}/api/system-logs/summary${buildQuery(params)}`, { accessToken }),
 
-  async exportCsv(accessToken: string, params: ListSystemLogsParams = {}): Promise<void> {
-    const response = await fetch(`${base}/api/system-logs/export${buildQuery(params)}`, {
-      credentials: 'include',
-      headers: { Authorization: `Bearer ${accessToken}` },
-    })
-
-    if (!response.ok) {
-      let title = response.statusText || `Request failed with status ${response.status}`
-      try {
-        const problem = (await response.json()) as { title?: string }
-        title = problem.title ?? title
-      } catch {
-        // body wasn't JSON — keep the status-text fallback
-      }
-      throw new ApiError(response.status, title)
-    }
-
-    const blob = await response.blob()
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `system-logs-${new Date().toISOString().slice(0, 10)}.csv`
-    document.body.appendChild(link)
-    link.click()
-    link.remove()
-    URL.revokeObjectURL(url)
-  },
+  /**
+   * Downloads the CSV export.
+   *
+   * The hand-rolled fetch this replaces bypassed {@link apiFetch} — necessarily, since that always
+   * parses JSON — and in doing so lost its 401-refresh-and-retry, so an export on a token that had
+   * just expired failed while every other request on the page recovered. It also could not tell the
+   * caller when the server had capped the file.
+   */
+  exportCsv: (accessToken: string | null, params: ListSystemLogsParams = {}): Promise<CsvDownloadResult> =>
+    hostDownloadCsv(
+      `${base}/api/system-logs/export${buildQuery(params)}`,
+      accessToken,
+      `system-logs-${new Date().toISOString().slice(0, 10)}.csv`,
+    ),
 }

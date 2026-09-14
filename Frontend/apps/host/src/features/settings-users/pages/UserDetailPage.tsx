@@ -21,7 +21,6 @@ import { usePermissionCatalog } from '../hooks/usePermissionCatalog'
 import { computeEffectivePermissions } from '../utils/effectivePermissions'
 import { PermissionMatrixTable } from '../components/PermissionMatrixTable/PermissionMatrixTable'
 import { useDebouncedValue } from '../../../shared/hooks/useDebouncedValue'
-import { DateTimeRangeFilter, type DateTimeRangeValue } from '../../../shared/components/DateTimeRangeFilter/DateTimeRangeFilter'
 import {
   Badge,
   Button,
@@ -46,6 +45,14 @@ import {
   type ActiveFilter,
   type ColumnFilterOption,
   type ResponsiveColumn,
+  DateRangeColumnFilter,
+  EMPTY_DATE_RANGE,
+  CsvExportError,
+  describeDateRange,
+  describeTruncation,
+  isDateRangeActive,
+  resolveDateRange,
+  type DateRangeValue,
 } from '@omniremit/ui'
 import styles from './UserDetailPage.module.css'
 
@@ -91,7 +98,9 @@ export function UserDetailPage() {
   const [resultFilter, setResultFilter] = useState('')
   const [appFilter, setAppFilter] = useState('')
   const [entitySearch, setEntitySearch] = useState('')
-  const [timeRange, setTimeRange] = useState<DateTimeRangeValue>({})
+  const [timeRange, setTimeRange] = useState<DateRangeValue>(EMPTY_DATE_RANGE)
+  // Resolved where it is used, never stored — a stored "Last 7 Days" would freeze into one week.
+  const timeBounds = useMemo(() => resolveDateRange(timeRange), [timeRange])
   const [viewingLog, setViewingLog] = useState<AuditLogDto | null>(null)
   const [exporting, setExporting] = useState(false)
 
@@ -163,8 +172,7 @@ export function UserDetailPage() {
         page: 1,
         pageSize: LOGS_POOL_SIZE,
         sortDir: 'desc',
-        from: timeRange.from,
-        to: timeRange.to,
+        ...timeBounds,
       })
       .then((res) => {
         if (!cancelled) setLogsPool(res.items)
@@ -175,7 +183,7 @@ export function UserDetailPage() {
     return () => {
       cancelled = true
     }
-  }, [accessToken, id, tab, timeRange, dataRevision])
+  }, [accessToken, id, tab, timeBounds, dataRevision])
 
   useEffect(() => {
     setLogsPage(1)
@@ -262,29 +270,44 @@ export function UserDetailPage() {
       value: `"${debouncedEntitySearch}"`,
       onRemove: () => setEntitySearch(''),
     },
-    (timeRange.from || timeRange.to) && {
+    isDateRangeActive(timeRange) && {
       key: 'time',
       label: 'Time',
-      value: `${timeRange.from ? formatDateTime(timeRange.from) : '…'} → ${timeRange.to ? formatDateTime(timeRange.to) : '…'}`,
-      onRemove: () => setTimeRange({}),
+      value: describeDateRange(timeRange),
+      onRemove: () => setTimeRange(EMPTY_DATE_RANGE),
     },
   ].filter(Boolean) as ActiveFilter[]
 
+  /**
+   * Exports this user's activity — and, since the fix on the server side, only this user's.
+   *
+   * `actorUserId` was always sent from here and the export endpoint had no parameter to bind it to,
+   * so it was dropped and the file contained the entire platform's audit trail under a message
+   * saying the export had succeeded. Both endpoints now bind one shared filter type, which makes
+   * that particular divergence structurally impossible rather than merely fixed.
+   */
   async function handleExportActivity() {
     if (!accessToken || !detail) return
     setExporting(true)
     try {
-      await auditLogsApi.exportCsv(accessToken, {
+      const result = await auditLogsApi.exportCsv(accessToken, {
         actorUserId: detail.id,
-        from: timeRange.from,
-        to: timeRange.to,
+        ...timeBounds,
         action: actionFilter || undefined,
         result: (resultFilter as any) || undefined,
         sourceApplication: appFilter || undefined,
       })
-      toast.success('Audit log report exported successfully.')
+
+      const truncation = describeTruncation(result)
+      if (truncation) {
+        // A warning, not a success. A partial file that reports itself as complete is the failure
+        // this whole export path was rebuilt to stop producing.
+        toast.warning(truncation)
+      } else {
+        toast.success('Audit log report exported successfully.')
+      }
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : 'Failed to export audit report.')
+      toast.error(err instanceof CsvExportError ? err.message : 'Failed to export audit report.')
     } finally {
       setExporting(false)
     }
@@ -355,7 +378,7 @@ export function UserDetailPage() {
       key: 'time',
       label: 'Time',
       priority: 'always',
-      header: <DateTimeRangeFilter label="Time" value={timeRange} onChange={setTimeRange} />,
+      header: <DateRangeColumnFilter label="Time" value={timeRange} onChange={setTimeRange} />,
       render: (l) => formatAuditTimestamp(l.occurredAt),
     },
     {
@@ -595,7 +618,7 @@ export function UserDetailPage() {
             setResultFilter('')
             setAppFilter('')
             setEntitySearch('')
-            setTimeRange({})
+            setTimeRange(EMPTY_DATE_RANGE)
           }}
         />
         <DataTable reserveHeight footer={<Pagination page={logsPage} pageSize={LOGS_PAGE_SIZE} total={logsTotal} onPageChange={setLogsPage} itemLabel="event" />}>

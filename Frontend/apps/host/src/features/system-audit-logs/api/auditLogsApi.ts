@@ -1,5 +1,7 @@
 import { env } from '../../../config/env'
-import { apiFetch, ApiError } from '../../../shared/api/httpClient'
+import { apiFetch } from '../../../shared/api/httpClient'
+import { hostDownloadCsv } from '../../../shared/api/exportCsv'
+import type { CsvDownloadResult } from '@omniremit/ui'
 import type { PagedResult } from '../../settings-users/api/usersApi'
 
 const base = env.authServiceUrl
@@ -37,6 +39,12 @@ export interface AuditLogSummaryDto {
 }
 
 export interface ListAuditLogsParams {
+  /** "Local" or "Google". Filtered client-side until the audit query became symmetric. */
+  authMethod?: string
+  /** Substring of the recorded address. */
+  sourceIp?: string
+  /** A browser or OS name as the detail drawer displays it. */
+  device?: string
   page?: number
   pageSize?: number
   service?: string
@@ -58,6 +66,16 @@ export interface ListAuditLogsParams {
   actionCategory?: string
 }
 
+/** The distinct values each bounded filter can take, given the other filters already applied. */
+export interface AuditLogFacetsDto {
+  services: string[]
+  actions: { action: string; count: number }[]
+  authMethods: string[]
+  modules: string[]
+  pages: string[]
+  actionCategories: string[]
+}
+
 export interface DateRangeParams {
   from?: string
   to?: string
@@ -72,19 +90,13 @@ function buildQuery(params: object) {
   return query ? `?${query}` : ''
 }
 
-export interface ActivityEventDto {
-  page: string
-  module?: string
-  sourceApplication?: string
-  action?: string
-  actionCategory?: string
-  pageLabel?: string
-  details?: string
-  entityType?: string
-  entityId?: string
-  entityLabel?: string
-}
-
+/*
+ * There is deliberately no `recordActivity` here any more, and no `POST /api/audit-logs/activity`
+ * for it to call. The browser used to be able to write audit rows naming any service and any
+ * module, with no permission check — so the trail recorded what a client asserted rather than what
+ * the platform did. Every audit row is now written by the service that performed the action, from
+ * the identity on its verified token.
+ */
 export const auditLogsApi = {
   list: (accessToken: string, params: ListAuditLogsParams = {}, signal?: AbortSignal) =>
     apiFetch<PagedResult<AuditLogDto>>(`${base}/api/audit-logs${buildQuery(params)}`, { accessToken, signal }),
@@ -92,43 +104,28 @@ export const auditLogsApi = {
   summary: (accessToken: string, params: DateRangeParams = {}) =>
     apiFetch<AuditLogSummaryDto>(`${base}/api/audit-logs/summary${buildQuery(params)}`, { accessToken }),
 
-  recordActivity: (accessToken: string, evt: ActivityEventDto) =>
-    apiFetch<void>(`${base}/api/audit-logs/activity`, {
-      method: 'POST',
-      accessToken,
-      body: evt,
-    }),
+  /**
+   * The distinct values each bounded filter can take, under the filters already applied.
+   *
+   * Backs the page's dropdowns now that filtering is server-side. They used to be built from
+   * whichever rows had been fetched, which meant a page of ten rows produced a ten-value dropdown —
+   * and, even with a large pre-fetch, offered values the other active filters had already excluded.
+   */
+  facets: (accessToken: string, params: ListAuditLogsParams = {}, signal?: AbortSignal) =>
+    apiFetch<AuditLogFacetsDto>(`${base}/api/audit-logs/facets${buildQuery(params)}`, { accessToken, signal }),
 
   /**
-   * Downloads the CSV export as a real browser file-save (not apiFetch — that always parses JSON).
-   * Uses a temporary object URL + anchor click, the standard client-side download pattern; the
-   * blob's bytes are exactly what the server produced, nothing constructed client-side.
+   * Downloads the CSV export.
+   *
+   * Delegates to the shared helper rather than hand-rolling the fetch, which is what fixes two
+   * things at once: the download now refreshes and replays on a stale token like every other request
+   * on the page, and it reports whether the server capped the file instead of handing over a partial
+   * export that looks complete.
    */
-  async exportCsv(accessToken: string, params: ListAuditLogsParams = {}): Promise<void> {
-    const response = await fetch(`${base}/api/audit-logs/export${buildQuery(params)}`, {
-      credentials: 'include',
-      headers: { Authorization: `Bearer ${accessToken}` },
-    })
-
-    if (!response.ok) {
-      let title = response.statusText || `Request failed with status ${response.status}`
-      try {
-        const problem = (await response.json()) as { title?: string }
-        problem.title && (title = problem.title)
-      } catch {
-        // body wasn't JSON — keep the status-text fallback
-      }
-      throw new ApiError(response.status, title)
-    }
-
-    const blob = await response.blob()
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `audit-logs-${new Date().toISOString().slice(0, 10)}.csv`
-    document.body.appendChild(link)
-    link.click()
-    link.remove()
-    URL.revokeObjectURL(url)
-  },
+  exportCsv: (accessToken: string | null, params: ListAuditLogsParams = {}): Promise<CsvDownloadResult> =>
+    hostDownloadCsv(
+      `${base}/api/audit-logs/export${buildQuery(params)}`,
+      accessToken,
+      `audit-logs-${new Date().toISOString().slice(0, 10)}.csv`,
+    ),
 }

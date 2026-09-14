@@ -83,6 +83,19 @@ function refreshOnce(): Promise<string> {
 }
 
 /**
+ * The same deduped refresh, for the one caller that cannot go through {@link apiFetch}.
+ *
+ * A CSV download has to read a blob, not JSON, so it issues its own `fetch` — and in doing so used
+ * to lose the 401-refresh-and-retry above entirely. Exposing the dedupe rather than letting the
+ * export call `authHooks.refresh()` directly is what keeps an export that races several ordinary
+ * requests from triggering a second, competing refresh: the server rotates the refresh cookie on
+ * every use, so two concurrent refreshes trip the reuse detection and end every session the user has.
+ */
+export function forceRefreshAccessToken(): Promise<string> {
+  return refreshOnce()
+}
+
+/**
  * Thin fetch wrapper shared by every API client (AuthService). Always sends
  * credentials so the httpOnly refresh cookie travels with same-site requests, JSON-encodes a
  * plain object body, and throws ApiError with the server's ProblemDetails title on non-2xx so

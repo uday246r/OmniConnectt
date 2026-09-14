@@ -15,9 +15,14 @@ public class AuthServiceClient(HttpClient httpClient, IOptions<AuthIntegrationOp
 {
     private readonly AuthIntegrationOptions _options = options.Value;
 
+    // Serialized by property NAME, so this only has to carry the subset of
+    // AuthService.Application.DTOs.RecordAuditLogRequest that this service ever populates — the
+    // positional order need not match the server's, and does not.
     private record RecordAuditLogRequest(
         string ServiceName, Guid? ActorUserId, string? ActorName, string Action, string? EntityType, string? EntityId, string? Details,
-        string? EntityLabel, string? SourceIp, string? UserAgent, string? CorrelationId = null);
+        string? EntityLabel, string? SourceIp, string? UserAgent, string? CorrelationId = null,
+        string? SourceApplication = null, string? Module = null, string? Page = null, string? ActionCategory = null,
+        string Result = "Success");
 
     private record SubmitInternalApprovalRequest(
         string Module, string Action, string? EntityType, string? EntityId, string? EntityLabel,
@@ -106,13 +111,49 @@ public class AuthServiceClient(HttpClient httpClient, IOptions<AuthIntegrationOp
     // sourceIp/userAgent come off THIS service's own current HttpContext — the real end user's
     // browser talks to LeadService directly, so this is where that information actually is;
     // AuthService's own connection for the internal POST below would just be this server's address.
-    public Task<bool> PushAuditLogAsync(string action, string? entityType, string? entityId, string? details, Guid? actorUserId, string? actorName, string? entityLabel = null, CancellationToken ct = default)
+    public Task<bool> PushAuditLogAsync(
+        string action, string? entityType, string? entityId, string? details, Guid? actorUserId, string? actorName,
+        string? entityLabel = null, string? sourceApplication = null, string? module = null, string? page = null,
+        string? actionCategory = null, string result = "Success", CancellationToken ct = default)
     {
         var httpContext = httpContextAccessor.HttpContext;
         var sourceIp = httpContext?.Connection.RemoteIpAddress?.ToString();
         var userAgent = httpContext?.Request.Headers.UserAgent.ToString();
-        return PostAsync("internal/audit-logs", new RecordAuditLogRequest("LeadService", actorUserId, actorName, action, entityType, entityId, details, entityLabel, sourceIp, userAgent), ct);
+
+        /*
+         * A correlation id, which this never sent.
+         *
+         * AuthService's audit service already threads one through a whole operation, and the
+         * maker-checker flow depends on it — but nothing outside AuthService ever supplied one, so
+         * every row a remote pushed landed with AuthService minting a fresh id from its own view of
+         * an incoming internal POST. A lead mutation and the audit row describing it were therefore
+         * two unrelated operations as far as the trail was concerned.
+         *
+         * An inbound X-Correlation-Id wins, so a chain that began in the host — or in AuthService
+         * replaying an approved mutation back into this service — stays one thread across the
+         * boundary. Falling back to this request's own trace id still keeps several writes within one
+         * inbound request together.
+         */
+        var correlationId = httpContext?.Request.Headers["X-Correlation-Id"].ToString() is { Length: > 0 } inbound
+            ? inbound
+            : httpContext?.TraceIdentifier;
+
+        return PostAsync(
+            "internal/audit-logs",
+            new RecordAuditLogRequest(
+                "LeadService", actorUserId, actorName, action, entityType, entityId, details, entityLabel,
+                sourceIp, userAgent, correlationId,
+                sourceApplication ?? DefaultSourceApplication, module, page, actionCategory, result),
+            ct);
     }
+
+    /// <summary>
+    /// The <c>SourceApplication</c> rows from this service carry by default — the name the sidebar
+    /// and the host's Audit Logs "Application" filter use, not the service's class name. Rows used to
+    /// omit it entirely, which left <c>HostOrRemote</c> and <c>RemoteName</c> null and made every
+    /// Lead row unmatchable by application.
+    /// </summary>
+    public const string DefaultSourceApplication = "Lead Management";
 
     /// <summary>
     /// Pushes a system-level log (error, warning, health event) to AuthService's centralized system

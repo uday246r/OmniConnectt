@@ -27,6 +27,7 @@ public class SetPasswordInviteService(
     PasswordHasher passwordHasher,
     IOptions<SmtpOptions> smtpOptions,
     IOptions<PasswordPolicyOptions> passwordPolicyOptions,
+    AuditLogAppService auditLog,
     ILogger<SetPasswordInviteService> logger)
 {
     private readonly SmtpOptions _smtp = smtpOptions.Value;
@@ -75,7 +76,34 @@ public class SetPasswordInviteService(
         var link = $"{_smtp.AppBaseUrl.TrimEnd('/')}/set-password?token={Uri.EscapeDataString(rawToken)}";
         var (subject, html, text) = BuildInviteEmail(user.Name, link, _smtp.InviteValidHours);
 
-        return await email.SendAsync(user.Email, user.Name, subject, html, text, ct);
+        var sent = await email.SendAsync(user.Email, user.Name, subject, html, text, ct);
+
+        /*
+         * An invite is a credential-granting act: whoever opens that link chooses the account's
+         * password. It went entirely unrecorded — the only trace was an ILogger line, which is not
+         * queryable and not part of the audit trail. The row names who issued it and for whom, never
+         * the token, which exists only in the email by design.
+         *
+         * Recorded whether or not the mail was accepted. A failed send still consumed the old invite
+         * (the supersede above already ran), so an operator asking "why did their old link stop
+         * working" needs to see the attempt, not just the successes.
+         */
+        var actorName = actingUserId is null
+            ? null
+            : await db.Users.AsNoTracking().Where(u => u.Id == actingUserId).Select(u => u.Name).FirstOrDefaultAsync(ct);
+
+        await auditLog.WriteHostAsync(
+            actingUserId, actorName, "auth.invite_issued",
+            AuditLogAppService.Modules.Authentication, AuditLogAppService.Categories.Auth,
+            entityType: "User", entityId: user.Id.ToString(), entityLabel: user.Email,
+            details: sent
+                ? $"Set-password invite sent to {user.Email}, valid for {_smtp.InviteValidHours}h. Any earlier invite for this account was revoked."
+                : $"Set-password invite for {user.Email} could not be delivered. Any earlier invite for this account was revoked and is no longer usable.",
+            result: sent ? "Success" : "Failure",
+            failureReason: sent ? null : "Invite email could not be delivered",
+            ct: ct);
+
+        return sent;
     }
 
     /// <summary>
@@ -119,6 +147,18 @@ public class SetPasswordInviteService(
 
         await db.SaveChangesAsync(ct);
         logger.LogInformation("Set-password invite redeemed for user {UserId}.", invite.UserId);
+
+        // The account is attributed to itself: redeeming happens on an anonymous endpoint, so the
+        // only identity involved is the one whose password just changed. That is also exactly the
+        // fact worth recording — a password was set from an emailed link rather than from inside a
+        // signed-in session, which is a different provenance from auth.password_changed.
+        await auditLog.WriteHostAsync(
+            invite.UserId, invite.User.Name, "auth.invite_redeemed",
+            AuditLogAppService.Modules.Authentication, AuditLogAppService.Categories.Auth,
+            entityType: "User", entityId: invite.UserId.ToString(), entityLabel: invite.User.Email,
+            details: "Password set through a single-use invite link. The link is now spent.",
+            authMethod: "Local", ct: ct);
+
         return null;
     }
 

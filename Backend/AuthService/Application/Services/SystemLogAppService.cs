@@ -74,7 +74,16 @@ public class SystemLogAppService(AuthDbContext db, IConfiguration config)
         return new SystemLogSummaryDto(errorCount, warningCount, infoCount, criticalCount, totalEvents, servicesReporting);
     }
 
-    public async Task<string> ExportCsvAsync(
+    /// <summary>
+    /// CSV of the current filtered result set, capped — and reporting that it capped.
+    /// </summary>
+    /// <remarks>
+    /// This method's filter set was already symmetric with the list's, which is why the System Logs
+    /// export never had the "the CSV does not match the screen" problem the audit export did. What it
+    /// shared with every other export on the platform was the silent truncation: it returned the
+    /// newest 10,000 rows of a larger match with no indication that anything was missing.
+    /// </remarks>
+    public async Task<CsvExport> ExportCsvAsync(
         string? severity = null, string? service = null, string? module = null, string? eventCode = null,
         DateTimeOffset? from = null, DateTimeOffset? to = null, string? correlationId = null,
         string? sortDir = null, string? messageSearch = null, string? environment = null,
@@ -82,23 +91,31 @@ public class SystemLogAppService(AuthDbContext db, IConfiguration config)
     {
         const int maxRows = 10_000;
         var baseQuery = BuildFilteredQuery(severity, service, module, eventCode, from, to, correlationId, messageSearch, environment);
+
+        var matched = await baseQuery.CountAsync(ct);
+
         var items = await (string.Equals(sortDir, "asc", StringComparison.OrdinalIgnoreCase)
             ? baseQuery.OrderBy(a => a.OccurredAt)
             : baseQuery.OrderByDescending(a => a.OccurredAt))
             .Take(maxRows).ToListAsync(ct);
-        var sb = new StringBuilder();
-        sb.AppendLine("Time,Severity,Service,Module,Environment,TenantId,UserId,CorrelationId,RequestId,StatusCode,EventCode,Message,StackTrace,Metadata");
+
+        var csv = new CsvBuilder(
+            "Time", "Severity", "Service", "Module", "Environment", "TenantId", "UserId",
+            "CorrelationId", "RequestId", "StatusCode", "EventCode", "Message", "StackTrace", "Metadata");
+
         foreach (var a in items)
         {
-            sb.AppendLine(string.Join(",", new[]
-            {
-                CsvField(a.OccurredAt.ToString("O")), CsvField(a.Severity), CsvField(a.ServiceName),
-                CsvField(a.Module), CsvField(a.Environment), CsvField(a.TenantId), CsvField(a.UserId?.ToString()),
-                CsvField(a.CorrelationId), CsvField(a.RequestId), CsvField(a.StatusCode?.ToString()),
-                CsvField(a.EventCode), CsvField(a.Message), CsvField(a.StackTrace), CsvField(a.Metadata),
-            }));
+            csv.AppendRow(
+                a.OccurredAt.ToString("O"), a.Severity, a.ServiceName,
+                a.Module, a.Environment, a.TenantId, a.UserId?.ToString(),
+                // Unlike the audit export, the correlation id belongs here: a system log is a
+                // diagnostic artifact, and correlating one across services is the main reason anyone
+                // exports it.
+                a.CorrelationId, a.RequestId, a.StatusCode?.ToString(),
+                a.EventCode, a.Message, a.StackTrace, a.Metadata);
         }
-        return sb.ToString();
+
+        return new CsvExport(csv.ToString(), items.Count, matched, maxRows);
     }
 
     private IQueryable<SystemLog> BuildFilteredQuery(

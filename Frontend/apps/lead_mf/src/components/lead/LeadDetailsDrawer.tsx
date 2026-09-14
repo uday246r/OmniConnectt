@@ -97,27 +97,8 @@ export const LeadDetailsDrawer: React.FC = () => {
     };
   }, [isDetailsDrawerOpen]);
 
-  useEffect(() => {
-    if (isDetailsDrawerOpen && selectedLead) {
-      const leadIdStr = selectedLead.id ? String(selectedLead.id) : '';
-      window.dispatchEvent(
-        new CustomEvent('omni:track-activity', {
-          detail: {
-            page: 'view-lead',
-            module: 'Lead Management',
-            sourceApplication: 'Lead Management',
-            pageLabel: 'View Leads',
-            action: 'lead.details_viewed',
-            actionCategory: 'ViewDetails',
-            entityType: 'Lead',
-            entityId: leadIdStr,
-            entityLabel: selectedLead.name,
-            details: `Viewed details for lead ${selectedLead.name} (${leadIdStr})`,
-          },
-        })
-      );
-    }
-  }, [isDetailsDrawerOpen, selectedLead]);
+  // No audit dispatch on open — opening this drawer renders data already in the browser. The lead
+  // VIEW that IS recorded is the server-side one on GET /api/leads/{id}, which the server observes.
 
   if (!isDetailsDrawerOpen || !selectedLead) return null;
 

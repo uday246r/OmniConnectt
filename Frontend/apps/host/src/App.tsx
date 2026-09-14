@@ -15,7 +15,6 @@ import { LoginPage } from './pages/LoginPage/LoginPage'
 import { PageSkeleton } from './shared/components/PageSkeleton/PageSkeleton'
 import { ForbiddenPage } from './pages/ForbiddenPage/ForbiddenPage'
 import { lazyWithPreload, preloadWhenIdle } from './shared/utils/lazyWithPreload'
-import { useActivityTracking } from './shared/hooks/useActivityTracking'
 
 /**
  * Every route is code-split.
@@ -287,7 +286,6 @@ function LoginRoute() {
  */
 
 function AuthenticatedShell() {
-  useActivityTracking()
   const user = useAuthStore((s) => s.user)
   const accessToken = useAuthStore((s) => s.accessToken)
   const hasCapability = useAuthStore((s) => s.hasCapability)

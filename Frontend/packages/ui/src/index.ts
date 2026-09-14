@@ -133,3 +133,28 @@ export type { FilterInputType } from './utils/filterInput'
 
 export { DetailSection, DetailSections, DetailGrid, DetailField, isEmptyDetailValue } from './data/DetailPanel/DetailPanel'
 export type { DetailSectionProps, DetailFieldProps } from './data/DetailPanel/DetailPanel'
+
+// ── Date range ───────────────────────────────────────────────────────────────
+export { DateRangeColumnFilter } from './data/DateRange/DateRangeColumnFilter'
+export type { DateRangeColumnFilterProps } from './data/DateRange/DateRangeColumnFilter'
+export { DateRangeFilterButton } from './data/DateRange/DateRangeFilterButton'
+export type { DateRangeFilterButtonProps } from './data/DateRange/DateRangeFilterButton'
+export { DateRangeFields } from './data/DateRange/DateRangeFields'
+export type { DateRangeFieldsProps } from './data/DateRange/DateRangeFields'
+export {
+  DATE_RANGE_PRESETS,
+  EMPTY_DATE_RANGE,
+  describeDateRange,
+  isDateRangeActive,
+  parseDateRange,
+  resolveDateRange,
+  serializeDateRange,
+} from './data/DateRange/dateRange'
+export type { DateRangeInstants, DateRangePreset, DateRangeValue } from './data/DateRange/dateRange'
+
+export { useAnchoredPopover } from './hooks/useAnchoredPopover'
+export type { AnchoredPopover, AnchoredPopoverOptions } from './hooks/useAnchoredPopover'
+
+// ── Export ───────────────────────────────────────────────────────────────────
+export { downloadCsv, describeTruncation, CsvExportError } from './utils/downloadCsv'
+export type { CsvDownloadRequest, CsvDownloadResult } from './utils/downloadCsv'

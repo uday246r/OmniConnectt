@@ -217,8 +217,10 @@ public partial class RemoteAppAppService(
 
         await SyncCapabilitiesAsync(featureKey, displayName, request.SidebarOrder, sourceUrl, ct);
 
-        await auditLog.WriteAsync(
-            ServiceName, actingUserId, actorName, "remoteapp.created", EntityType, feature.Id.ToString(),
+        await auditLog.WriteHostAsync(
+            actingUserId, actorName, "remoteapp.created",
+            AuditLogAppService.Modules.Applications, AuditLogAppService.Categories.Crud,
+            entityType: EntityType, entityId: feature.Id.ToString(), details:
             $"Registered remote app '{displayName}' ({key}).", entityLabel: displayName, ct: ct);
 
         return MutationResult<RemoteAppDto>.Ok(await ReadDtoAsync(feature.Id, ct));
@@ -307,8 +309,10 @@ public partial class RemoteAppAppService(
             await SyncCapabilitiesAsync(app.Feature.Key, displayName, request.SidebarOrder, newSourceUrl, ct);
         }
 
-        await auditLog.WriteAsync(
-            ServiceName, actingUserId, actorName, "remoteapp.updated", EntityType, id.ToString(),
+        await auditLog.WriteHostAsync(
+            actingUserId, actorName, "remoteapp.updated",
+            AuditLogAppService.Modules.Applications, AuditLogAppService.Categories.Crud,
+            entityType: EntityType, entityId: id.ToString(), details:
             $"Updated remote app '{displayName}' ({app.Key}).", entityLabel: displayName, ct: ct);
 
         return MutationResult<RemoteAppDto>.Ok(await ReadDtoAsync(id, ct));
@@ -378,8 +382,10 @@ public partial class RemoteAppAppService(
             await catalog.InvalidateNavigationAsync(ct);
         }
 
-        await auditLog.WriteAsync(
-            ServiceName, actingUserId, actorName, "remoteapp.status_changed", EntityType, id.ToString(),
+        await auditLog.WriteHostAsync(
+            actingUserId, actorName, "remoteapp.status_changed",
+            AuditLogAppService.Modules.Applications, AuditLogAppService.Categories.Crud,
+            entityType: EntityType, entityId: id.ToString(), details:
             $"Set '{app.Feature.DisplayName}' ({app.Key}) status to {parsedStatus}.",
             entityLabel: app.Feature.DisplayName, ct: ct);
 
@@ -417,8 +423,10 @@ public partial class RemoteAppAppService(
         // are the record of what an administrator actually granted.
         await catalog.DeactivateRemoteAppFeatureAsync(featureKey, ct);
 
-        await auditLog.WriteAsync(
-            ServiceName, actingUserId, actorName, "remoteapp.deleted", EntityType, id.ToString(),
+        await auditLog.WriteHostAsync(
+            actingUserId, actorName, "remoteapp.deleted",
+            AuditLogAppService.Modules.Applications, AuditLogAppService.Categories.Crud,
+            entityType: EntityType, entityId: id.ToString(), details:
             $"Removed remote app '{displayName}' ({key}).", entityLabel: displayName, ct: ct);
 
         return null;
@@ -428,7 +436,13 @@ public partial class RemoteAppAppService(
     /// Recovery utility — re-reads every registered app's capabilities from its PermissionsSourceUrl
     /// and re-syncs every non-Disabled app's permission feature.
     /// </summary>
-    public async Task<int> ResyncPermissionsAsync(CancellationToken ct = default)
+    /// <param name="actingUserId">
+    /// Who asked for the resync, for the audit record. Nullable because the parameter is optional to
+    /// keep existing callers compiling; a resync with no attributable actor still gets a row, since
+    /// the permission catalog changing anonymously is worse to discover than one that changed
+    /// unattributably.
+    /// </param>
+    public async Task<int> ResyncPermissionsAsync(Guid? actingUserId = null, string? actorName = null, CancellationToken ct = default)
     {
         var apps = await db.RemoteApps.AsNoTracking().Include(a => a.Feature).ToListAsync(ct);
 
@@ -444,6 +458,7 @@ public partial class RemoteAppAppService(
 
         // The catalog writes stay sequential on one context — DbContext is not thread-safe, so only
         // the network I/O above may overlap.
+        var unreachable = new List<string>();
         foreach (var (app, discovered) in fetches)
         {
             if (!string.IsNullOrWhiteSpace(app.PermissionsSourceUrl) && discovered is null)
@@ -451,6 +466,7 @@ public partial class RemoteAppAppService(
                 logger.LogWarning(
                     "Keeping last-known capability set for '{Key}' — permissions source unreachable or invalid.",
                     app.Key);
+                unreachable.Add(app.Key);
             }
 
             // A null discovery flows straight through as "leave it alone". That is the whole guarantee:
@@ -462,6 +478,32 @@ public partial class RemoteAppAppService(
             await catalog.UpsertRemoteAppFeatureAsync(
                 request.Key, request.DisplayName, request.SortOrder, request.Capabilities, request.Modules, ct);
         }
+
+        /*
+         * A resync rewrites the platform's entire permission catalog from what the remotes currently
+         * declare, and it left no trace at all. Capabilities can appear, and — when a remote answers
+         * with an empty list rather than being unreachable — disappear, deactivating every grant that
+         * referenced them. An administrator finding that a role lost a permission overnight had
+         * nothing to look at.
+         *
+         * The unreachable apps are named explicitly, because that is the case where the result is
+         * "nothing changed for this app" rather than "this app declares nothing" — the null-vs-empty
+         * distinction the whole discovery path is built around. A reviewer needs to know which of the
+         * two a given resync actually produced.
+         */
+        await auditLog.WriteHostAsync(
+            actingUserId, actorName, "remoteapp.permissions_resynced",
+            AuditLogAppService.Modules.Applications, AuditLogAppService.Categories.Configuration,
+            entityType: EntityType, entityId: null, entityLabel: "Remote app permissions",
+            details: $"Resynced capabilities from {active.Count} active remote app(s) of {apps.Count} registered." +
+                     (unreachable.Count > 0
+                         ? $" Could not read {unreachable.Count} of them, whose stored capability sets were left unchanged: {string.Join(", ", unreachable)}."
+                         : " All reachable."),
+            result: unreachable.Count > 0 ? "Failure" : "Success",
+            failureReason: unreachable.Count > 0
+                ? $"{unreachable.Count} remote app(s) could not be read"
+                : null,
+            ct: ct);
 
         return apps.Count;
     }

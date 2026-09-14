@@ -65,7 +65,8 @@ namespace LeadManagement.Api.Controllers
                 await _authServiceClient.PushAuditLogAsync(
                     "lead.created", "Lead", result.Id,
                     $"Created lead for '{result.Name}' ({result.Product})",
-                    CurrentUserId(), CurrentUserName(), result.Name);
+                    CurrentUserId(), CurrentUserName(), result.Name,
+                    module: "Leads", page: "create-lead", actionCategory: "CRUD");
 
                 return CreatedAtAction(nameof(GetLeadById), new { id = result.Id }, new ApiResponseDto<LeadRecordDto>
                 {
@@ -186,7 +187,8 @@ namespace LeadManagement.Api.Controllers
                 await _authServiceClient.PushAuditLogAsync(
                     "lead.updated", "Lead", id,
                     $"Updated lead '{updated.Name}'",
-                    CurrentUserId(), CurrentUserName(), updated.Name);
+                    CurrentUserId(), CurrentUserName(), updated.Name,
+                    module: "Leads", page: "view-lead", actionCategory: "CRUD");
 
                 return Ok(new ApiResponseDto<LeadRecordDto>
                 {
@@ -255,7 +257,8 @@ namespace LeadManagement.Api.Controllers
                 await _authServiceClient.PushAuditLogAsync(
                     "lead.deleted", "Lead", id,
                     $"Deleted lead (Reason: {dto.DeleteReason})",
-                    CurrentUserId(), CurrentUserName(), leadName);
+                    CurrentUserId(), CurrentUserName(), leadName,
+                    module: "Leads", page: "view-lead", actionCategory: "CRUD");
 
                 return Ok(new ApiResponseDto<bool>
                 {
@@ -286,11 +289,50 @@ namespace LeadManagement.Api.Controllers
             }
         }
 
+        /// <summary>
+        /// Records that a lead's full record was opened.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// This endpoint is the one client-initiated audit write left anywhere on the platform, and it
+        /// is a different thing from the ones that were removed. Those took the action, the actor and
+        /// the outcome from the request body and wrote whatever they were handed. This one takes only
+        /// an id: the capability check, the actor and the description all come from the server, and
+        /// the row cannot be written for a lead the caller is not allowed to read.
+        /// </para>
+        /// <para>
+        /// It stays a separate call because a lead's detail view is assembled from data the list
+        /// already returned, so there is no other request that means "this person opened this
+        /// record". Viewing a specific customer's file is exactly the access an audit trail exists to
+        /// record, which is why it is worth a request of its own rather than being dropped.
+        /// </para>
+        /// <para>
+        /// Now dual-written. The local row backs Lead Management's own audit screen; the central push
+        /// is new — views were the one Lead action that never reached the platform trail, so "what did
+        /// this person look at across the platform" silently excluded every lead they opened.
+        /// </para>
+        /// </remarks>
         [HttpPost("{id}/view-audit")]
         [RequiresCapability("Lead", "View")]
-        public async Task<ActionResult<ApiResponseDto<bool>>> LogLeadView(string id)
+        public async Task<ActionResult<ApiResponseDto<bool>>> LogLeadView(string id, CancellationToken ct)
         {
+            var lead = await _leadService.GetLeadByIdAsync(id);
+            if (lead is null)
+            {
+                return NotFound(new ApiResponseDto<bool>
+                {
+                    Success = false,
+                    Message = $"Lead '{id}' was not found."
+                });
+            }
+
             await _leadService.LogLeadViewAsync(id);
+
+            await _authServiceClient.PushAuditLogAsync(
+                "lead.viewed", "Lead", id, $"Viewed the full record for lead '{lead.Name}'.",
+                CurrentUserId(), CurrentUserName(), lead.Name,
+                module: "Leads", page: "view-lead", actionCategory: "ViewDetails", ct: ct);
+
             return Ok(new ApiResponseDto<bool> { Success = true, Data = true });
         }
 

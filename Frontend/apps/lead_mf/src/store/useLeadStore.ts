@@ -12,7 +12,7 @@ import {
 } from '../api/apiClient';
 import { isFieldRequired, type LeadFieldConfig } from '../config/fieldControlRegistry';
 import { canSeeDashboardCapability } from '../api/hostBridge';
-import { readStoredPageSize } from '@omniremit/ui';
+import { EMPTY_DATE_RANGE, readStoredPageSize, resolveDateRange, type DateRangeValue } from '@omniremit/ui';
 
 /** LeadFormData's field names match the backend's apiField catalog 1:1 with exactly one exception —
  * the form calls it `preferredBranch`, the catalog calls it `branch`. Central so both validateField
@@ -209,6 +209,20 @@ interface LeadStoreState {
   auditPageSize: number;
   auditSearchQuery: string;
   auditActionFilter: string;
+  /**
+   * Performed By and Outcome. Filtered in the browser over one fetched page until the audit endpoint
+   * accepted them, which left matches on other pages unreachable and the export ignoring both.
+   */
+  auditActorFilter: string;
+  auditStatusFilter: string;
+  /**
+   * The shared date range, held as a preset rather than as resolved instants — so "Last 7 Days" on a
+   * page left open overnight still means the last seven days.
+   *
+   * New. This screen offered no date filter at all, alone among the platform's log surfaces, even
+   * though the endpoint behind it had accepted date parameters the whole time.
+   */
+  auditDateRange: DateRangeValue;
   isLoadingAuditLogs: boolean;
   selectedAuditLog: AuditRecord | null;
   isAuditDetailsOpen: boolean;
@@ -220,7 +234,10 @@ interface LeadStoreState {
   /** Rows per page for the audit table. The page size was fixed at 10 with no way to change it. */
   setAuditPageSize: (size: number) => void;
   setAuditSearchQuery: (query: string) => void;
+  setAuditDateRange: (range: DateRangeValue) => void;
   setAuditActionFilter: (action: string) => void;
+  setAuditActorFilter: (actor: string) => void;
+  setAuditStatusFilter: (status: string) => void;
 }
 
 const FIELD_DISPLAY_NAMES: Record<string, string> = {
@@ -1325,6 +1342,9 @@ export const useLeadStore = create<LeadStoreState>((set, get) => ({
   auditPageSize: readStoredPageSize('lead.audit', 10),
   auditSearchQuery: '',
   auditActionFilter: '',
+  auditActorFilter: '',
+  auditStatusFilter: '',
+  auditDateRange: EMPTY_DATE_RANGE,
   isLoadingAuditLogs: false,
   selectedAuditLog: null,
   isAuditDetailsOpen: false,
@@ -1338,6 +1358,10 @@ export const useLeadStore = create<LeadStoreState>((set, get) => ({
         pageSize: state.auditPageSize,
         search: state.auditSearchQuery,
         actionType: state.auditActionFilter,
+        actor: state.auditActorFilter,
+        status: state.auditStatusFilter,
+        // Resolved at the point of use, never stored.
+        ...resolveDateRange(state.auditDateRange),
       });
 
       set({
@@ -1369,8 +1393,23 @@ export const useLeadStore = create<LeadStoreState>((set, get) => ({
     get().fetchAuditLogs();
   },
 
+  setAuditDateRange: (range) => {
+    set({ auditDateRange: range, auditPage: 1 });
+    get().fetchAuditLogs();
+  },
+
   setAuditActionFilter: (action) => {
     set({ auditActionFilter: action, auditPage: 1 });
+    get().fetchAuditLogs();
+  },
+
+  setAuditActorFilter: (actor) => {
+    set({ auditActorFilter: actor, auditPage: 1 });
+    get().fetchAuditLogs();
+  },
+
+  setAuditStatusFilter: (status) => {
+    set({ auditStatusFilter: status, auditPage: 1 });
     get().fetchAuditLogs();
   },
 }));

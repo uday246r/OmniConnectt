@@ -28,7 +28,7 @@ namespace AuthService.Infrastructure.Security;
 [AttributeUsage(AttributeTargets.Method | AttributeTargets.Class)]
 public class RequirePermissionAttribute(string featureKey, string capability) : Attribute, IAsyncAuthorizationFilter
 {
-    public Task OnAuthorizationAsync(AuthorizationFilterContext context)
+    public async Task OnAuthorizationAsync(AuthorizationFilterContext context)
     {
         var user = context.HttpContext.User;
 
@@ -38,13 +38,13 @@ public class RequirePermissionAttribute(string featureKey, string capability) : 
         if (user.Identity?.IsAuthenticated != true)
         {
             context.Result = new UnauthorizedResult();
-            return Task.CompletedTask;
+            return;
         }
 
         var isAdministrator = user.FindFirst(JwtTokenService.AdministratorClaimType)?.Value == "true";
         if (isAdministrator)
         {
-            return Task.CompletedTask;
+            return;
         }
 
         string[] permissions;
@@ -83,8 +83,9 @@ public class RequirePermissionAttribute(string featureKey, string capability) : 
                 Status = StatusCodes.Status403Forbidden,
             })
             { StatusCode = StatusCodes.Status403Forbidden };
-        }
 
-        return Task.CompletedTask;
+            await AuthorizationAudit.RecordDeniedAsync(
+                context, "authz.denied", required, $"The caller does not hold '{required}'");
+        }
     }
 }

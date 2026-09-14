@@ -133,7 +133,8 @@ namespace LeadManagement.Api.Services
 
             await _authServiceClient.PushAuditLogAsync(
                 "leadfieldconfig.updated", "LeadFieldConfig", productId.ToString(),
-                $"Updated Lead Management field settings for '{product.Name}'.", actingUserId, actorName, product.Name, ct);
+                $"Updated Lead Management field settings for '{product.Name}'.", actingUserId, actorName, product.Name,
+                module: "Field Settings", page: "field-settings", actionCategory: "Configuration", ct: ct);
 
             return MutationResult<List<LeadFieldConfig>>.Ok(await GetByProductAsync(productId, ct));
         }

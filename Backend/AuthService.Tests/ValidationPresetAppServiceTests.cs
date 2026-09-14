@@ -25,7 +25,7 @@ public class ValidationPresetAppServiceTests : IDisposable
             .Options;
 
         db = new AuthDbContext(options);
-        service = new ValidationPresetAppService(db);
+        service = new ValidationPresetAppService(db, TestAudit.For(db));
     }
 
     public void Dispose()

@@ -1,7 +1,9 @@
 import { canExportAuditLogs } from '../api/hostBridge';
 import React, { useEffect, useState } from 'react';
 import { ShieldCheck, Search, RefreshCw, Eye, Download, X, ChevronLeft, ChevronRight } from '@omniremit/ui/icons';
-import { ActorCell, Badge, Button, ColumnFilter, DataTable, FilterBar, Icon, PageHeader, Pagination, ResponsiveRows, RowAction, RowsPerPage, SearchField, formatAuditTimestamp, useDebouncedValue, type ActiveFilter } from '@omniremit/ui';
+import { ActorCell, Badge, Button, ColumnFilter, CsvExportError, DataTable, DateRangeColumnFilter, FilterBar, Icon, PageHeader, Pagination, ResponsiveRows, RowAction, RowsPerPage, SearchField, describeTruncation, formatAuditTimestamp, resolveDateRange, useDebouncedValue, type ActiveFilter } from '@omniremit/ui';
+import { remoteDownloadCsv } from '../api/exportCsv';
+import { API_BASE_URL } from '../api/apiClient';
 import { useLeadStore } from '../store/useLeadStore';
 import styles from './AuditLogsPage.module.css';
 import shell from '../shared/leadPage.module.css';
@@ -12,11 +14,17 @@ export const AuditLogsPage: React.FC = () => {
     auditLogs,
     auditSearchQuery,
     auditActionFilter,
+    auditDateRange,
+    setAuditDateRange,
     isLoadingAuditLogs,
     fetchAuditLogs,
     openAuditDetails,
     setAuditSearchQuery,
     setAuditActionFilter,
+    auditActorFilter: actorFilter,
+    setAuditActorFilter: setActorFilter,
+    auditStatusFilter: statusFilter,
+    setAuditStatusFilter: setStatusFilter,
     // Pagination — this state and the fetchAuditLogs page/pageSize wiring already existed in the
     // store; only the UI to drive it was missing, so only the first page (10 rows) of audit history
     // was ever reachable no matter how much existed.
@@ -42,18 +50,13 @@ export const AuditLogsPage: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedSearchInput]);
 
-  // Client-side: the audit endpoint takes `action` and `search` only, so these narrow the page
-  // that has already been fetched. Kept local rather than in the store for that reason.
-  const [actorFilter, setActorFilter] = useState('');
-
   /*
    * The Actor column offers the people who ACTUALLY appear in the audit log, not a free-text box
-   * and not the full role list. Typing narrows the list; clicking picks one. An empty
-   * type-to-search box gave no clue who was even in the data — you had to already know a name to
-   * find a row.
+   * and not the full role list. Typing narrows the list; clicking picks one.
    *
-   * Derived from the loaded page, which is the same scope the filter applies to, so the list can
-   * never offer a name that would return nothing.
+   * The OPTIONS come from the page on screen, but the FILTER is applied by the server across the
+   * whole trail — so a pick always returns every matching row, on every page, and the export
+   * honours it.
    */
   const actorOptions = React.useMemo(() => {
     const seen = new Map<string, string>();
@@ -63,7 +66,6 @@ export const AuditLogsPage: React.FC = () => {
     }
     return [...seen.values()].sort((a, b) => a.localeCompare(b)).map((n) => ({ value: n, label: n }));
   }, [auditLogs]);
-  const [statusFilter, setStatusFilter] = useState('');
 
   // Recommends matching rows from the currently-loaded page as the operator types — the same
   // "show it, don't make them press Enter to find out" treatment the Name/Mobile column filters
@@ -92,63 +94,56 @@ export const AuditLogsPage: React.FC = () => {
   }, [auditLogs, debouncedSearchInput]);
 
   /*
-   * Actor and Status filter CLIENT-SIDE — the audit endpoint accepts `action` and `search` only —
-   * while paging is server-side. The two cannot both be authoritative: with an actor filter on,
-   * page 2 of 2 read "Showing 11 to 13 of 13 events" above an empty table, because those three
-   * rows were fetched but none matched.
-   *
-   * So while a client-side filter is active the pager describes the rows actually on screen and
-   * server paging is suppressed. It is honest about what it is showing, at the cost of not
-   * reaching matches on other pages — which needs `actor` and `status` query parameters on the
-   * audit endpoint to fix properly.
+   * Actor and Status used to be filtered here, in the browser, over the page already fetched —
+   * while paging stayed server-side, so the pager and the table could not both be right, and
+   * matches on other pages were unreachable. Both are `actor` / `status` query parameters on the
+   * audit endpoint now; every row on screen is a row the server matched.
    */
-  const visibleLogs = auditLogs.filter((log) => {
-    if (actorFilter && !`${log.userName ?? ''} ${log.userRole ?? ''}`.toLowerCase().includes(actorFilter.toLowerCase())) return false;
-    if (statusFilter) {
-      const ok = (log.status ?? '').toUpperCase() !== 'FAILED';
-      if ((ok ? 'SUCCESS' : 'FAILED') !== statusFilter) return false;
-    }
-    return true;
-  });
-  const clientFiltered = Boolean(actorFilter || statusFilter);
-
 
   useEffect(() => {
     fetchAuditLogs();
   }, [fetchAuditLogs]);
 
-  const handleExportCSV = () => {
-    if (!auditLogs || auditLogs.length === 0) return;
+  const [exporting, setExporting] = useState(false);
+  const [exportNotice, setExportNotice] = useState<string | null>(null);
 
-    const headers = ['ID', 'Timestamp', 'User Name', 'User Role', 'Action Type', 'Description', 'Reason', 'Status', 'IP Address'];
-    const csvRows = [headers.join(',')];
+  /**
+   * Exports the whole filtered trail, from the server.
+   *
+   * @remarks
+   * This used to build the CSV here, from `auditLogs` — which is one page, ten rows by default — and
+   * save it as "Audit_Trail_Logs_<today>". Nothing about the file said it was a page rather than the
+   * log, so an export taken as evidence was almost always missing nearly all of it.
+   *
+   * The server now assembles it from the same filters this screen is showing, and reports when it
+   * had to cap the result rather than quietly serving a fraction.
+   */
+  const handleExportCSV = async () => {
+    setExporting(true);
+    setExportNotice(null);
+    try {
+      const query = new URLSearchParams();
+      if (auditSearchQuery) query.append('search', auditSearchQuery);
+      if (auditActionFilter) query.append('actionType', auditActionFilter);
+      const { from, to } = resolveDateRange(auditDateRange);
+      if (from) query.append('from', from);
+      if (to) query.append('to', to);
+      if (actorFilter) query.append('actor', actorFilter);
+      if (statusFilter) query.append('status', statusFilter);
 
-    auditLogs.forEach((log) => {
-      const row = [
-        `"${(log.id || '').toString().replace(/"/g, '""')}"`,
-        `"${(log.timestamp || '').toString().replace(/"/g, '""')}"`,
-        `"${(log.userName || '').toString().replace(/"/g, '""')}"`,
-        `"${(log.userRole || '').toString().replace(/"/g, '""')}"`,
-        `"${(log.actionType || '').toString().replace(/"/g, '""')}"`,
-        `"${(log.description || '').toString().replace(/"/g, '""')}"`,
-        `"${(log.reason || '').toString().replace(/"/g, '""')}"`,
-        `"${(log.status || '').toString().replace(/"/g, '""')}"`,
-        `"${(log.ipAddress || '').toString().replace(/"/g, '""')}"`,
-      ];
-      csvRows.push(row.join(','));
-    });
+      const result = await remoteDownloadCsv(
+        `${API_BASE_URL}/api/audit-logs/export?${query.toString()}`,
+        `lead-audit-logs-${new Date().toISOString().split('T')[0]}.csv`,
+      );
 
-    const csvContent = csvRows.join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    const dateStr = new Date().toISOString().split('T')[0];
-    link.setAttribute('href', url);
-    link.setAttribute('download', `Audit_Trail_Logs_${dateStr}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+      setExportNotice(describeTruncation(result));
+    } catch (err) {
+      setExportNotice(
+        err instanceof CsvExportError ? err.message : 'The audit log could not be exported.',
+      );
+    } finally {
+      setExporting(false);
+    }
   };
 
   /* The Action column's vocabulary. Was a toolbar <select>; the host puts this in the header. */
@@ -220,27 +215,38 @@ const getActionBadge = (action: string) => {
         subtitle="Immutable compliance record of all lead creation, update, view, and deletion events"
         actions={
           /*
-           * The one capability on this page that is a UI gate and nothing more.
+           * This used to be a UI gate and nothing more, because the CSV was assembled here from rows
+           * the caller already held under AuditLog:View — hiding the button withheld one click, not
+           * the data.
            *
-           * The CSV is assembled here from rows already fetched under AuditLog:View, so hiding this
-           * button withholds the convenience of one click, not the data — anyone who can read the
-           * page can copy what is on it. It is still worth granting separately, because an export is
-           * a distinct act that leaves the platform, but it must not be relied on as a control over
-           * who can obtain the rows. The manifest says the same thing next to the declaration.
+           * It is a real boundary now. The server assembles the file and enforces the same
+           * capability at the endpoint, so a caller without it gets a 403 rather than a hidden
+           * button and a working curl.
            */
           canExportAuditLogs() ? (
             <Button
               type="button"
               variant="onHeader"
               onClick={handleExportCSV}
-              disabled={auditLogs.length === 0}
+              disabled={exporting}
               leadingIcon={<Download size={15} />}
             >
-              Export CSV
+              {exporting ? 'Exporting…' : 'Export CSV'}
             </Button>
           ) : null
         }
       />
+
+      {/*
+        A capped or refused export, reported rather than swallowed. The browser-built export it
+        replaces logged its failures to the console and truncated its successes without a word, so
+        neither outcome reached the person who asked for the file.
+      */}
+      {exportNotice && (
+        <div className={styles.exportNotice} role="status">
+          {exportNotice}
+        </div>
+      )}
 
       {/* Main Table Container Card */}
       <FilterBar
@@ -311,9 +317,9 @@ const getActionBadge = (action: string) => {
         </div>
 
         {/* Main Table — always rendered so columns stay visible on empty filter results */}
-        <DataTable bare footer={<Pagination page={clientFiltered ? 1 : auditPage} pageSize={clientFiltered ? Math.max(visibleLogs.length, 1) : auditPageSize} total={clientFiltered ? visibleLogs.length : totalAuditRecords} itemLabel="event" onPageChange={setAuditPage} />}>
+        <DataTable bare footer={<Pagination page={auditPage} pageSize={auditPageSize} total={totalAuditRecords} itemLabel="event" onPageChange={setAuditPage} />}>
           <ResponsiveRows
-            rows={visibleLogs}
+            rows={auditLogs}
             rowKey={(log) => String(log.id)}
             loading={isLoadingAuditLogs}
             loadingRows={auditPageSize}
@@ -327,6 +333,16 @@ const getActionBadge = (action: string) => {
                 key: 'timestamp',
                 label: 'Date & Time',
                 priority: 'always',
+                // The date filter this screen never had. The endpoint behind it has accepted date
+                // parameters the whole time; nothing in the UI had ever sent them.
+                header: (
+                  <DateRangeColumnFilter
+                    key="timestamp"
+                    label="Date & Time"
+                    value={auditDateRange}
+                    onChange={setAuditDateRange}
+                  />
+                ),
                 render: (log) => (
                   <span className={styles.timestampCell}>{formatTimestamp(log.timestamp)}</span>
                 ),

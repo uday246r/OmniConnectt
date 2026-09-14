@@ -170,8 +170,13 @@ any remote registered under Setup > Applications must:
   registered remote declares its own capability set. AuthService is also the **maker-checker hub**
   (`ApprovalRequest`, `CheckerAssignment`, `ApprovalGatingService`) and the single sink for the
   platform audit log: host mutations write directly, other services write through an internal
-  API-key-protected endpoint, so host and remote audits land in one table. Unhandled errors return
-  safe, consistent `ProblemDetails` JSON.
+  API-key-protected endpoint, so host and remote audits land in one table. Audit rows are written
+  only by the backend performing the action, attributed from the verified token — there is no
+  browser-writable audit endpoint. Sign-in and session events, authorization denials, every
+  permission change (with an added/removed diff), refused approval decisions, admin configuration
+  changes and every CSV export are recorded; the full catalogue is
+  [docs/AUDIT-EVENTS.md](docs/AUDIT-EVENTS.md). Unhandled errors return safe, consistent
+  `ProblemDetails` JSON.
 - **Remote-app registry** (inside AuthService) — RemoteApps CRUD, Active/Maintenance/Disabled status
   with an admin-authored maintenance message, capability discovery from each remote's own
   `GET /permissions`, background reachability probing of each `ManifestUrl`, and the
@@ -188,7 +193,8 @@ any remote registered under Setup > Applications must:
   `tokens.css`), split-panel login, dynamic sidebar (Dashboard + registered apps + a System section),
   Module Federation runtime loader with zero build-time remotes, a topbar gear settings drawer
   surfacing exactly the Users / Roles / Applications screens the signed-in user can reach, Approval
-  Center and My Requests, System → Audit Logs, global search, skeleton loading throughout, every
+  Center and My Requests, System → Audit Logs and System Logs (server-side filtering and paging,
+  one shared date-range control and CSV export across every log screen in all three apps), global search, skeleton loading throughout, every
   route code-split, CSS Modules only (no Tailwind/CSS-in-JS), Zustand for auth, navigation and health state.
 - **`@omniremit/ui`** — the shared component library (`Frontend/packages/ui`), consumed by all three
   apps as a pnpm `workspace:*` dependency. **Deliberately not** a Module Federation `exposes` and not
@@ -207,8 +213,16 @@ any remote registered under Setup > Applications must:
   `Internal__ApiKey`, committed into the repo**. They have been blanked — every one of those values
   now comes from each service's `.env` — but they remain in git history. **Treat all of them as
   compromised and rotate them**: the four database passwords and the internal API key.
-- There is no CI pipeline. (Tests do exist: 180 backend across four xUnit projects, 160 frontend
-  across the host, both remotes and `@omniremit/ui`.)
+- There is no CI pipeline. (Tests do exist: 528 backend across three xUnit projects — AuthService
+  424, LeadService 59, Customer360Service 45 — and 366 frontend across the host 152, `@omniremit/ui`
+  138, `lead_mf` 28 and `customer360_mf` 48.)
+- Maker-Checker concurrency is tested with deterministic fault injection and model-level schema
+  assertions, not against a live Postgres: the database itself enforcing the partial unique index and
+  the `xmin` token, and genuine multi-instance behaviour (Redis cache, lock and SignalR backplane),
+  are not exercised by the suite.
+- Customer 360's masked-field reveal is not audited: the browser unmasks a value it already holds and
+  no request reaches the server, so there is no backend event to record. Auditing it needs
+  server-side masking plus a reveal endpoint.
 - `docs/ADDING-A-REMOTE-APP.md` still describes the earlier `employee_mf` / `EmployeeService`
   topology. `docs/DEPLOYMENT.md` and `docs/PERFORMANCE-AND-INFRA.md` now carry banners marking which
   parts are stale.

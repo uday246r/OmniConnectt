@@ -96,7 +96,7 @@ public class RemoteAppsController(
     [RequirePermission(Feature, "Edit")]
     public async Task<IActionResult> ResyncPermissions(CancellationToken ct)
     {
-        var count = await remoteApps.ResyncPermissionsAsync(ct);
+        var count = await remoteApps.ResyncPermissionsAsync(CurrentUserId(), CurrentUserName(), ct);
         return Ok(new { resyncedCount = count });
     }
 

@@ -1,6 +1,7 @@
 ﻿using System.Text;
 using AuthService.Application.DTOs;
 using AuthService.Application.Services;
+using AuthService.Infrastructure;
 using AuthService.Infrastructure.Security;
 using AuthService.Infrastructure.Seed;
 using Microsoft.AspNetCore.Authorization;
@@ -11,7 +12,7 @@ namespace AuthService.Controllers;
 [ApiController]
 [Route("api/system-logs")]
 [Authorize]
-public class SystemLogsController(SystemLogAppService systemLog) : ControllerBase
+public class SystemLogsController(SystemLogAppService systemLog, AuditLogAppService auditLog) : ControllerBase
 {
     private const string Feature = AuthDbSeeder.HostFeatureKeys.SystemLogs;
 
@@ -56,9 +57,34 @@ public class SystemLogsController(SystemLogAppService systemLog) : ControllerBas
         [FromQuery] string? environment = null,
         CancellationToken ct = default)
     {
-        var csv = await systemLog.ExportCsvAsync(severity, service, module, eventCode, from, to,
+        var export = await systemLog.ExportCsvAsync(severity, service, module, eventCode, from, to,
             correlationId, sortDir, messageSearch, environment, ct);
-        var bytes = Encoding.UTF8.GetBytes(csv);
-        return File(bytes, "text/csv", $"system-logs-{DateTimeOffset.UtcNow:yyyyMMdd-HHmmss}.csv");
+
+        ExportHeaders.Apply(Response, export);
+
+        // A system-log export is less sensitive than an audit-log one — it carries no business data —
+        // but it does carry stack traces and correlation ids, and it still leaves the platform. It is
+        // recorded for the same reason: so the trail can answer who took a copy of what.
+        await auditLog.WriteHostAsync(
+            CurrentUserId(), CurrentUserName(), "system_log.exported",
+            AuditLogAppService.Modules.SystemLogs, AuditLogAppService.Categories.Export,
+            entityType: "SystemLog", entityLabel: "System log",
+            details: $"Exported {export.RowCount} system log row(s)" +
+                     (export.Truncated
+                         ? $" of {export.MatchCount} matching — the export limit of {export.RowLimit} was reached"
+                         : "") +
+                     $". Severity: {severity ?? "any"}; service: {service ?? "any"}; " +
+                     $"from: {from?.ToString("O") ?? "any"}; to: {to?.ToString("O") ?? "any"}.",
+            sourceIp: HttpContext.Connection.RemoteIpAddress?.ToString(),
+            userAgent: Request.Headers.UserAgent.ToString() is { Length: > 0 } ua ? ua : null,
+            page: "system-logs", ct: ct);
+
+        return File(export.ToBytes(), "text/csv", $"system-logs-{DateTimeOffset.UtcNow:yyyyMMdd-HHmmss}.csv");
     }
+
+    private Guid? CurrentUserId() =>
+        Guid.TryParse(User.FindFirst("sub")?.Value, out var id) ? id : null;
+
+    private string? CurrentUserName() =>
+        User.FindFirst("name")?.Value ?? User.FindFirst("email")?.Value;
 }

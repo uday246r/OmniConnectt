@@ -25,7 +25,7 @@ public class SalutationAppServiceTests : IDisposable
             .Options;
 
         db = new AuthDbContext(options);
-        service = new SalutationAppService(db);
+        service = new SalutationAppService(db, TestAudit.For(db));
     }
 
     public void Dispose()

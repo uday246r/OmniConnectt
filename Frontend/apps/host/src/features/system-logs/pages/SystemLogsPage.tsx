@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+﻿import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuthStore } from '../../auth/store/authStore'
 import { TOPICS, useDataRevision } from '../../../shared/stores/invalidationStore'
@@ -17,12 +17,19 @@ import {
   type ActiveFilter,
   type BadgeTone,
   type ResponsiveColumn,
+  DateRangeFilterButton,
+  EMPTY_DATE_RANGE,
+  CsvExportError,
+  describeDateRange,
+  describeTruncation,
+  isDateRangeActive,
+  resolveDateRange,
+  type DateRangeValue,
 } from '@omniremit/ui'
 import { PermissionGate } from '../../../shared/components/PermissionGate/PermissionGate'
 import { ApiError } from '../../../shared/api/httpClient'
 import { useDebouncedValue } from '../../../shared/hooks/useDebouncedValue'
 import { systemLogsApi, type SystemLogDto, type SystemLogSummaryDto } from '../api/systemLogsApi'
-import { auditLogsApi } from '../../system-audit-logs/api/auditLogsApi'
 import { Icon } from '../../../shared/components/Icon/Icon'
 import { SystemLogDetailDrawer } from '../components/SystemLogDetailDrawer/SystemLogDetailDrawer'
 import styles from './SystemLogsPage.module.css'
@@ -30,52 +37,6 @@ import styles from './SystemLogsPage.module.css'
 const FEATURE = 'host.system.system-logs'
 const DEFAULT_PAGE_SIZE = 10
 
-type DateFilterMode = 'all' | 'today' | 'yesterday' | 'week' | 'month' | 'custom'
-
-const DATE_RANGES: { key: DateFilterMode; label: string }[] = [
-  { key: 'all', label: 'All Time' },
-  { key: 'today', label: 'Today' },
-  { key: 'yesterday', label: 'Yesterday' },
-  { key: 'week', label: 'Last 7 Days' },
-  { key: 'month', label: 'Last 30 Days' },
-  { key: 'custom', label: 'Custom' },
-]
-
-function computeRange(
-  preset: DateFilterMode,
-  customFrom?: string,
-  customTo?: string,
-  customFromTime?: string,
-  customToTime?: string,
-): { from?: string; to?: string } {
-  if (preset === 'custom') {
-    return {
-      from: customFrom ? new Date(`${customFrom}T${customFromTime || '00:00'}:00`).toISOString() : undefined,
-      to: customTo ? new Date(`${customTo}T${customToTime || '23:59'}:59`).toISOString() : undefined,
-    }
-  }
-  const now = new Date()
-  switch (preset) {
-    case 'today': {
-      const start = new Date(now); start.setHours(0, 0, 0, 0)
-      return { from: start.toISOString() }
-    }
-    case 'yesterday': {
-      const start = new Date(now); start.setDate(start.getDate() - 1); start.setHours(0, 0, 0, 0)
-      const end = new Date(start); end.setHours(23, 59, 59, 999)
-      return { from: start.toISOString(), to: end.toISOString() }
-    }
-    case 'week': {
-      const start = new Date(now); start.setDate(start.getDate() - 7)
-      return { from: start.toISOString() }
-    }
-    case 'month': {
-      const start = new Date(now); start.setDate(start.getDate() - 30)
-      return { from: start.toISOString() }
-    }
-    default: return {}
-  }
-}
 
 const TAB_IDS = {
   allEvents: 'all-events',
@@ -114,16 +75,8 @@ export function SystemLogsPage() {
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(() => readStoredPageSize('host.system-logs', DEFAULT_PAGE_SIZE))
 
-  // Date range
-  const [dateMode, setDateMode] = useState<DateFilterMode>('all')
-  const [customFrom, setCustomFrom] = useState('')
-  const [customTo, setCustomTo] = useState('')
-  const [customFromTime, setCustomFromTime] = useState('')
-  const [customToTime, setCustomToTime] = useState('')
-  const [customDraftFrom, setCustomDraftFrom] = useState('')
-  const [customDraftTo, setCustomDraftTo] = useState('')
-  const [showCustomDate, setShowCustomDate] = useState(false)
-  const customDateRef = useRef<HTMLDivElement>(null)
+  // One shared date range, resolved to instants only where a request needs them.
+  const [dateRange, setDateRange] = useState<DateRangeValue>(EMPTY_DATE_RANGE)
 
   // Filters
   const [severityFilter, setSeverityFilter] = useState('')
@@ -152,22 +105,10 @@ export function SystemLogsPage() {
   const availableModules = useMemo(() => [...new Set(cachedPool.map(r => r.module).filter(Boolean) as string[])].sort(), [cachedPool])
   const availableEventCodes = useMemo(() => [...new Set(cachedPool.map(r => r.eventCode))].sort(), [cachedPool])
 
+  /* Opening the drawer writes no audit row — see AuditLogsPage.handleOpenDetail for why. */
   const handleViewDetail = useCallback((log: SystemLogDto) => {
     setDetailLog(log)
-    if (accessToken) {
-      auditLogsApi.recordActivity(accessToken, {
-        page: 'system-logs',
-        module: 'System',
-        sourceApplication: 'Host',
-        action: 'system_log.details_viewed',
-        actionCategory: 'ViewDetails',
-        entityType: 'SystemLog',
-        entityId: log.id,
-        entityLabel: `${log.serviceName} — ${log.eventCode}`,
-        details: `Viewed system log ${log.id} (${log.eventCode} - ${log.severity} on ${log.serviceName})`,
-      }).catch(() => {})
-    }
-  }, [accessToken])
+  }, [])
 
   const revision = useDataRevision(TOPICS.systemLogs)
 
@@ -179,10 +120,7 @@ export function SystemLogsPage() {
     return severityFilter
   }, [activeTab, severityFilter])
 
-  const range = useMemo(
-    () => computeRange(dateMode, customFrom, customTo, customFromTime, customToTime),
-    [dateMode, customFrom, customTo, customFromTime, customToTime]
-  )
+  const range = useMemo(() => resolveDateRange(dateRange), [dateRange])
 
   const fetchSummary = useCallback(async () => {
     if (!accessToken) return
@@ -238,13 +176,13 @@ export function SystemLogsPage() {
   }, [fetchSummary, fetchLogs, revision])
 
   // Reset page on filter change
-  useEffect(() => { setPage(1) }, [activeTab, finalSeverity, serviceFilter, eventCodeFilter, messageSearch, environmentFilter, moduleFilter, dateMode, customFrom, customTo])
+  useEffect(() => { setPage(1) }, [activeTab, finalSeverity, serviceFilter, eventCodeFilter, messageSearch, environmentFilter, moduleFilter, range])
 
   const handleExport = async () => {
     if (!accessToken) return
     setExporting(true)
     try {
-      await systemLogsApi.exportCsv(accessToken, {
+      const result = await systemLogsApi.exportCsv(accessToken, {
         severity: finalSeverity || undefined,
         service: serviceFilter || undefined,
         eventCode: eventCodeFilter || undefined,
@@ -256,8 +194,14 @@ export function SystemLogsPage() {
         sortDir,
         correlationId: correlationSearch || correlationId || undefined,
       })
+
+      // A capped export is reported, not hidden. The file used to arrive containing the newest
+      // 10,000 rows of a larger match, with a 200 and a filename and nothing to suggest that
+      // anything was missing from it.
+      const truncation = describeTruncation(result)
+      if (truncation) setError(truncation)
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Export failed')
+      setError(err instanceof CsvExportError ? err.message : 'Export failed')
     } finally {
       setExporting(false)
     }
@@ -271,14 +215,13 @@ export function SystemLogsPage() {
   const handleClearFilters = () => {
     setServiceFilter(''); setEventCodeFilter(''); setSeverityFilter('')
     setMessageSearchRaw(''); setEnvironmentFilter(''); setModuleFilter('')
-    setDateMode('all'); setCustomFrom(''); setCustomTo('')
-    setCustomFromTime(''); setCustomToTime('')
+    setDateRange(EMPTY_DATE_RANGE)
     setCorrelationSearch(''); setPage(1)
   }
 
   const activeFilters = useMemo(() => {
     const active: ActiveFilter[] = []
-    if (dateMode !== 'all') active.push({ key: 'time', label: 'Time', value: DATE_RANGES.find(r => r.key === dateMode)?.label ?? dateMode, onRemove: () => { setDateMode('all'); setCustomFrom(''); setCustomTo('') } })
+    if (isDateRangeActive(dateRange)) active.push({ key: 'time', label: 'Time', value: describeDateRange(dateRange), onRemove: () => setDateRange(EMPTY_DATE_RANGE) })
     if (serviceFilter) active.push({ key: 'service', label: 'Service', value: serviceFilter, onRemove: () => setServiceFilter('') })
     if (environmentFilter) active.push({ key: 'env', label: 'Environment', value: environmentFilter, onRemove: () => setEnvironmentFilter('') })
     if (moduleFilter) active.push({ key: 'module', label: 'Module', value: moduleFilter, onRemove: () => setModuleFilter('') })
@@ -287,18 +230,9 @@ export function SystemLogsPage() {
     if (messageSearchRaw) active.push({ key: 'message', label: 'Message', value: `"${messageSearchRaw}"`, onRemove: () => setMessageSearchRaw('') })
     if (correlationSearch) active.push({ key: 'cid', label: 'Correlation ID', value: correlationSearch.slice(0, 8) + '…', onRemove: () => setCorrelationSearch('') })
     return active
-  }, [serviceFilter, environmentFilter, moduleFilter, eventCodeFilter, severityFilter, messageSearchRaw, correlationSearch, activeTab, dateMode])
+  }, [serviceFilter, environmentFilter, moduleFilter, eventCodeFilter, severityFilter, messageSearchRaw, correlationSearch, activeTab, dateRange])
 
   // Close custom date popover on outside click
-  useEffect(() => {
-    if (!showCustomDate) return
-    const handler = (e: MouseEvent) => {
-      if (customDateRef.current && !customDateRef.current.contains(e.target as Node)) setShowCustomDate(false)
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [showCustomDate])
-
   const columns: ResponsiveColumn<SystemLogDto>[] = useMemo(() => [
     { key: 'time', label: 'TIME', priority: 'always', render: (l) => <span className={styles.timeCell}>{formatAuditTimestamp(l.occurredAt)}</span> },
     {
@@ -325,48 +259,16 @@ export function SystemLogsPage() {
         pill={<><span className={styles.liveDot} />Live Stream</>}
         subtitle="Technical and operational event logs from all platform services — errors, warnings, health checks, and startup events."
         actions={
-          <div className={styles.dateRangeGroup} role="group" aria-label="Date range">
-            {DATE_RANGES.filter(r => r.key !== 'custom').map((r) => (
-              <button
-                key={r.key}
-                type="button"
-                className={r.key === dateMode ? styles.dateRangeActive : styles.dateRangeButton}
-                onClick={() => { setDateMode(r.key); setCustomFrom(''); setCustomTo('') }}
-              >
-                {r.label}
-              </button>
-            ))}
-            <div ref={customDateRef} style={{ position: 'relative' }}>
-              <button
-                type="button"
-                className={dateMode === 'custom' ? styles.dateRangeActive : styles.dateRangeButton}
-                onClick={() => setShowCustomDate(v => !v)}
-              >
-                {dateMode === 'custom' && customFrom ? `${customFrom} → ${customTo || '…'}` : 'Custom'}
-              </button>
-              {showCustomDate && (
-                <div className={styles.customDateDropdown}>
-                  <div className={styles.customDateRow}>
-                    <label className={styles.customDateLabel}>From</label>
-                    <input type="date" className={styles.dateInput} value={customDraftFrom} onChange={e => setCustomDraftFrom(e.target.value)} />
-                  </div>
-                  <div className={styles.customDateRow}>
-                    <label className={styles.customDateLabel}>To</label>
-                    <input type="date" className={styles.dateInput} value={customDraftTo} onChange={e => setCustomDraftTo(e.target.value)} />
-                  </div>
-                  <button
-                    type="button"
-                    className={styles.applyDateBtn}
-                    disabled={!customDraftFrom}
-                    onClick={() => {
-                      setCustomFrom(customDraftFrom); setCustomTo(customDraftTo)
-                      setDateMode('custom'); setShowCustomDate(false)
-                    }}
-                  >Apply</button>
-                </div>
-              )}
-            </div>
-          </div>
+          /*
+           * The shared control, replacing a hand-rolled preset row plus a bespoke popover.
+           *
+           * That popover had two problems worth naming. Its custom range was date-only — the state
+           * for a time of day existed and no control ever wrote to it — so the one screen most
+           * likely to need "between 14:00 and 15:00 when the errors started" could not express it.
+           * And its outside-click handler had no Escape counterpart, so an open popover could only
+           * be dismissed by clicking elsewhere.
+           */
+          <DateRangeFilterButton label="Date Range" value={dateRange} onChange={setDateRange} />
         }
       />
 
