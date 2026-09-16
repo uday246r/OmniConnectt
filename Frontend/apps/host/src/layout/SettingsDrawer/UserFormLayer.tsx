@@ -749,20 +749,43 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
             </button>
           </div>
         </div>
-      ) : createdResult ? (
+            ) : createdResult ? (
         <div className={styles.successArea}>
           <div className={styles.successCard}>
             <div className={styles.successIconWrap}>
               <Icon.CheckCircle width={42} height={42} />
             </div>
             <h3 className={styles.successTitle}>User Account Created!</h3>
-            <p className={styles.successText}>
-              Share this temporary password securely with <strong>{[createdResult.user.salutation, createdResult.user.name].filter(Boolean).join(' ')}</strong> ({createdResult.user.email}). It will not be visible again once closed.
-            </p>
-            <div className={styles.tempPassBox}>
-              <span className={styles.tempPassLabel}>Temporary Password</span>
-              <code>{createdResult.temporaryPassword}</code>
-            </div>
+
+            {createdResult.inviteEmailed ? (
+              /* ✅ Happy path — invite email delivered */
+              <>
+                <p className={styles.successText}>
+                  An invitation email has been sent to{' '}
+                  <strong>{[createdResult.user.salutation, createdResult.user.name].filter(Boolean).join(' ')}</strong>{' '}
+                  at <strong>{createdResult.user.email}</strong>.
+                </p>
+                <p className={styles.successText}>
+                  They will receive a secure link to set their own password and log in.
+                  No further action is needed from you.
+                </p>
+              </>
+            ) : (
+              /* ⚠️ Email not sent — SMTP issue */
+              <>
+                <p className={styles.successText}>
+                  The account for{' '}
+                  <strong>{[createdResult.user.salutation, createdResult.user.name].filter(Boolean).join(' ')}</strong>{' '}
+                  ({createdResult.user.email}) was created successfully.
+                </p>
+                <div className={styles.errorAlert} role="alert">
+                  <strong>⚠️ Invitation email could not be sent.</strong> The user has no way to log
+                  in until they receive an invitation link. Please check your SMTP configuration
+                  and ask an administrator to resend the invite.
+                </div>
+              </>
+            )}
+
             <button
               type="button"
               className={styles.doneBtn}

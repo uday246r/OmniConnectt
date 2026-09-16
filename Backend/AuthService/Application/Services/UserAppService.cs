@@ -193,13 +193,13 @@ public class UserAppService(
             UpdatedBy = actingUserId,
         };
 
-        // Local: generate + hash a real one-time temp password, returned once to the caller.
+        // Local: generate + hash a temporary password so the account has valid credentials in the
+        // database. This value is NEVER returned to the caller — the user sets their own password
+        // through the invitation email link (SetPasswordInviteService.IssueAsync below).
         // Google: PasswordHash stays null — this account can never sign in with a local password,
-        // see AuthAppService.LoginAsync's null-guard.
-        string? tempPassword = null;
-        if (isLocal)
+        // see AuthAppService.LoginAsync's null-guard. if (isLocal)
         {
-            tempPassword = TemporaryPasswordGenerator.Generate();
+            var tempPassword = TemporaryPasswordGenerator.Generate();
             user.PasswordHash = passwordHasher.Hash(user, tempPassword);
         }
 
@@ -208,7 +208,7 @@ public class UserAppService(
 
         // Bundled from the same submission that created this account — see
         // CreateUserWithOverridesRequest's doc comment for why this can't be a separate follow-up call
-        // the way it used to be.
+        // the way it used to be.c
         if (overrides is { Count: > 0 })
         {
             await ApplyOverridesAsync(user.Id, overrides, actingUserId, ct);
@@ -241,7 +241,7 @@ public class UserAppService(
             : $"Created {user.Email}";
         await auditLog.WriteAsync(ServiceName, actingUserId, actorName, "user.created", "User", user.Id.ToString(), auditDetail, SourceIp, userAgent: UserAgent, entityLabel: user.Name, ct: ct);
 
-        return MutationResult<CreateUserResponse>.Ok(new CreateUserResponse(ToDetailDto(saved, savedOverrides), tempPassword, inviteEmailed));
+        return MutationResult<CreateUserResponse>.Ok(new CreateUserResponse(ToDetailDto(saved, savedOverrides), inviteEmailed));
     }
 
     public async Task<MutationResult<UserDetailDto>> UpdateAsync(

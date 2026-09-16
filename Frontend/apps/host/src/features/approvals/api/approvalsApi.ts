@@ -21,9 +21,7 @@ export interface ApprovalRequestListItemDto {
   requestedAt: string
   decidedAt: string | null
   rejectionReason: string | null
-  /** True only for the caller's own approved Create-User requests whose one-time temporary
-   * password has not been collected yet. Carries no secret — just "there is something to collect". */
-  hasTempPassword: boolean
+
 }
 
 export interface ApprovalRequestDetailDto {
@@ -70,15 +68,7 @@ export function isApprovalPending(value: unknown): value is ApprovalPendingDto {
   return typeof value === 'object' && value !== null && 'approvalRequestId' in value && 'message' in value
 }
 
-/**
- * The one and only time this value is ever transmitted. Returned once by
- * POST /api/approvals/{id}/reveal-temp-password to the request's maker — a second call answers 410.
- */
-export interface RevealTempPasswordResponse {
-  temporaryPassword: string
-  userName: string
-  userEmail: string
-}
+
 
 export interface ListApprovalsParams {
   page?: number
@@ -124,8 +114,4 @@ export const approvalsApi = {
   reject: (accessToken: string, id: string, reason: string) =>
     apiFetch<ApprovalRequestDetailDto>(`${base}/api/approvals/${id}/reject`, { method: 'POST', accessToken, body: { reason } }),
 
-  /** Collects the one-time temporary password for an approved Create-User request. Succeeds
-   * exactly once per request — a second call answers 410. Maker-only; the server enforces ownership. */
-  revealTempPassword: (accessToken: string, id: string) =>
-    apiFetch<RevealTempPasswordResponse>(`${base}/api/approvals/${id}/reveal-temp-password`, { method: 'POST', accessToken }),
 }

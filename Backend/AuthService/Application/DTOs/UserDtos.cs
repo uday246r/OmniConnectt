@@ -86,14 +86,18 @@ public record CreateUserRequest(
     /// if provided; null/empty is always allowed (optional field).</summary>
     string? Salutation = null);
 
-/// <summary>Null for Google-provisioned accounts — there's no local password to hand back.</summary>
 /// <summary>
-/// <paramref name="InviteEmailed"/> reports whether a set-password link actually reached the user, so
-/// the UI can tell the maker "they have been emailed a setup link" instead of guessing. False covers
-/// both "SMTP is not configured here" and "delivery failed" — in either case the temporary password
-/// above is the fallback, which is exactly what the maker needs to know.
+/// Response returned after a user account is successfully created.
+///
+/// <paramref name="InviteEmailed"/> is true when a set-password invitation email was successfully
+/// delivered to the new user's email address. When false (SMTP not configured, or delivery failed)
+/// the user has no way to log in yet — the administrator should check SMTP settings and re-trigger
+/// an invite, or contact their email provider.
+///
+/// TemporaryPassword has been removed: credentials are never returned to the caller. The user sets
+/// their own password by clicking the link in the invitation email.
 /// </summary>
-public record CreateUserResponse(UserDetailDto User, string? TemporaryPassword, bool InviteEmailed = false);
+public record CreateUserResponse(UserDetailDto User, bool InviteEmailed = false);
 
 public record UpdateUserRequest(
     [Required(AllowEmptyStrings = false, ErrorMessage = "Name is required.")]

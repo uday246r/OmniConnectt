@@ -81,16 +81,6 @@ public class ApprovalAppService(
             auditLog.SeedCorrelationId(request.CorrelationId);
         }
 
-        // Refuse BEFORE the replay, not after. Approving a Create-User generates a temporary
-        // password that exists only in memory; if it cannot be encrypted for the maker to collect,
-        // the account would be created with a password nobody could ever learn. Failing up front
-        // leaves the request Pending and nothing applied.
-        if (request is { Module: ApprovalModuleKeys.Users, Action: ApprovalActionKeys.Create } && !secretProtector.IsConfigured)
-        {
-            throw new ConflictAppException(
-                "This server cannot store the temporary password a new account requires " +
-                "(Security__TempPasswordKey is not configured). Ask an administrator to configure it, then approve again.");
-        }
 
         /*
          * CLAIM FIRST, THEN REPLAY — both inside one transaction.
@@ -129,7 +119,7 @@ public class ApprovalAppService(
          * are deliberately NOT guarded, because those really are rolled back and really must re-run.
          */
         var remoteReplay = new RemoteReplayGuard();
-        var issuedTempPassword = await db.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
+        await db.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
         {
             await using var transaction = await db.Database.BeginTransactionAsync(ct);
 
@@ -147,19 +137,12 @@ public class ApprovalAppService(
                     "This request was just decided by someone else. Refresh to see its current status.");
             }
 
-            // The only thing a replay can produce that is otherwise unrecoverable afterwards is a
-            // Create-User's temporary password (everything else is readable back from the DB, or is a
-            // password hash which is one-way by design) — see ReplayAsync's own doc comment.
-            var tempPassword = await ReplayAsync(request, remoteReplay, ct);
-
-            if (tempPassword is not null)
-            {
-                request.TempPasswordCiphertext = secretProtector.Protect(tempPassword);
-                await db.SaveChangesAsync(ct);
-            }
+            // Replay the original mutation through the same validated method a direct call uses.
+            // For a Create-User, SetPasswordInviteService.IssueAsync inside CreateAsync sends the
+            // invitation email to the new user automatically — no temp password is stored or returned.
+            await ReplayAsync(request, remoteReplay, ct);
 
             await transaction.CommitAsync(ct);
-            return tempPassword;
         });
 
         var checkerName = await db.Users.AsNoTracking().Where(u => u.Id == checkerUserId).Select(u => u.Name).FirstOrDefaultAsync(ct);
@@ -168,16 +151,6 @@ public class ApprovalAppService(
             $"Approved {request.Action} on {request.Module}" + (request.EntityLabel is not null ? $" ({request.EntityLabel})" : "") + $" — requested by {request.MakerName}.",
             entityLabel: request.EntityLabel, correlationId: request.CorrelationId, ct: ct);
 
-        if (issuedTempPassword is not null)
-        {
-            // Names WHO the password is for and WHO must collect it — never the password itself.
-            // The audit log is readable by anyone holding host.system.audit-logs:View, a far wider
-            // audience than the single maker the secret is meant for.
-            await auditLog.WriteAsync(
-                ServiceName, checkerUserId, checkerName, "user.temp_password_issued", "ApprovalRequest", request.Id.ToString(),
-                $"A one-time temporary password was issued for {request.EntityLabel ?? "the new account"} and is waiting for {request.MakerName} to collect from My Requests.",
-                entityLabel: request.EntityLabel, correlationId: request.CorrelationId, ct: ct);
-        }
 
         var interestedUsers = new List<Guid> { request.MakerId, request.CheckerId };
         await events.PublishToApprovalViewersAsync(new PlatformEvent("approvals", "approved"), ct);
@@ -364,8 +337,11 @@ public class ApprovalAppService(
                 // Applied is always non-null here — bypassApproval:true means CreateAsync cannot take
                 // the gated branch. The password itself is null for a Google account, which has no
                 // local password.
-                return createResult.Applied?.TemporaryPassword;
 
+                    // Invitation email is sent automatically inside CreateAsync (via SetPasswordInviteService).
+    // No temp password is returned or stored — return null as this replay produces nothing to persist.
+    return null;
+    
             case (ApprovalModuleKeys.Users, ApprovalActionKeys.Update):
                 // Two possible origins for the same (Module, Action) pair, told apart by EntityType: a
                 // bundled core-field-plus-overrides edit from UserFormLayer ("User"), or a submission

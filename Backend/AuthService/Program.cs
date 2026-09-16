@@ -99,7 +99,7 @@ builder.Services.AddScoped<RoleAppService>();
 builder.Services.AddScoped<ApprovalAppService>();
 builder.Services.AddScoped<CheckerAssignmentAppService>();
 // Inert without SMTP settings, exactly as Google SSO is inert without a Client ID.
-builder.Services.AddScoped<IEmailSender, EmailSender>();
+builder.Services.AddScoped<IEmailSender, SmtpEmailSender>();
 builder.Services.AddScoped<SetPasswordInviteService>();
 builder.Services.AddScoped<PermissionCatalogAppService>();
 builder.Services.AddScoped<FineCapabilityService>();

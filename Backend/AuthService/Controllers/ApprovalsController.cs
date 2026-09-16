@@ -90,14 +90,7 @@ public class ApprovalsController(ApprovalAppService approvals) : ControllerBase
     /// must be able to collect a credential for an account they themselves created. Ownership is
     /// enforced server-side against the caller's own token id — see RevealTempPasswordAsync.
     /// </summary>
-    [HttpPost("{id:guid}/reveal-temp-password")]
-    public async Task<ActionResult<RevealTempPasswordResponse>> RevealTempPassword(Guid id, CancellationToken ct)
-    {
-        var currentUserId = CurrentUserId();
-        if (currentUserId is null) return Unauthorized();
-        return Ok(await approvals.RevealTempPasswordAsync(id, currentUserId.Value, ct));
-    }
-
+ 
     private Guid? CurrentUserId()
     {
         var sub = User.FindFirst(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub)?.Value;

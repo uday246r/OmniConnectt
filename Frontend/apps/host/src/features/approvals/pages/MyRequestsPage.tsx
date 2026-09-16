@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { useAuthStore } from '../../auth/store/authStore'
 import { Badge, Button, ColumnFilter, DataTable, EMPTY_VALUE, FilterBar, Icon, PageHeader, Pagination, ResponsiveRows, RowsPerPage, readStoredPageSize, type ActiveFilter, type BadgeTone } from '@omniremit/ui'
-import { approvalsApi, type ApprovalRequestListItemDto, type ApprovalStatus, type RevealTempPasswordResponse } from '../api/approvalsApi'
+import { approvalsApi, type ApprovalRequestListItemDto, type ApprovalStatus} from '../api/approvalsApi'
 import { useApprovalRequests } from '../hooks/useApprovalRequests'
 import { ApiError } from '../../../shared/api/httpClient'
 import styles from './MyRequestsPage.module.css'
@@ -197,46 +197,7 @@ export function MyRequestsPage() {
     setPage(1)
   }, [statusFilter])
 
-  // Instant feedback: the fetched row still says hasTempPassword until the refetch lands, so the
-  // button is hidden from this set immediately on success rather than flickering back.
-  const [collectedIds, setCollectedIds] = useState<Set<string>>(new Set())
-  const [revealing, setRevealing] = useState<string | null>(null) // request id in flight
-  const [revealed, setRevealed] = useState<RevealTempPasswordResponse | null>(null) // modal payload
-  const [revealError, setRevealError] = useState<string | null>(null)
-  const [copied, setCopied] = useState(false)
-
-  async function handleReveal(id: string) {
-    if (!accessToken) return
-    setRevealing(id)
-    setRevealError(null)
-    try {
-      const result = await approvalsApi.revealTempPassword(accessToken, id)
-      setCollectedIds((prev) => new Set(prev).add(id))
-      setRevealed(result)
-    } catch (err) {
-      /*
-       * Only a 410 means the password is genuinely gone (already collected — it is one-time).
-       *
-       * This used to mark the row collected for ANY failure, so a dropped connection or a
-       * momentary 500 permanently hid the only button that can retrieve the credential: the flag
-       * lives in component state, and nothing clears it short of a remount. The password was still
-       * sitting on the server, unreachable. Every other error now leaves the button in place so the
-       * operator can simply try again.
-       */
-      if (err instanceof ApiError && err.status === 410) {
-        setCollectedIds((prev) => new Set(prev).add(id))
-      }
-      setRevealError(err instanceof ApiError ? err.message : 'Could not retrieve the temporary password.')
-    } finally {
-      setRevealing(null)
-    }
-  }
-
-  function closeRevealModal() {
-    setRevealed(null)
-    setCopied(false)
-    setRefreshKey((k) => k + 1) // re-sync with server truth after the optimistic hide
-  }
+ 
 
   const optionsFrom = (pick: (r: ApprovalRequestListItemDto) => string | null | undefined) => {
     if (items === null) return []
@@ -354,7 +315,6 @@ export function MyRequestsPage() {
 
 
       {error && <div className={styles.errorBanner}>{error}</div>}
-      {revealError && <div className={styles.errorBanner}>{revealError}</div>}
 
       {/* Shared chrome. This page had a THIRD variant of the same table — 11px header padding and a
           1px #eaecf0 rule against the 12px / 1.5px #e2e8f0 used by Audit Logs and Approval Center —
@@ -465,25 +425,6 @@ export function MyRequestsPage() {
               render: (r) => <Badge tone={STATUS_TONES[r.status]} dot>{r.status}</Badge>,
             },
             {
-              key: 'password',
-              label: 'PASSWORD',
-              priority: 'low',
-              render: (r) =>
-                r.hasTempPassword && !collectedIds.has(r.id) ? (
-                  <button
-                    type="button"
-                    className={styles.revealBtn}
-                    disabled={revealing === r.id}
-                    onClick={() => handleReveal(r.id)}
-                  >
-                    <Icon.Key width={13} height={13} />
-                    <span>{revealing === r.id ? 'Retrieving…' : 'Get password'}</span>
-                  </button>
-                ) : (
-                  <span className={styles.mutedText}>{EMPTY_VALUE}</span>
-                ),
-            },
-            {
               key: 'rejectionReason',
               clamp: true,
               label: 'REJECTION REASON',
@@ -498,38 +439,6 @@ export function MyRequestsPage() {
         />
       </DataTable>
 
-      {revealed && (
-        <div className={styles.modalBackdrop} onClick={closeRevealModal}>
-          <div className={styles.modalCard} role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
-            <div className={styles.modalIconWrap}>
-              <Icon.ShieldCheck width={34} height={34} />
-            </div>
-            <h3 className={styles.modalTitle}>Temporary Password</h3>
-            <p className={styles.modalText}>
-              Share this securely with <strong>{revealed.userName}</strong> ({revealed.userEmail}). They will be
-              required to choose their own password the first time they sign in.
-            </p>
-            <div className={styles.tempPassBox}>
-              <code className={styles.tempPassValue}>{revealed.temporaryPassword}</code>
-              <button
-                type="button"
-                className={styles.copyBtn}
-                onClick={() => { void navigator.clipboard.writeText(revealed.temporaryPassword).then(() => setCopied(true)) }}
-              >
-                <Icon.Copy width={13} height={13} />
-                <span>{copied ? 'Copied' : 'Copy'}</span>
-              </button>
-            </div>
-            <p className={styles.modalWarning} role="alert">
-              <Icon.AlertCircle width={15} height={15} />
-              <span>This is the only time it will be shown. Once you close this, it cannot be retrieved again — the account would have to be re-created.</span>
-            </p>
-            <button type="button" className={styles.modalDoneBtn} onClick={closeRevealModal}>
-              I&apos;ve saved it — close
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

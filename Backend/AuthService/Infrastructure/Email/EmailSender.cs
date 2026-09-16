@@ -6,38 +6,12 @@ using MimeKit;
 
 namespace AuthService.Infrastructure.Email;
 
-public interface IEmailSender
-{
-    /// <summary>True when the deployment has SMTP configured; callers use it to decide whether to promise a mail.</summary>
-    bool IsEnabled { get; }
-
-    /// <summary>
-    /// Attempts delivery. Returns false rather than throwing on failure — see the class remarks for
-    /// why a mail problem must never fail the operation that triggered it.
-    /// </summary>
-    Task<bool> SendAsync(string toAddress, string toName, string subject, string htmlBody, string textBody, CancellationToken ct = default);
-}
-
 /// <summary>
-/// SMTP delivery over MailKit.
-///
-/// Two deliberate design choices:
-///
-/// 1. <b>Failure is never fatal.</b> Sending happens after an account has already been created, and
-///    an unreachable mail server must not undo that — otherwise a transient SMTP outage becomes a
-///    failed user-provisioning request, and the maker is left unsure whether the account exists.
-///    Failures are logged and reported to the caller as `false`, which surfaces as a warning while
-///    the encrypted temporary-password fallback stays available.
-///
-/// 2. <b>Unconfigured is a normal state.</b> Without SMTP settings this reports IsEnabled = false and
-///    sends nothing, exactly as Google SSO is inert without a Client ID. That keeps local development
-///    and any deployment that has not set up mail yet fully functional.
-///
-/// A plain-text alternative accompanies every HTML body: some corporate mail clients strip HTML
-/// entirely, and an invite whose link is invisible is the same as no invite at all.
+/// SMTP delivery over MailKit. Implements <see cref="IEmailSender"/> for the default deployment.
+/// To switch providers (SendGrid, AWS SES, Mailgun, etc.), create a new class that implements
+/// <see cref="IEmailSender"/> and register it in Program.cs instead of this one.
 /// </summary>
-public class EmailSender(IOptions<SmtpOptions> options, ILogger<EmailSender> logger) : IEmailSender
-{
+public class SmtpEmailSender(IOptions<SmtpOptions> options, ILogger<SmtpEmailSender> logger) : IEmailSender{
     private readonly SmtpOptions _smtp = options.Value;
 
     public bool IsEnabled => _smtp.IsConfigured;

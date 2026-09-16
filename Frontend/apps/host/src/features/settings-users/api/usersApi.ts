@@ -70,7 +70,7 @@ export interface CreateUserRequest {
 /** Null for Google-provisioned accounts — there's no local password to show. */
 export interface CreateUserResponse {
   user: UserDetailDto
-  temporaryPassword: string | null
+  inviteEmailed: boolean
 }
 
 export interface UpdateUserRequest {
