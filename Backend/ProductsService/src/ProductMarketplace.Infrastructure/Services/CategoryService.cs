@@ -25,29 +25,24 @@ public class CategoryService : ICategoryService
     {
         await SanitizeDisplayOrdersAsync(ct);
 
-        var query = Base().Where(c => c.ParentCategoryId == null);
+        // No Include of products: counts come from one grouped query, instead of loading every product
+        // row in the catalogue just to count how many belong to each category.
+        var query = _db.Categories.AsNoTracking().Where(c => c.ParentCategoryId == null);
         if (!string.IsNullOrWhiteSpace(status))
             query = query.Where(c => c.Status == status);
 
         var categories = await query.OrderBy(c => c.DisplayOrder).ThenBy(c => c.CreatedAt).ToListAsync(ct);
         var rollup = await BuildProductRollupAsync(ct);
 
-        return categories.Select(c =>
-        {
-            var dto = c.ToDto();
-            dto.TotalProductCount = rollup.TotalFor(c.Id);
-            return dto;
-        }).ToList();
+        return categories.Select(c => rollup.Describe(c)).ToList();
     }
 
     public async Task<CategoryDto?> GetByIdAsync(Guid id, CancellationToken ct = default)
     {
-        var c = await Base().FirstOrDefaultAsync(c => c.Id == id, ct);
+        var c = await _db.Categories.AsNoTracking().FirstOrDefaultAsync(c => c.Id == id, ct);
         if (c is null) return null;
 
-        var dto = c.ToDto();
-        dto.TotalProductCount = (await BuildProductRollupAsync(ct)).TotalFor(c.Id);
-        return dto;
+        return (await BuildProductRollupAsync(ct)).Describe(c);
     }
 
     public async Task<CategoryDto> CreateAsync(CategoryCreateUpdateDto dto, CancellationToken ct = default)
@@ -215,9 +210,7 @@ public class CategoryService : ICategoryService
 
     private async Task<CategoryDto> ToDtoWithRollupAsync(Category category, CancellationToken ct)
     {
-        var dto = category.ToDto();
-        dto.TotalProductCount = (await BuildProductRollupAsync(ct)).TotalFor(category.Id);
-        return dto;
+        return (await BuildProductRollupAsync(ct)).Describe(category);
     }
 
     /// <summary>
@@ -253,6 +246,16 @@ public class CategoryService : ICategoryService
         {
             _directCounts = directCounts;
             _childrenByParent = childrenByParent;
+        }
+
+        /// <summary>The category's DTO with its product and sub-category counts filled from the rollup.</summary>
+        public CategoryDto Describe(Category category)
+        {
+            var dto = category.ToDto();
+            dto.ProductCount = _directCounts.TryGetValue(category.Id, out var direct) ? direct : 0;
+            dto.SubCategoryCount = _childrenByParent.TryGetValue(category.Id, out var children) ? children.Count : 0;
+            dto.TotalProductCount = TotalFor(category.Id);
+            return dto;
         }
 
         public int TotalFor(Guid categoryId)

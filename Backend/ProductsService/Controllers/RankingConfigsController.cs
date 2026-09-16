@@ -1,4 +1,7 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using ProductMarketplace.Api.Infrastructure.Approvals;
+using ProductMarketplace.Api.Infrastructure.Security;
 using ProductMarketplace.Application.Dtos;
 using ProductMarketplace.Application.Interfaces;
 
@@ -6,26 +9,22 @@ namespace ProductMarketplace.Api.Controllers;
 
 [ApiController]
 [Route("api/ranking-configs")]
-public class RankingConfigsController : ControllerBase
+[Authorize]
+public class RankingConfigsController(IRankingConfigService service, ApprovalGate gate) : ControllerBase
 {
-    private readonly IRankingConfigService _service;
-
-    public RankingConfigsController(IRankingConfigService service)
-    {
-        _service = service;
-    }
-
     [HttpGet]
+    [RequiresCapability("setup", "View")]
     public async Task<IActionResult> GetConfig(CancellationToken ct)
-    {
-        var config = await _service.GetConfigAsync(ct);
-        return Ok(config);
-    }
+        => Ok(await service.GetConfigAsync(ct));
 
     [HttpPut]
+    [RequiresCapability("setup", "Manage")]
     public async Task<IActionResult> UpdateConfig([FromBody] RankingConfigUpdateDto dto, CancellationToken ct)
     {
-        var updated = await _service.UpdateConfigAsync(dto, ct);
-        return Ok(updated);
+        var current = await service.GetConfigAsync(ct);
+        var pending = await gate.TrySubmitAsync(ProductsMutations.RankingConfigUpdate, null, "Product ranking settings", dto, ct, before: current);
+        if (pending is not null) return Accepted(pending);
+
+        return Ok(await service.UpdateConfigAsync(dto, ct));
     }
 }

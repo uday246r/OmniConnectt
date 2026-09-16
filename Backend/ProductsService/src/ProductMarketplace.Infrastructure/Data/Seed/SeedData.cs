@@ -468,7 +468,7 @@ public static class SeedData
     }
 
     /// <summary>
-    /// Seeds ProductViewLogs and AuditLogs from whatever is currently in the database.
+    /// Seeds ProductViewLogs from whatever is currently in the database.
     /// Runs independently of <see cref="SeedAsync"/> (guarded per-table) so it safely backfills
     /// these newer tables against a database that was already seeded before they existed,
     /// without needing to touch or reset any existing data.
@@ -496,76 +496,15 @@ public static class SeedData
             await db.SaveChangesAsync();
         }
 
-        if (!await db.AuditLogs.AnyAsync())
-        {
-            var admins = new[]
-            {
-                ("Super Admin", "admin@omniconnect.bank"),
-                ("Priya Menon", "priya.menon@omniconnect.bank"),
-                ("Arjun Desai", "arjun.desai@omniconnect.bank"),
-            };
-            (string name, string email) RandomAdmin() => admins[rnd.Next(admins.Length)];
-
-            var auditLogs = new List<AuditLog>();
-            void Audit(string action, string entityType, Guid? entityId, string entityName, string description, int daysAgo, string? prev = null, string? next = null)
-            {
-                var (name, email) = RandomAdmin();
-                auditLogs.Add(new AuditLog
-                {
-                    Timestamp = now.AddDays(-Math.Max(daysAgo, 0)).AddMinutes(-rnd.Next(0, 1440)),
-                    ActorName = name,
-                    ActorEmail = email,
-                    Action = action,
-                    EntityType = entityType,
-                    EntityId = entityId,
-                    EntityName = entityName,
-                    Description = description,
-                    Success = true,
-                    PreviousValue = prev,
-                    NewValue = next
-                });
-            }
-
-            var products = await db.Products.ToListAsync();
-            foreach (var p in products)
-            {
-                var ageDays = (int)(now - p.CreatedAt).TotalDays;
-                Audit(AuditActions.CreateProduct, AuditEntityTypes.Product, p.Id, p.Name, $"Created product \"{p.Name}\"", ageDays);
-                if (p.Status is "Active" or "Inactive")
-                    Audit(AuditActions.ProductStatusChange, AuditEntityTypes.Product, p.Id, p.Name,
-                        $"Changed status of \"{p.Name}\" from Draft to {p.Status}", ageDays - 1, "Draft", p.Status.ToString());
-            }
-
-            var categories = await db.Categories.ToListAsync();
-            foreach (var c in categories)
-                Audit(AuditActions.CreateCategory, AuditEntityTypes.Category, c.Id, c.Name, $"Created category \"{c.Name}\"", (int)(now - c.CreatedAt).TotalDays);
-
-            var promotions = await db.Promotions.Include(p => p.Product).ToListAsync();
-            foreach (var promo in promotions)
-                Audit(AuditActions.CreatePromotion, AuditEntityTypes.Promotion, promo.Id, promo.Title, $"Created promotion \"{promo.Title}\" for {promo.Product.Name}", (int)(now - promo.CreatedAt).TotalDays);
-
-            var reviews = await db.Reviews.Include(r => r.Product).Where(r => r.Status != "Pending").ToListAsync();
-            foreach (var r in reviews)
-                Audit(AuditActions.ReviewStatusChange, AuditEntityTypes.Review, r.Id, r.Product.Name,
-                    $"Changed review by {r.CustomerName} on \"{r.Product.Name}\" from Pending to {r.Status}", (int)(now - r.UpdatedAt).TotalDays, "Pending", r.Status.ToString());
-
-            var applications = await db.Applications.Include(a => a.Product).ToListAsync();
-            foreach (var app in applications)
-            {
-                Audit(AuditActions.CreateApplication, AuditEntityTypes.Application, app.Id, app.ApplicationNumber,
-                    $"{app.CustomerName} submitted application {app.ApplicationNumber} for {app.Product.Name}", (int)(now - app.CreatedAt).TotalDays);
-                if (app.Status != "Submitted")
-                    Audit(AuditActions.ApplicationStatusChange, AuditEntityTypes.Application, app.Id, app.ApplicationNumber,
-                        $"Application {app.ApplicationNumber} ({app.Product.Name}) status changed from Submitted to {app.Status}",
-                        (int)(now - app.UpdatedAt).TotalDays, "Submitted", app.Status.ToString());
-            }
-
-            foreach (var term in new[] { "personal loan", "home loan", "credit card", "fixed deposit", "health insurance", "mutual fund" })
-                Audit(AuditActions.Search, AuditEntityTypes.Search, null, term, $"Searched products for \"{term}\"", rnd.Next(0, 10));
-
-            db.AuditLogs.AddRange(auditLogs);
-            await db.SaveChangesAsync();
-        }
+        /*
+         * No audit rows are invented.
+         *
+         * This used to plant hundreds of audit entries attributed to made-up administrators ("Priya
+         * Menon", "Arjun Desai") for actions nobody took. An audit trail exists to be evidence; a row that
+         * names a person who did not act is indistinguishable from one that does, and sample data has a
+         * habit of surviving into shared databases. The trail starts empty and fills with what really
+         * happens.
+         */
     }
 
     /// <summary>

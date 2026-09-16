@@ -625,9 +625,6 @@ export default function ProductDetailsModal() {
               </button>
             )}
           </div>
-          <Button type="button" variant="secondary" onClick={closeProductModal}>
-            Close Details
-          </Button>
         </div>
       }
     >

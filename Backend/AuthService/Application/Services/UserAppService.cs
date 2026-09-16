@@ -66,41 +66,118 @@ public class UserAppService(
         }
     }
 
+    public Task<PagedResult<UserListItemDto>> ListAsync(
+        int page, int pageSize, string? search, bool? isActive, Guid? roleId, CancellationToken ct = default) =>
+        ListAsync(page, pageSize, new UserListFilter { Search = search, IsActive = isActive, RoleId = roleId }, ct);
+
+    /// <summary>One page of the directory, every filter applied in the database — see <see cref="UserListFilter"/>.</summary>
     public async Task<PagedResult<UserListItemDto>> ListAsync(
-        int page, int pageSize, string? search, bool? isActive, Guid? roleId, CancellationToken ct = default)
+        int page, int pageSize, UserListFilter filter, CancellationToken ct = default)
     {
-        var query = db.Users.Include(u => u.Role).AsNoTracking().AsQueryable();
-
-        if (!string.IsNullOrWhiteSpace(search))
-        {
-            var term = search.Trim().ToLowerInvariant();
-            query = query.Where(u =>
-                u.Name.ToLower().Contains(term) ||
-                u.Email.ToLower().Contains(term) ||
-                (u.PhoneNumber != null && u.PhoneNumber.Contains(term)));
-        }
-
-        if (isActive is not null)
-        {
-            var status = isActive.Value ? UserStatus.Active : UserStatus.Inactive;
-            query = query.Where(u => u.Status == status);
-        }
-
-        if (roleId is not null)
-        {
-            query = query.Where(u => u.RoleId == roleId);
-        }
+        var query = ApplyFilter(db.Users.Include(u => u.Role).AsNoTracking(), filter);
 
         var total = await query.CountAsync(ct);
         var items = await query
             .OrderBy(u => u.Status)
             .ThenBy(u => u.Name)
+            // Two people can share a name; without a unique tiebreaker a row could appear on two pages or none.
+            .ThenBy(u => u.Id)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .Select(u => ToListItemDto(u))
             .ToListAsync(ct);
 
         return new PagedResult<UserListItemDto>(items, total, page, pageSize);
+    }
+
+    /// <summary>Headline counts for the whole directory, computed by the database.</summary>
+    public async Task<UserDirectorySummaryDto> SummaryAsync(CancellationToken ct = default)
+    {
+        // Three index-friendly counts rather than one grouped aggregate over a navigation, which not every
+        // provider translates. A DbContext runs one command at a time, so they are awaited in turn.
+        var users = db.Users.AsNoTracking();
+        var total = await users.CountAsync(ct);
+        var active = await users.CountAsync(u => u.Status == UserStatus.Active, ct);
+        var administrators = await users.CountAsync(u => u.Role != null && u.Role.IsAdministrator, ct);
+
+        return new UserDirectorySummaryDto(total, active, total - active, administrators);
+    }
+
+    /// <summary>The roles the Role filter can offer, under the other filters applied.</summary>
+    public async Task<UserListFacetsDto> FacetsAsync(UserListFilter filter, CancellationToken ct = default)
+    {
+        var scoped = ApplyFilter(db.Users.AsNoTracking(), filter with { Role = null, RoleId = null });
+
+        var roleNames = await scoped.Where(u => u.Role != null).Select(u => u.Role!.Name).Distinct().OrderBy(n => n).Take(200).ToListAsync(ct);
+        var anyWithoutRole = await scoped.AnyAsync(u => u.RoleId == null, ct);
+
+        return new UserListFacetsDto(anyWithoutRole ? [.. roleNames, NoRoleLabel] : roleNames);
+    }
+
+    /// <summary>How the list labels a user with no role. The Role filter accepts it as a value.</summary>
+    public const string NoRoleLabel = "No Role";
+
+    private static IQueryable<User> ApplyFilter(IQueryable<User> query, UserListFilter filter)
+    {
+        if (!string.IsNullOrWhiteSpace(filter.Search))
+        {
+            var term = filter.Search.Trim().ToLowerInvariant();
+            var digits = new string(term.Where(char.IsAsciiDigit).ToArray());
+            query = query.Where(u =>
+                u.Name.ToLower().Contains(term) ||
+                u.Email.ToLower().Contains(term) ||
+                (u.Role != null && u.Role.Name.ToLower().Contains(term)) ||
+                (digits.Length > 0 && u.PhoneNumber != null &&
+                 System.Text.RegularExpressions.Regex.Replace(u.PhoneNumber, "[^0-9]", "").Contains(digits)));
+        }
+
+        if (!string.IsNullOrWhiteSpace(filter.Name))
+        {
+            var name = filter.Name.Trim().ToLowerInvariant();
+            query = query.Where(u => u.Name.ToLower().Contains(name) || u.Email.ToLower().Contains(name));
+        }
+
+        if (!string.IsNullOrWhiteSpace(filter.Phone))
+        {
+            // Stored numbers carry formatting the operator won't type — compare digits only, in the database.
+            var digits = new string(filter.Phone.Where(char.IsAsciiDigit).ToArray());
+            if (digits.Length > 0)
+            {
+                query = query.Where(u => u.PhoneNumber != null &&
+                    System.Text.RegularExpressions.Regex.Replace(u.PhoneNumber, "[^0-9]", "").Contains(digits));
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(filter.Role))
+        {
+            var role = filter.Role.Trim();
+            query = string.Equals(role, NoRoleLabel, StringComparison.OrdinalIgnoreCase)
+                ? query.Where(u => u.RoleId == null)
+                : query.Where(u => u.Role != null && u.Role.Name == role);
+        }
+
+        if (filter.RoleId is not null)
+        {
+            query = query.Where(u => u.RoleId == filter.RoleId);
+        }
+
+        if (filter.IsActive is not null)
+        {
+            var status = filter.IsActive.Value ? UserStatus.Active : UserStatus.Inactive;
+            query = query.Where(u => u.Status == status);
+        }
+
+        if (filter.LastLoginFrom is not null)
+        {
+            query = query.Where(u => u.LastLoginAt != null && u.LastLoginAt >= filter.LastLoginFrom);
+        }
+
+        if (filter.LastLoginTo is not null)
+        {
+            query = query.Where(u => u.LastLoginAt != null && u.LastLoginAt <= filter.LastLoginTo);
+        }
+
+        return query;
     }
 
     public async Task<UserDetailDto> GetAsync(Guid id, CancellationToken ct = default)
@@ -313,7 +390,7 @@ public class UserAppService(
         var customFieldsForValidation = request.CustomFields ?? DeserializeExtraAttributes(user.ExtraAttributes);
         var extraAttributesJson = await ValidateAndBuildExtraAttributesAsync(
             request.Name.Trim(), email, request.PhoneNumber?.Trim(), customFieldsForValidation, ct);
-        var salutation = await ValidateSalutationAsync(request.Salutation, ct);
+        var salutation = await ValidateSalutationAsync(request.Salutation, ct, currentValue: user.Salutation);
 
         await gating.EnsureActorIdentifiedAsync(ApprovalModuleKeys.Users, actingUserId, ct);
 
@@ -804,12 +881,20 @@ public class UserAppService(
     /// <summary>Null/empty is always fine (Salutation is optional); a non-empty value must match one of
     /// the admin-configured SalutationCatalog entries — a stray value from a stale client must not be
     /// able to introduce a title the catalog no longer offers.</summary>
-    private async Task<string?> ValidateSalutationAsync(string? salutation, CancellationToken ct)
+    /// <param name="currentValue">The user's saved salutation, on an edit. Keeping it is always allowed, even
+    /// if it has since been removed from the list — otherwise removing a title made every user who held
+    /// it impossible to save until someone changed their title too.</param>
+    private async Task<string?> ValidateSalutationAsync(string? salutation, CancellationToken ct, string? currentValue = null)
     {
         var trimmed = salutation?.Trim();
         if (string.IsNullOrEmpty(trimmed))
         {
             return null;
+        }
+
+        if (string.Equals(trimmed, currentValue, StringComparison.Ordinal))
+        {
+            return trimmed;
         }
 
         var allowed = await salutations.GetSalutationsAsync(ct);

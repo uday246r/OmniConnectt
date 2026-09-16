@@ -73,3 +73,65 @@
   background: var(--omni-color-surface);
 }
 .input:focus { outline: none; border-color: var(--omni-color-primary-400, #60a5fa); }
+
+/* Renaming in place: the chip turns into a small text box with keep / cancel. */
+.chipEditing {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1.5px solid var(--omni-color-primary-600);
+  border-radius: var(--omni-radius-pill);
+  padding: 2px 6px 2px 10px;
+  background: var(--omni-color-surface);
+}
+
+.chipInput {
+  width: 90px;
+  border: 0;
+  outline: none;
+  background: transparent;
+  font: inherit;
+  font-size: var(--omni-font-size-sm);
+  color: var(--omni-color-text-primary);
+}
+
+.chipAction {
+  background: none;
+  border: none;
+  padding: 3px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: inherit;
+  cursor: pointer;
+  opacity: 0.7;
+}
+.chipAction:hover { opacity: 1; background: rgba(37, 99, 235, 0.14); }
+
+.renamedFrom {
+  font-size: var(--omni-font-size-xs);
+  font-weight: var(--omni-font-weight-regular);
+  color: var(--omni-color-text-muted);
+  text-decoration: line-through;
+}
+
+.count {
+  min-width: 18px;
+  padding: 0 5px;
+  border-radius: var(--omni-radius-pill);
+  background: var(--omni-color-surface);
+  color: var(--omni-color-text-secondary);
+  font-size: var(--omni-font-size-xs);
+  text-align: center;
+}
+
+.reload { margin-left: 10px; }
+
+.renameList {
+  margin: 0 0 10px;
+  padding-left: 18px;
+  display: grid;
+  gap: 6px;
+  font-size: var(--omni-font-size-sm);
+}

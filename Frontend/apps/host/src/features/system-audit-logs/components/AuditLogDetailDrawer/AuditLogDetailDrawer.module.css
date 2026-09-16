@@ -307,3 +307,54 @@
   color: var(--omni-color-text-primary);
   font-weight: var(--omni-font-weight-bold);
 }
+
+/* Details in words: the headline, then any permission list as plain Added / Removed items. */
+.detailsText {
+  margin: 0;
+  font-size: var(--omni-font-size-sm);
+  color: var(--omni-color-text-primary);
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.permissionChanges {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.permissionChangesTitle {
+  margin: 0 0 6px;
+  font-size: var(--omni-font-size-xs-plus);
+  font-weight: var(--omni-font-weight-semibold);
+  color: var(--omni-color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.permissionList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 4px;
+}
+
+.permissionAdded,
+.permissionRemoved {
+  padding: 6px 10px;
+  border-radius: var(--omni-radius-md);
+  font-size: var(--omni-font-size-sm);
+  line-height: 1.4;
+}
+
+.permissionAdded {
+  background: var(--omni-color-success-bg);
+  color: var(--omni-color-success-text);
+}
+
+.permissionRemoved {
+  background: var(--omni-color-danger-bg);
+  color: var(--omni-color-danger-text);
+}

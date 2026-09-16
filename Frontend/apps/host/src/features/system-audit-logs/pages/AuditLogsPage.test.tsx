@@ -1,6 +1,6 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter } from 'react-router-dom'
+import { renderWithQuery } from '../../../test/renderWithQuery'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useAuthStore } from '../../auth/store/authStore'
 import type { AuditLogDto } from '../api/auditLogsApi'
@@ -57,11 +57,7 @@ function row(over: Partial<AuditLogDto> = {}): AuditLogDto {
 }
 
 function renderPage() {
-  return render(
-    <MemoryRouter initialEntries={['/system/audit-logs']}>
-      <AuditLogsPage />
-    </MemoryRouter>,
-  )
+  return renderWithQuery(<AuditLogsPage />, { route: '/system/audit-logs' })
 }
 
 /** The params object the most recent call to `fn` was given. */
@@ -189,9 +185,49 @@ describe('reading is not writing', () => {
     fetchSpy.mockRestore()
   })
 
-  it('has no way to write an audit row from the browser at all', async () => {
+  /**
+   * The one thing the browser may report is which page it opened — by route alone. The server decides
+   * whether that is a page the user can open and what it is called; nothing else can be written.
+   */
+  it('can report a page view by route, and write nothing else', async () => {
     const actual = await vi.importActual<typeof import('../api/auditLogsApi')>('../api/auditLogsApi')
 
-    expect(Object.keys(actual.auditLogsApi).sort()).toEqual(['exportCsv', 'facets', 'list', 'summary'])
+    expect(Object.keys(actual.auditLogsApi).sort()).toEqual(['exportCsv', 'facets', 'list', 'recordPageView', 'summary'])
+    expect(actual.auditLogsApi.recordPageView.length).toBe(2)
+  })
+})
+
+describe('coming back to the page', () => {
+  /*
+   * The page used to hold its rows in component state, so leaving for another screen and coming back
+   * started from an empty table and fetched the list, the summary and the facets again. They are cached
+   * queries now: the rows are on screen at once, and a live update is what makes them stale.
+   */
+  it('shows the rows it already had without asking the server again', async () => {
+    const first = renderPage()
+    expect(await screen.findByText('Asha Rao')).toBeInTheDocument()
+    const calls = { list: api.list.mock.calls.length, summary: api.summary.mock.calls.length, facets: api.facets.mock.calls.length }
+    first.unmount()
+
+    renderWithQuery(<AuditLogsPage />, { client: first.client, route: '/system/audit-logs' })
+
+    expect(screen.getByText('Asha Rao')).toBeInTheDocument()
+    expect(api.list.mock.calls.length).toBe(calls.list)
+    expect(api.summary.mock.calls.length).toBe(calls.summary)
+    expect(api.facets.mock.calls.length).toBe(calls.facets)
+  })
+
+  it('refetches when the audit trail changes', async () => {
+    const { invalidate, TOPICS } = await import('../../../shared/stores/invalidationStore')
+    const { installInvalidationBridge } = await import('../../../shared/query/invalidationBridge')
+    const { client } = renderPage()
+    const uninstall = installInvalidationBridge(client)
+    expect(await screen.findByText('Asha Rao')).toBeInTheDocument()
+    const before = api.list.mock.calls.length
+
+    invalidate(TOPICS.auditLogs)
+
+    await waitFor(() => expect(api.list.mock.calls.length).toBeGreaterThan(before))
+    uninstall()
   })
 })

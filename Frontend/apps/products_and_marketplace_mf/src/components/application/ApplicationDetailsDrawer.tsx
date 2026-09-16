@@ -1,3 +1,4 @@
+import { isApprovalPending } from "../../services/httpClient";
 import { useEffect, useState } from "react";
 import { Drawer, DrawerSection } from "../drawer/Drawer";
 import { Icon } from "../common/Icon";
@@ -71,6 +72,7 @@ export function ApplicationDetailsDrawer({ applicationId }: { applicationId: str
       setNote("");
       setStatusMessage({ type: "success", text: `Application status marked as ${statusLabel} successfully.` });
     } catch (err) {
+      if (isApprovalPending(err)) return;
       setStatusMessage({ type: "error", text: (err as Error).message || "Failed to update status." });
     } finally {
       setUpdating(false);

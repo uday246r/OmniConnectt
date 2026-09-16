@@ -19,8 +19,13 @@ vi.mock('../api/salutationsApi', () => ({
 const mockGet = vi.mocked(salutationsApi.get)
 const mockUpdate = vi.mocked(salutationsApi.update)
 
-function catalog(salutations: string[], version = 1) {
-  return { salutations, version, updatedAt: new Date().toISOString() }
+function catalog(salutations: string[], version = 1, counts: Record<string, number> = {}) {
+  return {
+    salutations,
+    version,
+    updatedAt: new Date().toISOString(),
+    entries: salutations.map((value) => ({ id: `id-${value}`, value, userCount: counts[value] ?? 0 })),
+  }
 }
 
 beforeEach(() => {
@@ -133,11 +138,87 @@ describe('saving', () => {
     await userEvent.click(screen.getByRole('button', { name: /save changes/i }))
 
     await waitFor(() => {
-      expect(mockUpdate).toHaveBeenCalledWith('test-token', { salutations: ['Mr.', 'Ms.', 'Mrs.', 'Dr.', 'Prof.'] })
+      expect(mockUpdate).toHaveBeenCalledWith('test-token', {
+        entries: [
+          { id: 'id-Mr.', value: 'Mr.' },
+          { id: 'id-Ms.', value: 'Ms.' },
+          { id: 'id-Mrs.', value: 'Mrs.' },
+          { id: 'id-Dr.', value: 'Dr.' },
+          { id: '', value: 'Prof.' },
+        ],
+        expectedVersion: 1,
+      })
     })
     // Dirty state clears once the save round-trips successfully.
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /save changes/i })).toBeDisabled()
     })
+  })
+})
+
+describe('renaming', () => {
+  it('keeps the entry and asks before changing the profiles that show it', async () => {
+    mockGet.mockResolvedValue(catalog(['Mr', 'Ms.'], 4, { Mr: 12 }))
+    mockUpdate.mockResolvedValue(catalog(['Mr.', 'Ms.'], 5, { 'Mr.': 12 }))
+    render(<SalutationsCard canEdit />)
+    await screen.findByText('Mr')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Edit Mr' }))
+    const box = screen.getByRole('textbox', { name: 'New text for Mr' })
+    await userEvent.clear(box)
+    await userEvent.type(box, 'Mr.{Enter}')
+    await userEvent.click(screen.getByRole('button', { name: /save changes/i }))
+
+    expect(await screen.findByRole('dialog')).toHaveTextContent('Mr becomes Mr. on 12 user profiles.')
+    expect(mockUpdate).not.toHaveBeenCalled()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Rename' }))
+
+    await waitFor(() =>
+      expect(mockUpdate).toHaveBeenCalledWith('test-token', {
+        entries: [{ id: 'id-Mr', value: 'Mr.' }, { id: 'id-Ms.', value: 'Ms.' }],
+        expectedVersion: 4,
+      }),
+    )
+  })
+
+  it('saves without asking when nobody has the title yet', async () => {
+    mockGet.mockResolvedValue(catalog(['Mr', 'Ms.'], 1))
+    mockUpdate.mockResolvedValue(catalog(['Mr.', 'Ms.'], 2))
+    render(<SalutationsCard canEdit />)
+    await screen.findByText('Mr')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Edit Mr' }))
+    await userEvent.type(screen.getByRole('textbox', { name: 'New text for Mr' }), '.{Enter}')
+    await userEvent.click(screen.getByRole('button', { name: /save changes/i }))
+
+    await waitFor(() => expect(mockUpdate).toHaveBeenCalled())
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('refuses renaming to a salutation already in the list', async () => {
+    render(<SalutationsCard canEdit />)
+    await screen.findByText('Mr.')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Edit Mrs.' }))
+    const box = screen.getByRole('textbox', { name: 'New text for Mrs.' })
+    await userEvent.clear(box)
+    await userEvent.type(box, 'ms.{Enter}')
+
+    expect(screen.getByRole('alert')).toHaveTextContent(/already in the list/i)
+  })
+
+  it('offers a reload when someone else saved first', async () => {
+    const { ApiError } = await import('../../../shared/api/httpClient')
+    mockUpdate.mockRejectedValue(new ApiError(409, 'Someone else changed the salutation list while you were editing it.'))
+    render(<SalutationsCard canEdit />)
+    await screen.findByText('Mr.')
+
+    await userEvent.click(screen.getByRole('button', { name: /remove dr\./i }))
+    await userEvent.click(screen.getByRole('button', { name: /save changes/i }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Someone else changed')
+    await userEvent.click(screen.getByRole('button', { name: 'Reload' }))
+    await waitFor(() => expect(mockGet).toHaveBeenCalledTimes(2))
   })
 })

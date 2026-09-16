@@ -42,7 +42,9 @@ namespace LeadManagement.Api.Models.Dtos
         // check — they only ever apply once a value IS present.
         public string CustomerName { get; set; } = string.Empty;
 
-        [RegularExpression(@"^\d{6}-\d{2}-\d{4}$", ErrorMessage = "Please enter IC Number in format YYMMDD-PB-XXXX (e.g. 880512-14-5678).")]
+        // No format attribute: the IC number format is a Field Settings rule now (seeded with the
+        // YYMMDD-PB-XXXX pattern this attribute used to hard-code), so an administrator can change it,
+        // and approval replay checks it again. See LeadFieldConfigService.EnsureFormatsValid.
         public string IcNumber { get; set; } = string.Empty;
 
         /// <summary>Defaults to Malaysia, but no longer constrains what the number may be.</summary>

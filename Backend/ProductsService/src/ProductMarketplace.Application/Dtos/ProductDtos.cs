@@ -110,6 +110,12 @@ public class ProductQueryDto
     public string? Status { get; set; }
     public double? MinRating { get; set; }
     public string Sort { get; set; } = "recommended";
-    public int Page { get; set; } = 1;
-    public int PageSize { get; set; } = 8;
+    private int _page = 1;
+    private int _pageSize = 8;
+
+    /// <summary>1 or greater; anything lower is read as the first page rather than failing with a negative offset.</summary>
+    public int Page { get => _page; set => _page = value < 1 ? 1 : value; }
+
+    /// <summary>Between 1 and <see cref="Common.Paging.MaxPageSize"/>, so no caller can ask for the whole table in one response.</summary>
+    public int PageSize { get => _pageSize; set => _pageSize = Common.Paging.Clamp(value, 8); }
 }

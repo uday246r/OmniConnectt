@@ -22,7 +22,7 @@
 }
 
 .pm-doc-preview-card {
-  background: #ffffff;
+  background: var(--omni-color-surface);
   width: min(840px, 94vw);
   max-height: 90vh;
   border-radius: 16px;
@@ -51,7 +51,7 @@
   justify-content: space-between;
   gap: 16px;
   padding: 16px 20px;
-  background: #f8fafc;
+  background: var(--omni-color-surface-alt);
   border-bottom: 1px solid #eaecf0;
 }
 
@@ -66,9 +66,9 @@
   width: 34px;
   height: 34px;
   border-radius: 10px;
-  background: #eff6ff;
-  border: 1px solid #dbeafe;
-  color: #2563eb;
+  background: var(--omni-color-primary-50);
+  border: 1px solid var(--omni-color-primary-100);
+  color: var(--omni-color-primary-600);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -78,7 +78,7 @@
 .pm-doc-preview-title {
   font-size: 15px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--omni-color-text-primary);
   margin: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -110,7 +110,7 @@
   height: 520px;
   border: none;
   border-radius: 8px;
-  background: #ffffff;
+  background: var(--omni-color-surface);
 }
 
 .pm-doc-preview-footer {
@@ -119,6 +119,6 @@
   justify-content: flex-end;
   gap: 10px;
   padding: 14px 20px;
-  background: #ffffff;
+  background: var(--omni-color-surface);
   border-top: 1px solid #eaecf0;
 }

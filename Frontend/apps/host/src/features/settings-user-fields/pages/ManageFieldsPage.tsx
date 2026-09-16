@@ -42,6 +42,7 @@ export function ManageFieldsPage() {
         ])
         if (cancelled) return
         setFields([...schemaRes.fields].sort((a, b) => a.order - b.order))
+        setVersion(schemaRes.version)
         setCustomPresets(presetsRes.presets)
         setError(null)
         setDirty(false)
@@ -78,12 +79,16 @@ export function ManageFieldsPage() {
     setDirty(true)
   }
 
+  // The schema version this page is editing — sent with the save so two administrators cannot overwrite each other.
+  const [version, setVersion] = useState<number | undefined>(undefined)
+
   async function handleSaveChanges() {
     if (!accessToken) return
     setSaving(true)
     try {
-      const res = await userSchemaApi.update(accessToken, { fields })
+      const res = await userSchemaApi.update(accessToken, { fields, expectedVersion: version })
       setFields([...res.fields].sort((a, b) => a.order - b.order))
+      setVersion(res.version)
       setDirty(false)
       toast.success('User fields updated. The Create/Edit User form now reflects these changes.')
     } catch (err) {

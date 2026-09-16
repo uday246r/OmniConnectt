@@ -1,4 +1,6 @@
+import { isApprovalPending } from "../services/httpClient";
 import { useEffect, useState } from "react";
+import { PageHeader } from "@omniremit/ui";
 import { Icon } from "../components/common/Icon";
 import { EmptyState, ErrorState, LoadingSkeletonRows } from "../components/common/EmptyState";
 import { CategoryManagementPanel } from "../components/category/CategoryManagementPanel";
@@ -25,13 +27,6 @@ export function SetupPage() {
   const { fetchProductTypes, fetchDocumentDefinitions } = useSetupStore();
   const { fetchAll: fetchEmploymentTypes } = useEmploymentTypeStore();
 
-  const todayFormatted = new Date().toLocaleDateString("en-IN", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
-
   // Both product types, documents, and employment types are loaded up front
   useEffect(() => {
     fetchProductTypes();
@@ -41,21 +36,11 @@ export function SetupPage() {
 
   return (
     <div className="pm-page pm-setup-page">
-      <div className="pm-hero-banner">
-        <div className="pm-hero-banner-content">
-          <div className="pm-hero-icon-wrap">
-            <Icon name="settings" size={26} />
-          </div>
-          <div className="pm-hero-text">
-            <div className="pm-hero-badge-row">
-              <span className="pm-hero-live-badge">• Platform Configuration</span>
-              <span className="pm-hero-date">{todayFormatted}</span>
-            </div>
-            <h1>Setup & Configuration</h1>
-            <p>Configure product types, dynamic attributes, categories, document rules, employment categories, and lifecycle statuses.</p>
-          </div>
-        </div>
-      </div>
+      <PageHeader
+        title="Setup & Configuration"
+        subtitle="Configure product types, dynamic attributes, categories, document rules, employment categories, and lifecycle statuses."
+        icon={<Icon name="settings" size={24} />}
+      />
 
       <div className="pm-tabs pm-mt-4">
         <button className={`pm-tab ${tab === "product-types" ? "active" : ""}`} onClick={() => setTab("product-types")}>
@@ -112,6 +97,7 @@ function ProductTypesSetup({ canManage }: { canManage: boolean }) {
       setDeleteTypeTarget(null);
       useToastStore.getState().success("Product Type Deleted", `"${name}" has been deleted successfully.`);
     } catch (err) {
+      if (isApprovalPending(err)) return;
       setDeleteTypeError((err as Error).message);
       useToastStore.getState().danger("Delete Failed", (err as Error).message);
     } finally {
@@ -129,6 +115,7 @@ function ProductTypesSetup({ canManage }: { canManage: boolean }) {
       setDeleteFieldTarget(null);
       useToastStore.getState().success("Field Removed", `"${label}" has been removed from schema successfully.`);
     } catch (err) {
+      if (isApprovalPending(err)) return;
       setDeleteFieldError((err as Error).message);
       useToastStore.getState().danger("Delete Failed", (err as Error).message);
     } finally {
@@ -378,6 +365,7 @@ function DocumentsSetup({ canManage }: { canManage: boolean }) {
       setDeleteDocTarget(null);
       useToastStore.getState().success("Document Requirement Deleted", `"${name}" has been deleted successfully.`);
     } catch (err) {
+      if (isApprovalPending(err)) return;
       setDeleteDocError((err as Error).message);
       useToastStore.getState().danger("Delete Failed", (err as Error).message);
     } finally {
@@ -529,6 +517,7 @@ function StatusesSetup({ canManage }: { canManage: boolean }) {
       setDeleteTarget(null);
       useToastStore.getState().success("Status Configuration Deleted", `"${label}" status has been deleted successfully.`);
     } catch (err) {
+      if (isApprovalPending(err)) return;
       setDeleteError((err as Error).message);
       useToastStore.getState().danger("Delete Failed", (err as Error).message);
     } finally {
@@ -706,6 +695,7 @@ function EmploymentTypesSetup({ canManage }: { canManage: boolean }) {
       setDeleteTarget(null);
       useToastStore.getState().success("Employment Type Deleted", `"${name}" has been deleted successfully.`);
     } catch (err) {
+      if (isApprovalPending(err)) return;
       setDeleteError((err as Error).message);
       useToastStore.getState().danger("Delete Failed", (err as Error).message);
     } finally {

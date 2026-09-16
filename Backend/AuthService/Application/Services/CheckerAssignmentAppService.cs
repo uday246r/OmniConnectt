@@ -450,27 +450,36 @@ public class CheckerAssignmentAppService(
              * is relational keeps the production guarantee without making the code untestable.
              */
             var useTransaction = db.Database.IsRelational();
-            await using var tx = useTransaction ? await db.Database.BeginTransactionAsync(ct) : null;
+
+            // Inside the execution strategy: with retry-on-failure configured (Program.cs), Npgsql refuses a
+            // transaction opened by hand outside one — every bulk assignment failed with an
+            // InvalidOperationException before it reached the database.
+            var strategy = db.Database.CreateExecutionStrategy();
 
             try
             {
-                await db.SaveChangesAsync(ct);
-
-                var actorName = actingUserId is null ? null : await db.Users.AsNoTracking().Where(u => u.Id == actingUserId).Select(u => u.Name).FirstOrDefaultAsync(ct);
-                foreach (var assignment in newlyCreated)
+                await strategy.ExecuteAsync(async () =>
                 {
-                    await auditLog.WriteHostAsync(
-                        actingUserId, actorName, "checker_assignment.created",
-                        AuditLogAppService.Modules.CheckerAssignment, AuditLogAppService.Categories.Configuration,
-                        entityType: "CheckerAssignment", entityId: assignment.Id.ToString(), details:
-                        $"Assigned {(checkerRoleId.HasValue ? "role " : string.Empty)}{checkerName} as a checker for '{assignment.Module}' (bulk application assignment).",
-                        entityLabel: assignment.Module, ct: ct);
-                }
+                    await using var tx = useTransaction ? await db.Database.BeginTransactionAsync(ct) : null;
 
-                if (tx is not null)
-                {
-                    await tx.CommitAsync(ct);
-                }
+                    await db.SaveChangesAsync(ct);
+
+                    var actorName = actingUserId is null ? null : await db.Users.AsNoTracking().Where(u => u.Id == actingUserId).Select(u => u.Name).FirstOrDefaultAsync(ct);
+                    foreach (var assignment in newlyCreated)
+                    {
+                        await auditLog.WriteHostAsync(
+                            actingUserId, actorName, "checker_assignment.created",
+                            AuditLogAppService.Modules.CheckerAssignment, AuditLogAppService.Categories.Configuration,
+                            entityType: "CheckerAssignment", entityId: assignment.Id.ToString(), details:
+                            $"Assigned {(checkerRoleId.HasValue ? "role " : string.Empty)}{checkerName} as a checker for '{assignment.Module}' (bulk application assignment).",
+                            entityLabel: assignment.Module, ct: ct);
+                    }
+
+                    if (tx is not null)
+                    {
+                        await tx.CommitAsync(ct);
+                    }
+                });
             }
             catch (DbUpdateException ex) when (IsUniqueViolation(ex))
             {

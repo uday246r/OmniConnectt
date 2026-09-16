@@ -1,163 +1,171 @@
 # Adding a New Remote App
 
-How to stand up a new micro-frontend on OmniRemit without colliding with the host or any existing
-remote. Most of the steps exist because of a collision that has actually happened here.
+How to put a new micro-frontend and its backend on OmniRemit so that it signs people in with the
+platform's token, enforces the permissions the Role editor grants, records everything in the central
+audit trail, goes through maker-checker approval, and looks like the rest of the product.
 
-> ⚠️ **This document names files that no longer exist.** It was written against an
-> `employee_mf` / `EmployeeService` pair that has since been removed, and against a separate
-> `ModuleRegistry` service whose job now lives inside AuthService. Copy
-> **`Frontend/apps/customer360_mf`** (or `lead_mf`) instead — both are current, both are `.tsx`, and
-> both already follow the contract below. Wherever the text says ModuleRegistry fetches a remote's
-> `GET /permissions`, that is AuthService doing it now; nothing about the contract a remote must meet
-> has changed. The condensed, current version of that contract is in
-> [README.md](../README.md#contract-for-future-remote-apps).
+The host is never rebuilt to gain an app. Everything below ends with an administrator registering it
+in **Setup → Applications**.
 
-The host never needs rebuilding or redeploying to gain a new app. Everything below ends at an
-administrator pasting two URLs into **Setup → Applications**.
+**Copy a working pair, not this page.** The references, all current:
 
----
-
-## The five things that must be unique per app
-
-| Thing | Where it lives | What happens if it collides |
+| | Frontend | Backend |
 |---|---|---|
-| Registry **key** (`employee`) | Setup → Applications | Rejected at registration — unique index on `RemoteApp.Key`. |
-| MF **container name** (`employee_mf`) | `vite.config.js` → `remoteFederationConfig(name, …)` | Two apps overwrite each other's container on `window`; the wrong app renders. **Now rejected at registration** — the registry reads the built manifest and checks it. |
-| **Port** | the app's own `.env` → `VITE_PREVIEW_PORT` | Startup crash (`strictPort`), or worse, a manifest served on a port the registry doesn't know about. |
-| **CSS scope id** (`#employee-mf-scope`) | `postcss.config.cjs` → `SCOPE_ID`, and the root element in `App.jsx` | Styles leak between apps. |
-| Backend **path base** (`/api/employee-service`) | that service's `Program.cs` → `UsePathBase` | Route ambiguity between services. |
+| Closest analogue | `Frontend/apps/lead_mf` | `Backend/LeadService` |
+| Clean-architecture service | `Frontend/apps/products_and_marketplace_mf` | `Backend/ProductsService` |
+| Read-mostly, proxies an external system | `Frontend/apps/customer360_mf` | `Backend/Customer360Service` |
 
 ---
 
-## 1. Scaffold the frontend
+## The things that must be unique per app
 
-Copy `Frontend/apps/employee_mf` to `Frontend/apps/<your_app>_mf`. Then, in order:
-
-**`package.json`** — set a unique `name`. Keep `@omniremit/federation-config` as a
-`workspace:*` dependency. Keep the `dev` script as-is (`vite build --watch` + `vite preview`
-together); do **not** add `--port` flags back, the port comes from `.env` now.
-
-> There is no Vite dev server with HMR here, by design. The host consumes `dist/mf-manifest.json`,
-> which only a build produces. `pnpm dev` runs a watching build alongside the preview server so
-> edits still land automatically.
-
-**`vite.config.js`** — one call does the whole federation block:
-
-```js
-federation(remoteFederationConfig("<your_app>_mf", "./src/App.jsx"))
-```
-
-If your app imports `react-router-dom`, `zustand`, or `@tanstack/react-query`, you **must** declare
-them:
-
-```js
-federation(remoteFederationConfig("<your_app>_mf", "./src/App.jsx", ["react-router-dom"]))
-```
-
-Sharing requires *both* sides to declare a package. The host already declares all of them. A remote
-that imports `react-router-dom` without listing it here silently gets its **own second copy of the
-router**, with its own empty context — and every `useNavigate()` / `<Link>` inside your app throws
-`useNavigate() may be used only in the context of a <Router>` even though the host obviously has a
-router mounted. This is the single most confusing failure mode in the whole system.
-
-Only list packages you actually installed: the federation plugin emits a prebuild module per shared
-entry, so naming an uninstalled one fails the build outright.
-
-**`postcss.config.cjs`** — change `SCOPE_ID` to `<your-app>-mf-scope`. Leave both plugins in place.
-`postcss-prefix-selector` scopes selectors; the local `scopeKeyframes` plugin scopes `@keyframes`
-*names*, which selector prefixing cannot reach. Without the second one, two remotes each defining
-`@keyframes fadeIn` overwrite each other globally and animations break in whichever app's stylesheet
-was injected first.
-
-**`src/App.jsx`** — the root element carries the scope id and nothing else:
-
-```jsx
-<div id="<your-app>-mf-scope">
-```
-
-Do not also put a class there and write rules against it. The prefixer rewrites `.your-class` into
-the *descendant* selector `#<scope> .your-class`, which cannot match the element that carries the
-scope id. Root-element styles go under `:root` in your CSS — the config maps `:root` / `html` /
-`body` onto the scope element itself.
-
-**`src/index.css`** — keep the `:root` block. Element selectors (`h1`, `button`, `*`) are safe here
-*only* because the prefixer scopes them.
-
-**`.env`** and **`.env.example`** — set `VITE_PREVIEW_PORT` to an unused port and point the API vars
-at your backend.
-
-**Contract:** every remote must default-export a React component from `./src/App.jsx`. The host
-always resolves `<key>/App` — this is enforced by `REMOTE_ENTRY_MODULE` in the shared config, not by
-convention.
+| Thing | Where it lives | If it collides |
+|---|---|---|
+| App **key** (`lead`, `products`) | Setup → Applications, and the backend's `Self__AppKey` | Registration refuses it. Every permission is `remote.<key>.<module>:<Capability>`, so the backend's key must match. |
+| Module Federation **container name** (`lead_mf`) | `vite.config.ts` → `remoteFederationConfig(name, …)` | Refused at registration (AuthService reads the built manifest). |
+| **Port** | the app's `.env` → `VITE_PREVIEW_PORT`; the service's `launchSettings.json` | Startup failure, or a manifest on a port the registry does not know. |
+| **CSS scope id** (`#lead-mf-scope`) | `postcss.config.cjs` → `SCOPE_ID`, and the root element in `App.tsx` | Styles leak between apps. |
+| **Internal service key** | `Internal__Services__<ServiceName>__ApiKey` in AuthService's `.env` | Each service has its own; see *Service keys*. |
 
 ---
 
-## 2. Add it to the launcher
+## 1. Frontend
 
-In `.claude/launch.json`:
+Copy `Frontend/apps/lead_mf` to `Frontend/apps/<app>_mf`, then:
 
-```json
-{
-  "name": "<your-app>-mf-dev",
-  "runtimeExecutable": "pnpm",
-  "runtimeArgs": ["-C", "Frontend", "--filter", "<your-app>-mf", "dev"],
-  "port": 5002
-}
+- **`package.json`** — a unique `name`; keep `@omniremit/ui` and `@omniremit/federation-config` as
+  `workspace:*`. Keep the `test` / `build` scripts; `build` must type-check the app's real tsconfig.
+- **`vite.config.ts`** — `federation(remoteFederationConfig('<app>_mf', './src/App.tsx', ['zustand']))`.
+  List every shared package you actually import (`zustand`, `react-router-dom`, `@tanstack/react-query`).
+  An unlisted one gets its own second copy — a second router with an empty context is the classic
+  failure. Listing one you did not install fails the build.
+- **`postcss.config.cjs`** — change `SCOPE_ID`; keep both plugins (selectors and `@keyframes` names).
+- **`App.tsx`** — the root element carries only the scope id.
+- **Styles** — import `@omniremit/ui/tokens.css` before your own CSS, never the host's global CSS.
+  Build screens from `@omniremit/ui`: `Drawer`, `Modal`, `DataTable`, `Pagination`, `ColumnFilter`,
+  `Select` / `Combobox` (every dropdown is type-to-search), `Badge`, `Button`. Read
+  `docs/SHARED-UI-REFACTOR-STATUS.md` first.
+- **Drawers** — one close control (the header X), no footer "Close" button, and no database ids,
+  GUIDs, raw JSON or action keys shown to people. Show names and plain-language descriptions.
+- **Identity** — never run a login. `src/api/hostBridge.ts` reads `window.__omniremitHost__`:
+  `getAccessToken()`, `ensureFreshAccessToken()`, `hasCapability(featureKey, capability)`, `getUser()`.
+  Send `Authorization: Bearer <token>` on every call, refresh once on a 401, and send nothing that
+  names the user (no `X-Actor-*` headers — the server reads the actor from the token).
+- **Permissions in the UI** — ask the bridge with the same strings the backend enforces:
+  `hasCapability('remote.<key>.<module>', 'Create')`. Never grant everything in a mock provider.
+- **Approvals** — a gated change answers `202` with `{ approvalRequestId, checkerName, message }`.
+  Treat it as "sent for approval": close the form, say who must approve it, and do not show "saved".
+- **Exports** — download server-side CSVs with `downloadCsv` from `@omniremit/ui`; never build CSV in
+  the browser from the rows on screen.
+- **Page views** — nothing to do. Every page change inside a remote is a host URL change, and the host
+  records it (`usePageViewTracking`); the page name comes from your navigation manifest.
+- **Field formats** — to validate against Settings → Manage Formats, use `validateFieldValue` from
+  `@omniremit/ui/validation` and `ValidationRulesEditor` from `@omniremit/ui/validation-editor`.
+
+Every remote default-exports a React component from `./src/App.tsx`; the host always loads `<key>/App`.
+
+Add a launch entry in `.claude/launch.json` with `"runtimeArgs": ["-C", "Frontend", "--filter", "<app>-mf", "dev"]`.
+`-C Frontend` is required — the workspace root is `Frontend/`.
+
+---
+
+## 2. Backend
+
+Copy `Backend/LeadService` (or `ProductsService`). Build context for its Dockerfile is `Backend/`, so
+`Directory.Build.props` and `Backend/Shared` are available.
+
+### Configuration (`.env`, loaded from the service folder; document every key in `.env.example`)
+
+```
+Jwt__SigningKeyPublic=<the platform public key — same value every service uses>
+Jwt__Issuer=omniremit-auth-service
+Jwt__Audience=omniremit-host
+AuthService__BaseUrl=http://localhost:5155
+AuthService__InternalApiKey=<this service's own key>
+Internal__ApiKey=<the same key — AuthService presents it when replaying an approval here>
+Self__PublicBaseUrl=http://localhost:<port>
+Self__AppKey=<app key>
+Cors__AllowedOrigins__0=http://localhost:5173
+Cors__AllowedOrigins__1=http://localhost:<frontend port>
 ```
 
-`-C Frontend` is **required**, not cosmetic. The pnpm workspace root is `Frontend/`, and the repo
-root has no `package.json`. Without `-C`, pnpm walks *up past the repository* looking for a
-workspace and can latch onto an unrelated `package.json` in your home directory — which is exactly
-what happened here, producing a baffling `ERR_PNPM_MALFORMED_METADATA` about a package this project
-has never depended on.
+Nothing has a hard-coded fallback: CORS with no origins configured allows none, and a missing key
+refuses internal calls.
+
+### Service keys
+
+Each service has its own internal key. In **AuthService's** `.env`:
+
+```
+Internal__Services__<ServiceName>__ApiKey=<key>
+Internal__Services__<ServiceName>__CallbackBaseUrl=http://localhost:<port>
+```
+
+AuthService identifies the calling service by its key — audit and system-log rows are stamped with
+that service's name whatever the body claims — and refuses an approval callback URL outside that
+service's `CallbackBaseUrl`, so a leaked key cannot redirect replays elsewhere. It replays an approved
+change to the service with that same service's key.
+
+### Authentication and authorization
+
+- RS256 JWT bearer with `MapInboundClaims = false` and the public key only (copy from LeadService `Program.cs`).
+- `[Authorize]` on every controller. `[RequiresCapability("<Module>", "<Capability>")]` on every action,
+  reads included; `[RequiresAnyCapability("A:View", "B:Create")]` when several roles need the same read.
+  Administrators (the `administrator` claim) bypass capability checks.
+- `GET /permissions` reflects over those attributes (both kinds), so the Role editor offers exactly
+  what is enforced. A manifest adds labels and non-API capabilities (Export, Widget). An endpoint with
+  no attribute is ungated *and* invisible to the permission system — the reflection test in
+  `ProductsService.Tests` fails the build on one.
+- Fine-grained capabilities (exports, dashboard cards) use `[RequiresFineCapability]`.
+
+### Audit
+
+- Write every create, update, delete, export and security-relevant read to your local audit table
+  **and** push it to AuthService (`POST internal/audit-logs`) with `X-Correlation-Id`.
+- The actor comes from the token only. `Details` is one plain-language sentence a non-technical reader
+  understands ("Updated lead 'Asha Rao': phone number changed").
+- Add every new action key to `docs/AUDIT-EVENTS.md` in the same change.
+- Unhandled exceptions: answer with a generic message and a reference id, and report the detail with
+  `PushSystemLogAsync` (see `LeadService/Middleware/ExceptionMiddleware.cs`). Never return `ex.Message`
+  from a 500.
+
+### Maker-checker
+
+Before applying a mutation, ask `GET internal/approvals/gated/remote.<key>.<module>`. If gated, submit it
+(`POST internal/approvals/submit`, with `entityKey` for a create) and return `202`. Expose
+`POST /internal/approvals/apply` behind the internal key; it must re-run the **same validated service
+method** with `bypassApproval: true`, so a change approved later is checked against the rules in force
+then. `ProductsService/Infrastructure/Approvals` shows a table-driven version.
+
+### Scale
+
+Page and cap every list server-side (100 rows), filter and sort in SQL, index the filter columns, use
+a pooled `DbContext`, keep uploads behind a storage abstraction, and wrap startup migrations so an
+unreachable database does not crash the process.
 
 ---
 
-## 3. Stand up the backend (if it has one)
+## 3. Register it
 
-Copy `Backend/EmployeeService`. Then:
-
-- Give it a **unique `UsePathBase`** segment and a unique port.
-- Add its origin to every relevant `Cors__AllowedOrigins__*`.
-- Reuse the **same** `Jwt__SigningKeyPublic` and `AuthService__InternalApiKey` as the other services.
-  Only AuthService ever holds the private key.
-- Gate **every** endpoint with `[RequiresCapability("…")]`, including reads. The discovery endpoint
-  reflects over these attributes, so whatever you declare automatically becomes assignable in the
-  host's Role editor — nothing is hand-registered. Conversely, an endpoint with no attribute is
-  invisible to the permission system *and* ungated: EmployeeService shipped a `GET /api/employees`
-  with only `[Authorize]`, which meant any signed-in user could read every employee record including
-  salaries.
-
----
-
-## 4. Register it
-
-**Setup → Applications → + Register App**:
+**Setup → Applications → Register App**:
 
 | Field | Value |
 |---|---|
-| Key | `<your-app>` (lowercase, unique) |
-| Display name | anything |
-| Manifest URL | `http://localhost:<port>/mf-manifest.json` |
-| Permissions source URL | `http://localhost:<backend-port>/<path-base>/permissions` |
+| Key | the app key (lowercase, unique, equal to `Self__AppKey`) |
+| Display name | shown in the sidebar and on audit rows |
+| Manifest URL | `http://localhost:<frontend port>/mf-manifest.json` |
+| Permissions source URL | `http://localhost:<backend port>/<path base>/permissions` |
 
-Registration now **fetches the manifest** and will reject the app if it is unreachable, isn't a real
-Module Federation manifest, or claims a container name another app already uses. If it succeeds, the
-app's capabilities are pulled from the permissions endpoint and pushed into AuthService immediately;
-grant them per role in **Setup → Role → Application Access**.
+Registration fetches the manifest and the permissions. Grant capabilities per role under **Roles →
+Application Access**; assign checkers under **Checker Assignment**.
 
 ---
 
-## 5. Verify
+## 4. Verify
 
-```bash
-curl -s -o /dev/null -w "%{http_code}\n" http://localhost:<port>/mf-manifest.json
-```
-
-Then confirm, in the host:
-
-- The app appears in the sidebar and renders.
-- Its capabilities appear under **Application Access** in the Role editor.
-- Stop the app's server — within a probe interval the sidebar shows an **Unavailable** badge and the
-  dashboard health panel turns red *before* anyone clicks it. Start it again and both recover.
-- Open a page in both this app and another remote and confirm neither one's styling shifted.
+- The app appears in the sidebar for a role granted it, and not for one without it.
+- An anonymous call to its API returns 401; a signed-in user without the capability gets 403.
+- A change to a gated module appears in the Approval Center, and applies once approved.
+- Its actions — and every page opened in it — appear in **Audit Logs** with the real person's name.
+- Stopping its server shows an *Unavailable* badge within a probe interval; starting it recovers.
+- Its tests, and `pnpm build`, pass.

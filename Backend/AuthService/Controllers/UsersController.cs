@@ -17,10 +17,21 @@ public class UsersController(UserAppService users) : ControllerBase
     [HttpGet]
     [RequirePermission(Feature, "View")]
     public async Task<ActionResult<PagedResult<UserListItemDto>>> List(
-        [FromQuery] int page = 1, [FromQuery] int pageSize = 25,
-        [FromQuery] string? search = null, [FromQuery] bool? isActive = null, [FromQuery] Guid? roleId = null,
+        [FromQuery] UserListFilter filter, [FromQuery] int page = 1, [FromQuery] int pageSize = 25,
         CancellationToken ct = default)
-        => Ok(await users.ListAsync(Math.Max(page, 1), Math.Clamp(pageSize, 1, 100), search, isActive, roleId, ct));
+        => Ok(await users.ListAsync(Math.Max(page, 1), Math.Clamp(pageSize, 1, 100), filter, ct));
+
+    /// <summary>The whole directory's counts for the cards above the Users table.</summary>
+    [HttpGet("summary")]
+    [RequirePermission(Feature, "View")]
+    public async Task<ActionResult<UserDirectorySummaryDto>> Summary(CancellationToken ct)
+        => Ok(await users.SummaryAsync(ct));
+
+    /// <summary>The Role filter's options, from the directory itself under the other filters applied.</summary>
+    [HttpGet("facets")]
+    [RequirePermission(Feature, "View")]
+    public async Task<ActionResult<UserListFacetsDto>> Facets([FromQuery] UserListFilter filter, CancellationToken ct)
+        => Ok(await users.FacetsAsync(filter, ct));
 
     [HttpGet("{id:guid}")]
     [RequirePermission(Feature, "View")]

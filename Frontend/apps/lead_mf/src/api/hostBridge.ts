@@ -103,8 +103,12 @@ export const canDeleteLead = (): boolean =>
 export const canViewAuditLogs = (): boolean =>
   hasCapability(LEAD_SUBMODULE_AUDIT, 'View') || hasCapability(LEAD_FEATURE_KEY, 'View');
 
-export const canManageFieldSettings = (): boolean =>
-  hasCapability(LEAD_SUBMODULE_FIELD_SETTINGS, 'Manage') || hasCapability(LEAD_FEATURE_KEY, 'View');
+/**
+ * Changing field settings — exactly Field Settings:Manage, which is what the server's PUT requires. It
+ * used to also accept the app-level View, so anyone allowed into Lead Management was shown a Save
+ * button whose every press came back 403.
+ */
+export const canManageFieldSettings = (): boolean => hasCapability(LEAD_SUBMODULE_FIELD_SETTINGS, 'Manage');
 
 /*
  * Business capabilities — the dashboard's individual cards and charts, and the audit export.

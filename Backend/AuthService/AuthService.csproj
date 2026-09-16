@@ -35,4 +35,10 @@
     </PackageReference>
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- The platform field-format engine, shared with every service that validates admin-configured formats. -->
+    <ProjectReference Include="../Shared/OmniRemit.Validation/OmniRemit.Validation.csproj" />
+    <Using Include="OmniRemit.Validation" />
+  </ItemGroup>
+
 </Project>

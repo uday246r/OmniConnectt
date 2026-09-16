@@ -1,7 +1,9 @@
-﻿import { useCallback, useEffect, useMemo, useState } from 'react'
+﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuthStore } from '../../auth/store/authStore'
-import { TOPICS, useDataRevision } from '../../../shared/stores/invalidationStore'
+import { queryKeys } from '../../../shared/query/queryKeys'
+import { useLiveRefetchInterval } from '../../../shared/query/invalidationBridge'
 import {
   Badge,
   DataTable,
@@ -15,7 +17,6 @@ import {
   formatAuditTimestamp,
   readStoredPageSize,
   type ActiveFilter,
-  type BadgeTone,
   type ResponsiveColumn,
   DateRangeFilterButton,
   EMPTY_DATE_RANGE,
@@ -25,13 +26,15 @@ import {
   isDateRangeActive,
   resolveDateRange,
   type DateRangeValue,
+  Select,
 } from '@omniremit/ui'
 import { PermissionGate } from '../../../shared/components/PermissionGate/PermissionGate'
 import { ApiError } from '../../../shared/api/httpClient'
 import { useDebouncedValue } from '../../../shared/hooks/useDebouncedValue'
-import { systemLogsApi, type SystemLogDto, type SystemLogSummaryDto } from '../api/systemLogsApi'
+import { systemLogsApi, type ListSystemLogsParams, type SystemLogDto, type SystemLogSummaryDto } from '../api/systemLogsApi'
 import { Icon } from '../../../shared/components/Icon/Icon'
 import { SystemLogDetailDrawer } from '../components/SystemLogDetailDrawer/SystemLogDetailDrawer'
+import { environmentTone, formatEventCode, severityTone } from '../utils/systemLogFormatting'
 import styles from './SystemLogsPage.module.css'
 
 const FEATURE = 'host.system.system-logs'
@@ -46,24 +49,6 @@ const TAB_IDS = {
 } as const
 
 type TabId = (typeof TAB_IDS)[keyof typeof TAB_IDS]
-
-function getTone(severity: string): BadgeTone {
-  const s = severity.toLowerCase()
-  if (s === 'critical') return 'danger'
-  if (s === 'error') return 'danger'
-  if (s === 'warning') return 'warning'
-  if (s === 'info') return 'info'
-  return 'neutral'
-}
-
-function getEnvTone(env: string | null | undefined): BadgeTone {
-  if (!env) return 'neutral'
-  const e = env.toLowerCase()
-  if (e.includes('prod')) return 'danger'
-  if (e.includes('stag')) return 'warning'
-  if (e.includes('dev')) return 'info'
-  return 'neutral'
-}
 
 export function SystemLogsPage() {
   const accessToken = useAuthStore((s) => s.accessToken)
@@ -90,27 +75,17 @@ export function SystemLogsPage() {
   const messageSearch = useDebouncedValue(messageSearchRaw, 400)
   const [sortDir] = useState<'asc' | 'desc'>('desc')
 
-  const [summary, setSummary] = useState<SystemLogSummaryDto | null>(null)
-  const [logs, setLogs] = useState<SystemLogDto[]>([])
-  const [totalCount, setTotalCount] = useState(0)
-  const [isLoading, setIsLoading] = useState(true)
   const [exporting, setExporting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  /** An export outcome (truncation warning or failure) — shown above the table, never in place of it. */
+  const [exportNotice, setExportNotice] = useState<string | null>(null)
   const [detailLog, setDetailLog] = useState<SystemLogDto | null>(null)
-
-  // Pool of unique values for filter dropdowns
-  const [cachedPool, setCachedPool] = useState<SystemLogDto[]>([])
-  const availableServices = useMemo(() => [...new Set(cachedPool.map(r => r.serviceName))].sort(), [cachedPool])
-  const availableEnvironments = useMemo(() => [...new Set(cachedPool.map(r => r.environment).filter(Boolean) as string[])].sort(), [cachedPool])
-  const availableModules = useMemo(() => [...new Set(cachedPool.map(r => r.module).filter(Boolean) as string[])].sort(), [cachedPool])
-  const availableEventCodes = useMemo(() => [...new Set(cachedPool.map(r => r.eventCode))].sort(), [cachedPool])
+  const queryClient = useQueryClient()
+  const refetchInterval = useLiveRefetchInterval()
 
   /* Opening the drawer writes no audit row — see AuditLogsPage.handleOpenDetail for why. */
   const handleViewDetail = useCallback((log: SystemLogDto) => {
     setDetailLog(log)
   }, [])
-
-  const revision = useDataRevision(TOPICS.systemLogs)
 
   // Tab-based severity mapping
   const finalSeverity = useMemo(() => {
@@ -122,58 +97,64 @@ export function SystemLogsPage() {
 
   const range = useMemo(() => resolveDateRange(dateRange), [dateRange])
 
-  const fetchSummary = useCallback(async () => {
-    if (!accessToken) return
-    try {
-      const data = await systemLogsApi.summary(accessToken, range)
-      setSummary(data)
-    } catch { /* background failure */ }
-  }, [accessToken, range])
+  /** Every filter as the query parameters the server understands — shared by the list and the export. */
+  const filterParams = useMemo<ListSystemLogsParams>(() => ({
+    severity: finalSeverity || undefined,
+    service: serviceFilter || undefined,
+    eventCode: eventCodeFilter || undefined,
+    messageSearch: messageSearch || undefined,
+    environment: environmentFilter || undefined,
+    module: moduleFilter || undefined,
+    from: range.from,
+    to: range.to,
+    sortDir,
+    correlationId: correlationSearch || correlationId || undefined,
+  }), [finalSeverity, serviceFilter, eventCodeFilter, messageSearch, environmentFilter, moduleFilter, range, sortDir, correlationSearch, correlationId])
 
-  const fetchLogs = useCallback(async (signal?: AbortSignal) => {
-    if (!accessToken) return
-    setIsLoading(true)
-    setError(null)
-    try {
-      const res = await systemLogsApi.list(accessToken, {
-        page,
-        pageSize,
-        severity: finalSeverity || undefined,
-        service: serviceFilter || undefined,
-        eventCode: eventCodeFilter || undefined,
-        messageSearch: messageSearch || undefined,
-        environment: environmentFilter || undefined,
-        module: moduleFilter || undefined,
-        from: range.from,
-        to: range.to,
-        sortDir,
-        correlationId: correlationSearch || correlationId || undefined,
-      }, signal)
-      setLogs(res.items)
-      setTotalCount(res.total)
-      setCachedPool(prev => {
-        const map = new Map(prev.map(r => [r.id, r]))
-        res.items.forEach(r => map.set(r.id, r))
-        const list = Array.from(map.values())
-        return list.length > 2000 ? list.slice(-2000) : list
-      })
-    } catch (err) {
-      if (err instanceof Error && err.name === 'AbortError') return
-      setError(err instanceof ApiError ? err.message : 'Failed to load system logs')
-    } finally {
-      setIsLoading(false)
+  const listParams = useMemo(() => ({ ...filterParams, page, pageSize }), [filterParams, page, pageSize])
+
+  /*
+   * Cached queries keyed by what is shown: coming back to this page renders the rows already fetched at
+   * once and revalidates in the background, and a live update marks them stale through the invalidation
+   * bridge. They used to be component state, refetched — with a skeleton — on every visit and every event.
+   */
+  const listQuery = useQuery({
+    queryKey: queryKeys.systemLogs.list(listParams),
+    enabled: Boolean(accessToken),
+    placeholderData: keepPreviousData,
+    refetchInterval,
+    queryFn: ({ signal }) => systemLogsApi.list(accessToken!, listParams, signal),
+  })
+  const summaryQuery = useQuery({
+    queryKey: queryKeys.systemLogs.summary(range),
+    enabled: Boolean(accessToken),
+    placeholderData: keepPreviousData,
+    refetchInterval,
+    queryFn: () => systemLogsApi.summary(accessToken!, range),
+  })
+
+  const logs = listQuery.data?.items ?? []
+  const totalCount = listQuery.data?.total ?? 0
+  const isLoading = listQuery.isPending
+  const summary: SystemLogSummaryDto | null = summaryQuery.data ?? null
+  const listError = listQuery.isError
+    ? listQuery.error instanceof ApiError ? listQuery.error.message : 'Failed to load system logs'
+    : null
+
+  // Dropdown options: every value seen while browsing this session, capped. There is no facets endpoint
+  // for system logs; the pool grows as pages and filters are visited.
+  const poolRef = useRef(new Map<string, SystemLogDto>())
+  const cachedPool = useMemo(() => {
+    for (const row of listQuery.data?.items ?? []) poolRef.current.set(row.id, row)
+    if (poolRef.current.size > 2000) {
+      poolRef.current = new Map([...poolRef.current].slice(-2000))
     }
-  }, [
-    accessToken, page, pageSize, finalSeverity, serviceFilter, eventCodeFilter,
-    messageSearch, environmentFilter, moduleFilter, range, sortDir, correlationSearch, correlationId,
-  ])
-
-  useEffect(() => {
-    const ac = new AbortController()
-    void fetchSummary()
-    void fetchLogs(ac.signal)
-    return () => ac.abort()
-  }, [fetchSummary, fetchLogs, revision])
+    return [...poolRef.current.values()]
+  }, [listQuery.data])
+  const availableServices = useMemo(() => [...new Set(cachedPool.map(r => r.serviceName))].sort(), [cachedPool])
+  const availableEnvironments = useMemo(() => [...new Set(cachedPool.map(r => r.environment).filter(Boolean) as string[])].sort(), [cachedPool])
+  const availableModules = useMemo(() => [...new Set(cachedPool.map(r => r.module).filter(Boolean) as string[])].sort(), [cachedPool])
+  const availableEventCodes = useMemo(() => [...new Set(cachedPool.map(r => r.eventCode))].sort(), [cachedPool])
 
   // Reset page on filter change
   useEffect(() => { setPage(1) }, [activeTab, finalSeverity, serviceFilter, eventCodeFilter, messageSearch, environmentFilter, moduleFilter, range])
@@ -181,35 +162,24 @@ export function SystemLogsPage() {
   const handleExport = async () => {
     if (!accessToken) return
     setExporting(true)
+    setExportNotice(null)
     try {
-      const result = await systemLogsApi.exportCsv(accessToken, {
-        severity: finalSeverity || undefined,
-        service: serviceFilter || undefined,
-        eventCode: eventCodeFilter || undefined,
-        messageSearch: messageSearch || undefined,
-        environment: environmentFilter || undefined,
-        module: moduleFilter || undefined,
-        from: range.from,
-        to: range.to,
-        sortDir,
-        correlationId: correlationSearch || correlationId || undefined,
-      })
+      const result = await systemLogsApi.exportCsv(accessToken, filterParams)
 
       // A capped export is reported, not hidden. The file used to arrive containing the newest
       // 10,000 rows of a larger match, with a 200 and a filename and nothing to suggest that
       // anything was missing from it.
       const truncation = describeTruncation(result)
-      if (truncation) setError(truncation)
+      if (truncation) setExportNotice(truncation)
     } catch (err) {
-      setError(err instanceof CsvExportError ? err.message : 'Export failed')
+      setExportNotice(err instanceof CsvExportError ? err.message : 'Export failed')
     } finally {
       setExporting(false)
     }
   }
 
   const handleRefresh = () => {
-    void fetchSummary()
-    void fetchLogs()
+    void queryClient.invalidateQueries({ queryKey: queryKeys.systemLogs.all() })
   }
 
   const handleClearFilters = () => {
@@ -225,7 +195,7 @@ export function SystemLogsPage() {
     if (serviceFilter) active.push({ key: 'service', label: 'Service', value: serviceFilter, onRemove: () => setServiceFilter('') })
     if (environmentFilter) active.push({ key: 'env', label: 'Environment', value: environmentFilter, onRemove: () => setEnvironmentFilter('') })
     if (moduleFilter) active.push({ key: 'module', label: 'Module', value: moduleFilter, onRemove: () => setModuleFilter('') })
-    if (eventCodeFilter) active.push({ key: 'eventCode', label: 'Event Code', value: eventCodeFilter, onRemove: () => setEventCodeFilter('') })
+    if (eventCodeFilter) active.push({ key: 'eventCode', label: 'Event', value: formatEventCode(eventCodeFilter), onRemove: () => setEventCodeFilter('') })
     if (severityFilter && activeTab === TAB_IDS.allEvents) active.push({ key: 'severity', label: 'Severity', value: severityFilter, onRemove: () => setSeverityFilter('') })
     if (messageSearchRaw) active.push({ key: 'message', label: 'Message', value: `"${messageSearchRaw}"`, onRemove: () => setMessageSearchRaw('') })
     if (correlationSearch) active.push({ key: 'cid', label: 'Correlation ID', value: correlationSearch.slice(0, 8) + '…', onRemove: () => setCorrelationSearch('') })
@@ -237,14 +207,15 @@ export function SystemLogsPage() {
     { key: 'time', label: 'TIME', priority: 'always', render: (l) => <span className={styles.timeCell}>{formatAuditTimestamp(l.occurredAt)}</span> },
     {
       key: 'severity', label: 'SEVERITY', priority: 'always',
-      render: (l) => <Badge tone={getTone(l.severity)}>{l.severity}</Badge>
+      render: (l) => <Badge tone={severityTone(l.severity)}>{l.severity}</Badge>
     },
     { key: 'service', label: 'SERVICE', priority: 'high', render: (l) => <Badge tone="neutral">{l.serviceName}</Badge> },
     {
       key: 'environment', label: 'ENV', priority: 'low',
-      render: (l) => l.environment ? <Badge tone={getEnvTone(l.environment)}>{l.environment}</Badge> : <span className={styles.mutedText}>—</span>
+      render: (l) => l.environment ? <Badge tone={environmentTone(l.environment)}>{l.environment}</Badge> : <span className={styles.mutedText}>—</span>
     },
-    { key: 'eventCode', label: 'EVENT CODE', priority: 'high', render: (l) => <code className={styles.eventCode}>{l.eventCode}</code> },
+    // The readable event name; the raw code stays one hover away and under "Technical details".
+    { key: 'eventCode', label: 'EVENT', priority: 'high', render: (l) => <span className={styles.eventCode} title={l.eventCode}>{formatEventCode(l.eventCode)}</span> },
     {
       key: 'message', label: 'MESSAGE', priority: 'always',
       render: (l) => <span className={styles.messageCell} title={l.message}>{l.message}</span>
@@ -328,33 +299,26 @@ export function SystemLogsPage() {
         </div>
 
         {/* Service filter */}
-        <select className={styles.filterSelect} value={serviceFilter} onChange={e => setServiceFilter(e.target.value)}>
-          <option value="">All Services</option>
-          {availableServices.map(s => <option key={s} value={s}>{s}</option>)}
-        </select>
+        <div className={styles.filterCombo}>
+          <Select aria-label="Service" size="sm" placeholder="All Services" clearLabel="All Services" value={serviceFilter} onChange={e => setServiceFilter(e.target.value)} options={availableServices.map(s => ({ value: s, label: s }))} />
+        </div>
 
         {/* Environment filter */}
-        <select className={styles.filterSelect} value={environmentFilter} onChange={e => setEnvironmentFilter(e.target.value)}>
-          <option value="">All Environments</option>
-          {availableEnvironments.length > 0
-            ? availableEnvironments.map(e => <option key={e} value={e}>{e}</option>)
-            : ['Production', 'Staging', 'Development'].map(e => <option key={e} value={e}>{e}</option>)
-          }
-        </select>
+        <div className={styles.filterCombo}>
+          <Select aria-label="Environment" size="sm" placeholder="All Environments" clearLabel="All Environments" value={environmentFilter} onChange={e => setEnvironmentFilter(e.target.value)} options={(availableEnvironments.length > 0 ? availableEnvironments : ['Production', 'Staging', 'Development']).map(env => ({ value: env, label: env }))} />
+        </div>
 
         {/* Module filter */}
         {availableModules.length > 0 && (
-          <select className={styles.filterSelect} value={moduleFilter} onChange={e => setModuleFilter(e.target.value)}>
-            <option value="">All Modules</option>
-            {availableModules.map(m => <option key={m} value={m}>{m}</option>)}
-          </select>
+          <div className={styles.filterCombo}>
+            <Select aria-label="Module" size="sm" placeholder="All Modules" clearLabel="All Modules" value={moduleFilter} onChange={e => setModuleFilter(e.target.value)} options={availableModules.map(m => ({ value: m, label: m }))} />
+          </div>
         )}
 
         {/* Event Code filter */}
-        <select className={styles.filterSelect} value={eventCodeFilter} onChange={e => setEventCodeFilter(e.target.value)}>
-          <option value="">All Event Codes</option>
-          {availableEventCodes.map(c => <option key={c} value={c}>{c}</option>)}
-        </select>
+        <div className={styles.filterCombo}>
+          <Select aria-label="Event code" size="sm" placeholder="All Event Codes" clearLabel="All Event Codes" value={eventCodeFilter} onChange={e => setEventCodeFilter(e.target.value)} options={availableEventCodes.map(c => ({ value: c, label: formatEventCode(c) }))} />
+        </div>
 
         {/* Correlation ID search */}
         <input
@@ -395,10 +359,12 @@ export function SystemLogsPage() {
 
       {activeFilters.length > 0 && <FilterBar filters={activeFilters} onClearAll={handleClearFilters} />}
 
-      {error ? (
+      {exportNotice && <div className={styles.errorBanner} role="status">{exportNotice}</div>}
+
+      {listError ? (
         <EmptyState
           title="Failed to load system logs"
-          description={error}
+          description={listError}
           compact
         />
       ) : (

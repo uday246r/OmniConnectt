@@ -1,3 +1,4 @@
+import { EMPTY_VALUE, formatDate as platformFormatDate } from "@omniremit/ui";
 import type { FieldDataType } from "../types/domain";
 
 export function formatFieldValue(dataType: FieldDataType, value: string, unit?: string | null): string {
@@ -16,9 +17,15 @@ export function formatFieldValue(dataType: FieldDataType, value: string, unit?: 
   }
 }
 
-export function formatDate(value: string | null | undefined, options: Intl.DateTimeFormatOptions = { day: "2-digit", month: "short", year: "numeric" }): string {
-  if (!value) return "-";
-  return new Date(value).toLocaleDateString("en-IN", options);
+/**
+ * A date in the viewer's locale — the platform `formatDate` unless the caller asks for other parts.
+ * It was pinned to "en-IN" and printed "-" (or "Invalid Date") for a missing or malformed value.
+ */
+export function formatDate(value: string | null | undefined, options?: Intl.DateTimeFormatOptions): string {
+  if (!options) return platformFormatDate(value);
+  const date = value ? new Date(value) : null;
+  if (!date || Number.isNaN(date.getTime())) return EMPTY_VALUE;
+  return date.toLocaleDateString(undefined, options);
 }
 
 export function formatRelativeTime(value: string): string {

@@ -1,16 +1,25 @@
 namespace ProductMarketplace.Api.Infrastructure.Security;
 
 /// <summary>
-/// Business capabilities declared by ProductsService.
+/// Human wording for the capabilities this service publishes, plus the ones no endpoint guards by itself.
 /// </summary>
+/// <remarks>
+/// <para>
+/// Which API capabilities exist is NOT decided here. <c>GET /permissions</c> reflects over the
+/// <see cref="RequiresCapabilityAttribute"/>s actually on the controllers, so the Role editor can only
+/// offer permissions something enforces. This file used to be that list, typed by hand and enforced
+/// nowhere — every checkbox granted nothing and removing one refused nothing.
+/// </para>
+/// <para>
+/// Entries of type "Api" here only supply a label and description for a capability reflection found;
+/// an "Api" entry reflection did not find is not published. Other types — "Export", "Widget", "Chart" —
+/// are published from here, because they are enforced by <see cref="RequiresFineCapabilityAttribute"/>
+/// or the UI rather than by the token.
+/// </para>
+/// </remarks>
 public static class ProductsCapabilityManifest
 {
-    public sealed record Capability(
-        string Key,
-        string DisplayName,
-        string Description,
-        string Type,
-        int SortOrder);
+    public sealed record Capability(string Key, string DisplayName, string Description, string Type, int SortOrder);
 
     public sealed record CapabilityModule(string ModuleKey, IReadOnlyList<Capability> Capabilities);
 
@@ -18,46 +27,52 @@ public static class ProductsCapabilityManifest
     [
         new("dashboard",
         [
-            new("View", "View Dashboard", "View product & marketplace analytics metrics.", "Ui", 10),
+            new("View", "View dashboard", "See marketplace figures: products, applications, views and conversion.", "Api", 10),
         ]),
         new("products",
         [
-            new("View", "View Products", "Browse and view marketplace products.", "Api", 10),
-            new("Create", "Create Product", "Add new products to the catalog.", "Api", 20),
-            new("Edit", "Edit Product", "Update existing product details.", "Api", 30),
-            new("Delete", "Delete Product", "Remove products from the catalog.", "Api", 40),
-            new("Apply", "Apply to Product", "Submit applications for products.", "Api", 50),
+            new("View", "View products", "Browse the product catalogue and open a product.", "Api", 10),
+            new("Create", "Add products", "Add new products to the catalogue.", "Api", 20),
+            new("Edit", "Edit products", "Change a product's details or status.", "Api", 30),
+            new("Delete", "Delete products", "Remove products from the catalogue.", "Api", 40),
+            new("Apply", "Apply for products", "Submit an application for a product and upload its documents.", "Api", 50),
+            new("Export", "Download product list", "Download the product list as a spreadsheet file.", "Export", 60),
         ]),
         new("categories",
         [
-            new("View", "View Categories", "View category tree and definitions.", "Api", 10),
-            new("Create", "Create Category", "Add new categories.", "Api", 20),
-            new("Edit", "Edit Category", "Edit category properties.", "Api", 30),
-            new("Delete", "Delete Category", "Remove categories.", "Api", 40),
+            new("View", "View categories", "See product categories.", "Api", 10),
+            new("Create", "Add categories", "Add new categories.", "Api", 20),
+            new("Edit", "Edit categories", "Rename, reorder or change a category.", "Api", 30),
+            new("Delete", "Delete categories", "Remove categories.", "Api", 40),
         ]),
         new("promotions",
         [
-            new("View", "View Promotions", "View promotional campaigns.", "Api", 10),
-            new("Create", "Create Promotion", "Create new promotions.", "Api", 20),
-            new("Edit", "Edit Promotion", "Update promotions.", "Api", 30),
-            new("Delete", "Delete Promotion", "Delete promotions.", "Api", 40),
+            new("View", "View promotions", "See promotional offers.", "Api", 10),
+            new("Create", "Add promotions", "Create new promotional offers.", "Api", 20),
+            new("Edit", "Edit promotions", "Change a promotion or its status.", "Api", 30),
+            new("Delete", "Delete promotions", "Remove promotions.", "Api", 40),
+        ]),
+        new("reviews",
+        [
+            new("View", "View reviews", "Read customer reviews of products.", "Api", 10),
+            new("Create", "Write reviews", "Leave a review on a product.", "Api", 20),
+            new("Moderate", "Moderate reviews", "Publish, hide or reject customer reviews.", "Api", 30),
+            new("Delete", "Delete reviews", "Remove customer reviews.", "Api", 40),
         ]),
         new("applications",
         [
-            new("View", "View Applications", "View submitted product applications.", "Api", 10),
-            new("Manage", "Manage Applications", "Process and review applications.", "Api", 20),
-            new("Approve", "Approve Application", "Approve product applications.", "Api", 30),
-            new("Reject", "Reject Application", "Reject product applications.", "Api", 40),
+            new("View", "View applications", "See customer applications and their documents.", "Api", 10),
+            new("Manage", "Decide applications", "Move an application forward, approve or reject it.", "Api", 20),
         ]),
         new("setup",
         [
-            new("View", "View Setup", "View product types, document definitions and field configs.", "Api", 10),
-            new("Manage", "Manage Setup", "Modify status configs, document rules and field definitions.", "Api", 20),
+            new("View", "View setup", "See product types, fields, required documents, statuses and ranking settings.", "Api", 10),
+            new("Manage", "Change setup", "Change product types, fields, required documents, statuses and ranking settings.", "Api", 20),
         ]),
         new("audit",
         [
-            new("View", "View Audit Logs", "View product and marketplace activity trail.", "Api", 10),
-            new("Export", "Export Audit Logs", "Export audit trail to CSV.", "Export", 20),
+            new("View", "View audit log", "See who did what in Products & Marketplace.", "Api", 10),
+            new("Export", "Download audit log", "Download the audit log as a spreadsheet file.", "Export", 20),
         ]),
     ];
 

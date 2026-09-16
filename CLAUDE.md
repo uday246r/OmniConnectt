@@ -6,9 +6,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 OmniRemit is an enterprise micro-frontend platform: a central **host** React app that authenticated
 users land in, which dynamically loads independently-deployed **remote** micro-frontends at runtime
-from a database-backed registry — no remote is ever hard-coded into the host's build. Three .NET 10
-backend services, one PostgreSQL database each; a pnpm-workspace frontend (host + two remotes + a
-shared component library). Full architecture: [README.md](README.md). Local setup runbook (DB
+from a database-backed registry — no remote is ever hard-coded into the host's build. Four .NET 10
+backend services, one PostgreSQL database each; a pnpm-workspace frontend (host + three remotes + a
+shared component library). Contract for a new remote (JWT, CORS, per-service keys, audit, approvals,
+shared UI): [docs/ADDING-A-REMOTE-APP.md](docs/ADDING-A-REMOTE-APP.md). Full architecture: [README.md](README.md). Local setup runbook (DB
 provisioning, `.env` files, RS256 keys, first sign-in): [SETUP.md](SETUP.md) — do not re-derive that
 from scratch, follow it.
 
@@ -16,12 +17,21 @@ from scratch, follow it.
 Frontend/apps/host              shell — login, sidebar, settings, approvals, audit logs (5173)
 Frontend/apps/lead_mf            Lead Management remote (5002)
 Frontend/apps/customer360_mf     Customer 360 remote (5003)
+Frontend/apps/products_and_marketplace_mf  Products & Marketplace remote, app key "products" (5004)
 Frontend/packages/ui             @omniremit/ui — shared component library, workspace:* dep, NOT a Module Federation share
+                                   (subpaths: /validation field-format engine, /validation-editor rule editor)
 Backend/AuthService               users/roles/permissions/JWT/maker-checker/audit hub, remote-app
                                    registry, capability discovery, health probing, sidebar (5155)
 Backend/LeadService                 leads CRUD; path base /api/lead-service (5046)
 Backend/Customer360Service           customer profile/CRM proxy; no path base (5059)
+Backend/ProductsService              products marketplace; clean architecture (src/ProductMarketplace.*) (5266)
+Backend/Shared/OmniRemit.Validation  the server field-format engine, referenced by AuthService and LeadService
 ```
+
+Each service has its **own** internal API key (`Internal__Services__<Service>__ApiKey` in AuthService's
+`.env`); AuthService identifies the caller by it. Page views are audited through
+`POST /api/audit-logs/page-views`, which accepts only a route and resolves it against the caller's
+navigation tree — see `docs/AUDIT-EVENTS.md`.
 
 There was a fourth service, `ModuleRegistry` (port 5200), holding the remote-app registry in its own
 database and pushing capabilities into AuthService over HTTP. It has been **removed** and its whole
@@ -71,6 +81,15 @@ public class FooTests : IDisposable
 Method names are full sentences (`A_required_field_left_empty_fails_with_a_message_naming_the_field`),
 arrange/act/assert separated by blank lines, and a class-level `<summary>`/`<remarks>` explaining *why*
 the surface is worth testing — match this, don't invent a new style.
+
+### Running the whole platform, and load testing
+`node scripts/dev-backends.mjs` starts all four services (`auth lead c360 products` to pick a subset);
+in the desktop Browser pane use the `backends-all` + `remotes-all` + `frontend-dev` launch entries (the
+pane allows five dev servers, which is why the backends and remotes are grouped).
+Load testing — procedure and last results in `docs/LOAD-TEST-RESULTS.md`:
+`Backend/LoadTest/OmniRemit.LoadTest` (`seed|count|cleanup --run <id>`, every row tagged with the run id,
+cleanup re-counts to prove 0 remain — the Neon databases are shared), `scripts/loadtest/http-load.mjs`
+(concurrency ramp) and `scripts/loadtest/browser-bench.js` (signed-in latency from a host tab).
 
 ### Frontend (pnpm workspace, run from `Frontend/`)
 ```bash
@@ -135,16 +154,17 @@ bumps `Version`) with a matching frontend page under **Settings → Manage Field
 - **`ValidationPresetCatalog`** ("Manage Formats") — admin-defined reusable validation rules
   (`regex` / `lengthRange` / `numericRange` / `textPattern`) a field's rule can reference by key,
   layered alongside the fixed, code-defined preset catalog
-  (`Infrastructure/Validation/FieldPresets.cs` ↔ `packages/ui/src/validation/fieldPresets.ts` — **keep
-  these two in sync**, a preset id on one side with no match on the other silently stops validating on
-  whichever side was missed).
+  (`Backend/Shared/OmniRemit.Validation/FieldPresets.cs` ↔ `packages/ui/src/validation/fieldPresets.ts` —
+  **keep these two in sync**; `rule-parity.json` below catches a mismatch).
 - **`SalutationCatalog`** — the Mr./Ms./Dr./... list offered on Create/Edit User and shown on a
   profile. Same "fixed dropdown, admin-editable value list" shape as Role, not a `UserFieldSchema`
   field.
 
-`UserSchemaValidator.cs` (backend) and `schemaValidation.ts` (`packages/ui`, AJV-backed) are two
-independent implementations of the *same* rule engine — a request that skips the browser must be held
-to identical rules as one that didn't. An unrecognised preset id **fails open** everywhere in this
+`Backend/Shared/OmniRemit.Validation` (`FieldRuleEngine`, used by AuthService's `UserSchemaValidator` and by
+LeadService for lead fields) and `schemaValidation.ts` (`packages/ui`) are two implementations of the
+*same* rule engine — a request that skips the browser must be held to identical rules as one that
+didn't. Both run the shared table `packages/ui/src/validation/__fixtures__/rule-parity.json`
+(`ValidationParityTests.cs` / `ruleParity.test.ts`); add a row whenever either engine changes. An unrecognised preset id **fails open** everywhere in this
 system (never blocks every submission on a field just because a preset was renamed/deleted out from
 under it) — preserve that when adding a new preset kind.
 
@@ -188,7 +208,6 @@ backplane. Do not reintroduce a direct `IMemoryCache` dependency in an app servi
 a two-replica deploy serve stale sidebars.
 
 ## Known stale docs
-`docs/ADDING-A-REMOTE-APP.md` still references an earlier `employee_mf`/`EmployeeService` topology that
-no longer exists. `docs/DEPLOYMENT.md` and `docs/PERFORMANCE-AND-INFRA.md` carry banners marking which
+`docs/DEPLOYMENT.md` and `docs/PERFORMANCE-AND-INFRA.md` carry banners marking which
 parts predate the SQL Server→Postgres migration, and both still describe the retired ModuleRegistry
-service. Don't treat any of the three as current without checking against the actual code first.
+service. Don't treat either as current without checking against the actual code first.

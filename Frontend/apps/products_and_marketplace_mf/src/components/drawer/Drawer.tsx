@@ -1,8 +1,18 @@
 import type { ReactNode } from "react";
-import { useEffect } from "react";
+import { DetailSection, DetailSections, Drawer as SharedDrawer } from "@omniremit/ui";
 import { Icon, type IconName } from "../common/Icon";
-import "./Drawer.css";
+import "./DrawerContent.css";
 
+/**
+ * The platform drawer, with the two props this app's nineteen drawers are written against.
+ *
+ * Products used to ship its own drawer — its own overlay, header, close button, animation and 220
+ * lines of CSS — so it looked and behaved unlike every other drawer on the platform. The chrome now
+ * comes entirely from `@omniremit/ui`'s `Drawer` (one close control, Escape to close, in-tree
+ * rendering so the `#products-mf-scope` prefix still matches). This adapter only keeps the call
+ * sites' vocabulary: `isOpen` is the shared `open`, and `badge` — which the shared header has no slot
+ * for — is shown as the first line of the body.
+ */
 export function Drawer({
   isOpen,
   onClose,
@@ -10,7 +20,7 @@ export function Drawer({
   subtitle,
   icon,
   badge,
-  width = "min(700px, 94vw)",
+  width,
   footer,
   children,
 }: {
@@ -24,56 +34,25 @@ export function Drawer({
   footer?: ReactNode;
   children: ReactNode;
 }) {
-  useEffect(() => {
-    if (!isOpen) return;
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    document.addEventListener("keydown", onKeyDown);
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.removeEventListener("keydown", onKeyDown);
-      document.body.style.overflow = "";
-    };
-  }, [isOpen, onClose]);
-
-  if (!isOpen) return null;
-
   return (
-    <div className="pm-drawer-overlay" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <aside
-        className="pm-drawer"
-        style={{
-          width: typeof width === "number" ? `${width}px` : width,
-        }}
-        role="dialog"
-        aria-modal="true"
-      >
-        <header className="pm-drawer-header">
-          {/* Background decorative glass circles */}
-          <div className="pm-drawer-header-circle" />
-
-          <div className="pm-drawer-header-main">
-            {icon && <div className="pm-drawer-icon">{icon}</div>}
-            <div className="pm-drawer-heading">
-              <div className="pm-drawer-title-row">
-                <h2>{title}</h2>
-                {badge}
-              </div>
-              {subtitle && <p>{subtitle}</p>}
-            </div>
-          </div>
-          <button className="pm-drawer-close-btn" onClick={onClose} aria-label="Close" title="Close">
-            <Icon name="close" size={16} />
-          </button>
-        </header>
-        <div className="pm-drawer-body">{children}</div>
-        {footer && <footer className="pm-drawer-footer">{footer}</footer>}
-      </aside>
-    </div>
+    <SharedDrawer
+      open={isOpen}
+      onClose={onClose}
+      title={title}
+      subtitle={subtitle}
+      icon={icon}
+      width={typeof width === "number" ? `${width}px` : width}
+      footer={footer}
+    >
+      <DetailSections>
+        {badge ? <div className="pm-drawer-badge-row">{badge}</div> : null}
+        {children}
+      </DetailSections>
+    </SharedDrawer>
   );
 }
 
+/** A titled block inside a drawer body — the platform `DetailSection`, plus an optional header action. */
 export function DrawerSection({
   title,
   icon,
@@ -81,27 +60,20 @@ export function DrawerSection({
   action,
 }: {
   title?: string;
-  icon?: IconName | ReactNode;
+  icon?: IconName;
   children: ReactNode;
   action?: ReactNode;
 }) {
+  const content = (
+    <>
+      {action ? <div className="pm-drawer-section-action">{action}</div> : null}
+      {children}
+    </>
+  );
+  if (!title) return <section className="pm-drawer-section-plain">{content}</section>;
   return (
-    <section className="pm-drawer-section">
-      {title && (
-        <div className="pm-drawer-section-title">
-          <div className="pm-drawer-section-pill">
-            {icon && typeof icon === "string" ? (
-              <Icon name={icon as IconName} size={13} />
-            ) : (
-              icon
-            )}
-            <h3>{title}</h3>
-          </div>
-          {action}
-        </div>
-      )}
-      <div className="pm-drawer-section-content">{children}</div>
-    </section>
+    <DetailSection title={title} icon={icon ? <Icon name={icon} size={12} /> : undefined}>
+      {content}
+    </DetailSection>
   );
 }
-

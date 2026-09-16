@@ -119,6 +119,8 @@ namespace AuthService.Infrastructure.Migrations
 
                     b.HasIndex("CheckerId", "Status");
 
+                    b.HasIndex("EntityType", "EntityId");
+
                     b.HasIndex("MakerId", "RequestedAt")
                         .IsDescending(false, true);
 
@@ -131,7 +133,7 @@ namespace AuthService.Infrastructure.Migrations
                     b.HasIndex("Status", "RequestedAt")
                         .IsDescending(false, true);
 
-                    b.ToTable("ApprovalRequests", (string)null);
+                    b.ToTable("ApprovalRequests");
                 });
 
             modelBuilder.Entity("AuthService.Domain.Entities.AuditLog", b =>
@@ -237,13 +239,15 @@ namespace AuthService.Infrastructure.Migrations
                     b.HasIndex("ActorUserId", "OccurredAt")
                         .IsDescending(false, true);
 
+                    b.HasIndex("EntityType", "EntityId");
+
                     b.HasIndex("Result", "OccurredAt")
                         .IsDescending(false, true);
 
                     b.HasIndex("ServiceName", "OccurredAt")
                         .IsDescending(false, true);
 
-                    b.ToTable("AuditLogs", (string)null);
+                    b.ToTable("AuditLogs");
                 });
 
             modelBuilder.Entity("AuthService.Domain.Entities.CheckerAssignment", b =>
@@ -285,7 +289,7 @@ namespace AuthService.Infrastructure.Migrations
                         .IsUnique()
                         .HasFilter("\"CheckerUserId\" IS NOT NULL");
 
-                    b.ToTable("CheckerAssignments", null, t =>
+                    b.ToTable("CheckerAssignments", t =>
                         {
                             t.HasCheckConstraint("CK_CheckerAssignment_UserOrRole", "(\"CheckerUserId\" IS NOT NULL AND \"CheckerRoleId\" IS NULL) OR (\"CheckerUserId\" IS NULL AND \"CheckerRoleId\" IS NOT NULL)");
                         });
@@ -331,7 +335,7 @@ namespace AuthService.Infrastructure.Migrations
                     b.HasIndex("FeatureId", "NavKey")
                         .IsUnique();
 
-                    b.ToTable("FeatureNavItems", (string)null);
+                    b.ToTable("FeatureNavItems");
                 });
 
             modelBuilder.Entity("AuthService.Domain.Entities.HostNavItem", b =>
@@ -382,7 +386,7 @@ namespace AuthService.Infrastructure.Migrations
 
                     b.HasIndex("SectionKey");
 
-                    b.ToTable("HostNavItems", (string)null);
+                    b.ToTable("HostNavItems");
                 });
 
             modelBuilder.Entity("AuthService.Domain.Entities.NavSection", b =>
@@ -404,7 +408,7 @@ namespace AuthService.Infrastructure.Migrations
 
                     b.HasKey("Key");
 
-                    b.ToTable("NavSections", (string)null);
+                    b.ToTable("NavSections");
                 });
 
             modelBuilder.Entity("AuthService.Domain.Entities.PermissionFeature", b =>
@@ -450,7 +454,7 @@ namespace AuthService.Infrastructure.Migrations
 
                     b.HasIndex("ParentFeatureId");
 
-                    b.ToTable("PermissionFeatures", (string)null);
+                    b.ToTable("PermissionFeatures");
                 });
 
             modelBuilder.Entity("AuthService.Domain.Entities.PermissionFeatureCapability", b =>
@@ -496,7 +500,7 @@ namespace AuthService.Infrastructure.Migrations
                     b.HasIndex("FeatureId", "Key")
                         .IsUnique();
 
-                    b.ToTable("PermissionFeatureCapabilities", (string)null);
+                    b.ToTable("PermissionFeatureCapabilities");
                 });
 
             modelBuilder.Entity("AuthService.Domain.Entities.RefreshToken", b =>
@@ -541,7 +545,7 @@ namespace AuthService.Infrastructure.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("RefreshTokens", (string)null);
+                    b.ToTable("RefreshTokens");
                 });
 
             modelBuilder.Entity("AuthService.Domain.Entities.RemoteApp", b =>
@@ -615,7 +619,7 @@ namespace AuthService.Infrastructure.Migrations
 
                     b.HasIndex("Status");
 
-                    b.ToTable("RemoteApps", (string)null);
+                    b.ToTable("RemoteApps");
                 });
 
             modelBuilder.Entity("AuthService.Domain.Entities.Role", b =>
@@ -650,7 +654,7 @@ namespace AuthService.Infrastructure.Migrations
                     b.HasIndex("Name")
                         .IsUnique();
 
-                    b.ToTable("Roles", (string)null);
+                    b.ToTable("Roles");
                 });
 
             modelBuilder.Entity("AuthService.Domain.Entities.RolePermission", b =>
@@ -677,7 +681,7 @@ namespace AuthService.Infrastructure.Migrations
                     b.HasIndex("RoleId", "FeatureId", "Capability")
                         .IsUnique();
 
-                    b.ToTable("RolePermissions", (string)null);
+                    b.ToTable("RolePermissions");
                 });
 
             modelBuilder.Entity("AuthService.Domain.Entities.SalutationCatalog", b =>
@@ -697,11 +701,12 @@ namespace AuthService.Infrastructure.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<int>("Version")
+                        .IsConcurrencyToken()
                         .HasColumnType("integer");
 
                     b.HasKey("Id");
 
-                    b.ToTable("SalutationCatalogs", (string)null);
+                    b.ToTable("SalutationCatalogs");
                 });
 
             modelBuilder.Entity("AuthService.Domain.Entities.SetPasswordInvite", b =>
@@ -742,7 +747,7 @@ namespace AuthService.Infrastructure.Migrations
 
                     b.HasIndex("UserId", "UsedAt", "RevokedAt");
 
-                    b.ToTable("SetPasswordInvites", (string)null);
+                    b.ToTable("SetPasswordInvites");
                 });
 
             modelBuilder.Entity("AuthService.Domain.Entities.SystemLog", b =>
@@ -822,7 +827,7 @@ namespace AuthService.Infrastructure.Migrations
                     b.HasIndex("Severity", "OccurredAt")
                         .IsDescending(false, true);
 
-                    b.ToTable("SystemLogs", (string)null);
+                    b.ToTable("SystemLogs");
                 });
 
             modelBuilder.Entity("AuthService.Domain.Entities.User", b =>
@@ -903,7 +908,7 @@ namespace AuthService.Infrastructure.Migrations
 
                     b.HasIndex("Status");
 
-                    b.ToTable("Users", (string)null);
+                    b.ToTable("Users");
                 });
 
             modelBuilder.Entity("AuthService.Domain.Entities.UserFieldSchema", b =>
@@ -923,11 +928,12 @@ namespace AuthService.Infrastructure.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<int>("Version")
+                        .IsConcurrencyToken()
                         .HasColumnType("integer");
 
                     b.HasKey("Id");
 
-                    b.ToTable("UserFieldSchemas", (string)null);
+                    b.ToTable("UserFieldSchemas");
                 });
 
             modelBuilder.Entity("AuthService.Domain.Entities.UserPermissionOverride", b =>
@@ -965,7 +971,7 @@ namespace AuthService.Infrastructure.Migrations
                     b.HasIndex("UserId", "FeatureId", "Capability")
                         .IsUnique();
 
-                    b.ToTable("UserPermissionOverrides", (string)null);
+                    b.ToTable("UserPermissionOverrides");
                 });
 
             modelBuilder.Entity("AuthService.Domain.Entities.ValidationPresetCatalog", b =>
@@ -985,11 +991,12 @@ namespace AuthService.Infrastructure.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<int>("Version")
+                        .IsConcurrencyToken()
                         .HasColumnType("integer");
 
                     b.HasKey("Id");
 
-                    b.ToTable("ValidationPresetCatalogs", (string)null);
+                    b.ToTable("ValidationPresetCatalogs");
                 });
 
             modelBuilder.Entity("AuthService.Domain.Entities.ApprovalRequest", b =>

@@ -6,4 +6,10 @@
   <Project Path="LeadService.Tests/LeadService.Tests.csproj" />
   <Project Path="Customer360Service.Tests/Customer360Service.Tests.csproj" />
   <Project Path="ProductsService/ProductMarketplace.Api.csproj" />
+  <Project Path="ProductsService/src/ProductMarketplace.Domain/ProductMarketplace.Domain.csproj" />
+  <Project Path="ProductsService/src/ProductMarketplace.Application/ProductMarketplace.Application.csproj" />
+  <Project Path="ProductsService/src/ProductMarketplace.Infrastructure/ProductMarketplace.Infrastructure.csproj" />
+  <Project Path="ProductsService.Tests/ProductsService.Tests.csproj" />
+  <Project Path="Shared/OmniRemit.Validation/OmniRemit.Validation.csproj" />
+  <Project Path="LoadTest/OmniRemit.LoadTest/OmniRemit.LoadTest.csproj" />
 </Solution>

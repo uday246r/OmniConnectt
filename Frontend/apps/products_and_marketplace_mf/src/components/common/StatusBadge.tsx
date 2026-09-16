@@ -1,3 +1,4 @@
+import { Badge } from "@omniremit/ui";
 import { useStatusConfigStore } from "../../stores/useStatusConfigStore";
 import type { StatusEntityType, StatusTone } from "../../types/domain";
 
@@ -37,7 +38,12 @@ export function StatusBadge({ status, entityType }: { status: string; entityType
   const label = loaded ? getLabel(entityType, status) : FALLBACK_LABEL[status] ?? status;
   const tone = loaded ? getTone(entityType, status) : FALLBACK_TONE[status] ?? "neutral";
 
-  return <span className={`pm-badge pm-badge-dot pm-badge-${tone}`}>{label}</span>;
+  // The platform badge, so a status here reads exactly like one in the host or another remote.
+  return (
+    <Badge tone={tone} dot>
+      {label}
+    </Badge>
+  );
 }
 
 /**

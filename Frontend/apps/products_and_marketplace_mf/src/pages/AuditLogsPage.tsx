@@ -1,12 +1,15 @@
 import { useEffect, useState } from "react";
+import { CustomSelect } from "../components/common/CustomSelect";
 import { Icon } from "../components/common/Icon";
-import { Pagination } from "../components/common/Pagination";
 import { EmptyState, ErrorState, LoadingSkeletonRows } from "../components/common/EmptyState";
 import { useAuditLogStore } from "../stores/useAuditLogStore";
 import { useDrawerStore } from "../stores/useDrawerStore";
 import { subscribeToAuditLogs } from "../services/realtime";
-import { exportToCsv } from "../utils/exportCsv";
-import { formatDate } from "../utils/fieldFormat";
+import { CsvExportError, DateRangeFilterButton, EMPTY_DATE_RANGE, describeTruncation, formatAuditTimestamp, Pagination, Button, PageHeader } from "@omniremit/ui";
+import { downloadServerCsv } from "../services/exportCsv";
+import { usePermissions } from "../permissions/PermissionContext";
+import { PERMISSIONS } from "../permissions/permissions";
+import { useToastStore } from "../stores/useToastStore";
 import "./AuditLogsPage.css";
 
 function formatAction(action: string): string {
@@ -26,10 +29,10 @@ export function AuditLogsPage() {
     search,
     action,
     entityType,
+    dateRange,
     page,
     pageSize,
     totalCount,
-    totalPages,
     actionOptions,
     entityTypeOptions,
     summary,
@@ -37,6 +40,8 @@ export function AuditLogsPage() {
     setSearch,
     setAction,
     setEntityType,
+    setDateRange,
+    currentFilters,
     setPage,
     setPageSize,
     fetchAuditLogs,
@@ -46,15 +51,10 @@ export function AuditLogsPage() {
   } = useAuditLogStore();
   const { open } = useDrawerStore();
   const [live, setLive] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const canExport = usePermissions().has(PERMISSIONS.AUDIT_LOGS_EXPORT);
   const [pageSizeOption, setPageSizeOption] = useState<string>("10");
   const [customPageSize, setCustomPageSize] = useState<number>(15);
-
-  const todayFormatted = new Date().toLocaleDateString("en-IN", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
 
   useEffect(() => {
     fetchActionOptions();
@@ -63,7 +63,7 @@ export function AuditLogsPage() {
 
   useEffect(() => {
     fetchAuditLogs();
-  }, [search, action, entityType, page, pageSize, fetchAuditLogs]);
+  }, [search, action, entityType, dateRange, page, pageSize, fetchAuditLogs]);
 
   useEffect(() => {
     const unsubscribe = subscribeToAuditLogs(
@@ -73,7 +73,7 @@ export function AuditLogsPage() {
     return unsubscribe;
   }, [ingestLiveEntry]);
 
-  const hasFilters = !!(search || action || entityType || pageSizeOption !== "10");
+  const hasFilters = !!(search || action || entityType || dateRange.preset !== "all" || pageSizeOption !== "10");
 
   function handlePageSizeChange(opt: string) {
     setPageSizeOption(opt);
@@ -86,19 +86,18 @@ export function AuditLogsPage() {
     }
   }
 
-  function handleExport() {
-    exportToCsv(
-      "audit-logs.csv",
-      items.map((l) => ({
-        Timestamp: l.timestamp,
-        "Initiated By": l.actorName,
-        Action: l.action,
-        EntityType: l.entityType,
-        EntityName: l.entityName || "-",
-        Description: l.description,
-        Success: l.success ? "Yes" : "No",
-      }))
-    );
+  /** Downloads every matching entry, built by the server with the filters on screen. */
+  async function handleExport() {
+    setExporting(true);
+    try {
+      const result = await downloadServerCsv("/audit-logs/export", { ...currentFilters() }, `products-audit-log-${new Date().toISOString().slice(0, 10)}.csv`);
+      const truncation = describeTruncation(result);
+      if (truncation) useToastStore.getState().warning("Download limited", truncation);
+    } catch (err) {
+      useToastStore.getState().danger("Download failed", err instanceof CsvExportError ? err.message : "The audit log could not be downloaded.");
+    } finally {
+      setExporting(false);
+    }
   }
 
   // Figures come from the server's aggregate over the full filtered set - counting the rows in
@@ -108,28 +107,22 @@ export function AuditLogsPage() {
 
   return (
     <div className="pm-page pm-audit-logs-page">
-      <div className="pm-hero-banner">
-        <div className="pm-hero-banner-content">
-          <div className="pm-hero-icon-wrap">
-            <Icon name="shield" size={26} />
-          </div>
-          <div className="pm-hero-text">
-            <div className="pm-hero-badge-row">
-              <span className={`pm-hero-live-badge ${live ? "connected" : ""}`}>
-                • {live ? "Live Security Trail" : "Connecting Trail..."}
-              </span>
-              <span className="pm-hero-date">{todayFormatted}</span>
-            </div>
-            <h1>Security & Audit Logs</h1>
-            <p>Real-time, immutable compliance trail of admin actions and platform lifecycle events.</p>
-          </div>
-        </div>
-        <div className="pm-hero-actions">
-          <button className="pm-btn pm-hero-add-btn" onClick={handleExport}>
-            <Icon name="download" size={15} /> Export Log CSV
-          </button>
-        </div>
-      </div>
+      <PageHeader
+        title="Security & Audit Logs"
+        subtitle="Compliance trail of admin actions and platform lifecycle events."
+        icon={<Icon name="shield" size={24} />}
+        pill={live ? "Live" : "Connecting…"}
+        actions={
+          <>
+            <DateRangeFilterButton label="Date Range" value={dateRange} onChange={setDateRange} />
+            {canExport && (
+              <Button variant="onHeader" leadingIcon={<Icon name="download" size={15} />} onClick={() => void handleExport()} disabled={exporting}>
+                {exporting ? "Downloading…" : "Download CSV"}
+              </Button>
+            )}
+          </>
+        }
+      />
 
       <div className="pm-kpi-grid">
         <div className="pm-kpi-card pm-kpi-tone-blue">
@@ -212,23 +205,13 @@ export function AuditLogsPage() {
           )}
         </div>
 
-        <select className="pm-select" value={action ?? ""} onChange={(e) => setAction(e.target.value || null)}>
-          <option value="">All Actions</option>
-          {actionOptions.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </select>
+        <div className="pm-filter-combo">
+          <CustomSelect aria-label="Action" options={[{ value: "", label: "All Actions" }, ...actionOptions]} value={action ?? ""} onChange={(v) => setAction(v || null)} />
+        </div>
 
-        <select className="pm-select" value={entityType ?? ""} onChange={(e) => setEntityType(e.target.value || null)}>
-          <option value="">All Entities</option>
-          {entityTypeOptions.map((t) => (
-            <option key={t} value={t}>
-              {t}
-            </option>
-          ))}
-        </select>
+        <div className="pm-filter-combo">
+          <CustomSelect aria-label="Record type" options={[{ value: "", label: "All Entities" }, ...entityTypeOptions]} value={entityType ?? ""} onChange={(v) => setEntityType(v || null)} />
+        </div>
 
         <div className="pm-page-size-picker">
           <span className="pm-filter-label">Show:</span>
@@ -268,6 +251,7 @@ export function AuditLogsPage() {
               setSearch("");
               setAction(null);
               setEntityType(null);
+              setDateRange(EMPTY_DATE_RANGE);
               handlePageSizeChange("10");
             }}
           >
@@ -307,8 +291,7 @@ export function AuditLogsPage() {
                 {items.map((log) => (
                   <tr key={log.id} style={{ cursor: "pointer" }} onClick={() => open("audit-log-details", { auditLogId: log.id })}>
                     <td className="pm-text-muted" style={{ whiteSpace: "nowrap" }}>
-                      {formatDate(log.timestamp, { day: "2-digit", month: "short", year: "numeric" })}{" "}
-                      {new Date(log.timestamp).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
+                      {formatAuditTimestamp(log.timestamp)}
                     </td>
                     <td>
                       <div className="pm-cat-name-cell">
@@ -350,7 +333,7 @@ export function AuditLogsPage() {
         )}
       </div>
 
-      <Pagination page={page} totalPages={totalPages} totalCount={totalCount} pageSize={pageSize} onPageChange={setPage} itemLabel="events" />
+      <Pagination page={page} total={totalCount} pageSize={pageSize} onPageChange={setPage} itemLabel="event" />
     </div>
   );
 }

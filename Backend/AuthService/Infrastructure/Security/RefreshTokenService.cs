@@ -115,7 +115,10 @@ public class RefreshTokenService(AuthDbContext db, IOptions<JwtOptions> jwtOptio
     public async Task<RotateResult> RotateAsync(string rawToken, string? createdByIp, CancellationToken ct = default)
     {
         var hash = Hash(rawToken);
+        // IgnoreQueryFilters: a token belonging to a deleted user must still be FOUND, so that presenting
+        // an already-revoked one is detected as reuse rather than shrugged off as "unknown".
         var existing = await db.RefreshTokens
+            .IgnoreQueryFilters()
             .Include(t => t.User)
             .ThenInclude(u => u!.Role)
             .FirstOrDefaultAsync(t => t.TokenHash == hash, ct);
@@ -133,7 +136,7 @@ public class RefreshTokenService(AuthDbContext db, IOptions<JwtOptions> jwtOptio
             return RotateResult.Failed(RefreshFailureReason.Reused, existing.UserId, revoked);
         }
 
-        if (existing.ExpiresAt <= DateTimeOffset.UtcNow || existing.User is null)
+        if (existing.ExpiresAt <= DateTimeOffset.UtcNow || existing.User is null || existing.User.IsDeleted)
         {
             return RotateResult.Failed(RefreshFailureReason.Expired, existing.UserId);
         }
@@ -223,6 +226,7 @@ public class RefreshTokenService(AuthDbContext db, IOptions<JwtOptions> jwtOptio
     private async Task<int> RevokeAllForUserAsync(Guid userId, CancellationToken ct)
     {
         var active = await db.RefreshTokens
+            .IgnoreQueryFilters()
             .Where(t => t.UserId == userId && t.RevokedAt == null)
             .ToListAsync(ct);
 

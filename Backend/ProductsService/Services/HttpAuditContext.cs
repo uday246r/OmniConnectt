@@ -1,51 +1,54 @@
-using System.Security.Claims;
+using ProductMarketplace.Api.Infrastructure.Security;
 using ProductMarketplace.Application.Interfaces;
 
 namespace ProductMarketplace.Api.Services;
 
 /// <summary>
-/// Resolves the actor recorded on every audit entry.
-/// <para>
-/// Resolution order is deliberate and does not change when this remote is mounted in the Host App:
-/// an authenticated <see cref="ClaimsPrincipal"/> always wins, so the moment the Host App supplies a
-/// real authenticated session (it owns identity, roles and permissions - this remote never logs anyone
-/// in) the audit trail switches to verified identity with no service change anywhere.
-/// </para>
-/// <para>
-/// The X-Actor-* header fallback exists only for standalone development, where the frontend sends its
-/// local current-user context. Those headers are caller-supplied and therefore untrusted: they are
-/// honoured only while no authenticated principal exists AND only when
-/// <c>Audit:TrustActorHeaders</c> is enabled (default: Development only). In a deployed environment
-/// with no authentication wired up yet, the actor is recorded as "System" rather than as whatever the
-/// caller claimed, so the trail can never be silently forged.
-/// </para>
+/// Resolves the actor recorded on every audit entry, from the verified platform token only.
 /// </summary>
+/// <remarks>
+/// <para>
+/// This used to fall back to <c>X-Actor-Name</c> / <c>X-Actor-Email</c> request headers whenever no user
+/// was signed in — which, with no authentication registered, was always — and that fallback was on by
+/// default in Development. The browser chose whose name went on every row. The service now requires a
+/// platform token on every business endpoint, and the actor comes from its claims or from nowhere.
+/// </para>
+/// <para>
+/// The one exception is an approval replay. That request comes from AuthService with the internal key
+/// and no user token, and everything it writes must be attributed to the maker who asked for the change,
+/// not left anonymous — <see cref="AuditActorOverride"/> carries that identity for the request.
+/// </para>
+/// </remarks>
 public class HttpAuditContext : IAuditContext
 {
     public const string SystemActor = "System";
 
+    public Guid? UserId { get; }
     public string ActorName { get; }
     public string ActorEmail { get; }
     public string? IpAddress { get; }
+    public string? UserAgent { get; }
 
-    public HttpAuditContext(IHttpContextAccessor accessor, IConfiguration configuration, IHostEnvironment environment)
+    public HttpAuditContext(IHttpContextAccessor accessor, AuditActorOverride actorOverride)
     {
         var httpContext = accessor.HttpContext;
         IpAddress = httpContext?.Connection.RemoteIpAddress?.ToString();
+        UserAgent = httpContext?.Request.Headers.UserAgent.ToString() is { Length: > 0 } ua ? ua : null;
+
+        if (actorOverride.IsSet)
+        {
+            UserId = actorOverride.UserId;
+            ActorName = actorOverride.UserName ?? SystemActor;
+            ActorEmail = string.Empty;
+            return;
+        }
 
         var user = httpContext?.User;
         if (user?.Identity?.IsAuthenticated == true)
         {
-            ActorName = FirstClaim(user, ClaimTypes.Name, "name", "preferred_username") ?? SystemActor;
-            ActorEmail = FirstClaim(user, ClaimTypes.Email, "email") ?? string.Empty;
-            return;
-        }
-
-        var trustHeaders = configuration.GetValue("Audit:TrustActorHeaders", environment.IsDevelopment());
-        if (trustHeaders && httpContext is not null)
-        {
-            ActorName = Trimmed(httpContext.Request.Headers["X-Actor-Name"].FirstOrDefault()) ?? SystemActor;
-            ActorEmail = Trimmed(httpContext.Request.Headers["X-Actor-Email"].FirstOrDefault()) ?? string.Empty;
+            UserId = Guid.TryParse(user.FindFirst(JwtClaimTypes.Subject)?.Value, out var id) ? id : null;
+            ActorEmail = Trimmed(user.FindFirst(JwtClaimTypes.Email)?.Value) ?? string.Empty;
+            ActorName = Trimmed(user.FindFirst(JwtClaimTypes.Name)?.Value) ?? (ActorEmail.Length > 0 ? ActorEmail : SystemActor);
             return;
         }
 
@@ -53,8 +56,23 @@ public class HttpAuditContext : IAuditContext
         ActorEmail = string.Empty;
     }
 
-    private static string? FirstClaim(ClaimsPrincipal user, params string[] claimTypes) =>
-        claimTypes.Select(t => Trimmed(user.FindFirst(t)?.Value)).FirstOrDefault(v => v is not null);
-
     private static string? Trimmed(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+}
+
+/// <summary>
+/// Per-request identity for work done on someone's behalf — set only by the approval replay endpoint,
+/// which has verified AuthService's internal key before setting it.
+/// </summary>
+public class AuditActorOverride
+{
+    public bool IsSet { get; private set; }
+    public Guid? UserId { get; private set; }
+    public string? UserName { get; private set; }
+
+    public void AttributeTo(Guid userId, string? userName)
+    {
+        IsSet = true;
+        UserId = userId;
+        UserName = userName;
+    }
 }

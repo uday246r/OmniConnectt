@@ -21,7 +21,9 @@ import { Icon } from '../../../shared/components/Icon/Icon'
 import drawerStyles from '../../../layout/SettingsDrawer/SettingsDrawer.module.css'
 import styles from './ApprovalCenterPage.module.css'
 import { TOPICS, invalidate } from '../../../shared/stores/invalidationStore'
-import { useLiveRevision } from '../../../shared/hooks/useLiveRevision'
+import { useLiveRefetchInterval } from '../../../shared/query/invalidationBridge'
+import { queryKeys } from '../../../shared/query/queryKeys'
+import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query'
 
 const DEFAULT_PAGE_SIZE = 10
 
@@ -410,6 +412,8 @@ const FEATURE = 'host.system.approvals'
 
 export function ApprovalCenterPage() {
   const accessToken = useAuthStore((s) => s.accessToken)
+  const queryClient = useQueryClient()
+  const refetchInterval = useLiveRefetchInterval()
   const currentUserId = useAuthStore((s) => s.user?.id)
 
   const [activeTab, setActiveTab] = useState<TabId>(TAB_IDS.pending)
@@ -485,7 +489,6 @@ export function ApprovalCenterPage() {
    * offer names that happened to be loaded — a maker whose requests were all older than the newest
    * 200 was absent from the list and unfindable by picking.
    */
-  const [facets, setFacets] = useState<ApprovalFacetsDto | null>(null)
 
   // Debounced TYPED text — feeds the recommendation lists only. The table reads `.applied`.
   const debouncedMaker = useDebouncedValue(makerFilter.query, 200)
@@ -495,6 +498,48 @@ export function ApprovalCenterPage() {
   // Resolved where the request is built, never stored — a stored "Last 7 Days" would freeze.
   const range = useMemo(() => resolveDateRange(requestedRange), [requestedRange])
   const decided = useMemo(() => resolveDateRange(decidedRange), [decidedRange])
+
+  /**
+   * Every filter on this screen, as the query parameters the server applies.
+   *
+   * One builder for the table, the dropdown options and the export. The table used to fetch the
+   * newest 200 requests per status (two requests for Processed, merged in the browser), then filter
+   * action, maker, checker, record and assignment client-side and page the remainder — so anything
+   * outside those 200 could not be found, and the export, which could only send what the server
+   * understood, answered a broader question than the table.
+   */
+  const buildFilterParams = useCallback((): ListApprovalsParams => {
+    const tabStatus = activeTab === TAB_IDS.processed ? 'Approved,Rejected' : TAB_STATUS_FILTER[activeTab]
+    return {
+      module: module || undefined,
+      status: statusFilter || tabStatus,
+      action: (actionFilter || undefined) as ListApprovalsParams['action'],
+      makerName: makerFilter.applied || undefined,
+      checkerName: checkerFilter.applied || undefined,
+      entityLabel: recordFilter.applied || undefined,
+      assignedToMe: assignedToMeOnly || undefined,
+      sortBy: activeTab === TAB_IDS.processed ? 'decided' : undefined,
+      from: range.from,
+      to: range.to,
+      decidedFrom: decided.from,
+      decidedTo: decided.to,
+    }
+  }, [
+    activeTab, module, statusFilter, actionFilter, makerFilter.applied, checkerFilter.applied,
+    recordFilter.applied, assignedToMeOnly, range.from, range.to, decided.from, decided.to,
+  ])
+
+  const filterParams = useMemo(() => buildFilterParams(), [buildFilterParams])
+
+  // Dropdown options under the filters applied. A failure empties the dropdowns, never the table.
+  const facetsQuery = useQuery({
+    queryKey: queryKeys.approvals.facets(filterParams),
+    enabled: Boolean(accessToken),
+    placeholderData: keepPreviousData,
+    refetchInterval,
+    queryFn: ({ signal }) => approvalsApi.facets(accessToken!, filterParams, signal),
+  })
+  const facets: ApprovalFacetsDto | null = facetsQuery.isError ? null : (facetsQuery.data ?? null)
 
   /*
    * Known makers and checkers narrow as you type, in step with the table (both read the same
@@ -532,12 +577,6 @@ export function ApprovalCenterPage() {
     return list.filter((m) => m.label.toLowerCase().includes(q) || m.key.toLowerCase().includes(q))
   }, [facets, moduleSearch])
 
-  const [summary, setSummary] = useState<ApprovalSummaryDto | null>(null)
-  const [refreshKey, setRefreshKey] = useState(0)
-  // Invalidated whenever a Settings-drawer mutation (users/roles/applications/checker
-  // assignments) happens elsewhere, so this list doesn't go stale without a manual reload —
-  // mirrors MyRequestsPage's identical use of the same signal.
-  const dataRevision = useLiveRevision(TOPICS.approvals)
 
   const [viewingId, setViewingId] = useState<string | null>(null)
   const [detail, setDetail] = useState<ApprovalRequestDetailDto | null>(null)
@@ -567,78 +606,28 @@ export function ApprovalCenterPage() {
     }
   }, [activeHeaderFilter])
 
-  const loadSummary = useCallback(async () => {
-    if (!accessToken) return
-    try {
-      setSummary(await approvalsApi.summary(accessToken))
-    } catch {
-    }
-  }, [accessToken])
+  // Cached, and refreshed by live updates through the invalidation bridge.
+  const summaryQuery = useQuery({
+    queryKey: queryKeys.approvals.summary(),
+    enabled: Boolean(accessToken),
+    refetchInterval,
+    queryFn: () => approvalsApi.summary(accessToken!),
+  })
+  const summary: ApprovalSummaryDto | null = summaryQuery.data ?? null
 
-  useEffect(() => {
-    void loadSummary()
-  }, [loadSummary, dataRevision])
 
-  /**
-   * Every filter on this screen, as the query parameters the server applies.
-   *
-   * One builder for the table, the dropdown options and the export. The table used to fetch the
-   * newest 200 requests per status (two requests for Processed, merged in the browser), then filter
-   * action, maker, checker, record and assignment client-side and page the remainder — so anything
-   * outside those 200 could not be found, and the export, which could only send what the server
-   * understood, answered a broader question than the table.
-   */
-  const buildFilterParams = useCallback((): ListApprovalsParams => {
-    const tabStatus = activeTab === TAB_IDS.processed ? 'Approved,Rejected' : TAB_STATUS_FILTER[activeTab]
-    return {
-      module: module || undefined,
-      status: statusFilter || tabStatus,
-      action: (actionFilter || undefined) as ListApprovalsParams['action'],
-      makerName: makerFilter.applied || undefined,
-      checkerName: checkerFilter.applied || undefined,
-      entityLabel: recordFilter.applied || undefined,
-      assignedToMe: assignedToMeOnly || undefined,
-      sortBy: activeTab === TAB_IDS.processed ? 'decided' : undefined,
-      from: range.from,
-      to: range.to,
-      decidedFrom: decided.from,
-      decidedTo: decided.to,
-    }
-  }, [
-    activeTab, module, statusFilter, actionFilter, makerFilter.applied, checkerFilter.applied,
-    recordFilter.applied, assignedToMeOnly, range.from, range.to, decided.from, decided.to,
-  ])
+  const listParams = useMemo(() => ({ ...filterParams, page, pageSize }), [filterParams, page, pageSize])
 
   const fetcher = useCallback(
     async (token: string, signal?: AbortSignal) => {
-      const res = await approvalsApi.list(token, { ...buildFilterParams(), page, pageSize }, signal)
+      const res = await approvalsApi.list(token, listParams, signal)
       return { items: res.items, total: res.total }
     },
-    [buildFilterParams, page, pageSize],
+    [listParams],
   )
 
-  useEffect(() => {
-    if (!accessToken) return
-    const controller = new AbortController()
-    approvalsApi
-      .facets(accessToken, buildFilterParams(), controller.signal)
-      .then(setFacets)
-      .catch(() => {
-        // An aborted or failed facets call empties the dropdowns, never the table.
-        if (!controller.signal.aborted) setFacets(null)
-      })
-    return () => controller.abort()
-  }, [accessToken, buildFilterParams, dataRevision, refreshKey])
-  const { items, total, error } = useApprovalRequests(
-    accessToken,
-    fetcher,
-    [
-      activeTab, page, pageSize, module, actionFilter, assignedToMeOnly,
-      makerFilter.applied, recordFilter.applied, checkerFilter.applied, statusFilter,
-      refreshKey, range.from, range.to, decided.from, decided.to,
-    ],
-    [dataRevision],
-  )
+
+  const { items, total, error } = useApprovalRequests(accessToken, queryKeys.approvals.list(listParams), fetcher)
 
   /*
    * Record suggestions come from the rows on screen. A record label is unbounded free text, so a
@@ -699,9 +688,8 @@ export function ApprovalCenterPage() {
     try {
       const updated = await approvalsApi.approve(accessToken, detail.id)
       setDetail(updated)
-      setRefreshKey((k) => k + 1)
-      void loadSummary()
-      invalidate()
+      // Marks the list, its options, the summary and the badges stale everywhere (invalidation bridge).
+      invalidate(TOPICS.approvals, TOPICS.kpis)
     } catch (err) {
       setDetailError(err instanceof ApiError ? err.message : 'Could not approve this request.')
     } finally {
@@ -717,9 +705,7 @@ export function ApprovalCenterPage() {
       const updated = await approvalsApi.reject(accessToken, detail.id, rejectReason.trim())
       setDetail(updated)
       setRejecting(false)
-      setRefreshKey((k) => k + 1)
-      void loadSummary()
-      invalidate()
+      invalidate(TOPICS.approvals, TOPICS.kpis)
     } catch (err) {
       setDetailError(err instanceof ApiError ? err.message : 'Could not reject this request.')
     } finally {
@@ -917,7 +903,7 @@ export function ApprovalCenterPage() {
             <span>Assigned to me</span>
           </label>
 
-          <button type="button" className={styles.refreshBtn} onClick={() => { setRefreshKey((k) => k + 1); void loadSummary() }}>
+          <button type="button" className={styles.refreshBtn} onClick={() => void queryClient.invalidateQueries({ queryKey: queryKeys.approvals.all() })}>
             <Icon.Activity width={15} height={15} />
             <span>Refresh</span>
           </button>

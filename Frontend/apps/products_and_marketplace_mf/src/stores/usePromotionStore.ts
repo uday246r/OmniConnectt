@@ -1,11 +1,15 @@
 import { create } from "zustand";
 import { promotionApi } from "../services/promotionApi";
-import type { Promotion, PromotionInput } from "../types/domain";
+import type { Promotion, PromotionInput, StatusCount } from "../types/domain";
+
+let latestListRequest = 0;
 
 interface PromotionState {
   items: Promotion[];
   totalCount: number;
   totalPages: number;
+  /** Per-status counts for the whole filtered set; null until loaded or when they could not be. */
+  statusCounts: StatusCount[] | null;
   loading: boolean;
   error: string | null;
   search: string;
@@ -28,6 +32,7 @@ export const usePromotionStore = create<PromotionState>((set, get) => ({
   items: [],
   totalCount: 0,
   totalPages: 0,
+  statusCounts: null,
   loading: false,
   error: null,
   search: "",
@@ -42,11 +47,19 @@ export const usePromotionStore = create<PromotionState>((set, get) => ({
 
   fetchPromotions: async () => {
     const { search, status, page, pageSize } = get();
+    const requestId = ++latestListRequest;
     set({ loading: true, error: null });
     try {
-      const result = await promotionApi.search({ search: search || undefined, status: status || undefined, page, pageSize });
-      set({ items: result.items, totalCount: result.totalCount, totalPages: result.totalPages, loading: false });
+      const [result, statusCounts] = await Promise.all([
+        promotionApi.search({ search: search || undefined, status: status || undefined, page, pageSize }),
+        // The cards count the whole filtered set; a failure there must not hide the list.
+        promotionApi.statusCounts({ search: search || undefined }).catch(() => null),
+      ]);
+      // A slower, older request finishing last must not overwrite the answer to the newer one.
+      if (requestId !== latestListRequest) return;
+      set({ items: result.items, totalCount: result.totalCount, totalPages: result.totalPages, statusCounts, loading: false });
     } catch (err) {
+      if (requestId !== latestListRequest) return;
       set({ error: (err as Error).message, loading: false });
     }
   },
@@ -77,6 +90,8 @@ export const usePromotionStore = create<PromotionState>((set, get) => ({
     });
     try {
       await promotionApi.remove(id);
+      // Refill the page and the status counts from the server rather than trusting the local guess.
+      void get().fetchPromotions();
     } catch (err) {
       set({ items: previousItems, totalCount: previousTotal });
       throw err;

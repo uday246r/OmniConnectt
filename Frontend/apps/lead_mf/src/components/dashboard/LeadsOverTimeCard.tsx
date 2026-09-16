@@ -11,7 +11,7 @@ import {
 import card from '../../shared/dashboardCard.module.css';
 import styles from './LeadsOverTimeCard.module.css';
 import { useLeadStore } from '../../store/useLeadStore';
-import { SkeletonBlock } from '@omniremit/ui';
+import { Select, SkeletonBlock } from '@omniremit/ui';
 
 const GRANULARITY_LABELS: Record<string, string> = {
   daily: 'Daily',
@@ -43,18 +43,19 @@ export const LeadsOverTimeCard: React.FC = () => {
           </p>
         </div>
 
-        {/* headerManageBtn style */}
-        <select
-          value={dashboardGranularity}
-          onChange={(e) =>
-            setDashboardGranularity(e.target.value as 'daily' | 'weekly' | 'monthly')
-          }
-          className={styles.granularitySelect}
-        >
-          <option value="daily">Daily</option>
-          <option value="weekly">Weekly</option>
-          <option value="monthly">Monthly</option>
-        </select>
+        <div className={styles.granularityPicker}>
+          <Select
+            aria-label="Group by"
+            size="sm"
+            value={dashboardGranularity}
+            onChange={(e) => setDashboardGranularity(e.target.value as 'daily' | 'weekly' | 'monthly')}
+            options={[
+              { value: 'daily', label: 'Daily' },
+              { value: 'weekly', label: 'Weekly' },
+              { value: 'monthly', label: 'Monthly' },
+            ]}
+          />
+        </div>
       </div>
 
       {/* Chart */}

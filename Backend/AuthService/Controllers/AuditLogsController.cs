@@ -3,8 +3,10 @@ using AuthService.Application.Services;
 using AuthService.Infrastructure;
 using AuthService.Infrastructure.Security;
 using AuthService.Infrastructure.Seed;
+using AuthService.Options;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace AuthService.Controllers;
 
@@ -13,14 +15,17 @@ namespace AuthService.Controllers;
 /// </summary>
 /// <remarks>
 /// <para>
-/// There is deliberately no write endpoint. There used to be — <c>POST /api/audit-logs/activity</c>,
+/// There is deliberately no free-form write endpoint. There used to be — <c>POST /api/audit-logs/activity</c>,
 /// which any signed-in user could call with a body naming any service, any module and any action,
 /// carrying no permission requirement at all. A trail anyone can write into records what clients
 /// choose to say rather than what the platform did.
 /// </para>
 /// <para>
 /// Rows are written in-process by the services that perform the work, and by other services through
-/// <see cref="InternalAuditLogsController"/>, which is API-key protected.
+/// <see cref="InternalAuditLogsController"/>, which is API-key protected. The one thing a browser can
+/// report is <see cref="RecordPageView"/>, and it can name only a route: who opened it comes from the
+/// token, and whether it is a page they can open — and what it is called — comes from their own
+/// navigation tree, so the row cannot say anything the platform would not have said itself.
 /// </para>
 /// <para>
 /// Note that <see cref="List"/>, <see cref="Summary"/>, <see cref="Facets"/> and <see cref="Export"/>
@@ -33,9 +38,40 @@ namespace AuthService.Controllers;
 [ApiController]
 [Route("api/audit-logs")]
 [Authorize]
-public class AuditLogsController(AuditLogAppService auditLog) : ControllerBase
+public class AuditLogsController(AuditLogAppService auditLog, PageViewAuditService pageViews) : ControllerBase
 {
     private const string Feature = AuthDbSeeder.HostFeatureKeys.SystemAuditLogs;
+
+    public sealed record PageViewRequest(string? Path);
+
+    /// <summary>
+    /// Records that the signed-in person opened a page.
+    /// </summary>
+    /// <remarks>
+    /// Needs no audit permission: everyone's page views are recorded, not only auditors'. 204 whether a
+    /// row was written or an identical one from the last few seconds already covers it, so the browser
+    /// has nothing to act on; 400 for a route that is not a page the caller can open.
+    /// </remarks>
+    [HttpPost("page-views")]
+    [EnableRateLimiting(RateLimitPolicies.PageViews)]
+    public async Task<IActionResult> RecordPageView([FromBody] PageViewRequest request, CancellationToken ct)
+    {
+        if (CurrentUserId() is not { } userId)
+        {
+            return Unauthorized();
+        }
+
+        var (permissions, isAdministrator) = TokenPermissions.Read(User);
+        var outcome = await pageViews.RecordAsync(
+            userId, CurrentUserName(), permissions, isAdministrator, request.Path,
+            HttpContext.Connection.RemoteIpAddress?.ToString(),
+            Request.Headers.UserAgent.ToString() is { Length: > 0 } ua ? ua : null,
+            ct);
+
+        return outcome == PageViewOutcome.Refused
+            ? Problem(title: "That is not a page you can open.", statusCode: StatusCodes.Status400BadRequest)
+            : NoContent();
+    }
 
     [HttpGet]
     [RequirePermission(Feature, "View")]

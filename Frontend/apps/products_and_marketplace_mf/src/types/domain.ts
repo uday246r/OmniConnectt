@@ -43,6 +43,12 @@ export interface PagedResult<T> {
   totalPages: number;
 }
 
+/** How many records hold one status, counted by the server over the whole filtered set. */
+export interface StatusCount {
+  status: string;
+  count: number;
+}
+
 export interface FieldDefinition {
   id: string;
   key: string;

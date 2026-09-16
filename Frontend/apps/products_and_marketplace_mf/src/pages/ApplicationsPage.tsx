@@ -1,7 +1,9 @@
+import { Pagination, PageHeader } from "@omniremit/ui";
 import { useEffect, useState } from "react";
+import { CustomSelect } from "../components/common/CustomSelect";
 import { Icon } from "../components/common/Icon";
 import { StatusBadge } from "../components/common/StatusBadge";
-import { Pagination } from "../components/common/Pagination";
+import { StatusCountCards } from "../components/common/StatusCountCards";
 import { EmptyState, ErrorState, LoadingSkeletonRows } from "../components/common/EmptyState";
 import { useApplicationStore } from "../stores/useApplicationStore";
 import { useDrawerStore } from "../stores/useDrawerStore";
@@ -18,7 +20,7 @@ export function ApplicationsPage() {
     page,
     pageSize,
     totalCount,
-    totalPages,
+    statusCounts,
     setSearch,
     setStatus,
     setPage,
@@ -35,13 +37,6 @@ export function ApplicationsPage() {
     .filter((c) => c.entityType === "Application" && c.enabled)
     .sort((a, b) => a.sortOrder - b.sortOrder);
 
-  const todayFormatted = new Date().toLocaleDateString("en-IN", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
-
   useEffect(() => {
     fetchStatusConfigs();
   }, [fetchStatusConfigs]);
@@ -49,10 +44,6 @@ export function ApplicationsPage() {
   useEffect(() => {
     fetchApplications();
   }, [search, status, page, pageSize, fetchApplications]);
-
-  const pendingCount = items.filter((a) => a.status === "Submitted" || a.status === "UnderReview").length;
-  const approvedCount = items.filter((a) => a.status === "Approved" || a.status === "Completed").length;
-  const docsNeededCount = items.filter((a) => a.status === "DocumentsRequired").length;
 
   function handlePageSizeChange(opt: string) {
     setPageSizeOption(opt);
@@ -67,87 +58,13 @@ export function ApplicationsPage() {
 
   return (
     <div className="pm-page pm-applications-page">
-      <div className="pm-hero-banner">
-        <div className="pm-hero-banner-content">
-          <div className="pm-hero-icon-wrap">
-            <Icon name="file" size={26} />
-          </div>
-          <div className="pm-hero-text">
-            <div className="pm-hero-badge-row">
-              <span className="pm-hero-live-badge">• Processing Pipeline</span>
-              <span className="pm-hero-date">{todayFormatted}</span>
-            </div>
-            <h1>Application Pipeline</h1>
-            <p>Review, evaluate, verify documents, and process customer product applications.</p>
-          </div>
-        </div>
-      </div>
+      <PageHeader
+        title="Application Pipeline"
+        subtitle="Review, evaluate, verify documents, and process customer product applications."
+        icon={<Icon name="file" size={24} />}
+      />
 
-      <div className="pm-kpi-grid">
-        <div className="pm-kpi-card pm-kpi-tone-blue">
-          <div className="pm-kpi-top">
-            <div className="pm-kpi-icon pm-kpi-icon-blue">
-              <Icon name="file" size={20} />
-            </div>
-            <span className="pm-kpi-label">Total Applications</span>
-          </div>
-          <div className="pm-kpi-value-row">
-            <span className="pm-kpi-value">{totalCount}</span>
-          </div>
-          <div className="pm-kpi-trend-row">
-            <span className="pm-badge pm-badge-info">Platform-wise</span>
-            <span className="pm-kpi-subtitle">Customer Pipeline</span>
-          </div>
-        </div>
-
-        <div className="pm-kpi-card pm-kpi-tone-amber">
-          <div className="pm-kpi-top">
-            <div className="pm-kpi-icon pm-kpi-icon-amber">
-              <Icon name="clock" size={20} />
-            </div>
-            <span className="pm-kpi-label">Pending Review</span>
-          </div>
-          <div className="pm-kpi-value-row">
-            <span className="pm-kpi-value">{pendingCount}</span>
-          </div>
-          <div className="pm-kpi-trend-row">
-            <span className="pm-badge pm-badge-warning">In Queue</span>
-            <span className="pm-kpi-subtitle">Awaiting Decision</span>
-          </div>
-        </div>
-
-        <div className="pm-kpi-card pm-kpi-tone-green">
-          <div className="pm-kpi-top">
-            <div className="pm-kpi-icon pm-kpi-icon-green">
-              <Icon name="check" size={20} />
-            </div>
-            <span className="pm-kpi-label">Approved Pipeline</span>
-          </div>
-          <div className="pm-kpi-value-row">
-            <span className="pm-kpi-value">{approvedCount}</span>
-          </div>
-          <div className="pm-kpi-trend-row">
-            <span className="pm-badge pm-badge-success">Sanctioned</span>
-            <span className="pm-kpi-subtitle">Passed Verification</span>
-          </div>
-        </div>
-
-        <div className="pm-kpi-card pm-kpi-tone-purple">
-          <div className="pm-kpi-top">
-            <div className="pm-kpi-icon pm-kpi-icon-purple">
-              <Icon name="shield" size={20} />
-            </div>
-            <span className="pm-kpi-label">Docs Required</span>
-          </div>
-          <div className="pm-kpi-value-row">
-            <span className="pm-kpi-value">{docsNeededCount}</span>
-          </div>
-          <div className="pm-kpi-trend-row">
-            <span className="pm-badge pm-badge-neutral">Pending Docs</span>
-            <span className="pm-kpi-subtitle">Customer Action Needed</span>
-          </div>
-        </div>
-      </div>
+      <StatusCountCards entityType="Application" counts={statusCounts} totalLabel="Applications" totalIcon="file" loading={loading} />
 
       <div className="pm-filter-bar pm-categories-filter-bar">
         <div className="pm-search-input">
@@ -164,14 +81,14 @@ export function ApplicationsPage() {
           )}
         </div>
 
-        <select className="pm-select" value={status ?? ""} onChange={(e) => setStatus(e.target.value || null)}>
-          <option value="">All Status</option>
-          {applicationStatuses.map((s) => (
-            <option key={s.id} value={s.value}>
-              {s.label}
-            </option>
-          ))}
-        </select>
+        <div className="pm-filter-combo">
+          <CustomSelect
+            aria-label="Status"
+            options={[{ value: "", label: "All Status" }, ...applicationStatuses.map((s) => ({ value: s.value, label: s.label }))]}
+            value={status ?? ""}
+            onChange={(v) => setStatus(v || null)}
+          />
+        </div>
 
         <div className="pm-page-size-picker">
           <span className="pm-filter-label">Show:</span>
@@ -276,7 +193,7 @@ export function ApplicationsPage() {
         )}
       </div>
 
-      <Pagination page={page} totalPages={totalPages} totalCount={totalCount} pageSize={pageSize} onPageChange={setPage} itemLabel="applications" />
+      <Pagination page={page} total={totalCount} pageSize={pageSize} onPageChange={setPage} itemLabel="application" />
     </div>
   );
 }

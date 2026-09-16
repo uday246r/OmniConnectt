@@ -13,7 +13,7 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [
       react(),
-      federation(remoteFederationConfig('products_mf', './src/App.tsx', ['zustand', 'react-router-dom'])),
+      federation(remoteFederationConfig('products_mf', './src/App.tsx', ['zustand'])),
     ],
 
     build: {

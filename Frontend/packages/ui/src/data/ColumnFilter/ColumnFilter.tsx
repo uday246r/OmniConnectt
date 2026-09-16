@@ -24,7 +24,7 @@ export interface ColumnFilterProps {
   title?: ReactNode
   /** Label for the "no filter" row. Omit to hide that row. */
   allLabel?: ReactNode
-  /** Show a type-to-search box above the list. Worth it past roughly ten options. */
+  /** Show a type-to-search box above the list. On by default: people search every dropdown, however short. */
   searchable?: boolean
   /**
    * The typed text IS the filter, rather than a way to narrow `options`.

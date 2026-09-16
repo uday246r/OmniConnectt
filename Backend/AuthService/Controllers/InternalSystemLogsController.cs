@@ -16,7 +16,7 @@ public class InternalSystemLogsController(SystemLogAppService systemLog) : Contr
     public async Task<IActionResult> Record([FromBody] RecordSystemLogRequest request, CancellationToken ct)
     {
         await systemLog.WriteAsync(
-            request.Severity, request.ServiceName, request.EventCode, request.Message,
+            request.Severity, InternalCaller.Get(HttpContext) ?? request.ServiceName, request.EventCode, request.Message,
             request.Module, request.Environment, request.TenantId, request.UserId,
             request.CorrelationId, request.RequestId, request.StatusCode, request.StackTrace,
             request.Metadata, ct);

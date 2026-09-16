@@ -27,23 +27,6 @@ namespace LeadManagement.Api.Controllers
         [RequiresCapability("Lead", "Create")]
         public async Task<ActionResult<ApiResponseDto<LeadRecordDto>>> CreateLead([FromBody] CreateLeadDto dto)
         {
-            if (!ModelState.IsValid)
-            {
-                var errors = ModelState
-                    .Where(x => x.Value?.Errors.Count > 0)
-                    .ToDictionary(
-                        kvp => kvp.Key,
-                        kvp => kvp.Value!.Errors.First().ErrorMessage
-                    );
-
-                return BadRequest(new ApiResponseDto<LeadRecordDto>
-                {
-                    Success = false,
-                    Message = "Validation failed for lead submission.",
-                    Errors = errors
-                });
-            }
-
             try
             {
                 var outcome = await _leadService.CreateLeadAsync(dto, CurrentUserId(), bypassApproval: IsSuperAdmin());
@@ -81,19 +64,15 @@ namespace LeadManagement.Api.Controllers
                 // it — never collapse this into the generic 500 branch below.
                 return StatusCode(503, new ApiResponseDto<LeadRecordDto> { Success = false, Message = ex.Message });
             }
+            catch (LeadFieldConfigService.FieldFormatException ex)
+            {
+                return BadRequest(new ApiResponseDto<LeadRecordDto> { Success = false, Message = "Some details are not in the right format.", Errors = new Dictionary<string, string>(ex.Errors) });
+            }
             catch (InvalidOperationException ex)
             {
                 // A validation failure the service layer already produced a clear message for (unknown
                 // product, a field-config Required/Editable violation) — 400, not a generic 500.
                 return BadRequest(new ApiResponseDto<LeadRecordDto> { Success = false, Message = ex.Message });
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, new ApiResponseDto<LeadRecordDto>
-                {
-                    Success = false,
-                    Message = ex.Message
-                });
             }
         }
 
@@ -150,23 +129,6 @@ namespace LeadManagement.Api.Controllers
         [RequiresCapability("Lead", "Edit")]
         public async Task<ActionResult<ApiResponseDto<LeadRecordDto>>> UpdateLead(string id, [FromBody] UpdateLeadDto dto)
         {
-            if (!ModelState.IsValid)
-            {
-                var errors = ModelState
-                    .Where(x => x.Value?.Errors.Count > 0)
-                    .ToDictionary(
-                        kvp => kvp.Key,
-                        kvp => kvp.Value!.Errors.First().ErrorMessage
-                    );
-
-                return BadRequest(new ApiResponseDto<LeadRecordDto>
-                {
-                    Success = false,
-                    Message = "Validation failed for lead update.",
-                    Errors = errors
-                });
-            }
-
             try
             {
                 var outcome = await _leadService.UpdateLeadAsync(id, dto, CurrentUserId(), bypassApproval: IsSuperAdmin());
@@ -209,17 +171,13 @@ namespace LeadManagement.Api.Controllers
             {
                 return StatusCode(503, new ApiResponseDto<LeadRecordDto> { Success = false, Message = ex.Message });
             }
+            catch (LeadFieldConfigService.FieldFormatException ex)
+            {
+                return BadRequest(new ApiResponseDto<LeadRecordDto> { Success = false, Message = "Some details are not in the right format.", Errors = new Dictionary<string, string>(ex.Errors) });
+            }
             catch (InvalidOperationException ex)
             {
                 return BadRequest(new ApiResponseDto<LeadRecordDto> { Success = false, Message = ex.Message });
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, new ApiResponseDto<LeadRecordDto>
-                {
-                    Success = false,
-                    Message = ex.Message
-                });
             }
         }
 
@@ -227,15 +185,6 @@ namespace LeadManagement.Api.Controllers
         [RequiresCapability("Lead", "Delete")]
         public async Task<ActionResult<ApiResponseDto<bool>>> DeleteLead(string id, [FromBody] DeleteLeadDto dto)
         {
-            if (!ModelState.IsValid)
-            {
-                return BadRequest(new ApiResponseDto<bool>
-                {
-                    Success = false,
-                    Message = "Delete reason is required."
-                });
-            }
-
             try
             {
                 // Captured before delete purely for the audit entry's friendly entity name — the
@@ -278,14 +227,6 @@ namespace LeadManagement.Api.Controllers
             catch (ApprovalServiceUnavailableException ex)
             {
                 return StatusCode(503, new ApiResponseDto<bool> { Success = false, Message = ex.Message });
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, new ApiResponseDto<bool>
-                {
-                    Success = false,
-                    Message = ex.Message
-                });
             }
         }
 

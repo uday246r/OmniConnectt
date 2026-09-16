@@ -38,6 +38,41 @@ export const queryKeys = {
     detail: (id: string) => ['applications', 'detail', id] as const,
   },
 
+  /*
+   * The list pages below take the page's own filter-params object as part of the key. A params object
+   * describes WHAT is shown, so it satisfies the rule above; live updates reach these queries through
+   * shared/query/invalidationBridge.ts rather than a revision number in the key.
+   */
+  auditLogPages: {
+    list: (params: object) => ['auditLogs', 'list', params] as const,
+    summary: (params: object) => ['auditLogs', 'summary', params] as const,
+    facets: (params: object) => ['auditLogs', 'facets', params] as const,
+  },
+
+  systemLogs: {
+    all: () => ['systemLogs'] as const,
+    list: (params: object) => ['systemLogs', 'list', params] as const,
+    summary: (params: object) => ['systemLogs', 'summary', params] as const,
+  },
+
+  approvals: {
+    all: () => ['approvals'] as const,
+    list: (params: object) => ['approvals', 'list', params] as const,
+    facets: (params: object) => ['approvals', 'facets', params] as const,
+    summary: () => ['approvals', 'summary'] as const,
+    mine: (params: object) => ['approvals', 'mine', params] as const,
+    mineFacets: (params: object) => ['approvals', 'mine-facets', params] as const,
+    detail: (id: string) => ['approvals', 'detail', id] as const,
+  },
+
+  /** The Users directory page: a server-filtered page, the whole-directory counts, role options, type-ahead. */
+  userDirectory: {
+    page: (params: object) => ['users', 'directory', 'page', params] as const,
+    summary: () => ['users', 'directory', 'summary'] as const,
+    facets: (params: object) => ['users', 'directory', 'facets', params] as const,
+    suggest: (field: 'search' | 'name' | 'phone', needle: string) => ['users', 'directory', 'suggest', field, needle] as const,
+  },
+
   auditLogs: {
     all: () => ['auditLogs'] as const,
     /**

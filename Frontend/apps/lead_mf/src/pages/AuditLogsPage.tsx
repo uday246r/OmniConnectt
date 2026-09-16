@@ -360,7 +360,7 @@ const getActionBadge = (action: string) => {
                     onChange={setActorFilter}
                     options={actorOptions}
                     allLabel="Everyone"
-                    searchable={actorOptions.length > 6}
+                    searchable
                     filterType="alpha"
                     searchPlaceholder="Type a name to narrow…"
                     emptyHint="Nobody in this log matches that."

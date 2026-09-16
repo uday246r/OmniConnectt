@@ -72,6 +72,7 @@ export function ManageFormatsPage() {
         const res = await customPresetsApi.get(accessToken!)
         if (cancelled) return
         setPresets(res.presets)
+        setVersion(res.version)
         setError(null)
         setDirty(false)
       } catch (err) {
@@ -102,12 +103,16 @@ export function ManageFormatsPage() {
     setDirty(true)
   }
 
+  // The catalog version this page is editing — sent with the save so two administrators cannot overwrite each other.
+  const [version, setVersion] = useState<number | undefined>(undefined)
+
   async function handleSaveChanges() {
     if (!accessToken) return
     setSaving(true)
     try {
-      const res = await customPresetsApi.update(accessToken, { presets })
+      const res = await customPresetsApi.update(accessToken, { presets, expectedVersion: version })
       setPresets(res.presets)
+      setVersion(res.version)
       setDirty(false)
       toast.success('Formats updated. They now appear in the validation rule picker on any field.')
     } catch (err) {

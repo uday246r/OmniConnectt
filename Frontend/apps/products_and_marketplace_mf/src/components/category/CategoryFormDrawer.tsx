@@ -1,3 +1,5 @@
+import { isApprovalPending } from "../../services/httpClient";
+import { CustomSelect } from "../common/CustomSelect";
 import { useEffect, useMemo, useState } from "react";
 import { Drawer, DrawerSection } from "../drawer/Drawer";
 import { Icon } from "../common/Icon";
@@ -55,6 +57,7 @@ export function CategoryFormDrawer({ categoryId }: { categoryId?: string }) {
       }
       close();
     } catch (err) {
+      if (isApprovalPending(err)) return;
       setError((err as Error).message);
     } finally {
       setSubmitting(false);
@@ -87,23 +90,16 @@ export function CategoryFormDrawer({ categoryId }: { categoryId?: string }) {
           </div>
           <div className="pm-field">
             <label>Icon</label>
-            <select className="pm-select" value={iconKey} onChange={(e) => setIconKey(e.target.value)}>
-              {ICONS.map((i) => (
-                <option key={i} value={i}>
-                  {i}
-                </option>
-              ))}
-            </select>
+            <CustomSelect aria-label="Icon" options={ICONS} value={iconKey} onChange={setIconKey} />
           </div>
           <div className="pm-field">
             <label>Status</label>
-            <select className="pm-select" value={status} onChange={(e) => setStatus(e.target.value as CategoryStatus)}>
-              {statusOptions.filter((c) => c.value === status || c.enabled).map((c) => (
-                <option key={c.value} value={c.value}>
-                  {c.label}
-                </option>
-              ))}
-            </select>
+            <CustomSelect
+              aria-label="Status"
+              options={statusOptions.filter((c) => c.value === status || c.enabled).map((c) => ({ value: c.value, label: c.label }))}
+              value={status}
+              onChange={(v) => setStatus(v as CategoryStatus)}
+            />
           </div>
           <div className="pm-field">
             <label>Sort Order</label>

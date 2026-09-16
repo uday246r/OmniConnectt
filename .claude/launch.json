@@ -2,6 +2,31 @@
   "version": "0.0.1",
   "configurations": [
     {
+      "name": "backends-all",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "scripts/dev-backends.mjs"
+      ],
+      "port": 5155
+    },
+    {
+      "name": "remotes-all",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "-C",
+        "Frontend",
+        "--parallel",
+        "--filter",
+        "lead-mf",
+        "--filter",
+        "customer360-mf",
+        "--filter",
+        "products-mf",
+        "dev"
+      ],
+      "port": 5002
+    },
+    {
       "name": "frontend-dev",
       "runtimeExecutable": "pnpm",
       "runtimeArgs": [

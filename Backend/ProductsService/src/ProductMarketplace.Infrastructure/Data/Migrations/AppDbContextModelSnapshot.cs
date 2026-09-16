@@ -72,6 +72,8 @@ namespace ProductMarketplace.Infrastructure.Data.Migrations
                     b.HasIndex("ApplicationNumber")
                         .IsUnique();
 
+                    b.HasIndex("CreatedAt");
+
                     b.HasIndex("ProductId");
 
                     b.HasIndex("Status");
@@ -205,6 +207,9 @@ namespace ProductMarketplace.Infrastructure.Data.Migrations
                         .HasMaxLength(150)
                         .HasColumnType("character varying(150)");
 
+                    b.Property<Guid?>("ActorUserId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasColumnType("text");
@@ -240,9 +245,13 @@ namespace ProductMarketplace.Infrastructure.Data.Migrations
 
                     b.HasIndex("Action");
 
+                    b.HasIndex("ActorUserId");
+
                     b.HasIndex("EntityType");
 
                     b.HasIndex("Timestamp");
+
+                    b.HasIndex("EntityType", "EntityId");
 
                     b.ToTable("AuditLogs");
                 });
@@ -492,12 +501,18 @@ namespace ProductMarketplace.Infrastructure.Data.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("ApplicationCount");
+
                     b.HasIndex("CategoryId");
 
                     b.HasIndex("Code")
                         .IsUnique();
 
+                    b.HasIndex("CreatedAt");
+
                     b.HasIndex("ProductTypeId");
+
+                    b.HasIndex("RatingAverage");
 
                     b.HasIndex("Status");
 

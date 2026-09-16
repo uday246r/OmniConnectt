@@ -28,9 +28,10 @@ public class ProductService : IProductService
         .Include(p => p.Reviews)
         .Include(p => p.Promotions);
 
-    public async Task<PagedResult<ProductListItemDto>> SearchAsync(ProductQueryDto query, CancellationToken ct = default)
+    /// <summary>The single definition of which products a catalogue query selects — shared by the page and the download.</summary>
+    private IQueryable<Product> Filtered(ProductQueryDto query)
     {
-        var q = FullGraph().AsQueryable();
+        var q = _db.Products.AsNoTracking().AsQueryable();
 
         if (query.CategoryId.HasValue) q = q.Where(p => p.CategoryId == query.CategoryId);
         if (query.ProductTypeId.HasValue) q = q.Where(p => p.ProductTypeId == query.ProductTypeId);
@@ -50,30 +51,97 @@ public class ProductService : IProductService
                 p.ProductType.Name.ToLower().Contains(lower) ||
                 p.Benefits.Any(b => b.Title.ToLower().Contains(lower)) ||
                 p.FieldValues.Any(v => v.Value.ToLower().Contains(lower)));
+        }
 
-            await RecordSearchTermAsync(lower, ct);
+        return q;
+    }
+
+    private async Task<IOrderedQueryable<Product>> SortedAsync(IQueryable<Product> q, string sort, CancellationToken ct)
+    {
+        var now = DateTime.UtcNow;
+        var ranking = await _rankingConfig.GetConfigAsync(ct);
+
+        IOrderedQueryable<Product> sorted = sort.ToLowerInvariant() switch
+        {
+            "trending" => q.OrderByDescending(p => p.ViewCount * ranking.TrendingViewWeight + p.ApplicationCount * ranking.TrendingApplicationWeight),
+            // Products with no primary rate sort last, as decimal.MaxValue did before.
+            "lowest-rate" => q
+                .OrderBy(p => p.FieldValues.Where(v => v.FieldDefinition.IsPrimaryMetric).Select(v => v.NumericValue).FirstOrDefault() == null)
+                .ThenBy(p => p.FieldValues.Where(v => v.FieldDefinition.IsPrimaryMetric).Select(v => v.NumericValue).FirstOrDefault()),
+            "newly-added" => q.OrderByDescending(p => p.CreatedAt),
+            "top-rated" => q.OrderByDescending(p => p.RatingAverage).ThenByDescending(p => p.RatingCount),
+            "most-applied" => q.OrderByDescending(p => p.ApplicationCount),
+            _ => q.OrderByDescending(p =>
+                p.RatingAverage * ranking.RecommendedRatingWeight
+                + p.ApplicationCount * ranking.RecommendedApplicationWeight
+                + (p.Promotions.Any(x => x.Status == "Active" && x.StartDate <= now && x.EndDate >= now) ? ranking.RecommendedPromotionWeight : 0)),
+        };
+
+        // A stable tiebreaker, so a product never appears on two pages or on none.
+        return sorted.ThenBy(p => p.Id);
+    }
+
+    /// <summary>The largest product download served in one file.</summary>
+    public const int ExportRowLimit = 10_000;
+
+    public async Task<CsvExport> ExportCsvAsync(ProductQueryDto query, CancellationToken ct = default)
+    {
+        var filtered = Filtered(query);
+        var matched = await filtered.CountAsync(ct);
+        var rows = await (await SortedAsync(filtered, query.Sort, ct))
+            .Take(ExportRowLimit)
+            .Select(p => new { p.Name, p.Code, Category = p.Category.Name, Type = p.ProductType.Name, p.Status, p.RatingAverage, p.RatingCount, p.ApplicationCount, p.ViewCount, p.CreatedAt })
+            .ToListAsync(ct);
+
+        var csv = new CsvBuilder("Product", "Code", "Category", "Type", "Status", "Average rating", "Ratings", "Applications", "Views", "Added (UTC)");
+        foreach (var r in rows)
+        {
+            csv.AppendRow(r.Name, r.Code, r.Category, r.Type, r.Status, r.RatingAverage.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture),
+                r.RatingCount.ToString(), r.ApplicationCount.ToString(), r.ViewCount.ToString(), r.CreatedAt.ToString("O"));
+        }
+
+        return new CsvExport(csv.ToString(), rows.Count, matched, ExportRowLimit);
+    }
+
+    /// <summary>
+    /// Filters, counts, sorts and pages in the database, then loads the full detail for that one page only.
+    /// </summary>
+    /// <remarks>
+    /// This used to load every matching product with its whole graph — field values, benefits,
+    /// eligibility, every review and every promotion — into memory, sort the list in C#, and then keep
+    /// eight. The cost of a catalogue page grew with the size of the catalogue and the number of reviews,
+    /// so a large catalogue made every browse request slower and heavier until the process ran out of
+    /// memory. Each ranking is now an SQL ORDER BY over indexed counters, and only the page's ids are
+    /// ever materialised.
+    /// </remarks>
+    public async Task<PagedResult<ProductListItemDto>> SearchAsync(ProductQueryDto query, CancellationToken ct = default)
+    {
+        var q = Filtered(query);
+
+        var term = query.Search?.Trim();
+        // Only the first page of a search counts as a search; paging through its results does not.
+        if (!string.IsNullOrWhiteSpace(term) && query.Page == 1)
+        {
+            await RecordSearchTermAsync(term.ToLower(), ct);
             await _audit.LogAsync(AuditActions.Search, AuditEntityTypes.Search, null, term,
                 $"Searched products for \"{term}\"", ct: ct);
         }
 
-        var all = await q.ToListAsync(ct);
+        var total = await q.CountAsync(ct);
         var now = DateTime.UtcNow;
-        var ranking = await _rankingConfig.GetConfigAsync(ct);
+        var page = query.Page;
+        var pageSize = query.PageSize;
 
-        IEnumerable<Product> sorted = query.Sort.ToLowerInvariant() switch
-        {
-            "trending" => all.OrderByDescending(p => p.ViewCount * ranking.TrendingViewWeight + p.ApplicationCount * ranking.TrendingApplicationWeight),
-            "lowest-rate" => all.OrderBy(p => PrimaryNumeric(p) ?? decimal.MaxValue),
-            "newly-added" => all.OrderByDescending(p => p.CreatedAt),
-            "top-rated" => all.OrderByDescending(p => p.RatingAverage).ThenByDescending(p => p.RatingCount),
-            "most-applied" => all.OrderByDescending(p => p.ApplicationCount),
-            _ => all.OrderByDescending(p => p.RatingAverage * ranking.RecommendedRatingWeight + p.ApplicationCount * ranking.RecommendedApplicationWeight + (p.Promotions.Any(x => x.IsPromotionActive(now)) ? ranking.RecommendedPromotionWeight : 0))
-        };
+        var pageIds = await (await SortedAsync(q, query.Sort, ct))
+            .Skip((page - 1) * pageSize).Take(pageSize)
+            .Select(p => p.Id)
+            .ToListAsync(ct);
 
-        var total = all.Count;
-        var page = query.Page < 1 ? 1 : query.Page;
-        var pageSize = query.PageSize < 1 ? 8 : query.PageSize;
-        var items = sorted.Skip((page - 1) * pageSize).Take(pageSize).Select(p => p.ToListItemDto(now)).ToList();
+        var loaded = await FullGraph().AsNoTracking().AsSplitQuery()
+            .Where(p => pageIds.Contains(p.Id))
+            .ToListAsync(ct);
+        var byId = loaded.ToDictionary(p => p.Id);
+        var items = pageIds.Where(byId.ContainsKey).Select(id => byId[id].ToListItemDto(now)).ToList();
 
         return new PagedResult<ProductListItemDto> { Items = items, Page = page, PageSize = pageSize, TotalCount = total };
     }

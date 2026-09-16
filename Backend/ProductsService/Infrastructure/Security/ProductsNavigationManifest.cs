@@ -45,6 +45,7 @@ public static class ProductsNavigationManifest
         [
             new("setup", "Setup", "Settings", 10, "View"),
         ]),
+        new("reviews", "Reviews", 65, []),
         new("audit", "Audit Logs", 70,
         [
             new("audit-logs", "Audit Logs", "ShieldCheck", 10, "View"),

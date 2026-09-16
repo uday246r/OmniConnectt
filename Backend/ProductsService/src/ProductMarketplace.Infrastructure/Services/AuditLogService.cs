@@ -14,12 +14,14 @@ public class AuditLogService : IAuditLogService
     private readonly AppDbContext _db;
     private readonly IAuditContext _auditContext;
     private readonly IHubContext<AuditLogHub> _hub;
+    private readonly IAuditForwarder _forwarder;
 
-    public AuditLogService(AppDbContext db, IAuditContext auditContext, IHubContext<AuditLogHub> hub)
+    public AuditLogService(AppDbContext db, IAuditContext auditContext, IHubContext<AuditLogHub> hub, IAuditForwarder forwarder)
     {
         _db = db;
         _auditContext = auditContext;
         _hub = hub;
+        _forwarder = forwarder;
     }
 
     public async Task LogAsync(string action, string entityType, Guid? entityId, string entityName, string description,
@@ -28,6 +30,7 @@ public class AuditLogService : IAuditLogService
         var entry = new AuditLog
         {
             Timestamp = DateTime.UtcNow,
+            ActorUserId = _auditContext.UserId,
             ActorName = _auditContext.ActorName,
             ActorEmail = _auditContext.ActorEmail,
             Action = action,
@@ -44,7 +47,15 @@ public class AuditLogService : IAuditLogService
         _db.AuditLogs.Add(entry);
         await _db.SaveChangesAsync(ct);
 
-        await _hub.Clients.All.SendAsync("AuditLogCreated", entry.ToDto(), ct);
+        /*
+         * Only to signed-in audit viewers. This broadcast to Clients.All over an anonymous hub, so anyone
+         * who opened a socket received every action taken in the marketplace — customer names and
+         * application numbers included — the moment it happened.
+         */
+        await _hub.Clients.Group(AuditLogHub.ViewersGroup).SendAsync("AuditLogCreated", entry.ToDto(), ct);
+
+        await _forwarder.ForwardAsync(new AuditForwardEntry(
+            action, entityType, entityId, entityName, description, success, entry.ActorUserId, entry.ActorName), ct);
     }
 
     /// <summary>
@@ -58,8 +69,8 @@ public class AuditLogService : IAuditLogService
 
         if (!string.IsNullOrWhiteSpace(query.Action)) q = q.Where(a => a.Action == query.Action);
         if (!string.IsNullOrWhiteSpace(query.EntityType)) q = q.Where(a => a.EntityType == query.EntityType);
-        if (query.From.HasValue) q = q.Where(a => a.Timestamp >= query.From.Value);
-        if (query.To.HasValue) q = q.Where(a => a.Timestamp <= query.To.Value);
+        if (query.From.HasValue) { var from = query.From.Value.UtcDateTime; q = q.Where(a => a.Timestamp >= from); }
+        if (query.To.HasValue) { var to = query.To.Value.UtcDateTime; q = q.Where(a => a.Timestamp <= to); }
         if (!string.IsNullOrWhiteSpace(query.Search))
         {
             var lower = query.Search.ToLower();
@@ -117,6 +128,31 @@ public class AuditLogService : IAuditLogService
     {
         var actions = await _db.AuditLogs.AsNoTracking().Select(a => a.Action).Distinct().OrderBy(a => a).ToListAsync(ct);
         return actions.Select(a => new AuditActionOptionDto { Value = a, Label = HumanizeAction(a) }).ToList();
+    }
+
+    /// <summary>The largest audit export served in one file.</summary>
+    public const int ExportRowLimit = 10_000;
+
+    /// <summary>
+    /// Replaces a CSV the browser assembled from the one page of rows on screen and saved under a name
+    /// that claimed to be the audit log. Uses <see cref="ApplyFilters"/>, the same definition the list
+    /// uses, so the file always answers the question the screen was answering.
+    /// </summary>
+    public async Task<CsvExport> ExportCsvAsync(AuditLogQueryDto query, CancellationToken ct = default)
+    {
+        var q = ApplyFilters(query);
+        var matched = await q.CountAsync(ct);
+        var rows = await q.OrderByDescending(a => a.Timestamp).Take(ExportRowLimit).ToListAsync(ct);
+
+        var csv = new CsvBuilder("Time (UTC)", "Performed by", "Email", "What happened", "Record type", "Record", "Description", "Outcome", "Before", "After");
+        foreach (var a in rows)
+        {
+            csv.AppendRow(
+                a.Timestamp.ToString("O"), a.ActorName, a.ActorEmail, HumanizeAction(a.Action), a.EntityType, a.EntityName,
+                a.Description, a.Success ? "Success" : "Failure", a.PreviousValue, a.NewValue);
+        }
+
+        return new CsvExport(csv.ToString(), rows.Count, matched, ExportRowLimit);
     }
 
     private static string HumanizeAction(string action)

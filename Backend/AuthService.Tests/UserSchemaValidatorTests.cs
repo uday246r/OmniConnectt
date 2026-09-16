@@ -135,7 +135,7 @@ public class UserSchemaValidatorTests
     }
 
     [Fact]
-    public void MobileIN_accepts_the_same_loose_shape_the_default_phone_annotation_does()
+    public void MobileIN_accepts_a_number_valid_for_its_own_country()
     {
         var fields = new[]
         {

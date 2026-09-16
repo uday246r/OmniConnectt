@@ -1,21 +1,30 @@
-# Use official .NET 10.0 SDK image to build the app
+# Build context is Backend/, NOT Backend/LeadService/:
+#
+#   docker build -f LeadService/Dockerfile -t omniremit-lead .
+#
+# The service references Backend/Shared/OmniRemit.Validation (the platform's field-format engine),
+# which lies outside the service folder, and inherits Backend/Directory.Build.props.
+
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
-# Copy project file and restore dependencies
-COPY ["LeadManagement.Api.csproj", "./"]
-RUN dotnet restore "LeadManagement.Api.csproj"
+# Manifests first, so the restore layer caches independently of source edits.
+COPY Directory.Build.props ./
+COPY Shared/OmniRemit.Validation/OmniRemit.Validation.csproj Shared/OmniRemit.Validation/
+COPY LeadService/LeadManagement.Api.csproj LeadService/
+RUN dotnet restore LeadService/LeadManagement.Api.csproj
 
-# Copy remaining source code and publish
-COPY . .
-RUN dotnet publish "LeadManagement.Api.csproj" -c Release -o /app/publish
+COPY Shared/ Shared/
+COPY LeadService/ LeadService/
+RUN dotnet publish LeadService/LeadManagement.Api.csproj -c Release -o /app/publish --no-restore
 
-# Final runtime stage using .NET 10.0 ASP.NET runtime
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 WORKDIR /app
 COPY --from=build /app/publish .
 
-# Expose port 8080
+# Non-root. The aspnet image ships an unprivileged 'app' user for exactly this.
+USER $APP_UID
+
 ENV ASPNETCORE_URLS=http://+:8080
 EXPOSE 8080
 

@@ -1,3 +1,4 @@
+import { isApprovalPending } from "../../services/httpClient";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Drawer, DrawerSection } from "../drawer/Drawer";
 import { Icon } from "../common/Icon";
@@ -323,6 +324,7 @@ export function ApplyNowDrawer({ productId }: { productId: string }) {
       );
       useToastStore.getState().success("Application Submitted!", `Reference #${result.applicationNumber}`);
     } catch (err) {
+      if (isApprovalPending(err)) return;
       setError((err as Error).message);
       useToastStore.getState().danger("Submission Failed", (err as Error).message);
     } finally {

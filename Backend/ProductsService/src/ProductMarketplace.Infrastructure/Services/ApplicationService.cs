@@ -45,22 +45,41 @@ public partial class ApplicationService : IApplicationService
 
     public async Task<PagedResult<ApplicationListItemDto>> SearchAsync(ApplicationQueryDto query, CancellationToken ct = default)
     {
-        var q = FullGraph().AsQueryable();
-        if (query.ProductId.HasValue) q = q.Where(a => a.ProductId == query.ProductId);
-        if (!string.IsNullOrWhiteSpace(query.Status))
-            q = q.Where(a => a.Status == query.Status);
-        if (!string.IsNullOrWhiteSpace(query.Search))
-        {
-            var lower = query.Search.ToLower();
-            q = q.Where(a => a.CustomerName.ToLower().Contains(lower) || a.ApplicationNumber.ToLower().Contains(lower) || a.Product.Name.ToLower().Contains(lower));
-        }
+        var q = Filtered(query, includeStatus: true);
 
         var total = await q.CountAsync(ct);
-        var items = await q.OrderByDescending(a => a.CreatedAt)
+        // A list row needs the product and its category only. This used to load every application's
+        // field values, documents and status history (four split queries per page) just to discard them.
+        var items = await q.Include(a => a.Product).ThenInclude(p => p.Category)
+            .AsNoTracking()
+            .OrderByDescending(a => a.CreatedAt).ThenBy(a => a.Id)
             .Skip((query.Page - 1) * query.PageSize).Take(query.PageSize)
             .ToListAsync(ct);
 
         return new PagedResult<ApplicationListItemDto> { Items = items.Select(a => a.ToListItemDto()).ToList(), Page = query.Page, PageSize = query.PageSize, TotalCount = total };
+    }
+
+    public async Task<IReadOnlyList<StatusCountDto>> StatusCountsAsync(ApplicationQueryDto query, CancellationToken ct = default)
+    {
+        var rows = await Filtered(query, includeStatus: false)
+            .GroupBy(a => a.Status)
+            .Select(g => new { Status = g.Key, Count = g.Count() })
+            .ToListAsync(ct);
+        return rows.OrderBy(r => r.Status).Select(r => new StatusCountDto(r.Status, r.Count)).ToList();
+    }
+
+    private IQueryable<DomainApplication> Filtered(ApplicationQueryDto query, bool includeStatus)
+    {
+        IQueryable<DomainApplication> q = _db.Applications.AsNoTracking();
+        if (query.ProductId.HasValue) q = q.Where(a => a.ProductId == query.ProductId);
+        if (includeStatus && !string.IsNullOrWhiteSpace(query.Status))
+            q = q.Where(a => a.Status == query.Status);
+        if (!string.IsNullOrWhiteSpace(query.Search))
+        {
+            var lower = query.Search.Trim().ToLower();
+            q = q.Where(a => a.CustomerName.ToLower().Contains(lower) || a.ApplicationNumber.ToLower().Contains(lower) || a.Product.Name.ToLower().Contains(lower));
+        }
+        return q;
     }
 
     public async Task<ApplicationDetailDto?> GetByIdAsync(Guid id, CancellationToken ct = default)
@@ -183,11 +202,36 @@ public partial class ApplicationService : IApplicationService
             throw new InvalidOperationException($"File exceeds the {DocumentUploadConstraints.MaxFileSizeBytes / 1024 / 1024}MB limit.");
 
         var extension = Path.GetExtension(fileName);
-        if (!DocumentUploadConstraints.AllowedContentTypesToExtension.ContainsKey(contentType) || !DocumentUploadConstraints.AllowedExtensions.Contains(extension))
+        if (!DocumentUploadConstraints.AllowedExtensions.Contains(extension))
             throw new InvalidOperationException("Only PDF, JPG and PNG files are allowed.");
 
+        // Read the file's own signature and trust that, not the browser's label.
+        var header = new byte[8];
+        var read = 0;
+        while (read < header.Length)
+        {
+            var n = await content.ReadAsync(header.AsMemory(read), ct);
+            if (n == 0) break;
+            read += n;
+        }
+
+        var detected = DocumentUploadConstraints.DetectContentType(header.AsSpan(0, read))
+            ?? throw new InvalidOperationException("This file is not a real PDF, JPG or PNG. Please upload the original document.");
+
+        Stream body;
+        if (content.CanSeek)
+        {
+            content.Seek(0, SeekOrigin.Begin);
+            body = content;
+        }
+        else
+        {
+            body = new ConcatenatedStream(new MemoryStream(header, 0, read), content);
+        }
+
+        contentType = detected;
         if (!string.IsNullOrEmpty(document.StoragePath)) _fileStorage.Delete(document.StoragePath);
-        var storagePath = await _fileStorage.SaveAsync(applicationId, documentId, fileName, content, ct);
+        var storagePath = await _fileStorage.SaveAsync(applicationId, documentId, fileName, body, ct);
 
         document.StoragePath = storagePath;
         document.FileName = fileName;

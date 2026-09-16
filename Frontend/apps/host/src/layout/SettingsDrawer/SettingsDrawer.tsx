@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, type ComponentType } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../features/auth/store/authStore'
 import { isDrawerRoute, useSettingsDrawerStore, type SettingsTab } from '../../shared/stores/settingsDrawerStore'
@@ -10,7 +10,15 @@ import { RoleFormLayer } from './RoleFormLayer'
 import { UserFormLayer } from './UserFormLayer'
 import { ApplicationFormLayer } from './ApplicationFormLayer'
 import { CheckerAssignmentFormLayer } from './CheckerAssignmentFormLayer'
+import { visibleSettingsSections } from '../../shared/settings/settingsSections'
 import styles from './SettingsDrawer.module.css'
+
+/** The panel each drawer section renders. A drawer section added to SETTINGS_SECTIONS needs its panel here. */
+const SECTION_PANELS: Partial<Record<SettingsTab, ComponentType>> = {
+  roles: SettingsRolesTab,
+  applications: SettingsApplicationsTab,
+  'checker-assignment': SettingsCheckerAssignmentTab,
+}
 
 export function SettingsDrawer() {
   const isOpen = useSettingsDrawerStore((s) => s.isOpen)
@@ -24,7 +32,7 @@ export function SettingsDrawer() {
   /*
    * Switching tabs and closing are NAVIGATIONS, not direct store writes.
    *
-   * The URL is the source of truth for which tab is open — SettingsRoute in App.tsx reacts to it.
+   * The URL is the source of truth for which tab is open — SettingsDrawerUrlSync reacts to it.
    * Writing straight to the store here would move the drawer without moving the address bar, which is
    * exactly the behaviour being fixed: nothing was linkable and Back did not step between tabs.
    */
@@ -44,28 +52,22 @@ export function SettingsDrawer() {
   }
 
   /*
-   * Users left the drawer for a real page (UsersPage), so its tab button is a plain navigation +
-   * close instead of goToTab — /settings/users renders UsersPage directly now, not the drawer's own
-   * Users panel, so nothing here should open the drawer for it. Closing explicitly (rather than
-   * relying on SettingsRoute to do it) matters when this is clicked while the drawer is already open
-   * on another tab: without it, the drawer would stay open showing its previous tab while the page
-   * underneath silently changed.
+   * A `page` section (Users) is a real page, not a drawer panel, so its tab navigates there and closes
+   * the drawer explicitly — otherwise the drawer would stay open on its previous tab while the page
+   * underneath changed.
    */
-  const goToUsersPage = () => {
+  const goToPage = (tab: SettingsTab) => {
     closeDrawerStore()
-    navigate('/settings/users')
+    navigate(`/settings/${tab}`)
   }
 
   const isAdministrator = Boolean(useAuthStore((s) => s.user)?.isAdministrator)
   const hasCapability = useAuthStore((s) => s.hasCapability)
-  // Deliberately its own, narrower gate than Users/Roles/Applications' own View capability — only
-  // someone who can at least VIEW who's assigned as a checker sees this tab at all; Manage (a
-  // separate, further-narrowed capability) is what actually lets them add/remove assignments, see
-  // SettingsCheckerAssignmentTab's own canManage check.
-  const canAccessUsers = isAdministrator || hasCapability('host.settings.users', 'View')
-const canAccessRoles = isAdministrator || hasCapability('host.settings.roles', 'View')
-const canAccessApplications = isAdministrator || hasCapability('host.settings.applications', 'View')
-  const canAccessCheckerAssignment = isAdministrator || hasCapability('host.system.checker-assignment', 'View')
+  // Tabs are the sections this user may view, from the one registry the gear and the URL handler use.
+  // Each panel still applies its own narrower checks (e.g. Checker Assignment needs Manage to edit).
+  const sections = visibleSettingsSections((featureKey, capability = 'View') => isAdministrator || hasCapability(featureKey, capability))
+  const activeSection = sections.find((s) => s.tab === activeTab && s.kind === 'drawer')
+  const ActivePanel = activeSection ? SECTION_PANELS[activeSection.tab] : undefined
 
   // ESC key to close or pop layer
   useEffect(() => {
@@ -140,58 +142,29 @@ const canAccessApplications = isAdministrator || hasCapability('host.settings.ap
             </div>
 
             {/* Horizontal Tabs */}
-            <div className={styles.tabsNav}>
-              {canAccessUsers && (
-                <button
-                type="button"
-                className={styles.tabBtn}
-                onClick={goToUsersPage}
-              >
-                <Icon.Users width={16} height={16} />
-                <span>Users</span>
-              </button>
-              )}
-
-              {canAccessRoles && (
-              <button
-                type="button"
-                className={`${styles.tabBtn} ${activeTab === 'roles' ? styles.tabBtnActive : ''}`}
-                onClick={() => goToTab('roles')}
-              >
-                <Icon.ShieldCheck width={16} height={16} />
-                <span>Roles</span>
-              </button>
-              )}
-
-              {canAccessApplications && (
-              <button
-                type="button"
-                className={`${styles.tabBtn} ${activeTab === 'applications' ? styles.tabBtnActive : ''}`}
-                onClick={() => goToTab('applications')}
-              >
-                <Icon.Grid width={16} height={16} />
-                <span>Applications</span>
-              </button>
-              )}
-              
-              {canAccessCheckerAssignment && (
-                <button
-                  type="button"
-                  className={`${styles.tabBtn} ${activeTab === 'checker-assignment' ? styles.tabBtnActive : ''}`}
-                  onClick={() => goToTab('checker-assignment')}
-                >
-                  <Icon.UserCheck width={16} height={16} />
-                  <span>Checker Assignment</span>
-                </button>
-              )}
-
+            <div className={styles.tabsNav} role="tablist" aria-label="Settings sections">
+              {sections.map((section) => {
+                const SectionIcon = Icon[section.icon]
+                const selected = section.kind === 'drawer' && section.tab === activeTab
+                return (
+                  <button
+                    key={section.tab}
+                    type="button"
+                    role="tab"
+                    aria-selected={selected}
+                    className={`${styles.tabBtn} ${selected ? styles.tabBtnActive : ''}`}
+                    onClick={() => (section.kind === 'page' ? goToPage(section.tab) : goToTab(section.tab))}
+                  >
+                    <SectionIcon width={16} height={16} />
+                    <span>{section.label}</span>
+                  </button>
+                )
+              })}
             </div>
 
             {/* Tab Body */}
-            <div className={styles.tabBody}>
-              {activeTab === 'roles' && <SettingsRolesTab />}
-              {activeTab === 'applications' && <SettingsApplicationsTab />}
-              {activeTab === 'checker-assignment' && canAccessCheckerAssignment && <SettingsCheckerAssignmentTab />}
+            <div className={styles.tabBody} role="tabpanel">
+              {ActivePanel && <ActivePanel />}
             </div>
           </div>
         )}

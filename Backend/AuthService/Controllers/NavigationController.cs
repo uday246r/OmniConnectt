@@ -1,4 +1,3 @@
-using System.Text.Json;
 using AuthService.Application.DTOs;
 using AuthService.Application.Services;
 using AuthService.Infrastructure.Security;
@@ -29,22 +28,8 @@ public class NavigationController(NavigationAppService navigation) : ControllerB
     [HttpGet]
     public async Task<ActionResult<NavigationResponseDto>> Get(CancellationToken ct)
     {
-        var isAdministrator = User.FindFirst(JwtTokenService.AdministratorClaimType)?.Value == "true";
-        var permsClaim = User.FindFirst(JwtTokenService.PermissionsClaimType)?.Value;
-
-        HashSet<string> permissions;
-        try
-        {
-            permissions = string.IsNullOrEmpty(permsClaim)
-                ? []
-                : (JsonSerializer.Deserialize<string[]>(permsClaim) ?? []).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        }
-        catch (JsonException)
-        {
-            // Fail closed, matching the authorization filters: an unparseable claim means no
-            // permissions, so the caller sees an empty sidebar rather than everything.
-            permissions = [];
-        }
+        // Fails closed: an unparseable claim means an empty sidebar rather than everything.
+        var (permissions, isAdministrator) = TokenPermissions.Read(User);
 
         var tree = await navigation.GetAsync(permissions, isAdministrator, ct);
 

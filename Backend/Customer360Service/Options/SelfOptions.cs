@@ -3,8 +3,7 @@ namespace backend.Options;
 /// <summary>
 /// Bound from the "Self" config section. This service's own externally-reachable base URL, handed to
 /// AuthService as the CallbackUrl on every gated Field Settings mutation submitted for approval, and
-/// the module key this service was registered under in Setup → Applications (a runtime fact assigned
-/// at registration time — this service cannot self-derive it, hence the explicit config value).
+/// the keys it files approvals under.
 /// </summary>
 public class SelfOptions
 {
@@ -12,8 +11,19 @@ public class SelfOptions
 
     public string PublicBaseUrl { get; set; } = string.Empty;
 
-    /// <summary>The live PermissionFeature.Key synced for this service's "fieldsettings"
-    /// [RequiresCapability] module (e.g. "remote.customer360.fieldsettings") — set to match whatever
-    /// this app was actually registered as in Setup → Applications.</summary>
-    public string FieldSettingsModuleKey { get; set; } = string.Empty;
+    /// <summary>The key this app was registered under in Setup → Applications.</summary>
+    public string AppKey { get; set; } = "customer360";
+
+    private string? _fieldSettingsModuleKey;
+
+    /// <summary>
+    /// The PermissionFeature key Field Settings approvals are filed under. Defaults to
+    /// <c>remote.{AppKey}.fieldsettings</c>, so an unset value no longer turns every gating check into a
+    /// request for module "" (which AuthService cannot answer, so the change was refused with a 503).
+    /// </summary>
+    public string FieldSettingsModuleKey
+    {
+        get => string.IsNullOrWhiteSpace(_fieldSettingsModuleKey) ? $"remote.{AppKey.ToLowerInvariant()}.fieldsettings" : _fieldSettingsModuleKey;
+        set => _fieldSettingsModuleKey = value;
+    }
 }

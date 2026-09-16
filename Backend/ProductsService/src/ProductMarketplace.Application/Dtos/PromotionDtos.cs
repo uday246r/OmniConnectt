@@ -41,6 +41,12 @@ public class PromotionQueryDto
     public string? Search { get; set; }
     public Guid? ProductId { get; set; }
     public string? Status { get; set; }
-    public int Page { get; set; } = 1;
-    public int PageSize { get; set; } = 10;
+    private int _page = 1;
+    private int _pageSize = 10;
+
+    /// <summary>1 or greater; anything lower is read as the first page rather than failing with a negative offset.</summary>
+    public int Page { get => _page; set => _page = value < 1 ? 1 : value; }
+
+    /// <summary>Between 1 and <see cref="Common.Paging.MaxPageSize"/>, so no caller can ask for the whole table in one response.</summary>
+    public int PageSize { get => _pageSize; set => _pageSize = Common.Paging.Clamp(value, 10); }
 }

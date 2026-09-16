@@ -1,3 +1,5 @@
+import { isApprovalPending } from "../../services/httpClient";
+import { CustomSelect } from "../common/CustomSelect";
 import { useEffect, useState } from "react";
 import { Drawer, DrawerSection } from "../drawer/Drawer";
 import { Icon } from "../common/Icon";
@@ -67,6 +69,7 @@ export function StatusConfigFormDrawer({ statusConfigId, entityType }: { statusC
       }
       close();
     } catch (err) {
+      if (isApprovalPending(err)) return;
       setError((err as Error).message);
     } finally {
       setSubmitting(false);
@@ -110,13 +113,7 @@ export function StatusConfigFormDrawer({ statusConfigId, entityType }: { statusC
           </div>
           <div className="pm-field">
             <label>Badge Color</label>
-            <select className="pm-select" value={color} onChange={(e) => setColor(e.target.value as StatusTone)}>
-              {TONES.map((t) => (
-                <option key={t.value} value={t.value}>
-                  {t.label}
-                </option>
-              ))}
-            </select>
+            <CustomSelect aria-label="Badge color" options={TONES.map((t) => ({ value: t.value, label: t.label }))} value={color} onChange={(v) => setColor(v as StatusTone)} />
           </div>
           <div className="pm-field">
             <label>Sort Order</label>

@@ -94,26 +94,65 @@ export interface UpdateUserRequest {
   salutation?: string | null
 }
 
-export interface ListUsersParams {
-  page?: number
-  pageSize?: number
+/**
+ * Filters the server applies to the whole directory (the server caps a page at 100 rows, so nothing
+ * may be filtered or counted in the browser over one page of it).
+ */
+export interface UserFilterParams {
+  /** Name, email, role name, or digits of the mobile number. */
   search?: string
+  /** Name or email contains. */
+  name?: string
+  /** Digits the mobile number contains, formatting ignored. */
+  phone?: string
+  /** A role's exact name, or {@link NO_ROLE_LABEL}. */
+  role?: string
   isActive?: boolean
   roleId?: string
+  /** ISO instants bounding the last sign-in. A user who never signed in is outside any bounded range. */
+  lastLoginFrom?: string
+  lastLoginTo?: string
+}
+
+export interface ListUsersParams extends UserFilterParams {
+  page?: number
+  pageSize?: number
+}
+
+/** The value the list and the Role filter use for a user without a role; the server accepts it as a filter. */
+export const NO_ROLE_LABEL = 'No Role'
+
+export interface UserDirectorySummaryDto {
+  total: number
+  active: number
+  inactive: number
+  administrators: number
+}
+
+export interface UserListFacetsDto {
+  roles: string[]
 }
 
 function buildQuery(params: object) {
   const search = new URLSearchParams()
   for (const [key, value] of Object.entries(params) as [string, string | number | boolean | undefined][]) {
-    if (value !== undefined) search.set(key, String(value))
+    if (value !== undefined && value !== '') search.set(key, String(value))
   }
   const query = search.toString()
   return query ? `?${query}` : ''
 }
 
 export const usersApi = {
-  list: (accessToken: string, params: ListUsersParams = {}) =>
-    apiFetch<PagedResult<UserListItemDto>>(`${base}/api/users${buildQuery(params)}`, { accessToken }),
+  list: (accessToken: string, params: ListUsersParams = {}, signal?: AbortSignal) =>
+    apiFetch<PagedResult<UserListItemDto>>(`${base}/api/users${buildQuery(params)}`, { accessToken, signal }),
+
+  /** Counts for the whole directory, independent of any filter. */
+  summary: (accessToken: string, signal?: AbortSignal) =>
+    apiFetch<UserDirectorySummaryDto>(`${base}/api/users/summary`, { accessToken, signal }),
+
+  /** Role filter options under the other filters (the role filter itself is ignored). */
+  facets: (accessToken: string, params: UserFilterParams = {}, signal?: AbortSignal) =>
+    apiFetch<UserListFacetsDto>(`${base}/api/users/facets${buildQuery(params)}`, { accessToken, signal }),
 
   get: (accessToken: string, id: string) => apiFetch<UserDetailDto>(`${base}/api/users/${id}`, { accessToken }),
 

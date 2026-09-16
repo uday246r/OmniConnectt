@@ -1,4 +1,6 @@
 import { useEffect } from "react";
+import { Button, PageHeader, formatDate } from "@omniremit/ui";
+import { CustomSelect } from "../components/common/CustomSelect";
 import { Icon, type IconName } from "../components/common/Icon";
 import { KpiCard } from "../components/common/KpiCard";
 import { LineChart } from "../components/charts/LineChart";
@@ -20,8 +22,7 @@ const TREND_OPTIONS = [
 
 function formatRangeLabel(start?: string, end?: string): string {
   if (!start || !end) return "";
-  const fmt = (d: string) => new Date(d).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
-  return `${fmt(start)} - ${fmt(end)}`;
+  return `${formatDate(start)} – ${formatDate(end)}`;
 }
 
 export function DashboardPage() {
@@ -49,49 +50,19 @@ export function DashboardPage() {
 
   return (
     <div className="pm-page">
-      {/* Lead Management Style Hero Welcome Banner */}
-      <div className="pm-hero-banner">
-        {/* Background decorative circles */}
-        <div className="pm-hero-circle-1" />
-        <div className="pm-hero-circle-2" />
-
-        {/* Left Side: Frosted Icon & Header Text */}
-        <div className="pm-hero-left">
-          <div className="pm-hero-icon-wrap">
-            <Icon name="package" size={24} />
-          </div>
-          <div className="pm-hero-text">
-            <div className="pm-hero-title-row">
-              <h1 className="pm-hero-title">Product Marketplace Overview</h1>
-              <span className="pm-hero-live-badge">
-                <span className="pm-hero-live-dot" /> Live
-              </span>
-            </div>
-            <p className="pm-hero-subtitle">Real-time marketplace performance, product catalogs &amp; application insights</p>
-          </div>
-        </div>
-
-        {/* Right Side: Quick Action & Date Pill */}
-        <div className="pm-hero-right">
-          {canCreateProduct && (
-            <button
-              type="button"
-              className="pm-hero-btn"
-              onClick={() => openDrawer("product-form")}
-            >
-              <Icon name="plus" size={15} />
-              <span>Add Product</span>
-            </button>
-          )}
-
-          {summary && (
-            <div className="pm-hero-date-chip">
-              <Icon name="calendar" size={14} />
-              <span>{formatRangeLabel(summary.rangeStart, summary.rangeEnd)}</span>
-            </div>
-          )}
-        </div>
-      </div>
+      <PageHeader
+        title="Product Marketplace Overview"
+        subtitle="Marketplace performance, product catalogs and application insights."
+        icon={<Icon name="package" size={24} />}
+        pill={summary ? formatRangeLabel(summary.rangeStart, summary.rangeEnd) : undefined}
+        actions={
+          canCreateProduct && (
+            <Button variant="onHeader" leadingIcon={<Icon name="plus" size={15} />} onClick={() => openDrawer("product-form")}>
+              Add Product
+            </Button>
+          )
+        }
+      />
 
 
       {loading || !summary ? (
@@ -117,13 +88,9 @@ export function DashboardPage() {
               <h3 className="pm-panel-title">Applications Overview</h3>
               <p className="pm-panel-subtitle">Application submission volume trend over time</p>
             </div>
-            <select className="pm-select pm-select-sm" value={trendDays} onChange={(e) => setTrendDays(Number(e.target.value))}>
-              {TREND_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
+            <div className="pm-filter-combo">
+              <CustomSelect aria-label="Period" options={TREND_OPTIONS.map((o) => ({ value: String(o.value), label: o.label }))} value={String(trendDays)} onChange={(v) => setTrendDays(Number(v))} />
+            </div>
           </div>
           {trendLoading ? <div className="pm-skeleton" style={{ height: 220 }} /> : trend.length > 0 && <LineChart points={trend.map((t) => ({ label: t.label, value: t.value }))} />}
         </div>

@@ -26,7 +26,7 @@ public class InternalApiKeyFilter(IOptions<InternalApiOptions> options) : IAsync
 
     public Task OnAuthorizationAsync(AuthorizationFilterContext context)
     {
-        var expected = options.Value.ApiKey;
+        var expected = options.Value.ApiKey?.Trim() ?? string.Empty;
 
         if (string.IsNullOrWhiteSpace(expected))
         {
@@ -39,7 +39,7 @@ public class InternalApiKeyFilter(IOptions<InternalApiOptions> options) : IAsync
             return Task.CompletedTask;
         }
 
-        var provided = context.HttpContext.Request.Headers[HeaderName].ToString();
+        var provided = context.HttpContext.Request.Headers[HeaderName].ToString().Trim();
         if (!FixedTimeEquals(provided, expected))
         {
             context.Result = new UnauthorizedObjectResult(new ProblemDetails

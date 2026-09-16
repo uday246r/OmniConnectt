@@ -41,6 +41,22 @@ public sealed record AuditLogFilter
     /// <summary>Exact actor. This is the one the export used to drop.</summary>
     public Guid? ActorUserId { get; init; }
 
+    /// <summary>
+    /// Everything this person did, AND everything done to them: their account being created, edited,
+    /// disabled or deleted, their access being changed, sign-in attempts on their account, someone
+    /// opening their profile, and approval requests about them.
+    /// </summary>
+    /// <remarks>
+    /// The user's own audit tab used <see cref="ActorUserId"/> alone, so "who changed Priya's role?"
+    /// could not be answered from Priya's page — the change was done BY an administrator, and so
+    /// appeared only on theirs.
+    /// </remarks>
+    public Guid? InvolvingUserId { get; init; }
+
+    /// <summary>Leaves out what this person did themselves — with <see cref="InvolvingUserId"/>, the
+    /// "about this user" view: only what other people (or the system) did to them.</summary>
+    public Guid? ExcludeActorUserId { get; init; }
+
     /// <summary>Actor by name, or by id typed as text — a free-text box where an operator may paste
     /// either.</summary>
     public string? ActorName { get; init; }

@@ -438,6 +438,9 @@ namespace LeadManagement.Api.Migrations
                     b.Property<bool>("Sensitive")
                         .HasColumnType("boolean");
 
+                    b.Property<string>("ValidationsJson")
+                        .HasColumnType("jsonb");
+
                     b.Property<bool>("Visible")
                         .HasColumnType("boolean");
 

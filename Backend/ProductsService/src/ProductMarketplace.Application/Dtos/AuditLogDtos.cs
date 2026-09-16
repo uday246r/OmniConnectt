@@ -6,6 +6,7 @@ public class AuditLogDto
 {
     public Guid Id { get; set; }
     public DateTime Timestamp { get; set; }
+    public Guid? ActorUserId { get; set; }
     public string ActorName { get; set; } = string.Empty;
     public string ActorEmail { get; set; } = string.Empty;
     public string Action { get; set; } = string.Empty;
@@ -24,8 +25,9 @@ public class AuditLogQueryDto
     public string? Search { get; set; }
     public string? Action { get; set; }
     public string? EntityType { get; set; }
-    public DateTime? From { get; set; }
-    public DateTime? To { get; set; }
+    /// <summary>Inclusive instants, as every log screen on the platform sends them.</summary>
+    public DateTimeOffset? From { get; set; }
+    public DateTimeOffset? To { get; set; }
 
     [Range(1, int.MaxValue, ErrorMessage = "Page must be 1 or greater.")]
     public int Page { get; set; } = 1;

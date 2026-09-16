@@ -11,14 +11,17 @@ import type { CustomPreset } from '@omniremit/ui/validation'
  * every field that references the format it produces.
  */
 
-// Both <select>s in this component have no `htmlFor`-associated <label>, so they carry no accessible
-// name Testing Library can query by — indexing is deliberate, not a workaround: Format Type is always
-// the first combobox, Allowed Characters (only rendered for kind: 'textPattern') the second.
+// Both dropdowns are the shared searchable Select, labelled by their visible <label>s.
 function formatTypeSelect() {
-  return screen.getAllByRole('combobox')[0]
+  return screen.getByRole('combobox', { name: 'Format Type' })
 }
 function allowedCharactersSelect() {
-  return screen.getAllByRole('combobox')[1]
+  return screen.getByRole('combobox', { name: 'Allowed characters' })
+}
+/** Opens a dropdown and clicks the option with this label. */
+function choose(combobox: HTMLElement, label: string) {
+  fireEvent.mouseDown(combobox)
+  fireEvent.click(screen.getByRole('option', { name: label }))
 }
 
 function renderModal(props: Partial<Parameters<typeof FormatEditorModal>[0]> = {}) {
@@ -47,7 +50,7 @@ describe('visibility', () => {
   it('defaults to the Text / String Type kind — the friendliest option for a non-technical admin', () => {
     renderModal()
 
-    expect(formatTypeSelect()).toHaveValue('textPattern')
+    expect(formatTypeSelect()).toHaveValue('Text / String Type')
     expect(allowedCharactersSelect()).toBeInTheDocument()
   })
 
@@ -76,7 +79,7 @@ describe('switching format type reveals the right fields', () => {
   it('regex shows a pattern input', async () => {
     renderModal()
 
-    await userEvent.selectOptions(formatTypeSelect(), 'regex')
+    choose(formatTypeSelect(), 'Custom Pattern (Regex)')
 
     expect(screen.getByPlaceholderText('^EMP-[0-9]{4}$')).toBeInTheDocument()
   })
@@ -84,7 +87,7 @@ describe('switching format type reveals the right fields', () => {
   it('lengthRange shows minimum and maximum character inputs', async () => {
     renderModal()
 
-    await userEvent.selectOptions(formatTypeSelect(), 'lengthRange')
+    choose(formatTypeSelect(), 'Character Length Range')
 
     expect(screen.getByText('Minimum characters')).toBeInTheDocument()
     expect(screen.getByText('Maximum characters')).toBeInTheDocument()
@@ -93,7 +96,7 @@ describe('switching format type reveals the right fields', () => {
   it('numericRange shows minimum and maximum value inputs with a plain-number hint', async () => {
     renderModal()
 
-    await userEvent.selectOptions(formatTypeSelect(), 'numericRange')
+    choose(formatTypeSelect(), 'Numeric Value Range')
 
     expect(screen.getByText('Minimum value')).toBeInTheDocument()
     expect(screen.getByText(/read as a plain number/i)).toBeInTheDocument()
@@ -102,8 +105,8 @@ describe('switching format type reveals the right fields', () => {
   it('textPattern shows the allowed-characters dropdown, not a regex box', async () => {
     renderModal()
 
-    await userEvent.selectOptions(formatTypeSelect(), 'regex') // switch away first
-    await userEvent.selectOptions(formatTypeSelect(), 'textPattern')
+    choose(formatTypeSelect(), 'Custom Pattern (Regex)') // switch away first
+    choose(formatTypeSelect(), 'Text / String Type')
 
     expect(allowedCharactersSelect()).toBeInTheDocument()
     expect(screen.queryByPlaceholderText('^EMP-[0-9]{4}$')).not.toBeInTheDocument()
@@ -125,7 +128,7 @@ describe('the live tester', () => {
 
   it('reflects the numericRange bounds live as they are typed', async () => {
     renderModal()
-    await userEvent.selectOptions(formatTypeSelect(), 'numericRange')
+    choose(formatTypeSelect(), 'Numeric Value Range')
     await userEvent.type(screen.getByPlaceholderText('e.g. 6000000000'), '1000')
     await userEvent.type(screen.getByPlaceholderText('e.g. 9999999999'), '5000')
 
@@ -162,7 +165,7 @@ describe('saving', () => {
   it('refuses an empty regex pattern', async () => {
     const { onSave } = renderModal()
     await userEvent.type(screen.getByPlaceholderText(/e\.g\. employee code/i), 'Employee Code')
-    await userEvent.selectOptions(formatTypeSelect(), 'regex')
+    choose(formatTypeSelect(), 'Custom Pattern (Regex)')
 
     await userEvent.click(screen.getByRole('button', { name: 'Add Format' }))
 
@@ -173,7 +176,7 @@ describe('saving', () => {
   it('refuses a syntactically invalid regex pattern', async () => {
     const { onSave } = renderModal()
     await userEvent.type(screen.getByPlaceholderText(/e\.g\. employee code/i), 'Employee Code')
-    await userEvent.selectOptions(formatTypeSelect(), 'regex')
+    choose(formatTypeSelect(), 'Custom Pattern (Regex)')
     // fireEvent.change, not userEvent.type: userEvent parses "{" and "[" as key-sequence syntax.
     fireEvent.change(screen.getByPlaceholderText('^EMP-[0-9]{4}$'), { target: { value: '[unclosed' } })
 
@@ -186,7 +189,7 @@ describe('saving', () => {
   it('refuses a lengthRange with neither bound set', async () => {
     const { onSave } = renderModal()
     await userEvent.type(screen.getByPlaceholderText(/e\.g\. employee code/i), 'Code Length')
-    await userEvent.selectOptions(formatTypeSelect(), 'lengthRange')
+    choose(formatTypeSelect(), 'Character Length Range')
 
     await userEvent.click(screen.getByRole('button', { name: 'Add Format' }))
 
@@ -197,7 +200,7 @@ describe('saving', () => {
   it('refuses a numericRange where minimum exceeds maximum', async () => {
     const { onSave } = renderModal()
     await userEvent.type(screen.getByPlaceholderText(/e\.g\. employee code/i), 'Range')
-    await userEvent.selectOptions(formatTypeSelect(), 'numericRange')
+    choose(formatTypeSelect(), 'Numeric Value Range')
     await userEvent.type(screen.getByPlaceholderText('e.g. 6000000000'), '100')
     await userEvent.type(screen.getByPlaceholderText('e.g. 9999999999'), '10')
 
@@ -210,7 +213,7 @@ describe('saving', () => {
   it('calls onSave with the assembled preset on a valid textPattern submission', async () => {
     const { onSave } = renderModal()
     await userEvent.type(screen.getByPlaceholderText(/e\.g\. employee code/i), 'Company Name Text')
-    await userEvent.selectOptions(allowedCharactersSelect(), 'lettersAndSpaces')
+    choose(allowedCharactersSelect(), 'Letters & spaces')
 
     await userEvent.click(screen.getByRole('button', { name: 'Add Format' }))
 

@@ -1,39 +1,49 @@
-import { createContext, useContext, useMemo, type ReactNode } from "react";
-import { ALL_PERMISSIONS, type PermissionKey } from "./permissions";
+import { createContext, useContext, useMemo, type ReactNode } from 'react';
+import { hasCapability } from '../api/hostBridge';
+import { parsePermission, type PermissionKey } from './permissions';
 
 export interface PermissionContextValue {
-  /** Returns true if the current user/session has the given permission. */
+  /** Whether the signed-in user holds this permission. */
   has: (permission: PermissionKey) => boolean;
-  /** Returns true if the current user/session has every permission listed. */
   hasAll: (permissions: PermissionKey[]) => boolean;
-  /** Returns true if the current user/session has at least one of the permissions listed. */
   hasAny: (permissions: PermissionKey[]) => boolean;
 }
 
-const PermissionContext = createContext<PermissionContextValue | null>(null);
-
 /**
- * Standalone/local-dev permission provider. Grants a fixed permission set so every
- * marketplace feature can be built and tested before the Host App is wired up.
- * The Host App will later mount its own provider (same PermissionContextValue shape)
- * higher in the tree, sourced from the logged-in user's real roles/permissions -
- * no change to consuming components will be required.
+ * Answers from the host bridge — the signed-in user's real permissions.
+ *
+ * The default value is that same answer, so a component rendered without the provider (a test, a
+ * storybook-style preview) still asks the host rather than silently granting everything.
  */
-export function MockPermissionProvider({ children, granted = ALL_PERMISSIONS }: { children: ReactNode; granted?: PermissionKey[] }) {
+const fromHost: PermissionContextValue = {
+  has: (permission) => {
+    const { module, capability } = parsePermission(permission);
+    return hasCapability(module, capability);
+  },
+  hasAll: (permissions) => permissions.every((p) => fromHost.has(p)),
+  hasAny: (permissions) => permissions.some((p) => fromHost.has(p)),
+};
+
+const PermissionContext = createContext<PermissionContextValue>(fromHost);
+
+export function PlatformPermissionProvider({ children }: { children: ReactNode }) {
+  const value = useMemo(() => fromHost, []);
+  return <PermissionContext.Provider value={value}>{children}</PermissionContext.Provider>;
+}
+
+/** A fixed grant set, for tests only. */
+export function FixedPermissionProvider({ children, granted }: { children: ReactNode; granted: PermissionKey[] }) {
   const value = useMemo<PermissionContextValue>(() => {
-    const grantedSet = new Set(granted);
+    const set = new Set<string>(granted);
     return {
-      has: (permission) => grantedSet.has(permission),
-      hasAll: (permissions) => permissions.every((p) => grantedSet.has(p)),
-      hasAny: (permissions) => permissions.some((p) => grantedSet.has(p)),
+      has: (p) => set.has(p),
+      hasAll: (ps) => ps.every((p) => set.has(p)),
+      hasAny: (ps) => ps.some((p) => set.has(p)),
     };
   }, [granted]);
-
   return <PermissionContext.Provider value={value}>{children}</PermissionContext.Provider>;
 }
 
 export function usePermissions(): PermissionContextValue {
-  const ctx = useContext(PermissionContext);
-  if (!ctx) throw new Error("usePermissions must be used within a PermissionProvider (see MockPermissionProvider).");
-  return ctx;
+  return useContext(PermissionContext);
 }

@@ -1,6 +1,55 @@
 import type { ReactElement, SVGProps } from "react";
+import { Icon as SharedIcon, type IconComponent } from "@omniremit/ui";
+
+/*
+ * Every generic glyph (close, check, search, edit, trash, eye…) is drawn by the platform icon set, so
+ * the same action looks the same here as in the host and the other remotes. Only product-domain
+ * pictograms the platform has no equivalent for (loans, deposits, percent…) keep a local path.
+ *
+ * Several call sites passed names that did not exist ("file-text", "check-circle", "message-square",
+ * "refresh-cw") and silently rendered the fallback package glyph; those are real names now.
+ */
+const SHARED: Partial<Record<IconName, IconComponent>> = {
+  package: SharedIcon.Package,
+  shield: SharedIcon.Shield,
+  check: SharedIcon.Check,
+  "check-circle": SharedIcon.CheckCircle,
+  star: SharedIcon.Star,
+  search: SharedIcon.Search,
+  close: SharedIcon.X,
+  "chevron-down": SharedIcon.ChevronDown,
+  "chevron-left": SharedIcon.ChevronLeft,
+  "chevron-right": SharedIcon.ChevronRight,
+  plus: SharedIcon.Plus,
+  grid: SharedIcon.Grid,
+  download: SharedIcon.Download,
+  "more-vertical": SharedIcon.MoreVertical,
+  "more-horizontal": SharedIcon.MoreHorizontal,
+  edit: SharedIcon.Edit,
+  bell: SharedIcon.Bell,
+  calendar: SharedIcon.Calendar,
+  clock: SharedIcon.Clock,
+  file: SharedIcon.FileText,
+  "file-text": SharedIcon.FileText,
+  "message-square": SharedIcon.Chat,
+  "refresh-cw": SharedIcon.Activity,
+  user: SharedIcon.User,
+  building: SharedIcon.Building,
+  trash: SharedIcon.Trash,
+  eye: SharedIcon.Eye,
+  "trending-up": SharedIcon.TrendingUp,
+  info: SharedIcon.Info,
+  settings: SharedIcon.Settings,
+  briefcase: SharedIcon.Briefcase,
+  lock: SharedIcon.Lock,
+  dashboard: SharedIcon.Grid,
+};
 
 export type IconName =
+  | "check-circle"
+  | "file-text"
+  | "message-square"
+  | "refresh-cw"
   | "package"
   | "loan" | "loans"
   | "credit-card"
@@ -48,7 +97,8 @@ export type IconName =
   | "slash"
   | "external-link";
 
-const paths: Record<IconName, ReactElement> = {
+/** Local pictograms; a name drawn by the platform set above never reaches this table. */
+const paths: Partial<Record<IconName, ReactElement>> = {
   package: <><path d="M21 8L12 3 3 8l9 5 9-5Z" /><path d="M3 8v8l9 5 9-5V8" /><path d="M12 13v8" /></>,
   loan: <><rect x="3" y="7" width="18" height="13" rx="2" /><path d="M3 10h18" /><path d="M7 15h4" /></>,
   loans: <><rect x="3" y="7" width="18" height="13" rx="2" /><path d="M3 10h18" /><path d="M7 15h4" /></>,
@@ -100,6 +150,10 @@ const paths: Record<IconName, ReactElement> = {
 };
 
 export function Icon({ name, size = 18, strokeWidth = 2, ...rest }: { name: IconName; size?: number; strokeWidth?: number } & SVGProps<SVGSVGElement>) {
+  // Names arrive from data too (a category's or product's iconKey), so an unknown one falls back
+  // to the package glyph instead of rendering nothing.
+  const Shared = SHARED[name] ?? (paths[name] ? undefined : SharedIcon.Package);
+  if (Shared) return <Shared width={size} height={size} strokeWidth={strokeWidth} {...rest} />;
   return (
     <svg
       width={size}
@@ -112,7 +166,7 @@ export function Icon({ name, size = 18, strokeWidth = 2, ...rest }: { name: Icon
       strokeLinejoin="round"
       {...rest}
     >
-      {paths[name] ?? paths.package}
+      {paths[name]}
     </svg>
   );
 }

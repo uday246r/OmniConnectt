@@ -102,6 +102,8 @@ public class AuditLogEnhancementTests : IDisposable
             ["Action"] = new() { Action = "lead.created" },
             ["Result"] = new() { Result = "Success" },
             ["ActorUserId"] = new() { ActorUserId = actor },
+            ["InvolvingUserId"] = new() { InvolvingUserId = actor },
+            ["ExcludeActorUserId"] = new() { ExcludeActorUserId = Guid.NewGuid() },
             ["ActorName"] = new() { ActorName = "Findable" },
             ["CorrelationId"] = new() { CorrelationId = "corr-findable" },
             ["EntityType"] = new() { EntityType = "Lead" },

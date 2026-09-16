@@ -53,6 +53,10 @@ public class ProductConfiguration : IEntityTypeConfiguration<Product>
         builder.HasOne(p => p.Category).WithMany(c => c.Products).HasForeignKey(p => p.CategoryId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne(p => p.ProductType).WithMany(t => t.Products).HasForeignKey(p => p.ProductTypeId).OnDelete(DeleteBehavior.Restrict);
         builder.HasIndex(p => p.Status);
+        // The catalogue sorts: newest, most applied, top rated.
+        builder.HasIndex(p => p.CreatedAt);
+        builder.HasIndex(p => p.ApplicationCount);
+        builder.HasIndex(p => p.RatingAverage);
     }
 }
 
@@ -108,6 +112,7 @@ public class ApplicationConfiguration : IEntityTypeConfiguration<DomainApplicati
         builder.HasIndex(a => a.ApplicationNumber).IsUnique();
         builder.HasOne(a => a.Product).WithMany(p => p.Applications).HasForeignKey(a => a.ProductId).OnDelete(DeleteBehavior.Restrict);
         builder.HasIndex(a => a.Status);
+        builder.HasIndex(a => a.CreatedAt);
     }
 }
 
@@ -151,6 +156,8 @@ public class AuditLogConfiguration : IEntityTypeConfiguration<AuditLog>
         builder.HasIndex(a => a.Timestamp);
         builder.HasIndex(a => a.Action);
         builder.HasIndex(a => a.EntityType);
+        builder.HasIndex(a => a.ActorUserId);
+        builder.HasIndex(a => new { a.EntityType, a.EntityId });
         builder.Property(a => a.ActorName).HasMaxLength(150);
         builder.Property(a => a.Action).HasMaxLength(100);
         builder.Property(a => a.EntityType).HasMaxLength(50);

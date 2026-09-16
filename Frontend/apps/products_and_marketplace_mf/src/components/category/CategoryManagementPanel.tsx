@@ -1,7 +1,8 @@
+import { Pagination } from "@omniremit/ui";
+import { isApprovalPending } from "../../services/httpClient";
 import { useEffect, useMemo, useState } from "react";
 import { Icon } from "../common/Icon";
 import { StatusBadge } from "../common/StatusBadge";
-import { Pagination } from "../common/Pagination";
 import { CustomSelect } from "../common/CustomSelect";
 import { EmptyState, ErrorState, LoadingSkeletonRows } from "../common/EmptyState";
 import { ConfirmModal } from "../common/ConfirmModal";
@@ -124,6 +125,7 @@ export function CategoryManagementPanel({ showAddButton = false }: { showAddButt
       setDeleteTarget(null);
       useToastStore.getState().success("Category Deleted", `"${name}" has been deleted successfully.`);
     } catch (err) {
+      if (isApprovalPending(err)) return;
       setDeleteError((err as Error).message);
       useToastStore.getState().danger("Delete Failed", (err as Error).message);
     } finally {
@@ -401,11 +403,10 @@ export function CategoryManagementPanel({ showAddButton = false }: { showAddButt
 
             <Pagination
               page={validCurrentPage}
-              totalPages={totalPages}
-              totalCount={filtered.length}
-              pageSize={pageSizeNum || filtered.length}
+              total={filtered.length}
+              pageSize={pageSizeNum || Math.max(1, filtered.length)}
               onPageChange={setCurrentPage}
-              itemLabel="categories"
+              itemLabel="category"
             />
           </>
         )}
@@ -447,6 +448,7 @@ export function CategoryManagementPanel({ showAddButton = false }: { showAddButt
                     setDeleteTarget(null);
                     setDeleteError(null);
                   } catch (err) {
+                    if (isApprovalPending(err)) return;
                     setDeleteError((err as Error).message);
                   }
                 },

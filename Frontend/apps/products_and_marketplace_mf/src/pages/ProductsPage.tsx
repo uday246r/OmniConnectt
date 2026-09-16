@@ -1,7 +1,7 @@
+import { isApprovalPending } from "../services/httpClient";
 import { useState, useEffect } from "react";
 import { Icon, type IconName } from "../components/common/Icon";
 import { ProductCard } from "../components/product/ProductCard";
-import { Pagination } from "../components/common/Pagination";
 import { EmptyState, ErrorState, LoadingSkeletonGrid } from "../components/common/EmptyState";
 import { ConfirmModal } from "../components/common/ConfirmModal";
 import { CustomSelect } from "../components/common/CustomSelect";
@@ -13,8 +13,8 @@ import { useToastStore } from "../stores/useToastStore";
 import { usePermissions } from "../permissions/PermissionContext";
 import { PERMISSIONS } from "../permissions/permissions";
 import { productApi } from "../services/productApi";
-import { exportToCsv } from "../utils/exportCsv";
-import { formatFieldValue } from "../utils/fieldFormat";
+import { CsvExportError, describeTruncation, Pagination, Button, PageHeader } from "@omniremit/ui";
+import { downloadServerCsv } from "../services/exportCsv";
 import type { ProductStatus, SortOption, TopPerformer } from "../types/domain";
 import "./ProductsPage.css";
 
@@ -54,7 +54,6 @@ export function ProductsPage() {
     fetchProductTypes,
     updateStatus,
     removeProduct,
-    totalPages,
   } = useProductStore();
   const { categories, fetchAll: fetchCategories } = useCategoryStore();
   const { open } = useDrawerStore();
@@ -75,13 +74,6 @@ export function ProductsPage() {
     { label: "All Status", value: "" },
     ...productStatuses.map((s) => ({ label: s.label, value: s.value })),
   ];
-
-  const todayFormatted = new Date().toLocaleDateString("en-IN", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
 
   const [deleteTarget, setDeleteTarget] = useState<typeof items[0] | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -141,6 +133,7 @@ export function ProductsPage() {
         await updateStatus(productId, "Active");
         useToastStore.getState().success("Product Activated", "Product status updated to Active.");
       } catch (err) {
+        if (isApprovalPending(err)) return;
         useToastStore.getState().danger("Status Update Failed", (err as Error).message);
       }
       return;
@@ -150,6 +143,7 @@ export function ProductsPage() {
         await updateStatus(productId, "Inactive");
         useToastStore.getState().success("Product Deactivated", "Product status updated to Inactive.");
       } catch (err) {
+        if (isApprovalPending(err)) return;
         useToastStore.getState().danger("Status Update Failed", (err as Error).message);
       }
       return;
@@ -177,6 +171,7 @@ export function ProductsPage() {
       setDeleteTarget(null);
       useToastStore.getState().success("Product Deleted", `"${name}" has been deleted successfully.`);
     } catch (err) {
+      if (isApprovalPending(err)) return;
       setDeleteError((err as Error).message);
       useToastStore.getState().danger("Delete Failed", (err as Error).message);
     } finally {
@@ -184,20 +179,20 @@ export function ProductsPage() {
     }
   }
 
-  function handleExport() {
-    exportToCsv(
-      "products.csv",
-      items.map((p) => ({
-        Name: p.name,
-        Code: p.code,
-        Category: p.categoryName,
-        Type: p.productTypeName,
-        Status: p.status,
-        Rating: p.ratingAverage,
-        Applications: p.applicationCount,
-        PrimaryMetric: p.cardFields[0] ? `${p.cardFields[0].label}: ${formatFieldValue(p.cardFields[0].dataType, p.cardFields[0].value, p.cardFields[0].unit)}` : "",
-      }))
-    );
+  /** Every product matching the filters on screen, built by the server — not just the cards on this page. */
+  async function handleExport() {
+    const { search, categoryId, productTypeId, status, sort } = useProductStore.getState();
+    try {
+      const result = await downloadServerCsv(
+        "/products/export",
+        { search, categoryId, productTypeId, status, sort },
+        `products-${new Date().toISOString().slice(0, 10)}.csv`,
+      );
+      const truncation = describeTruncation(result);
+      if (truncation) useToastStore.getState().warning("Download limited", truncation);
+    } catch (err) {
+      useToastStore.getState().danger("Download failed", err instanceof CsvExportError ? err.message : "The product list could not be downloaded.");
+    }
   }
 
   function handleViewAll() {
@@ -219,57 +214,46 @@ export function ProductsPage() {
 
   return (
     <div className="pm-page pm-products-page">
-      <div className="pm-hero-banner pm-products-hero">
-        <div className="pm-hero-banner-content">
-          <div className="pm-hero-icon-wrap">
-            <Icon name="package" size={26} />
-          </div>
-          <div className="pm-hero-text">
-            <div className="pm-hero-badge-row">
-              <span className="pm-hero-live-badge">• Live Marketplace</span>
-              <span className="pm-hero-date">{todayFormatted}</span>
-            </div>
-            <h1>Product Marketplace</h1>
-            <p>Discover, compare, and apply for verified banking and financial products.</p>
-            <div className="pm-hero-chips pm-hero-chips-inline">
-              <span className="pm-hero-chip">
-                <Icon name="percent" size={12} /> Low Rates
-              </span>
-              <span className="pm-hero-chip">
-                <Icon name="check" size={12} /> Quick Approval
-              </span>
-              <span className="pm-hero-chip">
-                <Icon name="shield" size={12} /> 100% Secure
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <div className="pm-hero-right-col">
-          {canCreate && (
-            <button className="pm-btn pm-hero-add-btn" onClick={() => open("product-form", {})}>
-              <Icon name="plus" size={16} /> Add Product
-            </button>
-          )}
-          <div className="pm-hero-search">
-            <Icon name="search" size={16} className="pm-hero-search-icon" />
-            <input
-              className="pm-input pm-flex-1"
-              placeholder="Search products, rates, benefits..."
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-            />
-            {searchInput && (
-              <button className="pm-hero-clear-btn" onClick={() => setSearchInput("")} title="Clear search">
-                <Icon name="close" size={14} />
-              </button>
+      <PageHeader
+        className="pm-products-hero"
+        title="Product Marketplace"
+        subtitle="Discover, compare, and apply for banking and financial products."
+        icon={<Icon name="package" size={24} />}
+        actions={
+          <div className="pm-hero-right-col">
+            {canCreate && (
+              <Button variant="onHeader" leadingIcon={<Icon name="plus" size={16} />} onClick={() => open("product-form", {})}>
+                Add Product
+              </Button>
             )}
-            <button className="pm-btn pm-btn-primary" onClick={() => setSearch(searchInput)}>
-              Search
-            </button>
+            <form
+              className="pm-hero-search"
+              role="search"
+              onSubmit={(e) => {
+                e.preventDefault();
+                setSearch(searchInput);
+              }}
+            >
+              <Icon name="search" size={16} className="pm-hero-search-icon" />
+              <input
+                className="pm-input pm-flex-1"
+                aria-label="Search products"
+                placeholder="Search products, rates, benefits..."
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+              />
+              {searchInput && (
+                <button type="button" className="pm-hero-clear-btn" onClick={() => setSearchInput("")} aria-label="Clear search" title="Clear search">
+                  <Icon name="close" size={14} />
+                </button>
+              )}
+              <button type="submit" className="pm-btn pm-btn-primary">
+                Search
+              </button>
+            </form>
           </div>
-        </div>
-      </div>
+        }
+      />
 
       <div className="pm-category-row">
         <button className={`pm-category-pill ${!categoryId ? "active" : ""}`} onClick={() => setCategoryId(null)}>
@@ -406,7 +390,7 @@ export function ProductsPage() {
                   />
                 ))}
               </div>
-              <Pagination page={page} totalPages={totalPages} totalCount={totalCount} pageSize={pageSize} onPageChange={setPage} itemLabel="products" />
+              <Pagination page={page} total={totalCount} pageSize={pageSize} onPageChange={setPage} itemLabel="product" />
             </>
           )}
         </div>
@@ -469,6 +453,7 @@ export function ProductsPage() {
                     setDeleteTarget(null);
                     setDeleteError(null);
                   } catch (err) {
+                    if (isApprovalPending(err)) return;
                     setDeleteError((err as Error).message);
                   }
                 },

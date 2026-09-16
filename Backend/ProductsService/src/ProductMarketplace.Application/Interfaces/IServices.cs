@@ -71,6 +71,9 @@ public interface IProductService
     Task<bool> DeleteAsync(Guid id, CancellationToken ct = default);
     Task<ProductDetailDto?> UpdateStatusAsync(Guid id, string status, CancellationToken ct = default);
     Task<List<TopPerformerDto>> GetTopPerformersAsync(string metric, int take, CancellationToken ct = default);
+
+    /// <summary>Every product matching the catalogue filters, as CSV, capped and reporting how many matched.</summary>
+    Task<CsvExport> ExportCsvAsync(ProductQueryDto query, CancellationToken ct = default);
 }
 
 public interface IReviewService
@@ -85,6 +88,8 @@ public interface IReviewService
 public interface IPromotionService
 {
     Task<PagedResult<PromotionDto>> SearchAsync(PromotionQueryDto query, CancellationToken ct = default);
+    /// <summary>How many promotions hold each status under the search and product filters (the status filter is ignored).</summary>
+    Task<IReadOnlyList<StatusCountDto>> StatusCountsAsync(PromotionQueryDto query, CancellationToken ct = default);
     Task<PromotionDto?> GetByIdAsync(Guid id, CancellationToken ct = default);
     Task<PromotionDto> CreateAsync(PromotionCreateUpdateDto dto, CancellationToken ct = default);
     Task<PromotionDto?> UpdateAsync(Guid id, PromotionCreateUpdateDto dto, CancellationToken ct = default);
@@ -95,6 +100,8 @@ public interface IPromotionService
 public interface IApplicationService
 {
     Task<PagedResult<ApplicationListItemDto>> SearchAsync(ApplicationQueryDto query, CancellationToken ct = default);
+    /// <summary>How many applications hold each status under the search and product filters (the status filter is ignored).</summary>
+    Task<IReadOnlyList<StatusCountDto>> StatusCountsAsync(ApplicationQueryDto query, CancellationToken ct = default);
     Task<ApplicationDetailDto?> GetByIdAsync(Guid id, CancellationToken ct = default);
     Task<ApplicationDetailDto> CreateAsync(ApplicationCreateDto dto, CancellationToken ct = default);
     Task<ApplicationDetailDto?> UpdateStatusAsync(Guid id, ApplicationStatusUpdateDto dto, CancellationToken ct = default);
@@ -124,15 +131,38 @@ public interface IDashboardService
     Task<List<KeyValuePair<string, int>>> GetTopSearchesAsync(int take, CancellationToken ct = default);
 }
 
-/// <summary>Identifies who is performing the current request. Backed by request headers sent by the
-/// frontend's mock-current-user context today; the Host App will populate this from the real
-/// authenticated session once integrated - no consuming code needs to change.</summary>
+/// <summary>
+/// Identifies who is performing the current request, from the verified platform token only — never from
+/// anything the browser sends. During an approval replay it names the maker who requested the change.
+/// </summary>
 public interface IAuditContext
 {
+    Guid? UserId { get; }
     string ActorName { get; }
     string ActorEmail { get; }
     string? IpAddress { get; }
+    string? UserAgent { get; }
 }
+
+/// <summary>
+/// Copies an audit entry into the platform's central audit trail, so activity in this remote appears in
+/// the host's Audit Logs and in each user's activity history. Best effort: a failure to forward never
+/// fails the action that was already recorded locally.
+/// </summary>
+public interface IAuditForwarder
+{
+    Task ForwardAsync(AuditForwardEntry entry, CancellationToken ct = default);
+}
+
+public sealed record AuditForwardEntry(
+    string Action,
+    string EntityType,
+    Guid? EntityId,
+    string EntityName,
+    string Description,
+    bool Success,
+    Guid? ActorUserId,
+    string ActorName);
 
 public interface IAuditLogService
 {
@@ -143,4 +173,7 @@ public interface IAuditLogService
     Task<List<AuditActionOptionDto>> GetActionOptionsAsync(CancellationToken ct = default);
     Task<AuditLogSummaryDto> GetSummaryAsync(AuditLogQueryDto query, CancellationToken ct = default);
     Task<List<string>> GetEntityTypesAsync(CancellationToken ct = default);
+
+    /// <summary>The whole filtered trail as CSV, capped, reporting how many rows matched.</summary>
+    Task<CsvExport> ExportCsvAsync(AuditLogQueryDto query, CancellationToken ct = default);
 }

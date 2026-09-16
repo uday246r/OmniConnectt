@@ -7,9 +7,17 @@ public class LocalFileStorageService : IFileStorageService
 {
     private readonly string _uploadDirectory;
 
-    public LocalFileStorageService(IWebHostEnvironment env)
+    /// <param name="configuration">
+    /// <c>Storage:UploadsPath</c> points the store at a shared volume, which is what lets more than one
+    /// instance serve the same documents. Unset, files go under the content root, which is right for one
+    /// instance only — each replica would otherwise hold its own, partial set.
+    /// </param>
+    public LocalFileStorageService(IWebHostEnvironment env, Microsoft.Extensions.Configuration.IConfiguration configuration)
     {
-        _uploadDirectory = Path.Combine(env.ContentRootPath, "AppData", "Uploads");
+        var configured = configuration["Storage:UploadsPath"];
+        _uploadDirectory = string.IsNullOrWhiteSpace(configured)
+            ? Path.Combine(env.ContentRootPath, "AppData", "Uploads")
+            : Path.GetFullPath(configured);
         Directory.CreateDirectory(_uploadDirectory);
     }
 

@@ -27,7 +27,8 @@ public record FieldDefinitionDto(
 
 public record UserFieldSchemaDto(IReadOnlyList<FieldDefinitionDto> Fields, int Version, DateTimeOffset UpdatedAt);
 
-public record UpdateUserFieldSchemaRequest(IReadOnlyList<FieldDefinitionDto> Fields);
+/// <param name="ExpectedVersion">The version the editor loaded; a different current version is a 409, not a silent overwrite.</param>
+public record UpdateUserFieldSchemaRequest(IReadOnlyList<FieldDefinitionDto> Fields, int? ExpectedVersion = null);
 
 /// <summary>One field-level validation failure, e.g. from a dynamic (schema-defined) rule that a fixed
 /// data-annotation on the DTO cannot express. Surfaced via FieldValidationException.</summary>

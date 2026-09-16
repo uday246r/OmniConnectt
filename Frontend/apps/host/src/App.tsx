@@ -1,15 +1,17 @@
 import { lazy, Suspense, useEffect } from 'react'
-import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation, useNavigate, useParams, type Location } from 'react-router-dom'
+import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation, useNavigate, type Location } from 'react-router-dom'
 import { AppShell } from './layout/AppShell/AppShell'
 import { RequireAuth } from './features/auth/components/RequireAuth'
 import { RequireCapability } from './features/auth/components/RequireCapability'
 import { RequirePasswordChange } from './features/auth/components/RequirePasswordChange'
 import { useSilentRefresh } from './features/auth/hooks/useSilentRefresh'
 import { usePlatformConnection } from './shared/realtime/usePlatformConnection'
+import { usePageViewTracking } from './shared/hooks/usePageViewTracking'
 import { useAuthStore } from './features/auth/store/authStore'
 import { useRemoteHealthStore } from './shared/stores/remoteHealthStore'
 import { useNavigationStore } from './shared/stores/navigationStore'
-import { isDrawerRoute, useSettingsDrawerStore, type SettingsTab } from './shared/stores/settingsDrawerStore'
+import { isDrawerRoute, useSettingsDrawerStore } from './shared/stores/settingsDrawerStore'
+import { SettingsDrawerUrlSync, useSettingsBackgroundLocation } from './layout/SettingsDrawer/SettingsDrawerUrlSync'
 import { RouteFallback } from './shared/components/RouteFallback/RouteFallback'
 import { LoginPage } from './pages/LoginPage/LoginPage'
 import { PageSkeleton } from './shared/components/PageSkeleton/PageSkeleton'
@@ -83,86 +85,6 @@ const FEATURE_KEYS = {
 } as const
 
 /**
- * Opens the settings drawer for a `/settings/...` URL — and, unlike before, leaves the URL alone.
- *
- * This previously called `navigate('/', { replace: true })` in the same effect that opened the
- * drawer, so every settings URL was thrown away the instant it was consumed. Clicking Users, Roles,
- * Applications or Checker Assignment left the address bar on the dashboard, nothing was linkable, and
- * Back did not step between tabs. The URL is now the source of truth: the tab buttons navigate, and
- * this component reacts.
- *
- * Users, Roles and Applications used to exist twice over: once as routed full pages behind SetupPanel,
- * and once as tabs inside the gear drawer. Both were live, so the same CRUD was maintained in two
- * places and they had drifted badly — the routed forms never received the validation or the
- * catalog-driven permission grid, which is why every bug reported against those screens reproduced
- * there and not in the drawer.
- *
- * The URLs are kept rather than deleted so bookmarks keep working AND so global search keeps working:
- * SearchAppService builds routes like "/settings/users/{id}" server-side, and this is what turns one
- * into an open drawer. `replace` is used so the redirect leaves no dead history entry for Back to
- * bounce off.
- */
-function SettingsRoute({ tab }: { tab: SettingsTab }) {
-  const { id } = useParams<{ id: string }>()
-  const openTab = useSettingsDrawerStore((s) => s.open)
-  const pushLayer = useSettingsDrawerStore((s) => s.pushLayer)
-  const returnPath = useSettingsDrawerStore((s) => s.returnPath)
-  const location = useLocation()
-
-  useEffect(() => {
-    openTab(tab)
-
-    // A trailing /new or /:id opens the matching form layer straight away. Ordering matters: open()
-    // resets the layer stack, so the push has to follow it, which is why both live in one effect.
-    const isNew = location.pathname.endsWith('/new')
-    if (isNew || id) {
-      const entityId = isNew ? undefined : id
-      if (tab === 'users') pushLayer({ type: 'user-form', userId: entityId })
-      else if (tab === 'roles') pushLayer({ type: 'role-form', roleId: entityId })
-      else if (tab === 'applications') pushLayer({ type: 'app-form', appId: entityId })
-    }
-  }, [tab, id, location.pathname, openTab, pushLayer])
-
-  /*
-   * The backdrop behind the drawer must match where the operator actually was before the gear icon
-   * was clicked — not hard-coded to DashboardPage, which flashes briefly for every user who opened
-   * Settings from a non-dashboard page.
-   *
-   * `returnPath` is captured by Topbar.openSettings() synchronously before navigate('/settings') is
-   * called, so by the time this component renders it already holds the correct origin path. We strip
-   * the query string for the prefix checks; query params don't change which component to render.
-   *
-   * Fallback: if returnPath is '/' or anything unrecognised, DashboardPage is the correct default
-   * because that IS the root route. Users who genuinely come from the dashboard should see it.
-   */
-  const basePath = returnPath.split('?')[0].replace(/\/$/, '') || '/'
-
-  if (tab === 'users' || basePath === '/settings/users') {
-    return <UsersPage />
-  }
-  if (basePath === '/profile') {
-    return <ProfilePage />
-  }
-  if (basePath === '/system/audit-logs') {
-    return <AuditLogsPage />
-  }
-  if (basePath === '/system/system-logs') {
-    return <SystemLogsPage />
-  }
-  if (basePath === '/system/approvals') {
-    return <ApprovalCenterPage />
-  }
-  if (basePath === '/my-requests') {
-    return <MyRequestsPage />
-  }
-  if (basePath.startsWith('/apps/')) {
-    return <RemoteAppPage />
-  }
-  // Default: dashboard (covers '/' and any future routes not yet listed above)
-  return <DashboardPage />
-}
-
-/**
  * The dashboard, gated by the same capability that decides whether its sidebar row appears.
  *
  * The row was hidden for a user without `host.dashboard:View`, but the route itself was open, so
@@ -176,40 +98,6 @@ function SettingsRoute({ tab }: { tab: SettingsTab }) {
  * exactly as configured. The navigation tree already knows what they CAN reach, so the first row in
  * it is a far better destination — and it is the server's answer, not a guess made here.
  */
-/**
- * `/settings` with no tab — send the operator to the first tab they can actually open.
- *
- * It used to resolve straight to the Users tab, so anyone without `Users:View` (a role that manages
- * only applications, say) was bounced from `/settings` to `/404` by that tab's own guard. The drawer
- * already picks its visible tabs this way; this makes the bare URL agree with it.
- *
- * Users is checked LAST, not first. Users has a real page now (UsersPage) instead of a drawer tab,
- * so landing there means no drawer opens at all — which used to be fine when it was the only thing
- * behind the gear icon, but would now silently strand Roles/Applications/Checker-Assignment for
- * anyone who also has those (the gear icon calls this same redirect, and previously that operator
- * saw a tab strip they could switch between; putting Users first made every one of those sections
- * unreachable from the gear icon). Ordering the drawer-only tabs first means the gear icon still
- * opens the drawer whenever the operator has any of those, and its tab strip's Users button (see
- * SettingsDrawer.tsx) reaches the real page from there. Someone with ONLY Users access still lands
- * correctly — Users is the fallback, not left out.
- */
-function SettingsIndexRedirect() {
-  const isAdministrator = Boolean(useAuthStore((s) => s.user)?.isAdministrator)
-  const hasCapability = useAuthStore((s) => s.hasCapability)
-
-  const firstAllowed = (
-    [
-      ['roles', FEATURE_KEYS.roles],
-      ['applications', FEATURE_KEYS.applications],
-      ['checker-assignment', FEATURE_KEYS.checkerAssignment],
-      ['users', FEATURE_KEYS.users],
-    ] as const
-  ).find(([, featureKey]) => isAdministrator || hasCapability(featureKey, 'View'))
-
-  // No settings access at all: 404 rather than an empty drawer that can do nothing.
-  return <Navigate to={firstAllowed ? `/settings/${firstAllowed[0]}` : '/404'} replace />
-}
-
 function DashboardRoute() {
   const isAdministrator = useAuthStore((s) => Boolean(s.user?.isAdministrator))
   const hasCapability = useAuthStore((s) => s.hasCapability)
@@ -288,7 +176,6 @@ function LoginRoute() {
 function AuthenticatedShell() {
   const user = useAuthStore((s) => s.user)
   const accessToken = useAuthStore((s) => s.accessToken)
-  const hasCapability = useAuthStore((s) => s.hasCapability)
   const logout = useAuthStore((s) => s.logout)
   const ensureFreshAccessToken = useAuthStore((s) => s.ensureFreshAccessToken)
   const navigate = useNavigate()
@@ -309,6 +196,9 @@ function AuthenticatedShell() {
     if (isDrawerRoute(shellLocation.pathname)) return
     setReturnPath(`${shellLocation.pathname}${shellLocation.search}`)
   }, [shellLocation.pathname, shellLocation.search, setReturnPath])
+
+  // Every page opened, host or remote, goes into the audit trail — resolved and labelled server-side.
+  usePageViewTracking()
 
   // The sidebar is rendered entirely from this tree, and it is the only source of it. A second feed
   // listing the same apps used to sit alongside this one; the two answered the same question with
@@ -358,12 +248,7 @@ function AuthenticatedShell() {
     return () => clearInterval(interval)
   }, [accessToken, refetchHealth, hasUnsettledApp])
 
-  const isAdministrator = Boolean(user?.isAdministrator)
-  const settingsAccess = {
-    users: isAdministrator || hasCapability(FEATURE_KEYS.users, 'View'),
-    roles: isAdministrator || hasCapability(FEATURE_KEYS.roles, 'View'),
-    applications: isAdministrator || hasCapability(FEATURE_KEYS.applications, 'View'),
-  }
+  // Settings visibility (the gear and its tabs) is decided from SETTINGS_SECTIONS where it is used.
   // canAccessAuditLogs / canAccessApprovals are gone: the sidebar no longer takes per-section access
   // flags from the client, because the navigation tree already applied those same permissions
   // server-side. Deciding visibility twice, in two languages, is how the two drift apart.
@@ -375,7 +260,6 @@ function AuthenticatedShell() {
     <AppShell
       appHealth={appHealth}
       userName={user?.name}
-      settingsAccess={settingsAccess}
       onLogout={() => {
         void logout().then(() => navigate('/login', { replace: true }))
       }}
@@ -430,9 +314,18 @@ function AppRoutes() {
     void preloadDashboard()
   }, [hydrate])
 
+  /*
+   * While a settings drawer URL is open, the page routes render the location the operator came from.
+   * The same page element stays mounted under the drawer instead of being swapped for a copy, so
+   * nothing behind it reloads — see SettingsDrawerUrlSync.
+   */
+  const routesLocation = useSettingsBackgroundLocation()
+
   return (
     <Suspense fallback={<RouteFallback />}>
-      <Routes>
+      {/* Outside <Routes>, so it sees the real drawer URL rather than the page rendered behind it. */}
+      <SettingsDrawerUrlSync />
+      <Routes location={routesLocation}>
         <Route path="/login" element={<LoginRoute />} />
         {/*
           Public by necessity — the recipient of an invite has no credentials yet, which is the whole
@@ -516,45 +409,17 @@ function AppRoutes() {
           <Route path="my-requests" element={<MyRequestsPage />} />
 
           {/*
-            Settings has no pages of its own — it IS the gear drawer, rendered globally by AppShell.
-
-            These routes exist so every /settings/* URL still resolves: each opens the drawer on the right
-            tab and, for /new or /:id, pushes the matching form layer, then hands the URL back to the
-            dashboard. That keeps bookmarks, the back button and — importantly — global search working,
-            since SearchAppService builds "/settings/users/{id}" style routes server-side.
-
-            The routed page components and SetupPanel are gone. They were a second, older implementation
-            of the same CRUD, and every bug reported against these screens came from them rather than the
-            drawer: the user form there had no validation at all (so it accepted "989898989sssss" and
-            "ashok246@gmail.comsssssssss"), and the role form's permission grid still read capabilities off
-            the PARENT feature — which for remote.employee declares none, so every column rendered a dash.
-            Deleting them is what fixes those, not patching them twice.
+            Settings pages. The drawer screens (roles, applications, checker assignment, create user)
+            have no route here at all: their URLs render the page the operator came from (see
+            routesLocation in AppRoutes) and SettingsDrawerUrlSync opens the drawer over it.
           */}
           <Route path="settings">
-            <Route index element={<SettingsIndexRedirect />} />
-
-            {/*
-              Users has real pages now (UsersPage / UserDetailPage) instead of opening the drawer's
-              Users tab — a proper main-content table and profile view rather than a card list behind
-              an overlay. /new is left exactly as it was: it still opens the drawer's create-user form
-              (validated there, not rebuilt here — see the big comment below on why). index and :id are
-              gated on the default View capability, not Edit — viewing a profile shouldn't require
-              edit rights, unlike the old generic :id route this replaces.
-            */}
             <Route path="users">
               <Route
                 index
                 element={
                   <RequireCapability featureKey={FEATURE_KEYS.users}>
                     <UsersPage />
-                  </RequireCapability>
-                }
-              />
-              <Route
-                path="new"
-                element={
-                  <RequireCapability featureKey={FEATURE_KEYS.users} capability="Create">
-                    <SettingsRoute tab="users" />
                   </RequireCapability>
                 }
               />
@@ -568,9 +433,8 @@ function AppRoutes() {
               />
             </Route>
 
-            {/* Real pages, not drawer tabs — same reasoning as Users above. No /new or /:id: both
-                screens edit everything inline (a modal per field/format), so there's nothing a
-                sub-route would ever need to address. */}
+            {/* Real pages, not drawer tabs. Both screens edit everything inline (a modal per
+                field/format), so no sub-route is needed. */}
             <Route
               path="fields"
               element={
@@ -587,41 +451,6 @@ function AppRoutes() {
                 </RequireCapability>
               }
             />
-
-            {(
-              [
-                ['roles', FEATURE_KEYS.roles, 'Create'],
-                ['applications', FEATURE_KEYS.applications, 'Register'],
-                ['checker-assignment', FEATURE_KEYS.checkerAssignment, 'Manage'],
-              ] as const
-            ).map(([tab, featureKey, createCapability]) => (
-              <Route key={tab} path={tab}>
-                <Route
-                  index
-                  element={
-                    <RequireCapability featureKey={featureKey}>
-                      <SettingsRoute tab={tab} />
-                    </RequireCapability>
-                  }
-                />
-                <Route
-                  path="new"
-                  element={
-                    <RequireCapability featureKey={featureKey} capability={createCapability}>
-                      <SettingsRoute tab={tab} />
-                    </RequireCapability>
-                  }
-                />
-                <Route
-                  path=":id"
-                  element={
-                    <RequireCapability featureKey={featureKey} capability="Edit">
-                      <SettingsRoute tab={tab} />
-                    </RequireCapability>
-                  }
-                />
-              </Route>
-            ))}
           </Route>
         </Route>
       </Route>

@@ -15,6 +15,12 @@ public static class RateLimitPolicies
     /// corporate NAT — which a bank branch office very much is.
     /// </summary>
     public const string Sensitive = "sensitive";
+
+    /// <summary>
+    /// Page-view recording. Partitioned by user id. Generous enough for someone clicking quickly
+    /// through the sidebar, low enough that a script looping on the endpoint cannot fill the audit table.
+    /// </summary>
+    public const string PageViews = "page-views";
 }
 
 /// <summary>
@@ -48,4 +54,9 @@ public class RateLimitOptions
     public int SensitivePermitLimit { get; set; } = 5;
 
     public int SensitiveWindowSeconds { get; set; } = 300;
+
+    /// <summary>Page views accepted per user per window. Over the limit the view is simply not recorded.</summary>
+    public int PageViewPermitLimit { get; set; } = 60;
+
+    public int PageViewWindowSeconds { get; set; } = 60;
 }

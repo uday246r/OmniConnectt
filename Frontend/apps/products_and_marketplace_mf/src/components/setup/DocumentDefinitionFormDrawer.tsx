@@ -1,3 +1,5 @@
+import { isApprovalPending } from "../../services/httpClient";
+import { CustomSelect } from "../common/CustomSelect";
 import { useEffect, useState } from "react";
 import { Drawer, DrawerSection } from "../drawer/Drawer";
 import { Icon } from "../common/Icon";
@@ -48,6 +50,7 @@ export function DocumentDefinitionFormDrawer({ documentId }: { documentId?: stri
       }
       close();
     } catch (err) {
+      if (isApprovalPending(err)) return;
       setError((err as Error).message);
     } finally {
       setSubmitting(false);
@@ -84,14 +87,12 @@ export function DocumentDefinitionFormDrawer({ documentId }: { documentId?: stri
           </div>
           <div className="pm-field pm-field-full">
             <label>Applies To</label>
-            <select className="pm-select" value={productTypeId} onChange={(e) => setProductTypeId(e.target.value)}>
-              <option value="">All Product Types</option>
-              {productTypes.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name} only
-                </option>
-              ))}
-            </select>
+            <CustomSelect
+              aria-label="Applies to"
+              options={[{ value: "", label: "All Product Types" }, ...productTypes.map((t) => ({ value: t.id, label: `${t.name} only` }))]}
+              value={productTypeId}
+              onChange={setProductTypeId}
+            />
           </div>
         </div>
       </DrawerSection>

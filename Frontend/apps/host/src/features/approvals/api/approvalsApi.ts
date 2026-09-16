@@ -117,6 +117,12 @@ export interface ListApprovalsParams {
   decidedTo?: string
 }
 
+/**
+ * My Requests' filters. The server always narrows to the caller's own requests; there is no maker to name.
+ * Every filter is applied on the server, so searching finds a request on any page.
+ */
+export type MyRequestsParams = Omit<ListApprovalsParams, 'makerId' | 'makerName' | 'assignedToMe'>
+
 function buildQuery(params: object) {
   const search = new URLSearchParams()
   for (const [key, value] of Object.entries(params) as [string, string | number | boolean | undefined][]) {
@@ -149,12 +155,12 @@ export const approvalsApi = {
     ),
 
   /** "My Requests" — the maker's own submissions, regardless of whether they hold Approval Center access. */
-  listMine: (
-    accessToken: string,
-    params: { page?: number; pageSize?: number; status?: ApprovalStatus } = {},
-    signal?: AbortSignal,
-  ) =>
+  listMine: (accessToken: string, params: MyRequestsParams = {}, signal?: AbortSignal) =>
     apiFetch<PagedResult<ApprovalRequestListItemDto>>(`${base}/api/approvals/mine${buildQuery(params)}`, { accessToken, signal }),
+
+  /** My Requests' dropdown options, from the caller's own requests under the same filters. */
+  mineFacets: (accessToken: string, params: MyRequestsParams = {}, signal?: AbortSignal) =>
+    apiFetch<ApprovalFacetsDto>(`${base}/api/approvals/mine/facets${buildQuery(params)}`, { accessToken, signal }),
 
   get: (accessToken: string, id: string) =>
     apiFetch<ApprovalRequestDetailDto>(`${base}/api/approvals/${id}`, { accessToken }),

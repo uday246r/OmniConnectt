@@ -45,12 +45,23 @@ public class UserFieldSchemaAppService(AuthDbContext db, AuditLogAppService audi
     public async Task<IReadOnlyList<FieldDefinitionDto>> GetFieldsAsync(CancellationToken ct = default)
         => (await GetAsync(ct)).Fields;
 
+    private const string StaleMessage =
+        "Someone else changed the user fields while you were editing. Reload to see their changes, then make yours again.";
+
     public async Task<UserFieldSchemaDto> UpdateAsync(
         UpdateUserFieldSchemaRequest request, Guid? actingUserId, CancellationToken ct = default)
     {
         ValidateShape(request.Fields);
 
         var row = await db.UserFieldSchemas.OrderByDescending(s => s.UpdatedAt).FirstOrDefaultAsync(ct);
+
+        // Two administrators editing at once: a save based on an older version is refused rather than
+        // silently undoing the other person's work.
+        if (request.ExpectedVersion is {} expectedVersion && expectedVersion != (row?.Version ?? 0))
+        {
+            throw new ConflictAppException(StaleMessage);
+        }
+
         var now = DateTimeOffset.UtcNow;
         var schemaJson = JsonSerializer.Serialize(request.Fields, JsonOptions);
 
@@ -67,7 +78,14 @@ public class UserFieldSchemaAppService(AuthDbContext db, AuditLogAppService audi
             row.UpdatedBy = actingUserId;
         }
 
-        await db.SaveChangesAsync(ct);
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            throw new ConflictAppException(StaleMessage);
+        }
 
         /*
          * Unaudited until now, along with the other two admin-editable catalogs.
@@ -141,7 +159,7 @@ public class UserFieldSchemaAppService(AuthDbContext db, AuditLogAppService audi
 
             foreach (var rule in field.Validations)
             {
-                if (rule.Type == Infrastructure.Validation.FieldPresets.Custom)
+                if (rule.Type == FieldPresets.Custom)
                 {
                     if (string.IsNullOrWhiteSpace(rule.Pattern))
                     {

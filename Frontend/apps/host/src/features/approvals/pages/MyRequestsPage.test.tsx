@@ -1,6 +1,6 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter } from 'react-router-dom'
+import { renderWithQuery } from '../../../test/renderWithQuery'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useAuthStore } from '../../auth/store/authStore'
 import { ApiError } from '../../../shared/api/httpClient'
@@ -18,6 +18,7 @@ import type { ApprovalRequestListItemDto } from '../api/approvalsApi'
 
 const api = vi.hoisted(() => ({
   listMine: vi.fn(),
+  mineFacets: vi.fn(),
   revealTempPassword: vi.fn(),
 }))
 
@@ -46,16 +47,13 @@ function item(over: Partial<ApprovalRequestListItemDto> = {}): ApprovalRequestLi
 }
 
 function renderPage() {
-  return render(
-    <MemoryRouter>
-      <MyRequestsPage />
-    </MemoryRouter>,
-  )
+  return renderWithQuery(<MyRequestsPage />)
 }
 
 beforeEach(() => {
   vi.clearAllMocks()
   api.listMine.mockResolvedValue({ items: [item()], total: 1, page: 1, pageSize: 10 })
+  api.mineFacets.mockResolvedValue({ modules: ['host.settings.users', 'remote.lead.lead'], actions: ['Create', 'Delete'], makers: [], checkers: ['Ben Ito', 'Chen Li'] })
   useAuthStore.setState({
     status: 'authenticated',
     accessToken: 'token',
@@ -126,5 +124,27 @@ describe('collecting the temporary password', () => {
 
     expect(await screen.findByText('Service unavailable')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /get password/i })).toBeEnabled()
+  })
+})
+
+describe('filtering', () => {
+  it('asks the server for module, action and checker instead of narrowing the page it has', async () => {
+    renderPage()
+    await screen.findByText('new.hire@example.com')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Action' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Delete' }))
+
+    await waitFor(() => expect(api.listMine.mock.calls.at(-1)?.[1]).toMatchObject({ action: 'Delete', page: 1 }))
+    expect(api.mineFacets.mock.calls.at(-1)?.[1]).toMatchObject({ action: 'Delete' })
+  })
+
+  it('offers dropdown options from all of the maker’s requests, not only the page on screen', async () => {
+    renderPage()
+    await screen.findByText('new.hire@example.com')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Checker' }))
+
+    expect(await screen.findByRole('button', { name: 'Chen Li' })).toBeInTheDocument()
   })
 })

@@ -93,14 +93,29 @@ public class ApprovalsController(ApprovalAppService approvals, AuditLogAppServic
     /// </summary>
     [HttpGet("mine")]
     public async Task<ActionResult<PagedResult<ApprovalRequestListItemDto>>> ListMine(
-        [FromQuery] int page = 1, [FromQuery] int pageSize = 25, [FromQuery] string? status = null, CancellationToken ct = default)
+        [FromQuery] ApprovalFilter filter, [FromQuery] int page = 1, [FromQuery] int pageSize = 25, CancellationToken ct = default)
     {
         var currentUserId = CurrentUserId();
         if (currentUserId is null) return Unauthorized();
-        return Ok(await approvals.ListAsync(
-            Math.Max(page, 1), Math.Clamp(pageSize, 1, 100),
-            new ApprovalFilter { Status = status, MakerId = currentUserId }, ct));
+
+        // Every filter the Approval Center has — but always narrowed to the caller's own requests. My
+        // Requests used to take only a status and filter the rest within the one page it had fetched,
+        // so a request on page three could not be found by searching for it.
+        return Ok(await approvals.ListAsync(Math.Max(page, 1), Math.Clamp(pageSize, 1, 100), Mine(filter, currentUserId.Value), ct));
     }
+
+    /// <summary>My Requests' dropdown options, drawn from the caller's own requests under the filters applied.</summary>
+    [HttpGet("mine/facets")]
+    public async Task<ActionResult<ApprovalFacetsDto>> MineFacets([FromQuery] ApprovalFilter filter, CancellationToken ct = default)
+    {
+        var currentUserId = CurrentUserId();
+        if (currentUserId is null) return Unauthorized();
+        return Ok(await approvals.FacetsAsync(Mine(filter, currentUserId.Value), ct));
+    }
+
+    /// <summary>Forces the maker to the caller, whatever the query string said; the checker filter is by name only.</summary>
+    private static ApprovalFilter Mine(ApprovalFilter filter, Guid currentUserId) =>
+        filter with { MakerId = currentUserId, MakerName = null, CheckerId = null };
 
     [HttpGet("{id:guid}")]
     [RequirePermission(Feature, "View")]

@@ -54,3 +54,8 @@
 .footnoteStrong {
   color: var(--omni-color-text-secondary);
 }
+
+/* The searchable Group-by dropdown in the card header. */
+.granularityPicker {
+  width: 120px;
+}

@@ -56,9 +56,6 @@ export default function CaseDetailsModal() {
               </button>
             )}
           </div>
-          <Button type="button" variant="secondary" onClick={closeCaseModal}>
-            Close Details
-          </Button>
         </div>
       }
     >

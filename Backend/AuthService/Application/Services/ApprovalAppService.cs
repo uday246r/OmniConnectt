@@ -604,7 +604,8 @@ public class ApprovalAppService(
                     new ApplyApprovedMutationRequest(
                         request.Module, request.Action, request.EntityType, request.EntityId, request.NewDataJson,
                         request.MakerId, request.MakerName, request.CorrelationId),
-                    ct);
+                    ct,
+                    request.SourceService);
                 remoteReplay.Fired = true;
                 break;
         }

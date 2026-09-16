@@ -1366,7 +1366,7 @@ export default function Customer360() {
                                 }}
                                 options={intData.uniqueStatuses.map((s) => ({ value: s, label: s }))}
                                 allLabel="All Statuses"
-                                searchable={intData.uniqueStatuses.length > 6}
+                                searchable
                               />
                             ),
                             render: (item) => (
@@ -1548,7 +1548,7 @@ export default function Customer360() {
                                     onChange={setIndTypeFilter}
                                     options={indData.uniqueTypes.map((t) => ({ value: t, label: t }))}
                                     allLabel="All Types"
-                                    searchable={indData.uniqueTypes.length > 6}
+                                    searchable
                                   />
                                 ),
                                 render: (item) => (
@@ -1580,7 +1580,7 @@ export default function Customer360() {
                                     onChange={setIndStatusFilter}
                                     options={indData.uniqueStatuses.map((s) => ({ value: s, label: s }))}
                                     allLabel="All Statuses"
-                                    searchable={indData.uniqueStatuses.length > 6}
+                                    searchable
                                   />
                                 ),
                                 render: (item) => (
@@ -2038,7 +2038,7 @@ export default function Customer360() {
                                     onChange={setCorpTypeFilter}
                                     options={corpData.uniqueTypes.map((t) => ({ value: t, label: t }))}
                                     allLabel="All Types"
-                                    searchable={corpData.uniqueTypes.length > 6}
+                                    searchable
                                   />
                                 ),
                                 render: (item) => (
@@ -2070,7 +2070,7 @@ export default function Customer360() {
                                     onChange={setCorpStatusFilter}
                                     options={corpData.uniqueStatuses.map((s) => ({ value: s, label: s }))}
                                     allLabel="All Statuses"
-                                    searchable={corpData.uniqueStatuses.length > 6}
+                                    searchable
                                   />
                                 ),
                                 render: (item) => (

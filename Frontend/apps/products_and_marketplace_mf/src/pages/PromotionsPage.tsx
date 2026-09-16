@@ -1,7 +1,9 @@
+import { Pagination, Button, PageHeader } from "@omniremit/ui";
+import { isApprovalPending } from "../services/httpClient";
 import { useEffect, useState } from "react";
 import { Icon } from "../components/common/Icon";
 import { StatusBadge } from "../components/common/StatusBadge";
-import { Pagination } from "../components/common/Pagination";
+import { StatusCountCards } from "../components/common/StatusCountCards";
 import { EmptyState, ErrorState, LoadingSkeletonRows } from "../components/common/EmptyState";
 import { ConfirmModal } from "../components/common/ConfirmModal";
 import { CustomSelect } from "../components/common/CustomSelect";
@@ -24,7 +26,7 @@ export function PromotionsPage() {
     page,
     pageSize,
     totalCount,
-    totalPages,
+    statusCounts,
     setSearch,
     setStatus,
     setPage,
@@ -50,13 +52,6 @@ export function PromotionsPage() {
     .filter((c) => c.entityType === "Promotion" && c.enabled)
     .sort((a, b) => a.sortOrder - b.sortOrder);
 
-  const todayFormatted = new Date().toLocaleDateString("en-IN", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
-
   useEffect(() => {
     fetchStatusConfigs();
   }, [fetchStatusConfigs]);
@@ -64,10 +59,6 @@ export function PromotionsPage() {
   useEffect(() => {
     fetchPromotions();
   }, [search, status, page, pageSize, fetchPromotions]);
-
-  const activeCount = items.filter((p) => p.status === "Active").length;
-  const scheduledCount = items.filter((p) => p.status === "Scheduled").length;
-  const draftCount = items.filter((p) => p.status === "Draft").length;
 
   async function handleConfirmDelete() {
     if (!deleteTarget) return;
@@ -79,6 +70,7 @@ export function PromotionsPage() {
       setDeleteTarget(null);
       useToastStore.getState().success("Promotion Deleted", `"${title}" has been deleted successfully.`);
     } catch (err) {
+      if (isApprovalPending(err)) return;
       setDeleteError((err as Error).message);
       useToastStore.getState().danger("Delete Failed", (err as Error).message);
     } finally {
@@ -99,94 +91,20 @@ export function PromotionsPage() {
 
   return (
     <div className="pm-page pm-promotions-page">
-      <div className="pm-hero-banner">
-        <div className="pm-hero-banner-content">
-          <div className="pm-hero-icon-wrap">
-            <Icon name="tag" size={26} />
-          </div>
-          <div className="pm-hero-text">
-            <div className="pm-hero-badge-row">
-              <span className="pm-hero-live-badge">• Active Campaigns</span>
-              <span className="pm-hero-date">{todayFormatted}</span>
-            </div>
-            <h1>Promotions & Campaigns</h1>
-            <p>Create, schedule, prioritize, and monitor marketing campaigns and product incentives.</p>
-          </div>
-        </div>
-        {canCreate && (
-          <div className="pm-hero-actions">
-            <button className="pm-btn pm-hero-add-btn" onClick={() => open("promotion-form", {})}>
-              <Icon name="plus" size={16} /> Add Promotion
-            </button>
-          </div>
-        )}
-      </div>
+      <PageHeader
+        title="Promotions & Campaigns"
+        subtitle="Create, schedule, prioritize, and monitor marketing campaigns and product incentives."
+        icon={<Icon name="tag" size={24} />}
+        actions={
+          canCreate && (
+            <Button variant="onHeader" leadingIcon={<Icon name="plus" size={16} />} onClick={() => open("promotion-form", {})}>
+              Add Promotion
+            </Button>
+          )
+        }
+      />
 
-      <div className="pm-kpi-grid">
-        <div className="pm-kpi-card pm-kpi-tone-blue">
-          <div className="pm-kpi-top">
-            <div className="pm-kpi-icon pm-kpi-icon-blue">
-              <Icon name="tag" size={20} />
-            </div>
-            <span className="pm-kpi-label">Total Promotions</span>
-          </div>
-          <div className="pm-kpi-value-row">
-            <span className="pm-kpi-value">{totalCount}</span>
-          </div>
-          <div className="pm-kpi-trend-row">
-            <span className="pm-badge pm-badge-info">Platform-wise</span>
-            <span className="pm-kpi-subtitle">Campaign Roster</span>
-          </div>
-        </div>
-
-        <div className="pm-kpi-card pm-kpi-tone-green">
-          <div className="pm-kpi-top">
-            <div className="pm-kpi-icon pm-kpi-icon-green">
-              <Icon name="check" size={20} />
-            </div>
-            <span className="pm-kpi-label">Active Campaigns</span>
-          </div>
-          <div className="pm-kpi-value-row">
-            <span className="pm-kpi-value">{activeCount}</span>
-          </div>
-          <div className="pm-kpi-trend-row">
-            <span className="pm-badge pm-badge-success">Live</span>
-            <span className="pm-kpi-subtitle">Running in App</span>
-          </div>
-        </div>
-
-        <div className="pm-kpi-card pm-kpi-tone-purple">
-          <div className="pm-kpi-top">
-            <div className="pm-kpi-icon pm-kpi-icon-purple">
-              <Icon name="calendar" size={20} />
-            </div>
-            <span className="pm-kpi-label">Scheduled Offers</span>
-          </div>
-          <div className="pm-kpi-value-row">
-            <span className="pm-kpi-value">{scheduledCount}</span>
-          </div>
-          <div className="pm-kpi-trend-row">
-            <span className="pm-badge pm-badge-neutral">Upcoming</span>
-            <span className="pm-kpi-subtitle">Queued Releases</span>
-          </div>
-        </div>
-
-        <div className="pm-kpi-card pm-kpi-tone-amber">
-          <div className="pm-kpi-top">
-            <div className="pm-kpi-icon pm-kpi-icon-amber">
-              <Icon name="edit" size={20} />
-            </div>
-            <span className="pm-kpi-label">Draft Offers</span>
-          </div>
-          <div className="pm-kpi-value-row">
-            <span className="pm-kpi-value">{draftCount}</span>
-          </div>
-          <div className="pm-kpi-trend-row">
-            <span className="pm-badge pm-badge-warning">Draft</span>
-            <span className="pm-kpi-subtitle">In Configuration</span>
-          </div>
-        </div>
-      </div>
+      <StatusCountCards entityType="Promotion" counts={statusCounts} totalLabel="Promotions" totalIcon="tag" loading={loading} />
 
       <div className="pm-filter-bar pm-categories-filter-bar">
         <div className="pm-search-input">
@@ -352,7 +270,7 @@ export function PromotionsPage() {
         )}
       </div>
 
-      <Pagination page={page} totalPages={totalPages} totalCount={totalCount} pageSize={pageSize} onPageChange={setPage} itemLabel="promotions" />
+      <Pagination page={page} total={totalCount} pageSize={pageSize} onPageChange={setPage} itemLabel="promotion" />
 
       <ConfirmModal
         isOpen={!!deleteTarget}

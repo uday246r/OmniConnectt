@@ -39,7 +39,10 @@ export { Input } from './primitives/Input/Input'
 export type { InputProps } from './primitives/Input/Input'
 
 export { Select } from './primitives/Select/Select'
-export type { SelectProps, SelectOption } from './primitives/Select/Select'
+export type { SelectProps, SelectOption, SelectChangeEvent } from './primitives/Select/Select'
+
+export { Combobox } from './primitives/Combobox/Combobox'
+export type { ComboboxProps, ComboboxOption } from './primitives/Combobox/Combobox'
 
 export { SearchField } from './primitives/SearchField/SearchField'
 export type { SearchFieldProps, SearchFieldSuggestion } from './primitives/SearchField/SearchField'

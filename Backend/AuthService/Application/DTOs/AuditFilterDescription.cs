@@ -23,6 +23,8 @@ public static class AuditFilterDescription
         Add(parts, "page", f.PageName);
         Add(parts, "result", f.Result);
         Add(parts, "actor", f.ActorUserId?.ToString() ?? f.ActorName);
+        Add(parts, "involvingUser", f.InvolvingUserId?.ToString());
+        Add(parts, "excludingActor", f.ExcludeActorUserId?.ToString());
         Add(parts, "record", f.EntityId ?? f.EntityType);
         Add(parts, "operation", f.CorrelationId);
         Add(parts, "signInMethod", f.AuthMethod);

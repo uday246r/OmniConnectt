@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect } from 'react';
 import { DashboardPage } from './pages/DashboardPage';
 import { ProductsPage } from './pages/ProductsPage';
 import { CategoriesPage } from './pages/CategoriesPage';
@@ -8,10 +8,9 @@ import { AuditLogsPage } from './pages/AuditLogsPage';
 import { SetupPage } from './pages/SetupPage';
 import { DrawerHost } from './components/drawer/DrawerHost';
 import { ToastContainer } from './components/common/ToastContainer';
-import { MockPermissionProvider } from './permissions/PermissionContext';
+import { PlatformPermissionProvider } from './permissions/PermissionContext';
 import { HostNavigationProvider, type NavigateToPage } from './navigation/HostNavigation';
 import { useStatusConfigStore } from './stores/useStatusConfigStore';
-import { ALL_PERMISSIONS } from './permissions/permissions';
 
 // Standalone fallback tokens. Imported BEFORE this app's own stylesheet so tokens resolve
 // gracefully both inside and outside the host shell.
@@ -61,13 +60,13 @@ export const App: React.FC<ProductsAppProps> = ({ page, onNavigate }) => {
 
   return (
     <HostNavigationProvider value={onNavigate ?? (() => {})}>
-      <MockPermissionProvider granted={ALL_PERMISSIONS}>
+      <PlatformPermissionProvider>
         <div id="products-mf-scope" style={{ width: '100%', minHeight: '100%' }}>
           {renderActivePage()}
           <DrawerHost />
           <ToastContainer />
         </div>
-      </MockPermissionProvider>
+      </PlatformPermissionProvider>
     </HostNavigationProvider>
   );
 };

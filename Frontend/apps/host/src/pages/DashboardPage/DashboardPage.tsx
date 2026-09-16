@@ -1,17 +1,20 @@
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../features/auth/store/authStore'
 import { remoteAppsApi, type RemoteAppDto } from '../../features/settings-applications/api/remoteAppsApi'
 import { auditLogsApi, type AuditLogDto } from '../../features/system-audit-logs/api/auditLogsApi'
-import { dashboardApi, type DashboardStatsDto, type HealthEntryDto } from '../../features/dashboard/api/dashboardApi'
-import { ApiError, isAbortError } from '../../shared/api/httpClient'
+import { dashboardApi, type DashboardStatsDto } from '../../features/dashboard/api/dashboardApi'
+import type { HealthEntryDto } from '../../features/settings-applications/api/remoteAppsApi'
+import { useRemoteHealthStore } from '../../shared/stores/remoteHealthStore'
+import { queryKeys } from '../../shared/query/queryKeys'
+import { ApiError } from '../../shared/api/httpClient'
 import { SkeletonStatCard, SkeletonDashboardWidget, SkeletonAuditRow, SkeletonDonutChart } from '../../shared/components/Skeleton'
 import { Icon } from '../../shared/components/Icon/Icon'
 import styles from './DashboardPage.module.css'
 import { APP_NAME, COPYRIGHT_YEAR } from '../../shared/config/branding'
 import { TOPICS } from '../../shared/stores/invalidationStore'
 import { useLiveRevision } from '../../shared/hooks/useLiveRevision'
-import { useAbortableEffect } from '../../shared/hooks/useAbortableEffect'
 
 interface RoleDistribution {
   name: string
@@ -86,106 +89,67 @@ export function DashboardPage() {
   /*
    * Scoped to `kpis`, NOT the global revision counter.
    *
-   * This page's load re-probes every registered remote app over HTTP (dashboardApi.refreshHealth),
-   * so subscribing to every invalidation meant a single audit row — one login, by anyone — fired a
-   * full health sweep plus nine dashboard queries for every viewer with the page open. Under
+   * Subscribing to every invalidation meant a single audit row — one login, by anyone — refetched
+   * every dashboard query for every viewer with the page open. Under
    * server push that is a self-inflicted stampede. The `kpis` topic is coalesced server-side by
    * KpiCoalescerService, and the Settings mutations that should still refresh these cards name it
    * explicitly in their invalidate(...) calls.
    */
   const dataRevision = useLiveRevision(TOPICS.kpis)
 
-  const [loading, setLoading] = useState(true)
-  const [totalUsers, setTotalUsers] = useState(0)
-  const [totalRoles, setTotalRoles] = useState(0)
-  const [totalApps, setTotalApps] = useState(0)
+  /*
+   * One cached query instead of component state.
+   *
+   * These figures lived in useState and were fetched by an effect on every mount, so each return to the
+   * dashboard — and, before the settings routing fix, every click on the gear icon — refetched all of
+   * it. The query client keeps the last answer fresh for 30 seconds and shares it across mounts; a live
+   * KPI event (dataRevision) is what asks for new numbers, not navigation.
+   *
+   * Applications and the audit tail are still row-level fetches because the page renders those rows.
+   * Each is guarded on its own: a Promise.all rejects as a whole, and one failing card must not blank
+   * the others or show "0 users" for a service that is actually up.
+   */
+  const dashboardQuery = useQuery({
+    queryKey: [...queryKeys.dashboard.stats(), dataRevision],
+    enabled: Boolean(accessToken),
+    queryFn: async ({ signal }) => {
+      const token = accessToken!
+      const [stats, apps, logs] = await Promise.all([
+        dashboardApi.stats(token, signal),
+        // null, not an empty list, marks "could not load", so the card can tell it from "none registered".
+        remoteAppsApi.list(token, { pageSize: 12 }, signal).catch(() => null),
+        auditLogsApi.list(token, { pageSize: 6 }, signal).catch(() => ({ items: [] as AuditLogDto[], total: 0 })),
+      ])
+      return { stats, apps, logs }
+    },
+    // Keep showing the last figures while a live update fetches the next ones, rather than a skeleton.
+    placeholderData: (previous) => previous,
+  })
 
-  const [stats, setStats] = useState<DashboardStatsDto | null>(null)
-  const [apps, setApps] = useState<RemoteAppDto[]>([])
-  const [error, setError] = useState<string | null>(null)
-  // The applications call failed. Distinct from "zero apps registered" — the card must not print 0,
-  // which would read as a real count taken from a healthy service.
-  const [appsUnavailable, setAppsUnavailable] = useState(false)
-  // Real per-app reachability from the background probe. Drives the System Status card, which used
-  // to be hardcoded.
-  const [health, setHealth] = useState<HealthEntryDto[] | null>(null)
-  const [recentLogs, setRecentLogs] = useState<AuditLogDto[]>([])
+  const stats: DashboardStatsDto | null = dashboardQuery.data?.stats ?? null
+  const loading = dashboardQuery.isPending
+  const totalUsers = stats?.users ?? 0
+  const totalRoles = stats?.roles ?? 0
+  const appsResult = dashboardQuery.data?.apps
+  const totalApps = appsResult?.total ?? 0
+  const apps: RemoteAppDto[] = appsResult?.items ?? []
+  const appsUnavailable = dashboardQuery.isSuccess && appsResult === null
+  const recentLogs: AuditLogDto[] = dashboardQuery.data?.logs.items ?? []
+  const error = dashboardQuery.error
+    ? dashboardQuery.error instanceof ApiError ? dashboardQuery.error.message : 'Could not load dashboard metrics.'
+    : null
 
-  useAbortableEffect(async (signal) => {
-    if (!accessToken) return
-
-    async function loadDashboardData() {
-      try {
-        /*
-         * Counts, trends and the role breakdown come from ONE aggregate endpoint that computes them in
-         * SQL over the whole table.
-         *
-         * This replaces three list calls at pageSize:100 whose items were then counted in the browser.
-         * That was wrong the moment the platform had more than 100 users: the donut showed the role
-         * split of the first hundred rows while the centre showed the real total, so the slices did not
-         * add up to it — and it shipped 100 full user records, 100 roles and 100 applications across
-         * the wire purely to compute a handful of numbers.
-         *
-         * Applications and the audit tail are still fetched because the page renders those rows
-         * individually; they are genuinely row-level data, not aggregates.
-         */
-        const [statsRes, appsRes, logsRes, healthRes] = await Promise.all([
-          dashboardApi.stats(accessToken!, signal),
-          /*
-           * Guarded like its neighbours, and still worth it now that every call here goes to one
-           * service: a Promise.all rejects as a whole, so one failing endpoint would take the others
-           * down with it. That is how this page once reported "0 users, 0 roles" while the server was
-           * up and answering both correctly. Reporting zero users to a bank operator because one
-           * unrelated card could not load is a wrong fact, not a missing one.
-           *
-           * `null` (not an empty list) marks "could not load", so the card can distinguish that from
-           * "no applications are registered".
-           */
-          remoteAppsApi.list(accessToken!, { pageSize: 12 }, signal).catch(() => null),
-          auditLogsApi.list(accessToken!, { pageSize: 6 }, signal).catch(() => ({ items: [], total: 0 })),
-          // Re-probed on arrival rather than read from the registry's last sweep, so what the System
-          // Status card shows is what is true now. A failing probe must not blank the whole dashboard
-          // — the card falls back to "Unknown", which renders as a neutral "Checking".
-          dashboardApi.refreshHealth(accessToken!, signal).catch(() => [] as HealthEntryDto[]),
-        ])
-
-        {
-          setStats(statsRes)
-          setTotalUsers(statsRes.users ?? 0)
-          setTotalRoles(statsRes.roles ?? 0)
-          setTotalApps(appsRes?.total ?? 0)
-          setApps(appsRes?.items ?? [])
-          setAppsUnavailable(appsRes === null)
-          setRecentLogs(logsRes.items)
-          setHealth(healthRes)
-          setError(null)
-        }
-      } catch (err) {
-        /*
-         * An aborted request is not a failed one, and must leave every piece of state alone.
-         *
-         * This effect cancels its request whenever it is superseded — StrictMode's double-invoke in
-         * development, and any change of token or dataRevision in production. Treating that
-         * cancellation like a network error made the dashboard accuse itself of being broken on an
-         * ordinary page load: the banner read "Could not load dashboard metrics", every card showed
-         * 0, and System Status sat on "Checking", until the run that replaced this one happened to
-         * finish and clear it. The zeroes were the initial state, never overwritten.
-         *
-         * Returning here also skips setLoading(false) below, which matters just as much: the newer
-         * request is still in flight, so dropping the skeleton would expose those same zeroes as
-         * though they were real figures.
-         */
-        if (isAbortError(err)) return
-        // Surfaced instead of console-only: the page otherwise rendered zeroes, which reads as "the
-        // platform has no users" rather than "the request failed".
-        setError(err instanceof ApiError ? err.message : 'Could not load dashboard metrics.')
-      }
-
-      setLoading(false)
-    }
-
-    await loadDashboardData()
-  }, [accessToken, dataRevision])
+  /*
+   * System status reads the shell's shared health feed rather than re-probing every remote itself.
+   *
+   * Each dashboard visit used to POST a live re-probe of every registered application. With many
+   * viewers that is a probe storm aimed at the remotes, repeated on every navigation. The shell already
+   * polls this feed — every minute, every ten seconds while anything looks unhealthy, forcing a probe
+   * then — so the card shows the same answer the sidebar badges do.
+   */
+  const healthStatus = useRemoteHealthStore((s) => s.status)
+  const healthEntries = useRemoteHealthStore((s) => s.entries)
+  const health: HealthEntryDto[] | null = healthStatus === 'idle' || healthStatus === 'loading' ? null : healthEntries
 
   /**
    * Users by role, straight from the server's GROUP BY.

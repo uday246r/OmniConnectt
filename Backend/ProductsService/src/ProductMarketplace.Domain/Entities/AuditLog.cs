@@ -10,6 +10,9 @@ public class AuditLog
     public Guid Id { get; set; } = Guid.NewGuid();
     public DateTime Timestamp { get; set; } = DateTime.UtcNow;
 
+    /// <summary>The platform user id from the verified token. Null for rows written before sign-in was enforced.</summary>
+    public Guid? ActorUserId { get; set; }
+
     public string ActorName { get; set; } = "System";
     public string ActorEmail { get; set; } = string.Empty;
 

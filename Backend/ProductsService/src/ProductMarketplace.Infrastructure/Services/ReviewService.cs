@@ -104,9 +104,10 @@ public class ReviewService : IReviewService
     {
         var product = await _db.Products.FirstOrDefaultAsync(p => p.Id == productId, ct);
         if (product is null) return;
-        var published = await _db.Reviews.Where(r => r.ProductId == productId && r.Status == "Published").ToListAsync(ct);
-        product.RatingCount = published.Count;
-        product.RatingAverage = published.Count == 0 ? 0 : Math.Round(published.Average(r => r.Rating), 1);
+        // Aggregated in the database rather than loading every published review of the product.
+        var published = _db.Reviews.Where(r => r.ProductId == productId && r.Status == "Published");
+        product.RatingCount = await published.CountAsync(ct);
+        product.RatingAverage = product.RatingCount == 0 ? 0 : Math.Round(await published.AverageAsync(r => (double)r.Rating, ct), 1);
         await _db.SaveChangesAsync(ct);
     }
 }

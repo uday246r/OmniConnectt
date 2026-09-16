@@ -155,6 +155,7 @@ public static class Mapping
         Id = a.Id,
         Timestamp = a.Timestamp,
         ActorName = a.ActorName,
+        ActorUserId = a.ActorUserId,
         ActorEmail = a.ActorEmail,
         Action = a.Action,
         EntityType = a.EntityType,

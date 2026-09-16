@@ -47,12 +47,23 @@ public class ValidationPresetAppService(AuthDbContext db, AuditLogAppService aud
     public async Task<IReadOnlyList<CustomPresetDto>> GetPresetsAsync(CancellationToken ct = default)
         => (await GetAsync(ct)).Presets;
 
+    private const string StaleMessage =
+        "Someone else changed the formats while you were editing. Reload to see their changes, then make yours again.";
+
     public async Task<ValidationPresetCatalogDto> UpdateAsync(
         UpdateValidationPresetCatalogRequest request, Guid? actingUserId, CancellationToken ct = default)
     {
         ValidateShape(request.Presets);
 
         var row = await db.ValidationPresetCatalogs.OrderByDescending(c => c.UpdatedAt).FirstOrDefaultAsync(ct);
+
+        // Two administrators editing at once: a save based on an older version is refused rather than
+        // silently undoing the other person's work.
+        if (request.ExpectedVersion is {} expectedVersion && expectedVersion != (row?.Version ?? 0))
+        {
+            throw new ConflictAppException(StaleMessage);
+        }
+
         var now = DateTimeOffset.UtcNow;
         var presetsJson = JsonSerializer.Serialize(request.Presets, JsonOptions);
 
@@ -69,7 +80,14 @@ public class ValidationPresetAppService(AuthDbContext db, AuditLogAppService aud
             row.UpdatedBy = actingUserId;
         }
 
-        await db.SaveChangesAsync(ct);
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            throw new ConflictAppException(StaleMessage);
+        }
 
         /*
          * Worth auditing for a reason specific to this catalog: an unrecognised preset id FAILS OPEN

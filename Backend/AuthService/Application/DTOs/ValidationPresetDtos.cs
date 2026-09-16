@@ -8,7 +8,7 @@ namespace AuthService.Application.DTOs;
 ///  - "numericRange": MinValue/MaxValue bound the value parsed as a number (either may be null = open-ended).
 ///  - "textPattern": TextMode picks a character-class constraint (letters only, digits only, ...) —
 ///    the "string" option for an admin who doesn't want to write a regex. See
-///    Infrastructure.Validation.FieldPresets.TextPatternModes for the allowed values.
+///    OmniRemit.Validation.FieldPresets.TextPatternModes for the allowed values.
 /// </summary>
 public record CustomPresetDto(
     string Key,
@@ -24,4 +24,5 @@ public record CustomPresetDto(
 
 public record ValidationPresetCatalogDto(IReadOnlyList<CustomPresetDto> Presets, int Version, DateTimeOffset UpdatedAt);
 
-public record UpdateValidationPresetCatalogRequest(IReadOnlyList<CustomPresetDto> Presets);
+/// <param name="ExpectedVersion">The version the editor loaded; a different current version is a 409, not a silent overwrite.</param>
+public record UpdateValidationPresetCatalogRequest(IReadOnlyList<CustomPresetDto> Presets, int? ExpectedVersion = null);

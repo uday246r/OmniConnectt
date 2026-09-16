@@ -128,6 +128,12 @@ public class AuditLogAppService(AuthDbContext db, IPlatformEventPublisher events
         public const string Approval = "Approval";
         public const string Export = "Export";
         public const string Configuration = "Configuration";
+
+        /// <summary>
+        /// Opening a page. Written only by <see cref="PageViewAuditService"/>, which resolves the page
+        /// against the caller's own navigation tree rather than trusting what the browser names.
+        /// </summary>
+        public const string Navigation = "Navigation";
     }
 
     /// <summary>The <c>Module</c> vocabulary for host-originated rows — the functional areas the
@@ -179,6 +185,13 @@ public class AuditLogAppService(AuthDbContext db, IPlatformEventPublisher events
             ActionCategory = actionCategory
         });
         await db.SaveChangesAsync(ct);
+
+        // Page views are by far the most frequent row and change no figure on the dashboard. Pushing
+        // each one would make every open Audit Logs screen refetch on every click anyone makes.
+        if (actionCategory == Categories.Navigation)
+        {
+            return;
+        }
 
         await events.PublishToAuditViewersAsync(new PlatformEvent("audit-logs", action), ct);
         events.RequestKpiRefresh();
@@ -309,6 +322,10 @@ public class AuditLogAppService(AuthDbContext db, IPlatformEventPublisher events
         return new CsvExport(csv.ToString(), items.Count, matched, maxRows);
     }
 
+    private const string UserEntityType = "User";
+    private const string UserPermissionOverridesEntityType = "UserPermissionOverrides";
+    private const string ApprovalRequestEntityType = "ApprovalRequest";
+
     private IQueryable<AuditLog> BuildFilteredQuery(AuditLogFilter f)
     {
         var query = db.AuditLogs.AsNoTracking().AsQueryable();
@@ -316,6 +333,29 @@ public class AuditLogAppService(AuthDbContext db, IPlatformEventPublisher events
         if (f.ActorUserId is not null)
         {
             query = query.Where(a => a.ActorUserId == f.ActorUserId);
+        }
+
+        if (f.InvolvingUserId is { } involvedId)
+        {
+            var idText = involvedId.ToString();
+
+            // A subquery, not a list pulled into memory: a long-standing user can have any number of
+            // approval requests about them, and the whole OR has to stay one SQL statement to page.
+            var approvalsAboutUser = db.ApprovalRequests.AsNoTracking()
+                .Where(r => r.EntityType == UserEntityType && r.EntityId == idText)
+                .Select(r => r.Id.ToString());
+
+            query = query.Where(a =>
+                a.ActorUserId == involvedId
+                || ((a.EntityType == UserEntityType || a.EntityType == UserPermissionOverridesEntityType) && a.EntityId == idText)
+                || (a.EntityType == ApprovalRequestEntityType && approvalsAboutUser.Contains(a.EntityId!)));
+        }
+
+        if (f.ExcludeActorUserId is { } excludedActor)
+        {
+            // Rows with no actor at all (a failed sign-in against the account) are kept: nobody did
+            // them "themselves".
+            query = query.Where(a => a.ActorUserId == null || a.ActorUserId != excludedActor);
         }
 
         if (!string.IsNullOrWhiteSpace(f.CorrelationId))

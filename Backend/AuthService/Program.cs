@@ -107,6 +107,7 @@ builder.Services.AddScoped<DashboardAppService>();
 builder.Services.AddScoped<SearchAppService>();
 builder.Services.AddMemoryCache();
 builder.Services.AddScoped<NavigationAppService>();
+builder.Services.AddScoped<PageViewAuditService>();
 
 /*
  * Redis, when configured — and only then.
@@ -335,6 +336,22 @@ builder.Services.AddRateLimiter(options =>
                 QueueLimit = 0,
                 QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
             }));
+
+    // Per user, like Sensitive. A rejected page view costs the operator nothing: the page still opens.
+    options.AddPolicy(RateLimitPolicies.PageViews, httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: rateLimits.Enabled
+                ? httpContext.User.FindFirstValue("sub")
+                  ?? httpContext.Connection.RemoteIpAddress?.ToString()
+                  ?? "unknown"
+                : "disabled",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = rateLimits.Enabled ? rateLimits.PageViewPermitLimit : int.MaxValue,
+                Window = TimeSpan.FromSeconds(Math.Max(1, rateLimits.PageViewWindowSeconds)),
+                QueueLimit = 0,
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+            }));
 });
 
 builder.Services.Configure<PasswordPolicyOptions>(builder.Configuration.GetSection(PasswordPolicyOptions.SectionName));
@@ -495,5 +512,11 @@ app.MapHub<PlatformHub>("/hubs/platform", options =>
 // Real check — reports Unhealthy (503) when the database is unreachable, instead of the previous
 // hardcoded "ok" that could never fail.
 app.MapHealthChecks("/health").WithName("HealthCheck");
+// Liveness: the process is up and serving, with no dependency checks. /health (above) is readiness and
+// opens a database connection per call; the load test showed a probe hitting it at a few hundred
+// requests a second saturating the connection pool that real requests need. Point frequent liveness
+// probes here and reserve /health for readiness.
+app.MapHealthChecks("/health/live", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions { Predicate = _ => false })
+    .WithName("LivenessCheck");
 
 app.Run();

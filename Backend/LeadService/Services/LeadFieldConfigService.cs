@@ -72,7 +72,8 @@ namespace LeadManagement.Api.Services
         }
 
         public async Task<MutationResult<List<LeadFieldConfig>>> ReplaceAsync(
-            Guid productId, List<LeadFieldConfig> incoming, Guid? actingUserId, string? actorName = null, bool bypassApproval = false, CancellationToken ct = default)
+            Guid productId, List<LeadFieldConfig> incoming, Guid? actingUserId, string? actorName = null, bool bypassApproval = false, CancellationToken ct = default,
+            string? expectedVersion = null)
         {
             var product = await _db.Products.AsNoTracking().FirstOrDefaultAsync(p => p.Id == productId, ct)
                 ?? throw new InvalidOperationException($"Product '{productId}' was not found.");
@@ -81,6 +82,17 @@ namespace LeadManagement.Api.Services
                 .Where(f => f.ProductId == productId)
                 .ToDictionaryAsync(f => f.ApiField, StringComparer.OrdinalIgnoreCase, ct);
             var oldSnapshot = System.Text.Json.JsonSerializer.Serialize(existing.Values.ToList());
+
+            // Two administrators editing the same product's settings: the second save used to silently
+            // replace the first person's changes. A save based on an older version is refused instead.
+            if (expectedVersion is not null && !string.Equals(expectedVersion, Fingerprint(existing.Values), StringComparison.Ordinal))
+            {
+                throw new StaleSettingsException();
+            }
+
+            // Checked before the approval gate, so a checker is never asked to approve a pattern that
+            // cannot work — and again on replay, since replay comes back through here.
+            EnsureRulesWellFormed(incoming);
 
             var pending = await TrySubmitForApprovalAsync(productId, product.Name, oldSnapshot, incoming, actingUserId, bypassApproval, ct);
             if (pending is not null)
@@ -106,6 +118,9 @@ namespace LeadManagement.Api.Services
                     row.Sensitive = field.Sensitive;
                     row.MaskingRule = field.MaskingRule;
                     row.VisibleCharCount = field.VisibleCharCount;
+                    // Copied on this branch AND the insert below. Leaving it off either would make an
+                    // approved Field Settings change silently drop the field's formats on replay.
+                    row.ValidationsJson = field.ValidationsJson;
                 }
                 else
                 {
@@ -125,6 +140,7 @@ namespace LeadManagement.Api.Services
                         Sensitive = field.Sensitive,
                         MaskingRule = field.MaskingRule,
                         VisibleCharCount = field.VisibleCharCount,
+                        ValidationsJson = field.ValidationsJson,
                     });
                 }
             }
@@ -137,6 +153,23 @@ namespace LeadManagement.Api.Services
                 module: "Field Settings", page: "field-settings", actionCategory: "Configuration", ct: ct);
 
             return MutationResult<List<LeadFieldConfig>>.Ok(await GetByProductAsync(productId, ct));
+        }
+
+        /// <summary>Thrown when Field Settings are saved against a version someone else has since replaced.</summary>
+        public sealed class StaleSettingsException()
+            : Exception("Someone else changed these field settings while you were editing. Reload to see their changes, then make yours again.");
+
+        /// <summary>
+        /// A short fingerprint of a product's field settings — the version the page loads (as an ETag) and saves
+        /// against. Computed from the settings themselves, so it needs no version column and changes exactly when
+        /// anything an administrator can edit changes.
+        /// </summary>
+        public static string Fingerprint(IEnumerable<LeadFieldConfig> rows)
+        {
+            var canonical = string.Join("\n", rows
+                .OrderBy(r => r.ApiField, StringComparer.OrdinalIgnoreCase)
+                .Select(r => string.Join("|", r.ApiField, r.DisplayLabel, r.Section, r.DisplayOrder, r.Visible, r.Required, r.Editable, r.Sensitive, r.MaskingRule, r.VisibleCharCount, r.ValidationsJson ?? string.Empty)));
+            return Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(canonical)))[..16].ToLowerInvariant();
         }
 
         /// <summary>Idempotent per ProductId — an existing product's config is never touched, so admin
@@ -204,8 +237,149 @@ namespace LeadManagement.Api.Services
                 Sensitive = r.Sensitive,
                 MaskingRule = r.Sensitive ? "HideFirstShowLast" : "None",
                 VisibleCharCount = 4,
+                Validations = DefaultRules(r.ApiField),
             }).ToList();
         }
+
+        /// <summary>
+        /// The formats a new product starts with — the checks that used to be hard-coded. Administrators
+        /// change or remove them in Field Settings like any other rule. The same values are written to
+        /// existing products by the <c>LeadFieldFormats</c> migration.
+        /// </summary>
+        public static List<LeadFieldRule> DefaultRules(string apiField) => apiField switch
+        {
+            "icNumber" =>
+            [
+                new LeadFieldRule
+                {
+                    Type = FieldPresets.Custom,
+                    Pattern = "^[0-9]{6}-[0-9]{2}-[0-9]{4}$",
+                    Message = "Please enter IC Number in format YYMMDD-PB-XXXX (e.g. 880512-14-5678).",
+                },
+            ],
+            "phoneNumber" => [new LeadFieldRule { Type = FieldPresets.MobileIN, Message = "Please enter a valid phone number for the selected country." }],
+            "email" => [new LeadFieldRule { Type = FieldPresets.EmailSmart, Message = "Please enter a valid email address." }],
+            _ => [],
+        };
+
+        /// <summary>
+        /// Refuses rules that cannot be evaluated as the administrator intends: no type, no message, a
+        /// one-off pattern that is empty or does not compile, a length rule with no length.
+        /// </summary>
+        public static void EnsureRulesWellFormed(IEnumerable<LeadFieldConfig> fields)
+        {
+            var problems = new List<string>();
+            foreach (var field in fields)
+            {
+                foreach (var rule in field.Validations)
+                {
+                    var label = string.IsNullOrWhiteSpace(field.DisplayLabel) ? field.ApiField : field.DisplayLabel;
+                    if (string.IsNullOrWhiteSpace(rule.Message))
+                    {
+                        problems.Add($"{label}: every format needs the message people see when it is not met.");
+                    }
+
+                    if (rule.Type == FieldPresets.Custom)
+                    {
+                        if (string.IsNullOrWhiteSpace(rule.Pattern))
+                        {
+                            problems.Add($"{label}: the custom pattern is empty.");
+                        }
+                        else
+                        {
+                            try
+                            {
+                                _ = new System.Text.RegularExpressions.Regex(rule.Pattern, System.Text.RegularExpressions.RegexOptions.None, TimeSpan.FromMilliseconds(200));
+                            }
+                            catch (ArgumentException)
+                            {
+                                problems.Add($"{label}: \"{rule.Pattern}\" is not a valid pattern.");
+                            }
+                        }
+                    }
+
+                    if (rule.Type is FieldPresets.MinLength or FieldPresets.MaxLength or FieldPresets.ExactLength && rule.Value is not > 0)
+                    {
+                        problems.Add($"{label}: a length format needs a number of characters above zero.");
+                    }
+                }
+            }
+
+            if (problems.Count > 0)
+            {
+                throw new InvalidOperationException(string.Join(" ", problems));
+            }
+        }
+
+        /// <summary>Lead form fields whose value is not in the format its Field Settings require.</summary>
+        public sealed class FieldFormatException(IReadOnlyDictionary<string, string> errors)
+            : InvalidOperationException(string.Join(" ", errors.Values))
+        {
+            /// <summary>Keyed by the form's own field name (e.g. "preferredBranch", not "branch").</summary>
+            public IReadOnlyDictionary<string, string> Errors { get; } = errors;
+        }
+
+        /// <summary>
+        /// Checks every configured format on a submitted lead. Throws <see cref="FieldFormatException"/>
+        /// naming each field that fails.
+        /// </summary>
+        /// <param name="previous">On an edit, the lead as it is now. A value left unchanged is not
+        /// re-checked: tightening a format later must not make every older lead impossible to edit
+        /// until someone retypes a value nobody asked them to change.</param>
+        public static void EnsureFormatsValid(
+            List<LeadFieldConfig> fieldConfigs, CreateLeadDto dto, IReadOnlyList<FormatPreset> presets, LeadRecordDto? previous = null)
+        {
+            var index = FieldRuleEngine.Index(presets);
+            var errors = new Dictionary<string, string>(StringComparer.Ordinal);
+
+            foreach (var field in fieldConfigs)
+            {
+                var rules = field.Validations;
+                if (rules.Count == 0) continue;
+
+                var value = GetFormatValue(dto, field.ApiField);
+                if (string.IsNullOrWhiteSpace(value)) continue;
+
+                if (previous is not null && ValuesMatch(field.ApiField, dto, previous)) continue;
+
+                var message = FieldRuleEngine.FirstFailure(rules.Select(r => r.ToEngineRule()), value, index);
+                if (message is not null)
+                {
+                    errors[FormFieldName(field.ApiField)] = message;
+                }
+            }
+
+            if (errors.Count > 0)
+            {
+                throw new FieldFormatException(errors);
+            }
+        }
+
+        /// <summary>The value a format is checked against — the phone number with its country code, as the form shows it.</summary>
+        private static string? GetFormatValue(CreateLeadDto dto, string apiField) => apiField switch
+        {
+            "phoneNumber" => string.IsNullOrWhiteSpace(dto.PhoneNumber) ? null : ComposePhone(dto.PhoneCountryCode, dto.PhoneNumber),
+            _ => GetDtoValue(dto, apiField),
+        };
+
+        /// <summary>
+        /// "+60" and "12-345 6789" → "+60 12-345 6789". A number that already starts with its own country
+        /// code (older records were saved that way, which is why lists showed "+60 +60 …") is not
+        /// prefixed twice, or every such number would read as invalid.
+        /// </summary>
+        public static string ComposePhone(string? countryCode, string number)
+        {
+            var code = string.IsNullOrWhiteSpace(countryCode) ? string.Empty : countryCode.Trim();
+            var national = number.Trim();
+            while (code.Length > 0 && national.StartsWith(code, StringComparison.Ordinal))
+            {
+                national = national[code.Length..].TrimStart();
+            }
+
+            return $"{code} {national}".Trim();
+        }
+
+        public static string FormFieldName(string apiField) => apiField == "branch" ? "preferredBranch" : apiField;
 
         // ------------------------------------------------------------------------------------------
         // Backend enforcement — the mapping between the catalog's apiField string and the strongly

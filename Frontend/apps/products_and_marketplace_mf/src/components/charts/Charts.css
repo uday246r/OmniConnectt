@@ -24,19 +24,19 @@
 
 .pm-chart-x-labels span {
   font-size: 11px;
-  color: #94a3b8;
+  color: var(--omni-color-text-muted);
   font-weight: 500;
 }
 
 .pm-chart-x-labels span.active {
-  color: #2563eb;
+  color: var(--omni-color-primary-600);
   font-weight: 700;
 }
 
 .pm-chart-tooltip {
   position: absolute;
   transform: translate(-50%, -130%);
-  background: #0f172a;
+  background: var(--omni-color-text-primary);
   color: #ffffff;
   padding: 6px 10px;
   border-radius: 8px;
@@ -52,7 +52,7 @@
 
 .pm-chart-tooltip strong {
   font-size: 11px;
-  color: #93c5fd;
+  color: var(--omni-color-primary-300);
 }
 
 /* Donut Chart */
@@ -82,15 +82,15 @@
 .pm-donut-center strong {
   font-size: 24px;
   font-weight: 800;
-  color: #0f172a;
+  color: var(--omni-color-text-primary);
   line-height: 1;
   letter-spacing: -0.03em;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: var(--font-sans);
 }
 
 .pm-donut-center span {
   font-size: 11px;
-  color: #94a3b8;
+  color: var(--omni-color-text-muted);
   font-weight: 600;
   margin-top: 3px;
   letter-spacing: 0.04em;
@@ -121,7 +121,7 @@
 }
 
 .pm-donut-legend li:hover {
-  background: #f8fafc;
+  background: var(--omni-color-surface-alt);
   transform: translateX(2px);
 }
 
@@ -152,7 +152,7 @@
 .pm-donut-legend-value {
   font-size: 12px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--omni-color-text-primary);
   white-space: nowrap;
   flex-shrink: 0;
 }

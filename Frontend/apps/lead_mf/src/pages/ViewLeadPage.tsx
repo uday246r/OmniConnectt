@@ -492,7 +492,7 @@ export const ViewLeadPage: React.FC = () => {
                       onChange={(v) => setColumnFilter('product', v)}
                       options={toOptions(products)}
                       allLabel="All Products"
-                      searchable={products.length > 10}
+                      searchable
                     />
                   ),
                   render: (lead) => <div className={styles.productValue}>{lead.product}</div>,
@@ -509,7 +509,7 @@ export const ViewLeadPage: React.FC = () => {
                       onChange={(v) => setColumnFilter('branch', v)}
                       options={toOptions(branches)}
                       allLabel="All Branches"
-                      searchable={branches.length > 10}
+                      searchable
                     />
                   ),
                   render: (lead) =>

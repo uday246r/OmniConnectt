@@ -1,3 +1,4 @@
+import { isApprovalPending } from "../../services/httpClient";
 import { useEffect, useMemo, useState } from "react";
 import { Drawer, DrawerSection } from "../drawer/Drawer";
 import { Icon } from "../common/Icon";
@@ -91,6 +92,7 @@ export function ProductFormDrawer({ productId }: { productId?: string }) {
       }
       close();
     } catch (err) {
+      if (isApprovalPending(err)) return;
       setError((err as Error).message);
     } finally {
       setSubmitting(false);

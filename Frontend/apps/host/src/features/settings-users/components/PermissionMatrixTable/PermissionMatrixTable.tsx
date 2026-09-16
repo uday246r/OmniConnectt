@@ -269,7 +269,7 @@ export function PermissionMatrixTable({ permissions, catalog, registryApps, isAd
                   onChange={setAppFilter}
                   options={appOptions}
                   allLabel="All Applications"
-                  searchable={appOptions.length > 6}
+                  searchable
                   className={styles.permTh}
                 />
                 <th className={styles.permTh}>Module</th>

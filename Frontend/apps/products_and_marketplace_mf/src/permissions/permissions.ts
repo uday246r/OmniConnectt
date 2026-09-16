@@ -1,42 +1,50 @@
 /**
- * Canonical permission keys for the Product Marketplace remote.
- * The Host App is expected to supply the actual granted set at runtime via PermissionProvider;
- * until then, MockPermissionProvider grants a fixed local set for standalone development.
+ * Every permission a screen in this remote checks, written as `module:Capability`.
+ *
+ * These are the exact pairs the backend's `[RequiresCapability]` attributes enforce and publish to the
+ * Role editor. This list used to be its own vocabulary ("product_marketplace.products.view") that the
+ * host never issues, and it was granted in full to every user — so each button appeared for everyone
+ * and the server was the only thing (had it been checking) that would have said no.
  */
 export const PERMISSIONS = {
-  DASHBOARD_VIEW: "product_marketplace.dashboard.view",
+  DASHBOARD_VIEW: 'dashboard:View',
 
-  PRODUCTS_VIEW: "product_marketplace.products.view",
-  PRODUCTS_CREATE: "product_marketplace.products.create",
-  PRODUCTS_EDIT: "product_marketplace.products.edit",
-  PRODUCTS_DELETE: "product_marketplace.products.delete",
-  PRODUCTS_APPLY: "product_marketplace.products.apply",
+  PRODUCTS_VIEW: 'products:View',
+  PRODUCTS_CREATE: 'products:Create',
+  PRODUCTS_EDIT: 'products:Edit',
+  PRODUCTS_DELETE: 'products:Delete',
+  PRODUCTS_APPLY: 'products:Apply',
 
-  CATEGORIES_VIEW: "product_marketplace.categories.view",
-  CATEGORIES_CREATE: "product_marketplace.categories.create",
-  CATEGORIES_EDIT: "product_marketplace.categories.edit",
-  CATEGORIES_DELETE: "product_marketplace.categories.delete",
+  CATEGORIES_VIEW: 'categories:View',
+  CATEGORIES_CREATE: 'categories:Create',
+  CATEGORIES_EDIT: 'categories:Edit',
+  CATEGORIES_DELETE: 'categories:Delete',
 
-  REVIEWS_VIEW: "product_marketplace.reviews.view",
-  REVIEWS_MANAGE: "product_marketplace.reviews.manage",
+  REVIEWS_VIEW: 'reviews:View',
+  REVIEWS_MANAGE: 'reviews:Moderate',
 
-  PROMOTIONS_VIEW: "product_marketplace.promotions.view",
-  PROMOTIONS_CREATE: "product_marketplace.promotions.create",
-  PROMOTIONS_EDIT: "product_marketplace.promotions.edit",
-  PROMOTIONS_DELETE: "product_marketplace.promotions.delete",
+  PROMOTIONS_VIEW: 'promotions:View',
+  PROMOTIONS_CREATE: 'promotions:Create',
+  PROMOTIONS_EDIT: 'promotions:Edit',
+  PROMOTIONS_DELETE: 'promotions:Delete',
 
-  APPLICATIONS_VIEW: "product_marketplace.applications.view",
-  APPLICATIONS_MANAGE: "product_marketplace.applications.manage",
-  APPLICATIONS_APPROVE: "product_marketplace.applications.approve",
-  APPLICATIONS_REJECT: "product_marketplace.applications.reject",
+  APPLICATIONS_VIEW: 'applications:View',
+  // Moving an application forward, approving and rejecting are one permission on the server.
+  APPLICATIONS_MANAGE: 'applications:Manage',
+  APPLICATIONS_APPROVE: 'applications:Manage',
+  APPLICATIONS_REJECT: 'applications:Manage',
 
-  AUDIT_LOGS_VIEW: "product_marketplace.audit_logs.view",
+  AUDIT_LOGS_VIEW: 'audit:View',
+  AUDIT_LOGS_EXPORT: 'audit:Export',
 
-  SETUP_VIEW: "product_marketplace.setup.view",
-  SETUP_MANAGE: "product_marketplace.setup.manage",
+  SETUP_VIEW: 'setup:View',
+  SETUP_MANAGE: 'setup:Manage',
 } as const;
 
 export type PermissionKey = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
 
-/** Full grant set used for standalone/local development until the Host App supplies real permissions. */
-export const ALL_PERMISSIONS: PermissionKey[] = Object.values(PERMISSIONS);
+/** Splits `module:Capability`. */
+export function parsePermission(permission: PermissionKey): { module: string; capability: string } {
+  const [module, capability] = permission.split(':');
+  return { module, capability };
+}

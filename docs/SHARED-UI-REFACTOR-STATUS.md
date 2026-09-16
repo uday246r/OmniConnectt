@@ -1813,6 +1813,34 @@ lead_mf with **zero console errors**.
 `CapabilityPicker` got the missing debounce but no floating dropdown — its grouped, tickable list
 *is* the result, so a popover would cover the rows it filters and offer nothing selectable.
 
+### 4ac. Products & Marketplace onto the shared UI (2026-09-15)
+
+`products_and_marketplace_mf` was added after this refactor and shipped its own drawer, pagination,
+confirm dialog, badges, empty states, page banners, icon glyphs and a separate token palette with an
+Inter webfont import. It now follows the same "components + tokens" contract as the other remotes.
+
+| Was local | Now |
+|---|---|
+| `components/drawer/Drawer.tsx` + 220-line `Drawer.css` | Adapter over shared `Drawer` (keeps `isOpen`/`badge` for 19 call sites; badge renders first in the body). `DrawerSection` is shared `DetailSection` plus an optional action. `Drawer.css` deleted. |
+| `common/Pagination.tsx` | Deleted; 5 call sites use shared `Pagination` (`total`, singular `itemLabel`). |
+| `ConfirmModal` (bespoke side-drawer, 340 lines CSS, no Cancel button, always "Deletion Notice") | Same props, shared `Modal` + `Button` + `DetailGrid/DetailField`; explicit Cancel; notice worded by variant. |
+| `StatusBadge` markup | Shared `Badge tone dot` (label/tone still from Setup's status config). |
+| `EmptyState` / `ErrorState` / skeletons | Shared `EmptyState`, `Button`, `SkeletonBlock`. |
+| 7 hand-built hero banners (date chips, marketing chips) | Shared `PageHeader` with `onHeader` buttons. The invented "Low Rates / Quick Approval / 100% Secure" chips were removed. |
+| `common/Icon.tsx` 49 local SVGs | Generic glyphs drawn by the platform `Icon`; only product pictograms (loans, deposits, percent…) stay local. The four names call sites used that did not exist (`file-text`, `check-circle`, `message-square`, `refresh-cw`) are real now. |
+| `styles/tokens.css` own palette + Google Fonts | Every `--color-*`, `--radius-*`, `--shadow-*`, `--space-*`, `--font-sans` aliases the `--omni-*` token; font import removed. 350 hex literals that exactly equalled a platform token were replaced by it; dead rules for the old banners, pager and states were pruned. |
+
+Also fixed while there: the Products audit drawer hung on a skeleton when its load failed, printed a
+hard-coded "ProductMarketplace" service and pinned `en-IN` times; the Applications and Promotions
+cards counted only the rows on the current page — they now come from new
+`GET /api/applications/status-counts` and `GET /api/promotions/status-counts`, labelled by Setup's
+status configuration (`StatusCountCards`).
+
+Guards checked on the built `dist/assets/style.css`: 0 double `#products-mf-scope` prefixes, 0 Google
+Fonts references, global element selectors emitted as `:where(#products-mf-scope) …`, shared CSS-module
+classes unprefixed. Tests: `Drawer.test.tsx`, `ConfirmModal.test.tsx`, `StatusCountCards.test.tsx`,
+`Icon.test.tsx`.
+
 ## 5. Known remaining work
 
 - **Auto-generated class names in the host** — `styles.suc1`, `ufl3`, `rfl7`, `afl2`, `alp1`, `dp2`
@@ -1823,7 +1851,9 @@ lead_mf with **zero console errors**.
 - `lead_mf/index.css` (2,031) and `customer360_mf/index.css` (~1,990) still hold global layout and
   utility rules. Component styling is out; further decomposition is optional.
 - 3 pre-existing lint warnings in host files untouched by this work.
-- No test suite exists anywhere in the repo.
+- Products still renders its own table markup (`pm-table`) and form controls (`pm-input`, `CustomSelect`
+  wrapper over shared `Select`); moving those to `DataTable`/`ResponsiveRows` and shared `Input` is the
+  next step there. KPI cards (`pm-kpi-card`) are local too.
 - **`Customer360Service` still needs a restart** for the `ClaimTypes.Name` -> `JwtClaimTypes.Name`
   fix in `AuditController.cs` to take effect; until then c360 audit rows fall back to
   `resolveActor`, which shows an id rather than inventing a name.

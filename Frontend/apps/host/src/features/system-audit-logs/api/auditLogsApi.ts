@@ -55,6 +55,10 @@ export interface ListAuditLogsParams {
   sortDir?: 'asc' | 'desc'
   /** Scopes the list to a single actor's history — e.g. a user's Audit Log tab. */
   actorUserId?: string
+  /** Everything a user did AND everything done to them — the user detail page's Audit Log tab. */
+  involvingUserId?: string
+  /** With `involvingUserId`, leaves out what that user did themselves ("About this user"). */
+  excludeActorUserId?: string
   /** Scopes the list to every row stamped with one operation's id — see AuditLogDetailDrawer's "Related Activity". */
   correlationId?: string
   actorName?: string
@@ -96,8 +100,14 @@ function buildQuery(params: object) {
  * module, with no permission check — so the trail recorded what a client asserted rather than what
  * the platform did. Every audit row is now written by the service that performed the action, from
  * the identity on its verified token.
+ *
+ * The one exception is `recordPageView`, and it sends only the route. The server decides whether it
+ * is a page this user can open and what it is called, from their own navigation tree.
  */
 export const auditLogsApi = {
+  recordPageView: (accessToken: string, path: string) =>
+    apiFetch<void>(`${base}/api/audit-logs/page-views`, { method: 'POST', accessToken, body: { path }, keepalive: true }),
+
   list: (accessToken: string, params: ListAuditLogsParams = {}, signal?: AbortSignal) =>
     apiFetch<PagedResult<AuditLogDto>>(`${base}/api/audit-logs${buildQuery(params)}`, { accessToken, signal }),
 

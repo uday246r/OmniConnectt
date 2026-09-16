@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { testCustomPreset, type CustomPreset, type CustomPresetKind, type TextPatternMode } from '@omniremit/ui/validation'
-import { Button, Modal } from '@omniremit/ui'
+import { Button, Modal, Select } from '@omniremit/ui'
 import styles from './FieldEditorModal.module.css'
 
 const TEXT_PATTERN_MODE_LABELS: Record<TextPatternMode, string> = {
@@ -162,26 +162,24 @@ export function FormatEditorModal({ open, preset, existingKeys, onSave, onClose 
         </div>
 
         <div className={styles.formGroup}>
-          <label className={styles.label}>Format Type</label>
-          <select className={styles.select} value={kind} onChange={(e) => setKind(e.target.value as CustomPresetKind)}>
-            {(Object.keys(KIND_LABELS) as CustomPresetKind[]).map((k) => (
-              <option key={k} value={k}>{KIND_LABELS[k]}</option>
-            ))}
-          </select>
+          <label className={styles.label} htmlFor="format-kind">Format Type</label>
+          <Select
+            id="format-kind"
+            value={kind}
+            onChange={(e) => setKind(e.target.value as CustomPresetKind)}
+            options={(Object.keys(KIND_LABELS) as CustomPresetKind[]).map((k) => ({ value: k, label: KIND_LABELS[k] }))}
+          />
         </div>
 
         {kind === 'textPattern' && (
           <div className={styles.formGroup}>
-            <label className={styles.labelSm}>Allowed characters</label>
-            <select
-              className={styles.select}
+            <label className={styles.labelSm} htmlFor="format-text-mode">Allowed characters</label>
+            <Select
+              id="format-text-mode"
               value={textMode}
               onChange={(e) => setTextMode(e.target.value as TextPatternMode)}
-            >
-              {(Object.keys(TEXT_PATTERN_MODE_LABELS) as TextPatternMode[]).map((m) => (
-                <option key={m} value={m}>{TEXT_PATTERN_MODE_LABELS[m]}</option>
-              ))}
-            </select>
+              options={(Object.keys(TEXT_PATTERN_MODE_LABELS) as TextPatternMode[]).map((m) => ({ value: m, label: TEXT_PATTERN_MODE_LABELS[m] }))}
+            />
             <span className={styles.hintInline}>No regex needed — pick the kind of text this field should accept.</span>
           </div>
         )}

@@ -5,7 +5,7 @@
 const ACTION_LABELS: Record<string, string> = {
   'auth.login_succeeded': 'Login Succeeded',
   'auth.login_failed': 'Login Failed',
-  'page.viewed': 'Viewed Page',
+  'page.viewed': 'Opened Page',
   'details.viewed': 'Viewed Details',
   'system_log.details_viewed': 'Viewed System Log Details',
   'audit_log.details_viewed': 'Viewed Audit Log Details',

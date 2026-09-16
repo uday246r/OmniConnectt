@@ -1,5 +1,5 @@
 import { httpClient, API_BASE_URL } from "./httpClient";
-import type { ApplicationDetail, ApplicationDocument, ApplicationInput, ApplicationListItem, PagedResult } from "../types/domain";
+import type { ApplicationDetail, ApplicationDocument, ApplicationInput, ApplicationListItem, PagedResult, StatusCount } from "../types/domain";
 
 export interface ApplicationQuery {
   search?: string;
@@ -12,6 +12,11 @@ export interface ApplicationQuery {
 export const applicationApi = {
   async search(query: ApplicationQuery, signal?: AbortSignal): Promise<PagedResult<ApplicationListItem>> {
     const { data } = await httpClient.get("/applications", { params: query, signal });
+    return data;
+  },
+  /** Applications per status under the search/product filters (the status filter is ignored by the server). */
+  async statusCounts(query: Pick<ApplicationQuery, "search" | "productId">, signal?: AbortSignal): Promise<StatusCount[]> {
+    const { data } = await httpClient.get("/applications/status-counts", { params: query, signal });
     return data;
   },
   async getById(id: string, signal?: AbortSignal): Promise<ApplicationDetail> {

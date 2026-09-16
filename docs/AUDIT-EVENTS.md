@@ -7,9 +7,11 @@ add an action key, add it here in the same change.
 ## The rules every row follows
 
 1. **Only the service performing the action writes the row.** There is no endpoint a browser can
-   write audit rows through. `POST /api/audit-logs/activity` (AuthService) and `POST /v1/audit`
+   write free-form audit rows through. `POST /api/audit-logs/activity` (AuthService) and `POST /v1/audit`
    (Customer360Service) were deleted: both accepted a caller-chosen service name with no permission
    check, so the trail could be written by anyone holding a session. They now answer 404/405.
+   The single exception is page views (see *Navigation* below): the browser sends only a route, and
+   AuthService decides whether it is a page that user can open and what it is called.
 2. **The actor comes from the verified token**, never a request body or header. LeadService's old
    defaults (`USR-1001` / `Admin User` / `127.0.0.1`) and Customer360's `X-Staff-User` header are
    gone. Rows written before this change still show them, and are left untouched.
@@ -31,7 +33,6 @@ add an action key, add it here in the same change.
 
 | Former client event | Why it is gone and not replaced |
 |---|---|
-| `page.viewed` (host navigation) | Navigation reaches no backend. A row saying "a client claims it opened a page" is not evidence. |
 | `audit_log.details_viewed` | Expanding a row the browser already holds fetches nothing. |
 | `VIEW_SENSITIVE_DATA` (Customer 360 masked-field reveal) | `useFieldReveal` unmasks a value the browser already has; no request is made. Making this a real event means masking server-side and adding a reveal endpoint — a change to the Customer 360 data contract, out of scope here. |
 
@@ -107,8 +108,30 @@ revocation, and lifting one is a grant (`PermissionDiffDto.Summarise`, pinned by
 | `checker_assignment.created` / `.deleted` | Checker Assignment | A module is gated or un-gated |
 | `user_field_schema.updated` | User Schema | Manage Fields saved |
 | `validation_preset_catalog.updated` | User Schema | Manage Formats saved |
-| `salutation_catalog.updated` | User Schema | Salutation list saved |
+| `salutation_catalog.updated` | User Schema | Salutations added or removed — "Added 'Prof.'. Removed 'Mrs.'." |
+| `salutation_catalog.renamed` | User Schema | A salutation renamed; every profile holding it (deleted ones included) and pending user approvals change in the same transaction — "Renamed the salutation 'Mr' to 'Mr.'. 12 user profiles now show 'Mr.'." One row per rename |
 | `remoteapp.permissions_resynced` | Applications | A remote's capability catalogue is re-read and rewritten |
+
+### Navigation — category `Navigation`
+
+| Key | Fires when | Written as |
+|---|---|---|
+| `page.viewed` | A signed-in person opens a page, host or remote (`POST /api/audit-logs/page-views`, sent by the host's `usePageViewTracking`) | `SourceApplication` = `Host` or the remote app's display name; `Module` = the sidebar label; `Details` = "Opened Lead Management → Create Lead." A user's profile is recorded with `EntityType = User` and "Opened the profile of Priya Nair.", so it appears on that user's audit tab too |
+
+How it stays trustworthy and cheap:
+
+- **The body is only a route.** `PageViewResolver` matches it against the caller's own navigation tree
+  (built from their token, exactly as the sidebar is) plus the host pages reached outside the sidebar —
+  `/profile`, `/settings/users`, `/settings/users/{id}`, and the settings drawer tabs — each with the
+  permission its route requires. Anything else — a page the caller cannot open, a made-up app, a full
+  URL, `..` — is refused with 400 and writes nothing.
+- **One row per person per page per 30 seconds** (`PageViewAuditService.DedupeWindow`, held in
+  `IPlatformCache`, so it holds across replicas with Redis).
+- **Per-user rate limit** `RateLimitPolicies.PageViews` (`RateLimiting:PageViewPermitLimit`, default 60 per minute).
+- **No live push.** Navigation rows skip the "audit log changed" broadcast and the KPI recompute, so an
+  open Audit Logs screen does not refetch on every click anyone makes.
+- The host skips addresses that are not visits: `/apps/{app}` before it redirects, `/settings` before it
+  picks a tab, forms stacked on a drawer, apps showing their maintenance notice, and a route left within 800 ms.
 
 ### Applications — module `Applications`, category `CRUD`
 

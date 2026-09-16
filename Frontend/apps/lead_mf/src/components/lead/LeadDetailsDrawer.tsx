@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Button, Card, Drawer, getInitials } from '@omniremit/ui';
-import drawerLayout from '../../shared/drawerLayout.module.css';
+import { Card, Drawer, getInitials } from '@omniremit/ui';
 import styles from './LeadDetailsDrawer.module.css';
 import {
   User,
@@ -25,7 +24,6 @@ import {
   Check,
   Clock,
   Shield,
-  Hash,
   Sparkles,
 } from '@omniremit/ui/icons';
 import { useLeadStore } from '../../store/useLeadStore';
@@ -72,7 +70,6 @@ export const LeadDetailsDrawer: React.FC = () => {
   const { selectedLead, isDetailsDrawerOpen, closeDetailsDrawer, fieldConfig } = useLeadStore();
   const [revealed, setRevealed] = useState<Record<string, boolean>>({});
   const [copiedField, setCopiedField] = useState<string | null>(null);
-  const [copiedId, setCopiedId] = useState(false);
 
   function toggleReveal(apiField: string) {
     setRevealed((prev) => ({ ...prev, [apiField]: !prev[apiField] }));
@@ -102,7 +99,6 @@ export const LeadDetailsDrawer: React.FC = () => {
 
   if (!isDetailsDrawerOpen || !selectedLead) return null;
 
-  const leadIdStr = selectedLead.id ? String(selectedLead.id) : '';
   const initials = getInitials(selectedLead.name);
 
   const isHomeFinancing =
@@ -115,12 +111,6 @@ export const LeadDetailsDrawer: React.FC = () => {
     !!selectedLead.entityType ||
     !!selectedLead.dateOfIncorporation;
 
-  const handleCopyId = () => {
-    if (!leadIdStr) return;
-    navigator.clipboard.writeText(leadIdStr);
-    setCopiedId(true);
-    setTimeout(() => setCopiedId(false), 1600);
-  };
 
   const handleOverlayClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (e.target === e.currentTarget) {
@@ -226,27 +216,6 @@ export const LeadDetailsDrawer: React.FC = () => {
       title="Lead Record Details"
       subtitle="Viewing complete customer and financing application context"
       icon={<Shield size={22} />}
-      footer={
-        <div className={drawerLayout.footerSpread}>
-          <div className={styles.footerMeta}>
-            <span className={styles.leadId}>
-              Lead ID: {leadIdStr ? (leadIdStr.length > 16 ? `${leadIdStr.slice(0, 16)}…` : leadIdStr) : '—'}
-            </span>
-            <button
-              type="button"
-              onClick={handleCopyId}
-              className={`${styles.copyBtn}${copiedId ? ` ${styles.copyBtnCopied}` : ''}`}
-              title="Copy Lead ID"
-            >
-              {copiedId ? <Check size={13} /> : <Copy size={13} />}
-              <span>{copiedId ? 'Copied' : 'Copy ID'}</span>
-            </button>
-          </div>
-          <Button type="button" variant="secondary" onClick={closeDetailsDrawer}>
-            Close Details
-          </Button>
-        </div>
-      }
     >
           {/* Hero Identity / Overview Banner */}
           <div className="lead-hero-identity-card">
@@ -514,19 +483,6 @@ export const LeadDetailsDrawer: React.FC = () => {
                 </div>
               )}
 
-              <div className="lead-field-card lead-field-card-full">
-                <span className="lead-field-icon lead-field-icon-neutral">
-                  <Hash size={15} />
-                </span>
-                <div className="lead-field-body">
-                  <span className="lead-field-label">System Record Reference</span>
-                  <span
-                    className={`lead-field-value ${styles.monoId}`}
-                  >
-                    {leadIdStr || '—'}
-                  </span>
-                </div>
-              </div>
             </div>
           </section>
     </Drawer>

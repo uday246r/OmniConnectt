@@ -28,17 +28,36 @@ namespace LeadManagement.Api.Controllers
         }
 
         [HttpGet("{productId:guid}")]
-        [RequiresCapability("FieldSettings", "View")]
+        // Field Settings edits this; the lead forms and details view obey it (required, masking, formats).
+        [RequiresAnyCapability("FieldSettings:View", "Lead:View", "Lead:Create", "Lead:Edit")]
         public async Task<ActionResult<ApiResponseDto<List<LeadFieldConfig>>>> Get(Guid productId, CancellationToken ct)
         {
             var fields = await _service.GetByProductAsync(productId, ct);
+            // The version Field Settings saves against — a save based on anything older is refused.
+            Response.Headers.ETag = $"\"{LeadFieldConfigService.Fingerprint(fields)}\"";
             return Ok(new ApiResponseDto<List<LeadFieldConfig>> { Success = true, Data = fields });
+        }
+
+        /// <summary>
+        /// The formats administrators defined in Settings → Manage Formats. The lead form checks a value
+        /// against them as it is typed, and Field Settings offers them when choosing a field's format;
+        /// the server checks them again on save either way.
+        /// </summary>
+        [HttpGet("formats")]
+        [RequiresAnyCapability("FieldSettings:View", "Lead:View", "Lead:Create", "Lead:Edit")]
+        public async Task<ActionResult<ApiResponseDto<IReadOnlyList<OmniRemit.Validation.FormatPreset>>>> Formats(
+            [FromServices] ValidationPresetClient presets, CancellationToken ct)
+        {
+            return Ok(new ApiResponseDto<IReadOnlyList<OmniRemit.Validation.FormatPreset>> { Success = true, Data = await presets.GetAsync(ct) });
         }
 
         [HttpPut("{productId:guid}")]
         [RequiresCapability("FieldSettings", "Manage")]
         public async Task<IActionResult> Replace(Guid productId, [FromBody] List<LeadFieldConfig> fields, CancellationToken ct)
         {
+            // If-Match carries the ETag the page loaded; absent, the save is not version-checked (older callers).
+            var expectedVersion = Request.Headers.IfMatch.ToString().Trim().Trim('"');
+
             if (fields is not { Count: > 0 })
             {
                 return BadRequest(new ApiResponseDto<List<LeadFieldConfig>> { Success = false, Message = "At least one field is required." });
@@ -46,14 +65,19 @@ namespace LeadManagement.Api.Controllers
 
             try
             {
-                var outcome = await _service.ReplaceAsync(productId, fields, CurrentUserId(), CurrentUserName(), bypassApproval: IsSuperAdmin(), ct);
+                var outcome = await _service.ReplaceAsync(productId, fields, CurrentUserId(), CurrentUserName(), bypassApproval: IsSuperAdmin(), ct, expectedVersion: string.IsNullOrEmpty(expectedVersion) ? null : expectedVersion);
                 if (outcome.Pending is not null)
                 {
                     // Gated: nothing was changed. 202 Accepted — the request is understood and queued, not applied.
                     return StatusCode(202, new ApiResponseDto<ApprovalPendingDto> { Success = true, Message = outcome.Pending.Message, Data = outcome.Pending });
                 }
 
+                Response.Headers.ETag = $"\"{LeadFieldConfigService.Fingerprint(outcome.Applied!)}\"";
                 return Ok(new ApiResponseDto<List<LeadFieldConfig>> { Success = true, Data = outcome.Applied });
+            }
+            catch (LeadFieldConfigService.StaleSettingsException ex)
+            {
+                return Conflict(new ApiResponseDto<List<LeadFieldConfig>> { Success = false, Message = ex.Message });
             }
             catch (ApprovalServiceUnavailableException ex)
             {

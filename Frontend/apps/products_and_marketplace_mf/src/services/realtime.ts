@@ -1,5 +1,6 @@
 import { HubConnectionBuilder, HubConnectionState, LogLevel, type HubConnection } from "@microsoft/signalr";
 import { API_ORIGIN } from "./httpClient";
+import { ensureFreshAccessToken, getAccessToken, isRunningInHost } from "../api/hostBridge";
 import type { AuditLog } from "../types/domain";
 
 let connection: HubConnection | null = null;
@@ -8,7 +9,11 @@ let startPromise: Promise<void> | null = null;
 function getConnection(): HubConnection {
   if (!connection) {
     connection = new HubConnectionBuilder()
-      .withUrl(`${API_ORIGIN}/hubs/audit-log`, { withCredentials: true })
+      .withUrl(`${API_ORIGIN}/hubs/audit-log`, {
+        // The hub requires the platform token. A browser cannot put headers on a WebSocket, so it travels
+        // as a query parameter the server accepts on the hub path only.
+        accessTokenFactory: async () => getAccessToken() ?? (isRunningInHost() ? await ensureFreshAccessToken() : ""),
+      })
       .withAutomaticReconnect()
       .configureLogging(LogLevel.Warning)
       .build();

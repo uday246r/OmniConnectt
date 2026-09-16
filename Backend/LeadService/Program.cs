@@ -32,7 +32,40 @@ Env.TraversePath().Load();
 var builder = WebApplication.CreateBuilder(args);
 
 // Add Controllers & OpenAPI
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .ConfigureApiBehaviorOptions(options =>
+    {
+        /*
+         * [ApiController] answers an invalid body itself, before the action runs, with a
+         * ValidationProblemDetails. The actions used to check ModelState by hand to return this service's
+         * { success, message, errors } envelope instead — code that could never run, so the form got a
+         * shape it does not read and showed a generic error. The envelope is produced here now, with
+         * errors keyed by the form's own camelCase field names.
+         */
+        options.InvalidModelStateResponseFactory = context =>
+        {
+            var errors = context.ModelState
+                .Where(entry => entry.Value?.Errors.Count > 0)
+                .ToDictionary(
+                    entry => ToFieldName(entry.Key),
+                    entry => entry.Value!.Errors[0].ErrorMessage is { Length: > 0 } message
+                        ? message
+                        : "This value is not valid.");
+
+            return new Microsoft.AspNetCore.Mvc.BadRequestObjectResult(new LeadManagement.Api.Models.Dtos.ApiResponseDto<object>
+            {
+                Success = false,
+                Message = errors.Values.FirstOrDefault() ?? "Some details are not valid.",
+                Errors = errors,
+            });
+
+            static string ToFieldName(string key)
+            {
+                var name = key.StartsWith("$.", StringComparison.Ordinal) ? key[2..] : key;
+                return name.Length > 0 ? char.ToLowerInvariant(name[0]) + name[1..] : "request";
+            }
+        };
+    });
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 // Lets AuthServiceClient read the real caller's IP/User-Agent off the current request when it pushes
@@ -88,6 +121,8 @@ builder.Services.AddScoped<IDashboardService, DashboardService>();
 // default (100s) would hang the request instead of just delaying a best-effort audit push.
 builder.Services.AddHttpClient<AuthServiceClient>(client => client.Timeout = TimeSpan.FromSeconds(10));
 builder.Services.AddMemoryCache();
+builder.Services.AddSingleton<ValidationPresetClient.LastKnownGood>();
+builder.Services.AddHttpClient<ValidationPresetClient>(client => client.Timeout = TimeSpan.FromSeconds(5));
 builder.Services.AddHttpClient<FineCapabilityClient>(client => client.Timeout = TimeSpan.FromSeconds(10));
 builder.Services.AddScoped<KpiVisibilityService>();
 
@@ -96,26 +131,22 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
     {
-        var allowedOrigins = builder.Configuration.GetSection($"{CorsOptions.SectionName}:AllowedOrigins").Get<string[]>();
-        if (allowedOrigins != null && allowedOrigins.Length > 0)
-        {
-            policy.WithOrigins(allowedOrigins)
-                  .AllowAnyHeader()
-                  .AllowAnyMethod()
-                  .AllowCredentials()
-                  // Without this the CSV export still downloads, but the browser cannot read the
-                  // row-count headers — so a truncated file arrives with no warning, which is the
-                  // exact failure those headers exist to prevent.
-                  .WithExposedHeaders(LeadManagement.Api.Infrastructure.ExportHeaders.All);
-        }
-        else
-        {
-            policy.SetIsOriginAllowed(_ => true)
-                  .AllowAnyHeader()
-                  .AllowAnyMethod()
-                  .AllowCredentials()
-                  .WithExposedHeaders(LeadManagement.Api.Infrastructure.ExportHeaders.All);
-        }
+        /*
+         * Fails closed. With no origins configured this used to fall back to allowing ANY origin with
+         * credentials — every website a signed-in user visited could call this API as them. An
+         * unconfigured deployment now serves no browser origin at all, matching AuthService and
+         * Customer360Service; set Cors__AllowedOrigins__0.. in .env.
+         */
+        var allowedOrigins = builder.Configuration.GetSection($"{CorsOptions.SectionName}:AllowedOrigins").Get<string[]>() ?? [];
+        policy.WithOrigins(allowedOrigins)
+              .AllowAnyHeader()
+              .AllowAnyMethod()
+              .AllowCredentials()
+              // Without this the CSV export still downloads, but the browser cannot read the
+              // row-count headers — so a truncated file arrives with no warning, which is the
+              // exact failure those headers exist to prevent.
+              // ETag: Field Settings reads it to save against the version it loaded (see LeadFieldConfigController).
+              .WithExposedHeaders([.. LeadManagement.Api.Infrastructure.ExportHeaders.All, "ETag"]);
     });
 });
 
@@ -203,6 +234,8 @@ if (app.Environment.IsDevelopment())
 
 app.MapControllers();
 app.MapHealthChecks("/health");
+// Liveness without dependencies; /health (readiness) opens a database connection per call.
+app.MapHealthChecks("/health/live", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions { Predicate = _ => false });
 
 // Initialize database if connection string is configured
 var dbConnection = builder.Configuration.GetConnectionString("LeadDb")

@@ -1,5 +1,6 @@
 import { create } from "zustand";
-import { auditLogApi } from "../services/auditLogApi";
+import { EMPTY_DATE_RANGE, isDateRangeActive, resolveDateRange, type DateRangeValue } from "@omniremit/ui";
+import { auditLogApi, type AuditLogQuery } from "../services/auditLogApi";
 import type { AuditActionOption, AuditLog, AuditLogSummary } from "../types/domain";
 
 interface AuditLogState {
@@ -11,6 +12,8 @@ interface AuditLogState {
   search: string;
   action: string | null;
   entityType: string | null;
+  /** The platform's shared date range — the same control and meaning as every other log screen. */
+  dateRange: DateRangeValue;
   page: number;
   pageSize: number;
   actionOptions: AuditActionOption[];
@@ -21,6 +24,9 @@ interface AuditLogState {
   setSearch: (search: string) => void;
   setAction: (action: string | null) => void;
   setEntityType: (entityType: string | null) => void;
+  setDateRange: (range: DateRangeValue) => void;
+  /** The filters on screen, as sent to the list, the summary and the download. */
+  currentFilters: () => AuditLogQuery;
   setPage: (page: number) => void;
   setPageSize: (pageSize: number) => void;
   fetchAuditLogs: () => Promise<void>;
@@ -38,6 +44,7 @@ export const useAuditLogStore = create<AuditLogState>((set, get) => ({
   search: "",
   action: null,
   entityType: null,
+  dateRange: EMPTY_DATE_RANGE,
   page: 1,
   pageSize: 10,
   actionOptions: [],
@@ -48,17 +55,25 @@ export const useAuditLogStore = create<AuditLogState>((set, get) => ({
   setSearch: (search) => set({ search, page: 1 }),
   setAction: (action) => set({ action, page: 1 }),
   setEntityType: (entityType) => set({ entityType, page: 1 }),
+  setDateRange: (dateRange) => set({ dateRange, page: 1 }),
+
+  currentFilters: () => {
+    const { search, action, entityType, dateRange } = get();
+    return {
+      search: search || undefined,
+      action: action || undefined,
+      entityType: entityType || undefined,
+      // Resolved when used, so "Last 7 Days" left open overnight still means the last seven days.
+      ...resolveDateRange(dateRange),
+    };
+  },
   setPage: (page) => set({ page }),
   setPageSize: (pageSize) => set({ pageSize, page: 1 }),
 
   fetchAuditLogs: async () => {
-    const { search, action, entityType, page, pageSize } = get();
+    const { page, pageSize } = get();
     set({ loading: true, error: null });
-    const filters = {
-      search: search || undefined,
-      action: action || undefined,
-      entityType: entityType || undefined,
-    };
+    const filters = get().currentFilters();
     try {
       // The page of rows and the headline figures are fetched with the same filters, so the KPIs
       // describe the whole matching result set rather than just the rows currently rendered.
@@ -93,8 +108,8 @@ export const useAuditLogStore = create<AuditLogState>((set, get) => ({
    * prepended immediately; otherwise we just bump a "N new" indicator so the list isn't yanked out
    * from under an admin who is mid-filter/mid-read. */
   ingestLiveEntry: (entry) => {
-    const { page, search, action, entityType, items, summary } = get();
-    const noFilters = !search && !action && !entityType;
+    const { page, search, action, entityType, dateRange, items, summary } = get();
+    const noFilters = !search && !action && !entityType && !isDateRangeActive(dateRange);
     if (page === 1 && noFilters) {
       // Keep the headline figures in step with the row that was just prepended, so they don't drift
       // from the table until the next refetch.

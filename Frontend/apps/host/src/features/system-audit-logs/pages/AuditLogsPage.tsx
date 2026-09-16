@@ -1,12 +1,14 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router-dom'
 import { useAuthStore } from '../../auth/store/authStore'
-import { TOPICS, useDataRevision } from '../../../shared/stores/invalidationStore'
+import { queryKeys } from '../../../shared/query/queryKeys'
+import { useLiveRefetchInterval } from '../../../shared/query/invalidationBridge'
 import { ActorCell, Badge, CsvExportError, DataTable, DateRangeColumnFilter, DateRangeFilterButton, EMPTY_DATE_RANGE, EMPTY_VALUE, FilterBar, PageHeader, Pagination, ResponsiveRows, RowAction, RowsPerPage, describeDateRange, describeTruncation, formatAuditTimestamp, isDateRangeActive, readStoredPageSize, resolveDateRange, sanitizeFilterInput, filterTypeBlockedMessage, useCommittedFilter, type ActiveFilter, type CommittedFilter, type DateRangeValue } from '@omniremit/ui'
 import { PermissionGate } from '../../../shared/components/PermissionGate/PermissionGate'
 import { ApiError } from '../../../shared/api/httpClient'
 import { useDebouncedValue } from '../../../shared/hooks/useDebouncedValue'
-import { auditLogsApi, type AuditLogDto, type AuditLogFacetsDto, type AuditLogSummaryDto, type ListAuditLogsParams } from '../api/auditLogsApi'
+import { auditLogsApi, type AuditLogDto, type ListAuditLogsParams } from '../api/auditLogsApi'
 import { formatActionLabel, actionChipClass, formatIpv4 } from '../utils/auditLogFormatting'
 import { Icon } from '../../../shared/components/Icon/Icon'
 import { AuditLogDetailDrawer, serviceTone, parseUserAgent } from '../components/AuditLogDetailDrawer/AuditLogDetailDrawer'
@@ -111,9 +113,6 @@ export function AuditLogsPage() {
   }
   const [resultFilter, setResultFilter] = useState<'' | 'Success' | 'Failure'>('')
 
-  /** The bounded columns' options, from the server, under the filters already applied. */
-  const [facets, setFacets] = useState<AuditLogFacetsDto | null>(null)
-
   // Debounced TYPED text — these feed the recommendation lists only. What the table is filtered by
   // is `actorFilter.applied` / `recordFilter.applied` / `ipFilter.applied` / `deviceFilter.applied`, which change on commit.
   const debouncedServiceSearch = useDebouncedValue(serviceSearch, 200)
@@ -122,12 +121,11 @@ export function AuditLogsPage() {
   const debouncedIp = useDebouncedValue(ipFilter.query, 200)
   const debouncedDevice = useDebouncedValue(deviceFilter.query, 200)
 
-  const [summary, setSummary] = useState<AuditLogSummaryDto | null>(null)
-  const [logs, setLogs] = useState<AuditLogDto[] | null>(null)
-  const [total, setTotal] = useState(0)
+  /** Export outcome (truncation warning or failure). The list's own load error comes from its query. */
   const [error, setError] = useState<string | null>(null)
   const [viewingLog, setViewingLog] = useState<AuditLogDto | null>(null)
-  const [refreshKey, setRefreshKey] = useState(0)
+  const queryClient = useQueryClient()
+  const refetchInterval = useLiveRefetchInterval()
   const [exporting, setExporting] = useState(false)
 
   /*
@@ -139,7 +137,6 @@ export function AuditLogsPage() {
    * what is on screen, while the FILTER is server-side and complete. Before, the suggestions looked
    * complete and the filter was not.
    */
-  const suggestionPool = logs ?? []
 
   /*
    * Opening the drawer no longer writes an audit row.
@@ -153,10 +150,85 @@ export function AuditLogsPage() {
   const handleOpenDetail = useCallback((log: AuditLogDto) => {
     setViewingLog(log)
   }, [])
-  const dataRevision = useDataRevision(TOPICS.auditLogs)
-  const prevDepsRef = useRef<unknown[] | null>(null)
 
   const range = useMemo(() => resolveDateRange(dateRange), [dateRange])
+
+  /**
+   * Every filter this screen applies, as the query parameters the server understands.
+   *
+   * One builder shared by the list, the summary, the facets and the export — which is the point.
+   * The export used to assemble its own subset and silently dropped the IP, device and sign-in
+   * method filters, so the CSV answered a different question from the table it was launched from.
+   */
+  const buildFilterParams = useCallback((): ListAuditLogsParams => ({
+    service: service || undefined,
+    action: actionFilter || TAB_ACTION_FILTER[activeTab],
+    result:
+      resultFilter ||
+      (activeTab === TAB_IDS.loginErrors ? 'Failure' : activeTab === TAB_IDS.loginSuccesses ? 'Success' : undefined),
+    actorName: actorFilter.applied || undefined,
+    entityId: recordFilter.applied || undefined,
+    authMethod: authMethodFilter || undefined,
+    sourceIp: ipFilter.applied || undefined,
+    device: deviceFilter.applied || undefined,
+    correlationId: correlationId || undefined,
+    ...range,
+  }), [
+    service, actionFilter, activeTab, resultFilter, actorFilter.applied, recordFilter.applied,
+    authMethodFilter, ipFilter.applied, deviceFilter.applied, correlationId, range,
+  ])
+
+  const filterParams = useMemo(() => buildFilterParams(), [buildFilterParams])
+  const listParams = useMemo<ListAuditLogsParams>(
+    () => ({
+      ...filterParams,
+      // One operation is shown whole, oldest first, never split across pages — its later steps would
+      // otherwise disappear behind "page 2" of a story that is only a handful of rows long.
+      ...(correlationId ? { page: 1, pageSize: 100, sortDir: 'asc' as const } : { page, pageSize }),
+    }),
+    [filterParams, correlationId, page, pageSize],
+  )
+
+  /*
+   * Cached queries, keyed by exactly what is shown. Leaving this page and coming back renders the rows
+   * already fetched at once and revalidates in the background; a live update marks them stale through
+   * the invalidation bridge. Previously every visit started from an empty table and refetched all three.
+   *
+   * Every filter is a server-side predicate and paging is the server's — see AuditLogFilter.
+   */
+  const listQuery = useQuery({
+    queryKey: queryKeys.auditLogPages.list(listParams),
+    enabled: Boolean(accessToken),
+    placeholderData: keepPreviousData,
+    refetchInterval,
+    queryFn: ({ signal }) => auditLogsApi.list(accessToken!, listParams, signal),
+  })
+  const summaryQuery = useQuery({
+    queryKey: queryKeys.auditLogPages.summary(range),
+    enabled: Boolean(accessToken),
+    placeholderData: keepPreviousData,
+    refetchInterval,
+    queryFn: () => auditLogsApi.summary(accessToken!, range),
+  })
+  // The bounded columns' options, under the same filters the table shows. A failure empties the
+  // dropdowns rather than the table: facets are an affordance, and losing them must not look like
+  // losing the data.
+  const facetsQuery = useQuery({
+    queryKey: queryKeys.auditLogPages.facets(filterParams),
+    enabled: Boolean(accessToken),
+    placeholderData: keepPreviousData,
+    refetchInterval,
+    queryFn: ({ signal }) => auditLogsApi.facets(accessToken!, filterParams, signal),
+  })
+
+  const logs: AuditLogDto[] | null = listQuery.isError ? [] : (listQuery.data?.items ?? null)
+  const total = listQuery.data?.total ?? 0
+  const summary = summaryQuery.data ?? null
+  const facets = facetsQuery.isError ? null : (facetsQuery.data ?? null)
+  const listError = listQuery.isError
+    ? listQuery.error instanceof ApiError ? listQuery.error.message : 'Could not load audit logs.'
+    : null
+  const suggestionPool = logs ?? []
 
   /*
    * Zero extra API call: unique actors from the rows already loaded.
@@ -349,132 +421,6 @@ export function AuditLogsPage() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [viewingLog])
 
-  const loadSummary = useCallback(async () => {
-    if (!accessToken) return
-    try {
-      const result = await auditLogsApi.summary(accessToken, range)
-      setSummary(result)
-    } catch {
-      // Ignore
-    }
-  }, [accessToken, range])
-
-  useEffect(() => {
-    void loadSummary()
-  }, [loadSummary, dataRevision])
-
-  /**
-   * Every filter this screen applies, as the query parameters the server understands.
-   *
-   * One builder shared by the list, the summary, the facets and the export — which is the point.
-   * The export used to assemble its own subset and silently dropped the IP, device and sign-in
-   * method filters, so the CSV answered a different question from the table it was launched from.
-   */
-  const buildFilterParams = useCallback((): ListAuditLogsParams => ({
-    service: service || undefined,
-    action: actionFilter || TAB_ACTION_FILTER[activeTab],
-    result:
-      resultFilter ||
-      (activeTab === TAB_IDS.loginErrors ? 'Failure' : activeTab === TAB_IDS.loginSuccesses ? 'Success' : undefined),
-    actorName: actorFilter.applied || undefined,
-    entityId: recordFilter.applied || undefined,
-    authMethod: authMethodFilter || undefined,
-    sourceIp: ipFilter.applied || undefined,
-    device: deviceFilter.applied || undefined,
-    correlationId: correlationId || undefined,
-    ...range,
-  }), [
-    service, actionFilter, activeTab, resultFilter, actorFilter.applied, recordFilter.applied,
-    authMethodFilter, ipFilter.applied, deviceFilter.applied, correlationId, range,
-  ])
-
-  /*
-   * The bounded columns' dropdown options, recomputed whenever the filter set changes.
-   *
-   * Deliberately keyed on the SAME builder the table uses, so the options always describe the rows
-   * the table is currently able to show. A failure here empties the dropdowns rather than the table:
-   * facets are an affordance, and losing them must not look like losing the data.
-   */
-  useEffect(() => {
-    if (!accessToken) return
-    let cancelled = false
-    auditLogsApi
-      .facets(accessToken, buildFilterParams())
-      .then((f) => {
-        if (!cancelled) setFacets(f)
-      })
-      .catch(() => {
-        if (!cancelled) setFacets(null)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [accessToken, buildFilterParams, dataRevision, refreshKey])
-
-  useEffect(() => {
-    if (!accessToken) return
-    let cancelled = false
-
-    const activeDeps = [
-      page, pageSize, service, activeTab, actionFilter,
-      resultFilter, authMethodFilter, actorFilter.applied, recordFilter.applied,
-      ipFilter.applied, deviceFilter.applied, range, dateRange, refreshKey, correlationId,
-    ]
-
-    const activeDepsChanged =
-      prevDepsRef.current === null ||
-      prevDepsRef.current.length !== activeDeps.length ||
-      activeDeps.some((dep, i) => dep !== prevDepsRef.current![i])
-
-    prevDepsRef.current = activeDeps
-
-    if (activeDepsChanged) {
-      setLogs(null)
-    }
-    setError(null)
-
-    async function load() {
-      try {
-        /*
-         * Every filter is a query parameter now, and paging is the server's.
-         *
-         * This used to ask for `page: 1, pageSize: 200` unconditionally and then do eight filter
-         * passes and a `.slice()` in the browser. Two things followed, both invisible from the
-         * screen. Nothing older than the newest 200 matching rows could be reached at all — a search
-         * for an actor whose activity was last week simply returned nothing, indistinguishable from
-         * "this person did nothing". And `total` counted the filtered 200-row sample, so the pager
-         * confidently described a corpus that was not the corpus.
-         *
-         * The filters that were client-only — actor, record, IP, device, sign-in method — are the
-         * reason the pre-fetch existed. They are all server-side predicates now; see AuditLogFilter.
-         */
-        const params = buildFilterParams()
-
-        const result = await auditLogsApi.list(accessToken!, {
-          ...params,
-          // One operation is shown whole, oldest first, never split across pages — its later steps
-          // would otherwise disappear behind "page 2" of a story that is only a handful of rows long.
-          ...(correlationId
-            ? { page: 1, pageSize: 100, sortDir: 'asc' as const }
-            : { page, pageSize }),
-        })
-        if (cancelled) return
-
-        setLogs(result.items)
-        setTotal(result.total)
-      } catch (err) {
-        if (cancelled) return
-        setError(err instanceof ApiError ? err.message : 'Could not load audit logs.')
-        setLogs([])
-        setTotal(0)
-      }
-    }
-
-    void load()
-    return () => {
-      cancelled = true
-    }
-  }, [accessToken, page, pageSize, buildFilterParams, correlationId, refreshKey, dataRevision])
 
   // Changing the filter or page size invalidates the page number. One dependency now, because
   // buildFilterParams already closes over every filter there is.
@@ -643,8 +589,7 @@ export function AuditLogsPage() {
             type="button"
             className={styles.refreshBtn}
             onClick={() => {
-              setRefreshKey((k) => k + 1)
-              void loadSummary()
+              void queryClient.invalidateQueries({ queryKey: ['auditLogs'] })
             }}
             title="Refresh Logs"
           >
@@ -689,7 +634,7 @@ export function AuditLogsPage() {
         onClearAll={clearAllFilters}
       />
 
-      {error && <div className={styles.errorBanner}>{error}</div>}
+      {(error ?? listError) && <div className={styles.errorBanner}>{error ?? listError}</div>}
 
       {/* Scoped to one operation: a connected thread telling the story in order, not a table meant
           for scanning many unrelated rows. */}

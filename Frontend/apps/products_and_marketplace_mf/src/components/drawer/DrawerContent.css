@@ -1,68 +1,80 @@
+/*
+ * Content blocks inside Products drawers that the platform DetailPanel does not provide (lists of
+ * benefits, documents, reviews, a status timeline). The drawer chrome and section cards come from
+ * @omniremit/ui; everything here uses platform tokens so the two read as one design. Rows no longer
+ * jump on hover — they are read-only information, not controls.
+ */
+
+.pm-drawer-badge-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--omni-space-2, 8px);
+}
+
+.pm-drawer-section-action {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: var(--omni-space-2, 8px);
+}
+
+.pm-drawer-section-plain {
+  display: flex;
+  flex-direction: column;
+  gap: var(--omni-space-3, 12px);
+}
+
 .pm-detail-meta-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 10px;
-  font-size: 12.5px;
-  color: #64748b;
-  margin-bottom: 8px;
-  flex-wrap: wrap;
-  background: #f8fafc;
-  border: 1px solid #eaecf0;
-  border-radius: 10px;
-  padding: 8px 12px;
-  transition: all 150ms ease;
-}
-.pm-detail-meta-row:hover {
-  background: #ffffff;
-  border-color: #cbd5e1;
-  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+  margin-bottom: var(--omni-space-2, 8px);
+  padding: var(--omni-space-2, 8px) var(--omni-space-3, 12px);
+  background: var(--omni-color-surface-alt);
+  border: 1px solid var(--omni-color-border);
+  border-radius: var(--omni-radius-lg-minus, 10px);
+  color: var(--omni-color-text-secondary);
+  font-size: var(--omni-font-size-xs, 12px);
 }
 
 .pm-detail-description {
-  font-size: 13.5px;
-  color: #475569;
-  line-height: 1.6;
   margin: 0;
+  color: var(--omni-color-text-secondary);
+  font-size: var(--omni-font-size-sm-minus, 13px);
+  line-height: 1.6;
 }
 
 .pm-promo-block {
-  border: 1px solid #fde68a;
-  background: #fffbeb;
-  border-radius: 12px;
-  padding: 14px 16px;
-  margin-bottom: 8px;
-  transition: all 160ms cubic-bezier(0.16, 1, 0.3, 1);
-  cursor: default;
+  margin-bottom: var(--omni-space-2, 8px);
+  padding: var(--omni-space-3, 12px) var(--omni-space-4, 16px);
+  background: var(--omni-color-warning-50);
+  border: 1px solid var(--omni-color-warning-200);
+  border-radius: var(--omni-radius-lg, 12px);
 }
 .pm-promo-block:last-child {
   margin-bottom: 0;
 }
-.pm-promo-block:hover {
-  border-color: #f59e0b;
-  box-shadow: 0 4px 14px rgba(245, 158, 11, 0.18);
-  transform: translateY(-2px);
-  background: #fffdf5;
-}
 .pm-promo-block-head {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 4px;
+  gap: var(--omni-space-2, 8px);
+  margin-bottom: var(--omni-space-1, 4px);
 }
 .pm-promo-block-head strong {
-  font-size: 13.5px;
-  color: #0f172a;
+  color: var(--omni-color-text-primary);
+  font-size: var(--omni-font-size-sm-minus, 13px);
 }
 .pm-promo-block p {
-  font-size: 13px;
-  color: #78350f;
-  margin: 4px 0;
+  margin: var(--omni-space-1, 4px) 0;
+  color: var(--omni-color-warning-700);
+  font-size: var(--omni-font-size-sm-minus, 13px);
 }
 
 .pm-detail-fields {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--omni-space-3, 12px);
 }
 @media (max-width: 500px) {
   .pm-detail-fields {
@@ -71,37 +83,27 @@
 }
 
 .pm-detail-field {
-  background: #f8fafc;
-  border: 1px solid #eaecf0;
-  border-radius: 12px;
-  padding: 11px 14px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  transition: all 160ms cubic-bezier(0.16, 1, 0.3, 1);
-  cursor: default;
-}
-.pm-detail-field:hover {
-  background: #ffffff;
-  border-color: #3b82f6;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.08);
+  gap: var(--omni-space-1, 4px);
+  min-width: 0;
+  padding: 10px var(--omni-space-3, 12px);
+  background: var(--omni-color-surface-alt);
+  border: 1px solid var(--omni-color-border);
+  border-radius: var(--omni-radius-lg-minus, 10px);
 }
 .pm-detail-field span {
-  font-size: 10.5px;
-  font-weight: 700;
+  color: var(--omni-color-text-muted);
+  font-size: var(--omni-font-size-3xs, 10px);
+  font-weight: var(--omni-font-weight-bold, 700);
+  letter-spacing: 0.06em;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: #94a3b8;
-  transition: color 130ms ease;
-}
-.pm-detail-field:hover span {
-  color: #3b82f6;
 }
 .pm-detail-field strong {
-  font-size: 13px;
-  font-weight: 700;
-  color: #0f172a;
+  color: var(--omni-color-text-primary);
+  font-size: var(--omni-font-size-sm-minus, 13px);
+  font-weight: var(--omni-font-weight-semibold, 600);
+  overflow-wrap: anywhere;
 }
 
 .pm-benefit-list,
@@ -109,169 +111,107 @@
 .pm-review-list,
 .pm-doc-list,
 .pm-timeline {
-  list-style: none;
-  margin: 0;
-  padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--omni-space-2, 8px);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pm-benefit-list li,
+.pm-eligibility-list li,
+.pm-review-list li,
+.pm-doc-list li,
+.pm-timeline li {
+  padding: 10px var(--omni-space-3, 12px);
+  background: var(--omni-color-surface-alt);
+  border: 1px solid var(--omni-color-border);
+  border-radius: var(--omni-radius-lg-minus, 10px);
 }
 
 .pm-benefit-list li {
   display: flex;
-  gap: 12px;
   align-items: flex-start;
-  background: #f8fafc;
-  border: 1px solid #eaecf0;
-  border-radius: 12px;
-  padding: 12px 14px;
-  transition: all 160ms cubic-bezier(0.16, 1, 0.3, 1);
-  cursor: default;
-}
-.pm-benefit-list li:hover {
-  background: #ffffff;
-  border-color: #3b82f6;
-  transform: translateX(4px);
-  box-shadow: 0 2px 10px rgba(37, 99, 235, 0.08);
+  gap: var(--omni-space-3, 12px);
 }
 .pm-benefit-list li > svg {
-  color: #059669;
-  margin-top: 2px;
   flex-shrink: 0;
-  transition: transform 150ms ease;
-}
-.pm-benefit-list li:hover > svg {
-  transform: scale(1.15);
+  margin-top: 2px;
+  color: var(--omni-color-success-600);
 }
 .pm-benefit-list strong,
 .pm-eligibility-list strong {
-  font-size: 13px;
-  font-weight: 700;
-  color: #0f172a;
   display: block;
+  color: var(--omni-color-text-primary);
+  font-size: var(--omni-font-size-sm-minus, 13px);
+  font-weight: var(--omni-font-weight-bold, 700);
 }
 .pm-benefit-list p,
 .pm-eligibility-list p {
-  font-size: 12px;
-  color: #64748b;
   margin-top: 2px;
+  color: var(--omni-color-text-secondary);
+  font-size: var(--omni-font-size-xs, 12px);
 }
 
 .pm-eligibility-list li {
-  background: #f8fafc;
-  border: 1px solid #eaecf0;
-  border-left: 3.5px solid #2563eb;
-  border-radius: 4px 12px 12px 4px;
-  padding: 12px 14px;
-  transition: all 160ms cubic-bezier(0.16, 1, 0.3, 1);
-  cursor: default;
-}
-.pm-eligibility-list li:hover {
-  background: #ffffff;
-  border-color: #3b82f6;
-  border-left-color: #1d4ed8;
-  transform: translateX(4px);
-  box-shadow: 0 2px 10px rgba(37, 99, 235, 0.08);
+  border-left: 3px solid var(--omni-color-primary-600);
 }
 
-.pm-review-list li {
-  background: #f8fafc;
-  border: 1px solid #eaecf0;
-  border-radius: 12px;
-  padding: 14px 16px;
-  transition: all 160ms cubic-bezier(0.16, 1, 0.3, 1);
-  cursor: default;
-}
-.pm-review-list li:hover {
-  background: #ffffff;
-  border-color: #3b82f6;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.08);
-}
 .pm-review-list-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 4px;
+  margin-bottom: var(--omni-space-1, 4px);
 }
 .pm-review-list-head strong {
-  font-size: 13px;
-  font-weight: 700;
-  color: #0f172a;
+  color: var(--omni-color-text-primary);
+  font-size: var(--omni-font-size-sm-minus, 13px);
+  font-weight: var(--omni-font-weight-bold, 700);
 }
 .pm-review-list p {
-  font-size: 12.5px;
-  margin-top: 4px;
-  color: #475569;
+  margin-top: var(--omni-space-1, 4px);
+  color: var(--omni-color-text-secondary);
+  font-size: var(--omni-font-size-xs, 12px);
 }
 
 .pm-doc-list li {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: #f8fafc;
-  border: 1px solid #eaecf0;
-  border-radius: 12px;
-  padding: 12px 14px;
-  transition: all 160ms cubic-bezier(0.16, 1, 0.3, 1);
-  cursor: default;
-}
-.pm-doc-list li:hover {
-  background: #ffffff;
-  border-color: #3b82f6;
-  transform: translateX(4px);
-  box-shadow: 0 2px 10px rgba(37, 99, 235, 0.08);
+  gap: var(--omni-space-2, 8px);
 }
 .pm-doc-list-name {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  font-weight: 600;
-  color: #0f172a;
+  gap: var(--omni-space-2, 8px);
+  min-width: 0;
+  color: var(--omni-color-text-primary);
+  font-size: var(--omni-font-size-sm-minus, 13px);
+  font-weight: var(--omni-font-weight-semibold, 600);
 }
 
 .pm-timeline li {
   display: flex;
-  gap: 12px;
-  position: relative;
-  background: #f8fafc;
-  border: 1px solid #eaecf0;
-  border-radius: 12px;
-  padding: 12px 14px;
-  transition: all 160ms cubic-bezier(0.16, 1, 0.3, 1);
-  cursor: default;
-}
-.pm-timeline li:hover {
-  background: #ffffff;
-  border-color: #3b82f6;
-  transform: translateX(4px);
-  box-shadow: 0 2px 10px rgba(37, 99, 235, 0.08);
+  gap: var(--omni-space-3, 12px);
 }
 .pm-timeline-dot {
+  flex-shrink: 0;
   width: 10px;
   height: 10px;
-  border-radius: 50%;
-  background: #2563eb;
-  margin-top: 4px;
-  flex-shrink: 0;
-  box-shadow: 0 0 0 3px #dbeafe;
-  transition: transform 150ms ease, box-shadow 150ms ease;
-}
-.pm-timeline li:hover .pm-timeline-dot {
-  transform: scale(1.2);
-  box-shadow: 0 0 0 4px #bfdbfe;
+  margin-top: var(--omni-space-1, 4px);
+  background: var(--omni-color-primary-600);
+  border-radius: var(--omni-radius-circle, 50%);
+  box-shadow: 0 0 0 3px var(--omni-color-primary-100);
 }
 .pm-timeline-content strong {
-  font-size: 13px;
-  font-weight: 700;
-  color: #0f172a;
   display: block;
+  color: var(--omni-color-text-primary);
+  font-size: var(--omni-font-size-sm-minus, 13px);
+  font-weight: var(--omni-font-weight-bold, 700);
 }
 .pm-timeline-content p {
-  font-size: 12px;
-  color: #64748b;
   margin-top: 2px;
+  color: var(--omni-color-text-secondary);
+  font-size: var(--omni-font-size-xs, 12px);
 }
-
-

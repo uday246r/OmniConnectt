@@ -29,21 +29,25 @@ public class DashboardService : IDashboardService
         var now = DateTime.UtcNow;
         var cutoff = now.AddDays(-7);
 
-        var products = await _db.Products.AsNoTracking().ToListAsync(ct);
-        var applications = await _db.Applications.AsNoTracking().ToListAsync(ct);
+        /*
+         * Counted by the database. Both whole tables used to be loaded into memory to count them in C#,
+         * so the dashboard's cost grew with every product and application ever created.
+         */
+        var products = _db.Products.AsNoTracking();
+        var applications = _db.Applications.AsNoTracking();
+        string[] approvedStatuses = ["Approved", "Completed"];
 
-        var totalProductsNow = products.Count;
-        var totalProductsThen = products.Count(p => p.CreatedAt <= cutoff);
+        var totalProductsNow = await products.CountAsync(ct);
+        var totalProductsThen = await products.CountAsync(p => p.CreatedAt <= cutoff, ct);
 
-        var activeNow = products.Count(p => p.Status == "Active");
-        var activeThen = products.Count(p => p.Status == "Active" && p.CreatedAt <= cutoff);
+        var activeNow = await products.CountAsync(p => p.Status == "Active", ct);
+        var activeThen = await products.CountAsync(p => p.Status == "Active" && p.CreatedAt <= cutoff, ct);
 
-        var totalAppsNow = applications.Count;
-        var totalAppsThen = applications.Count(a => a.CreatedAt <= cutoff);
+        var totalAppsNow = await applications.CountAsync(ct);
+        var totalAppsThen = await applications.CountAsync(a => a.CreatedAt <= cutoff, ct);
 
-        bool IsApproved(string s) => s is "Approved" or "Completed";
-        var approvedNow = applications.Count(a => IsApproved(a.Status));
-        var approvedThen = applications.Count(a => IsApproved(a.Status) && a.CreatedAt <= cutoff);
+        var approvedNow = await applications.CountAsync(a => approvedStatuses.Contains(a.Status), ct);
+        var approvedThen = await applications.CountAsync(a => approvedStatuses.Contains(a.Status) && a.CreatedAt <= cutoff, ct);
 
         var conversionNow = totalAppsNow == 0 ? 0 : Math.Round(approvedNow / (double)totalAppsNow * 100, 2);
         var conversionThen = totalAppsThen == 0 ? 0 : Math.Round(approvedThen / (double)totalAppsThen * 100, 2);
@@ -66,13 +70,18 @@ public class DashboardService : IDashboardService
     public async Task<List<TrendPointDto>> GetApplicationTrendAsync(int days, CancellationToken ct = default)
     {
         var start = DateTime.UtcNow.Date.AddDays(-(days - 1));
-        var applications = await _db.Applications.AsNoTracking().Where(a => a.CreatedAt >= start).ToListAsync(ct);
+        // Grouped per day in the database; only one number per day comes back.
+        var perDay = await _db.Applications.AsNoTracking()
+            .Where(a => a.CreatedAt >= start)
+            .GroupBy(a => a.CreatedAt.Date)
+            .Select(g => new { Day = g.Key, Count = g.Count() })
+            .ToListAsync(ct);
+        var counts = perDay.ToDictionary(d => d.Day, d => d.Count);
 
         var points = new List<TrendPointDto>();
         for (var d = start; d <= DateTime.UtcNow.Date; d = d.AddDays(1))
         {
-            var count = applications.Count(a => a.CreatedAt.Date == d);
-            points.Add(new TrendPointDto { Label = d.ToString("dd MMM"), Date = d, Value = count });
+            points.Add(new TrendPointDto { Label = d.ToString("dd MMM"), Date = d, Value = counts.GetValueOrDefault(d) });
         }
         return points;
     }

@@ -1,5 +1,5 @@
 import { httpClient } from "./httpClient";
-import type { PagedResult, Promotion, PromotionInput } from "../types/domain";
+import type { PagedResult, Promotion, PromotionInput, StatusCount } from "../types/domain";
 
 export interface PromotionQuery {
   search?: string;
@@ -12,6 +12,11 @@ export interface PromotionQuery {
 export const promotionApi = {
   async search(query: PromotionQuery, signal?: AbortSignal): Promise<PagedResult<Promotion>> {
     const { data } = await httpClient.get("/promotions", { params: query, signal });
+    return data;
+  },
+  /** Promotions per status under the search/product filters (the status filter is ignored by the server). */
+  async statusCounts(query: Pick<PromotionQuery, "search" | "productId">, signal?: AbortSignal): Promise<StatusCount[]> {
+    const { data } = await httpClient.get("/promotions/status-counts", { params: query, signal });
     return data;
   },
   async create(input: PromotionInput): Promise<Promotion> {

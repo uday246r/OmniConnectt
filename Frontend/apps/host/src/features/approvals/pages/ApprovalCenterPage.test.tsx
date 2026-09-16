@@ -1,6 +1,6 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter } from 'react-router-dom'
+import { renderWithQuery } from '../../../test/renderWithQuery'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useAuthStore } from '../../auth/store/authStore'
 import { ApiError } from '../../../shared/api/httpClient'
@@ -66,11 +66,7 @@ function signInAs(id: string) {
 }
 
 function renderPage() {
-  return render(
-    <MemoryRouter>
-      <ApprovalCenterPage />
-    </MemoryRouter>,
-  )
+  return renderWithQuery(<ApprovalCenterPage />)
 }
 
 function lastParams(fn: ReturnType<typeof vi.fn>) {
@@ -205,5 +201,25 @@ describe('deciding', () => {
     await user.click(await screen.findByRole('button', { name: 'Approve' }))
 
     expect(await screen.findByText('This request has already been approved.')).toBeInTheDocument()
+  })
+})
+
+describe('coming back to the queue', () => {
+  /*
+   * The queue lived in component state and was fetched again, from an empty table, every time the page
+   * was opened. It is a cached query now: the requests are on screen at once when the checker returns.
+   */
+  it('shows the requests it already had without asking the server again', async () => {
+    const first = renderPage()
+    await screen.findByText('jane@example.com')
+    const calls = { list: api.list.mock.calls.length, summary: api.summary.mock.calls.length, facets: api.facets.mock.calls.length }
+    first.unmount()
+
+    renderWithQuery(<ApprovalCenterPage />, { client: first.client })
+
+    expect(screen.getByText('jane@example.com')).toBeInTheDocument()
+    expect(api.list.mock.calls.length).toBe(calls.list)
+    expect(api.summary.mock.calls.length).toBe(calls.summary)
+    expect(api.facets.mock.calls.length).toBe(calls.facets)
   })
 })

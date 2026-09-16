@@ -17,26 +17,29 @@ public static class DependencyInjection
         // Either way it surfaces here as ConnectionStrings:DefaultConnection, so a credential never
         // lives in source control.
         var connectionString = configuration.GetConnectionString("DefaultConnection");
-        if (string.IsNullOrWhiteSpace(connectionString))
-        {
-            throw new InvalidOperationException(
-                "No database connection string configured.\n\n" +
-                "Run this once from the backend folder:\n" +
-                "  cp .env.example .env\n" +
-                "then edit .env and set ConnectionStrings__DefaultConnection to your Postgres connection string.\n\n" +
-                "In a deployed environment, set the ConnectionStrings__DefaultConnection environment variable instead.");
-        }
 
-        services.AddDbContext<AppDbContext>(options =>
-            options.UseNpgsql(connectionString, npgsql =>
-            {
-                // Neon's serverless compute auto-suspends on idle; the first query after a suspend
-                // incurs a cold-start delay and can trip a transient connection failure under
-                // concurrent load. Retry-on-failure is the standard mitigation for cloud-hosted
-                // Postgres with this kind of scale-to-zero behavior.
-                npgsql.EnableRetryOnFailure(maxRetryCount: 5, maxRetryDelay: TimeSpan.FromSeconds(10), errorCodesToAdd: null);
-                npgsql.CommandTimeout(30);
-            }));
+        /*
+         * A missing connection string no longer stops the process from starting.
+         *
+         * Throwing here took the whole service down — including /health and /permissions, which is how
+         * the host notices a remote is broken and still shows its sidebar entry with a maintenance state.
+         * The service now starts, logs the problem (Program.cs), and fails only the requests that need the
+         * database, the same way LeadService and Customer360Service behave.
+         */
+        var configured = !string.IsNullOrWhiteSpace(connectionString);
+
+        // Pooled: instances are reset and reused instead of rebuilt per request, which matters under
+        // concurrent load. Safe because AppDbContext takes nothing but its options.
+        services.AddDbContextPool<AppDbContext>(options =>
+            options.UseNpgsql(
+                configured ? connectionString : "Host=unconfigured;Database=unconfigured;Username=unconfigured;Password=unconfigured",
+                npgsql =>
+                {
+                    // Neon's serverless compute auto-suspends on idle; the first query after a suspend
+                    // can trip a transient failure, which retry-on-failure absorbs.
+                    npgsql.EnableRetryOnFailure(maxRetryCount: 5, maxRetryDelay: TimeSpan.FromSeconds(10), errorCodesToAdd: null);
+                    npgsql.CommandTimeout(30);
+                }));
 
         services.AddScoped<ICategoryService, CategoryService>();
         services.AddScoped<IProductTypeService, ProductTypeService>();

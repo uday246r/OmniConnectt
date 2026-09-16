@@ -1,3 +1,4 @@
+import { Button, DetailField, DetailGrid, Modal } from "@omniremit/ui";
 import { Icon } from "./Icon";
 import "./ConfirmModal.css";
 
@@ -28,6 +29,16 @@ export interface ConfirmModalProps {
   onCancel: () => void;
 }
 
+/**
+ * A confirmation on the platform `Modal`.
+ *
+ * This was a 140-line bespoke dialog with 340 lines of CSS styled as a side drawer, which offered no
+ * Cancel button (only a corner ×), and headed every confirmation "Deletion Notice" even when the
+ * action was not a deletion. It keeps its props — eight call sites use it — but renders the shared
+ * dialog and buttons, shows an explicit Cancel, and words its notice by what the action is.
+ *
+ * Details with no value are left out rather than printed empty (the shared `DetailField` rule).
+ */
 export function ConfirmModal({
   isOpen,
   title,
@@ -35,6 +46,7 @@ export function ConfirmModal({
   entityName,
   details,
   confirmText = "Delete",
+  cancelText = "Cancel",
   variant = "danger",
   isLoading = false,
   errorMessage = null,
@@ -42,111 +54,64 @@ export function ConfirmModal({
   onConfirm,
   onCancel,
 }: ConfirmModalProps) {
-  if (!isOpen) return null;
+  const visibleDetails = (details ?? []).filter((d) => d.value !== undefined && d.value !== null && d.value !== "");
+  const secondaryVariant = secondaryAction?.variant === "danger" ? "danger" : secondaryAction?.variant === "primary" ? "primary" : "secondary";
 
   return (
-    <div className="pm-modal-overlay" onClick={onCancel} role="dialog" aria-modal="true">
-      <aside className="pm-confirm-drawer" onClick={(e) => e.stopPropagation()}>
-        <header className={`pm-confirm-drawer-header ${variant}`}>
-          <div className="pm-confirm-header-circle" />
-          <div className="pm-confirm-header-main">
-            <div className={`pm-confirm-icon ${variant}`}>
-              <Icon name={variant === "danger" ? "trash" : "info"} size={22} />
-            </div>
-            <div className="pm-confirm-heading">
-              <div className="pm-confirm-title-row">
-                <h2>{title}</h2>
-                <span className={`pm-badge ${variant === "danger" ? "pm-badge-danger" : variant === "warning" ? "pm-badge-warning" : "pm-badge-info"}`}>
-                  {variant === "danger" ? "Delete Action" : "Review"}
-                </span>
-              </div>
-              <p>Confirmation & Security Review</p>
-            </div>
-          </div>
-          <button className="pm-confirm-close-btn" onClick={onCancel} aria-label="Close" title="Close">
-            <Icon name="close" size={16} />
-          </button>
-        </header>
-
-        <div className="pm-confirm-body">
-          <div className="pm-confirm-warning-card">
-            <div className="pm-confirm-warning-icon">
-              <Icon name="shield" size={20} />
-            </div>
-            <div className="pm-confirm-warning-content">
-              <h4>Deletion Notice</h4>
-              <p>{message}</p>
-              {entityName && (
-                <div className="pm-confirm-target-chip">
-                  <Icon name="tag" size={12} />
-                  <span>{entityName}</span>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {details && details.length > 0 && (
-            <div className="pm-confirm-section">
-              <div className="pm-confirm-section-head">
-                <Icon name="list" size={15} />
-                <h3>Verification Summary</h3>
-              </div>
-              <div className="pm-confirm-details-grid">
-                {details.map((d, i) =>
-                  d.value !== undefined && d.value !== null && d.value !== "" ? (
-                    <div key={i} className="pm-confirm-detail-item">
-                      <span className="pm-confirm-detail-label">{d.label}</span>
-                      <strong className="pm-confirm-detail-value">{String(d.value)}</strong>
-                    </div>
-                  ) : null
-                )}
-              </div>
-            </div>
-          )}
-
-          <div className="pm-confirm-note">
-            <Icon name="info" size={14} />
-            <span>This action is logged for audit compliance and cannot be undone.</span>
-          </div>
-
-          {errorMessage && (
-            <div className="pm-confirm-error-banner">
-              <Icon name="close" size={16} />
-              <span>{errorMessage}</span>
-            </div>
-          )}
-        </div>
-
-        <footer className="pm-confirm-footer">
+    <Modal
+      open={isOpen}
+      title={title}
+      onClose={() => {
+        if (!isLoading) onCancel();
+      }}
+      actions={
+        <>
+          <Button variant="ghost" onClick={onCancel} disabled={isLoading}>
+            {cancelText}
+          </Button>
           {secondaryAction && (
-            <button
-              className={`pm-btn ${
-                secondaryAction.variant === "primary"
-                  ? "pm-btn-primary"
-                  : secondaryAction.variant === "warning"
-                  ? "pm-btn-warning"
-                  : secondaryAction.variant === "danger"
-                  ? "pm-btn-danger"
-                  : "pm-btn-outline"
-              }`}
-              onClick={secondaryAction.onClick}
-              disabled={isLoading}
-            >
+            <Button variant={secondaryVariant} onClick={secondaryAction.onClick} disabled={isLoading}>
               {secondaryAction.label}
-            </button>
+            </Button>
           )}
-          <button
-            className={`pm-btn ${variant === "danger" ? "pm-btn-danger" : variant === "warning" ? "pm-btn-warning" : "pm-btn-primary"}`}
+          <Button
+            variant={variant === "danger" ? "danger" : "primary"}
             onClick={onConfirm}
             disabled={isLoading}
+            leadingIcon={variant === "danger" ? <Icon name="trash" size={14} /> : undefined}
           >
-            {variant === "danger" && <Icon name="trash" size={14} />}
             {isLoading ? "Processing..." : confirmText}
-          </button>
-        </footer>
-      </aside>
-    </div>
+          </Button>
+        </>
+      }
+    >
+      <div className="pm-confirm-body">
+        <div className={`pm-confirm-notice pm-confirm-notice-${variant}`}>
+          <Icon name={variant === "danger" ? "trash" : "info"} size={18} />
+          <div>
+            <p className="pm-confirm-message">{message}</p>
+            {entityName && <p className="pm-confirm-target">{entityName}</p>}
+          </div>
+        </div>
+
+        {visibleDetails.length > 0 && (
+          <DetailGrid>
+            {visibleDetails.map((d) => (
+              <DetailField key={d.label} label={d.label}>
+                {String(d.value)}
+              </DetailField>
+            ))}
+          </DetailGrid>
+        )}
+
+        {variant === "danger" && <p className="pm-confirm-note">This action is recorded in the audit log and cannot be undone.</p>}
+
+        {errorMessage && (
+          <div className="pm-confirm-error" role="alert">
+            {errorMessage}
+          </div>
+        )}
+      </div>
+    </Modal>
   );
 }
-
-

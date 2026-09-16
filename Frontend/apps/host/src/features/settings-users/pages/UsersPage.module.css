@@ -174,3 +174,10 @@
   font-size: var(--omni-font-size-sm);
   font-weight: var(--omni-font-weight-semibold);
 }
+
+.rowActions {
+  display: inline-flex;
+  gap: var(--omni-space-2, 8px);
+  align-items: center;
+  justify-content: flex-end;
+}

@@ -26,3 +26,24 @@ public class PagingQuery
         set => _pageSize = value < 1 ? 8 : Math.Min(value, 100);
     }
 }
+
+/// <summary>The paging limits every list endpoint in this service shares.</summary>
+public static class Paging
+{
+    /// <summary>
+    /// The largest page any list returns. Page sizes used to be taken as given, so one request for
+    /// pageSize=1000000 made the database read the whole table into memory — a cheap request that is
+    /// expensive to serve. 100 matches every other service on the platform.
+    /// </summary>
+    public const int MaxPageSize = 100;
+
+    /// <summary>A non-positive size falls back to the list's own default; anything above the cap is capped.</summary>
+    public static int Clamp(int requested, int fallback) =>
+        requested < 1 ? fallback : Math.Min(requested, MaxPageSize);
+
+    /// <summary>For "top N" style endpoints.</summary>
+    public const int MaxTake = 50;
+
+    public static int ClampTake(int requested, int fallback) =>
+        requested < 1 ? fallback : Math.Min(requested, MaxTake);
+}
