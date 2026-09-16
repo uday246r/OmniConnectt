@@ -9,27 +9,13 @@ export default function CaseDetailsModal() {
   const { selectedCase, modalOpen, closeCaseModal } = useInteractionStore();
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
-  React.useEffect(() => {
-    if (modalOpen && selectedCase) {
-      const caseIdStr = String(selectedCase.caseId || '').trim();
-      window.dispatchEvent(
-        new CustomEvent('omni:track-activity', {
-          detail: {
-            page: 'individual',
-            module: 'Customer 360',
-            sourceApplication: 'Customer 360',
-            pageLabel: 'Individual',
-            action: 'case.details_viewed',
-            actionCategory: 'ViewDetails',
-            entityType: 'Case',
-            entityId: caseIdStr,
-            entityLabel: selectedCase.main || `Case #${caseIdStr}`,
-            details: `Viewed details for case #${caseIdStr} (${selectedCase.main || 'Interaction'})`,
-          },
-        })
-      );
-    }
-  }, [modalOpen, selectedCase]);
+  /*
+   * No audit dispatch here any more.
+   *
+   * Opening this drawer rendered data the browser already had; nothing was fetched and nothing was
+   * authorized, so the row it wrote through the host bridge asserted an event no server observed.
+   * That bridge member is gone platform-wide — see the host's hostBridge.ts.
+   */
 
   if (!modalOpen || !selectedCase) return null;
 
@@ -70,9 +56,6 @@ export default function CaseDetailsModal() {
               </button>
             )}
           </div>
-          <Button type="button" variant="secondary" onClick={closeCaseModal}>
-            Close Details
-          </Button>
         </div>
       }
     >

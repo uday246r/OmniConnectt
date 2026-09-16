@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { Save, ArrowLeft, CheckCircle2 } from '@omniremit/ui/icons';
-import { Button, Drawer, EmptyState } from '@omniremit/ui';
+import { Button, Drawer, EmptyState, Select } from '@omniremit/ui';
 import { LeadDiffTable } from '../../shared/LeadDiffTable';
 import { useLeadStore } from '../../store/useLeadStore';
 import drawerLayout from '../../shared/drawerLayout.module.css';
@@ -146,21 +146,17 @@ export const EditLeadDrawer: React.FC = () => {
         <form id={EDIT_FORM_ID} onSubmit={handleSaveClick}>
               {/* Product Selection */}
               <div className={form.stackWide}>
-                <label className={`form-label ${form.blockLabel}`}>
+                <label className={`form-label ${form.blockLabel}`} htmlFor="edit-lead-product">
                   Select Financial Product <span className={form.required}>*</span>
                 </label>
-                <select
+                <Select
+                  id="edit-lead-product"
+                  size="lg"
                   value={editFormData.product}
                   onChange={(e) => setEditFieldValue('product', e.target.value)}
-                  className={`form-input ${form.select} ${form.selectTall}`}
-                >
-                  <option value="">-- Select Product --</option>
-                  {products.map((p) => (
-                    <option key={p.value} value={p.label}>
-                      {p.label}
-                    </option>
-                  ))}
-                </select>
+                  placeholder="Select product"
+                  options={products.map((p) => ({ value: p.label, label: p.label }))}
+                />
                 {editErrors.product && <div className={form.errorText}>{editErrors.product}</div>}
               </div>
 

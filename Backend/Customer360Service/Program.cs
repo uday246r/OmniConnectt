@@ -69,6 +69,7 @@ builder.Services.AddSingleton<CrmProxyService>();
 // Scoped, not Singleton, now that it reads/writes through a (scoped) DbContext instead of an
 // in-memory List + local file.
 builder.Services.AddScoped<AuditRepository>();
+builder.Services.AddScoped<backend.Infrastructure.Audit.Customer360AuditWriter>();
 builder.Services.AddScoped<FieldConfigService>();
 
 // Phase 2 Maker-Checker: this service's first-ever connection to AuthService's internal surface.
@@ -102,7 +103,11 @@ builder.Services.AddCors(options =>
         policy.WithOrigins(allowedOrigins)
               .AllowAnyHeader()
               .AllowAnyMethod()
-              .AllowCredentials();
+              .AllowCredentials()
+              // Without this the CSV export still downloads, but the browser cannot read the
+              // row-count headers — so a truncated file arrives with no warning, which is the exact
+              // failure those headers exist to prevent.
+              .WithExposedHeaders(backend.Infrastructure.ExportHeaders.All);
     });
 });
 

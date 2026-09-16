@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using backend.Infrastructure;
@@ -9,11 +10,15 @@ using backend.Models;
 namespace backend.Data
 {
     /// <summary>
-    /// Now backed by Customer360DbContext's audit_logs table instead of a local JSON file — the file
-    /// version lived on this one process's disk (wiped on every redeploy on ephemeral hosts, and never
-    /// shared across replicas). Same read/write shape as before (newest-first, search + action filter,
-    /// paginated), so AuditController didn't need to change.
+    /// Backed by Customer360DbContext's audit_logs table — a redeploy no longer wipes the trail and
+    /// replicas no longer keep diverging copies, as they did when this was a local JSON file.
     /// </summary>
+    /// <remarks>
+    /// Writes arrive from <see cref="backend.Infrastructure.Audit.Customer360AuditWriter"/> only.
+    /// They used to arrive from the BROWSER, over a <c>POST /v1/audit</c> that any authenticated
+    /// caller could invoke with a body of their choosing; the endpoint is gone and the service now
+    /// records its own actions.
+    /// </remarks>
     public class AuditRepository
     {
         private readonly Customer360DbContext _db;
@@ -23,18 +28,51 @@ namespace backend.Data
             _db = db;
         }
 
-        public async Task AddAsync(AuditLog log)
+        public async Task AddAsync(AuditLog log, CancellationToken ct = default)
         {
             _db.AuditLogs.Add(log);
-            await _db.SaveChangesAsync();
+            await _db.SaveChangesAsync(ct);
         }
 
         public async Task<(List<AuditLog> Items, int TotalCount)> GetAsync(
-            string? search, string? action, int pageNumber, int pageSize)
+            AuditQuery filter, int pageNumber, int pageSize, CancellationToken ct = default)
+        {
+            var query = BuildFilteredQuery(filter);
+
+            var totalCount = await query.CountAsync(ct);
+
+            var items = await OrderNewestFirst(query)
+                .Skip((pageNumber - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync(ct);
+
+            return (items, totalCount);
+        }
+
+        /// <summary>
+        /// The same filtered set an export needs, capped by the caller rather than paged. Shares
+        /// <see cref="BuildFilteredQuery"/> with <see cref="GetAsync"/> deliberately: an export that
+        /// applies a different filter set from the screen it was launched from is worse than no
+        /// export, because it looks authoritative.
+        /// </summary>
+        public Task<List<AuditLog>> GetForExportAsync(AuditQuery filter, int maxRows, CancellationToken ct = default) =>
+            OrderNewestFirst(BuildFilteredQuery(filter)).Take(maxRows).ToListAsync(ct);
+
+        public Task<int> CountAsync(AuditQuery filter, CancellationToken ct = default) =>
+            BuildFilteredQuery(filter).CountAsync(ct);
+
+        // Id is the tiebreaker for rows written within the same instant. It is a random GUID string,
+        // so it orders arbitrarily — but deterministically, which is what paging needs to avoid a row
+        // appearing on two consecutive pages.
+        private static IQueryable<AuditLog> OrderNewestFirst(IQueryable<AuditLog> query) =>
+            query.OrderByDescending(l => l.Timestamp).ThenByDescending(l => l.Id);
+
+        private IQueryable<AuditLog> BuildFilteredQuery(AuditQuery filter)
         {
             IQueryable<AuditLog> query = _db.AuditLogs.AsNoTracking();
+            var (search, action, from, to) = (filter.Search, filter.Action, filter.From, filter.To);
 
-            // 1. Action filter (case-insensitive, ignores "All Actions")
+            // Action filter (case-insensitive, ignores "All Actions")
             if (!string.IsNullOrWhiteSpace(action) && !action.Equals("All Actions", StringComparison.OrdinalIgnoreCase))
             {
                 if (action.Equals("VIEW", StringComparison.OrdinalIgnoreCase))
@@ -47,7 +85,7 @@ namespace backend.Data
                 }
             }
 
-            // 2. Search query (case-insensitive matching on user, description, or status)
+            // Search query (case-insensitive matching on user, description, or status)
             if (!string.IsNullOrWhiteSpace(search))
             {
                 var pattern = $"%{search}%";
@@ -57,19 +95,53 @@ namespace backend.Data
                     EF.Functions.Like(l.Status, pattern));
             }
 
-            var totalCount = await query.CountAsync();
+            // Inclusive on both ends, matching AuthService's audit and system-log queries exactly, so
+            // the same range typed into any of the platform's log screens selects the same rows.
+            if (from is not null)
+            {
+                query = query.Where(l => l.Timestamp >= from);
+            }
 
-            // Newest-first: Timestamp is "yyyy-MM-dd HH:mm:ss" text, which sorts lexicographically
-            // identically to chronological order, then Id as a tiebreaker for entries written in the
-            // same second.
-            var items = await query
-                .OrderByDescending(l => l.Timestamp)
-                .ThenByDescending(l => l.Id)
-                .Skip((pageNumber - 1) * pageSize)
-                .Take(pageSize)
-                .ToListAsync();
+            if (to is not null)
+            {
+                query = query.Where(l => l.Timestamp <= to);
+            }
 
-            return (items, totalCount);
+            /*
+             * The four filters the screen used to apply in the browser. Lower-cased on both sides:
+             * they were case-insensitive client-side, and a search that stopped matching "Asha" for
+             * "asha" once it moved to the server would read as missing data.
+             */
+            if (!string.IsNullOrWhiteSpace(filter.Status))
+            {
+                var wantSuccess = filter.Status.Trim().Equals("SUCCESS", StringComparison.OrdinalIgnoreCase);
+                query = wantSuccess
+                    ? query.Where(l => l.Status == "" || l.Status.ToUpper() == "SUCCESS")
+                    : query.Where(l => l.Status != "" && l.Status.ToUpper() != "SUCCESS");
+            }
+
+            if (!string.IsNullOrWhiteSpace(filter.Actor))
+            {
+                var who = filter.Actor.Trim().ToLower();
+                var asId = Guid.TryParse(filter.Actor.Trim(), out var id) ? id : (Guid?)null;
+                query = query.Where(l => l.User.ToLower().Contains(who) || (asId != null && l.UserId == asId));
+            }
+
+            if (!string.IsNullOrWhiteSpace(filter.Customer))
+            {
+                var customer = filter.Customer.Trim().ToLower();
+                query = query.Where(l =>
+                    (l.CustomerName != null && l.CustomerName.ToLower().Contains(customer)) ||
+                    (l.CustomerId != null && l.CustomerId.ToLower().Contains(customer)));
+            }
+
+            if (!string.IsNullOrWhiteSpace(filter.Description))
+            {
+                var text = filter.Description.Trim().ToLower();
+                query = query.Where(l => l.Description.ToLower().Contains(text));
+            }
+
+            return query;
         }
     }
 }

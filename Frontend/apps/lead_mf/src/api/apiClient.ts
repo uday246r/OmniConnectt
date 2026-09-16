@@ -1,7 +1,8 @@
 import { getAccessToken, ensureFreshAccessToken, isRunningInHost } from './hostBridge';
 import type { LeadFieldConfig } from '../config/fieldControlRegistry';
+import type { CustomPreset } from '@omniremit/ui/validation';
 
-const API_BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL || 'http://localhost:5046/api/lead-service';
+export const API_BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL || 'http://localhost:5046/api/lead-service';
 
 export interface ApiResponse<T> {
   success: boolean;
@@ -363,12 +364,45 @@ export const apiClient = {
     }
   },
 
-  updateFieldConfig: async (productId: string, fields: LeadFieldConfig[]): Promise<ApiResponse<LeadFieldConfig[] | ApprovalPendingDto>> => {
+  /**
+   * The formats administrators defined in Settings → Manage Formats. Empty when they cannot be read:
+   * a field rule naming one then is not checked here, and the server — which reads the catalog itself —
+   * still is.
+   */
+  getFormatPresets: async (): Promise<CustomPreset[]> => {
+    try {
+      const res = await fetchWithAuth(`${API_BASE_URL}/api/lead-field-config/formats`);
+      if (!res.ok) return [];
+      const json: ApiResponse<CustomPreset[]> = await res.json();
+      return json.success ? json.data : [];
+    } catch {
+      return [];
+    }
+  },
+
+  /**
+   * Field Settings' own read: the rows plus the version they were read at, so a save can be refused if
+   * someone else saved in between rather than silently replacing their work.
+   */
+  getFieldConfigForEditing: async (productId: string): Promise<{ fields: LeadFieldConfig[]; version: string | null }> => {
+    const res = await fetchWithAuth(`${API_BASE_URL}/api/lead-field-config/${productId}`);
+    if (!res.ok) throw new Error('Could not load field settings for this product.');
+    const json: ApiResponse<LeadFieldConfig[]> = await res.json();
+    return { fields: json.success ? json.data : [], version: res.headers.get('ETag') };
+  },
+
+  /** Saves against `version` (the ETag read with the rows); a 409 means someone else saved first. */
+  updateFieldConfig: async (
+    productId: string,
+    fields: LeadFieldConfig[],
+    version?: string | null,
+  ): Promise<ApiResponse<LeadFieldConfig[] | ApprovalPendingDto> & { version?: string | null }> => {
     const res = await fetchWithAuth(`${API_BASE_URL}/api/lead-field-config/${productId}`, {
       method: 'PUT',
       body: JSON.stringify(fields),
+      headers: version ? { 'If-Match': version } : undefined,
     });
-    return await res.json();
+    return { ...(await res.json()), version: res.headers.get('ETag') };
   },
 
   getAuditLogs: async (params: {
@@ -377,8 +411,17 @@ export const apiClient = {
     search?: string;
     actionType?: string;
     entityId?: string;
-    startDate?: string;
-    endDate?: string;
+    /**
+     * Inclusive ISO 8601 instants, named the way every other log endpoint on the platform names
+     * them — the endpoint's old `startDate`/`endDate` were date-only strings that discarded the time
+     * of day, and nothing had ever sent them because no UI here offered a date filter.
+     */
+    from?: string;
+    to?: string;
+    /** Name or role, case-insensitive substring. */
+    actor?: string;
+    /** 'SUCCESS' or 'FAILED'. */
+    status?: string;
   }): Promise<PagedResult<any>> => {
     try {
       const query = new URLSearchParams();
@@ -387,8 +430,10 @@ export const apiClient = {
       if (params.search) query.append('search', params.search);
       if (params.actionType) query.append('actionType', params.actionType);
       if (params.entityId) query.append('entityId', params.entityId);
-      if (params.startDate) query.append('startDate', params.startDate);
-      if (params.endDate) query.append('endDate', params.endDate);
+      if (params.from) query.append('from', params.from);
+      if (params.to) query.append('to', params.to);
+      if (params.actor) query.append('actor', params.actor);
+      if (params.status) query.append('status', params.status);
 
       const res = await fetchWithAuth(`${API_BASE_URL}/api/auditlogs?${query.toString()}`);
       if (!res.ok) {

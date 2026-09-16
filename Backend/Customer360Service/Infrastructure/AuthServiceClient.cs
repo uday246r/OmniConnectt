@@ -16,9 +16,14 @@ public class AuthServiceClient(HttpClient httpClient, IOptions<AuthIntegrationOp
 {
     private readonly AuthIntegrationOptions _options = options.Value;
 
+    // Serialized by property NAME, so this only has to carry the subset of
+    // AuthService.Application.DTOs.RecordAuditLogRequest that this service ever populates — the
+    // positional order need not match the server's, and does not.
     private record RecordAuditLogRequest(
         string ServiceName, Guid? ActorUserId, string? ActorName, string Action, string? EntityType, string? EntityId, string? Details,
-        string? EntityLabel, string? SourceIp, string? UserAgent, string? CorrelationId = null);
+        string? EntityLabel, string? SourceIp, string? UserAgent, string? CorrelationId = null,
+        string? SourceApplication = null, string? Module = null, string? Page = null, string? ActionCategory = null,
+        string Result = "Success");
 
     private record SubmitInternalApprovalRequest(
         string Module, string Action, string? EntityType, string? EntityId, string? EntityLabel,
@@ -26,18 +31,27 @@ public class AuthServiceClient(HttpClient httpClient, IOptions<AuthIntegrationOp
 
     private record GatedResponse(bool Gated);
 
-    public Task<bool> PushAuditLogAsync(string action, string? entityType, string? entityId, string? details, Guid? actorUserId, string? actorName, string? entityLabel = null, CancellationToken ct = default)
+    public Task<bool> PushAuditLogAsync(
+        string action, string? entityType, string? entityId, string? details, Guid? actorUserId, string? actorName,
+        string? entityLabel = null, string? sourceApplication = null, string? module = null, string? page = null,
+        string? actionCategory = null, string result = "Success", CancellationToken ct = default)
     {
         var httpContext = httpContextAccessor.HttpContext;
         var sourceIp = httpContext?.Connection.RemoteIpAddress?.ToString();
         var userAgent = httpContext?.Request.Headers.UserAgent.ToString();
-        // This service's own request id, so two audit writes fired within the same inbound request
-        // (e.g. a mutation plus a related side-effect) land in AuthService sharing one correlation id
-        // instead of each minting its own from AuthService's perspective of a fresh internal POST.
-        var correlationId = httpContext?.TraceIdentifier;
+        // Prefer an id the caller already brought with them, so a chain that started in the host —
+        // or in AuthService replaying an approved mutation back into this service — stays one thread
+        // rather than splitting at every service boundary. Falling back to this service's own request
+        // id still keeps two writes within one inbound request together, which is what this did
+        // before the header was honoured.
+        var correlationId = httpContext?.Request.Headers["X-Correlation-Id"].ToString() is { Length: > 0 } inbound
+            ? inbound
+            : httpContext?.TraceIdentifier;
         return PostAsync(
             "internal/audit-logs",
-            new RecordAuditLogRequest("Customer360Service", actorUserId, actorName, action, entityType, entityId, details, entityLabel, sourceIp, userAgent, correlationId),
+            new RecordAuditLogRequest(
+                "Customer360Service", actorUserId, actorName, action, entityType, entityId, details, entityLabel,
+                sourceIp, userAgent, correlationId, sourceApplication, module, page, actionCategory, result),
             ct);
     }
 

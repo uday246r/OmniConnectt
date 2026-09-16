@@ -12,6 +12,8 @@ export interface UserFieldSchemaDto {
 
 export interface UpdateUserFieldSchemaRequest {
   fields: FieldDefinition[]
+  /** The version this page loaded; a save based on an older one is refused (409) instead of overwriting someone else's. */
+  expectedVersion?: number
 }
 
 export const userSchemaApi = {

@@ -287,7 +287,7 @@ export default function AllInteractions() {
                       onChange={setChannelFilter}
                       options={channelOptions}
                       allLabel="All Channels"
-                      searchable={channelOptions.length > 6}
+                      searchable
                       searchPlaceholder="Type to narrow channels…"
                       emptyHint="No channel here matches that."
                     />
@@ -307,7 +307,7 @@ export default function AllInteractions() {
                       onChange={setOfficerFilter}
                       options={officerOptions}
                       allLabel="Everyone"
-                      searchable={officerOptions.length > 6}
+                      searchable
                       filterType="alpha"
                       searchPlaceholder="Type a name to narrow…"
                       emptyHint="No officer here matches that."

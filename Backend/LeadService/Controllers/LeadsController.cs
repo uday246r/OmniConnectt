@@ -27,23 +27,6 @@ namespace LeadManagement.Api.Controllers
         [RequiresCapability("Lead", "Create")]
         public async Task<ActionResult<ApiResponseDto<LeadRecordDto>>> CreateLead([FromBody] CreateLeadDto dto)
         {
-            if (!ModelState.IsValid)
-            {
-                var errors = ModelState
-                    .Where(x => x.Value?.Errors.Count > 0)
-                    .ToDictionary(
-                        kvp => kvp.Key,
-                        kvp => kvp.Value!.Errors.First().ErrorMessage
-                    );
-
-                return BadRequest(new ApiResponseDto<LeadRecordDto>
-                {
-                    Success = false,
-                    Message = "Validation failed for lead submission.",
-                    Errors = errors
-                });
-            }
-
             try
             {
                 var outcome = await _leadService.CreateLeadAsync(dto, CurrentUserId(), bypassApproval: IsSuperAdmin());
@@ -65,7 +48,8 @@ namespace LeadManagement.Api.Controllers
                 await _authServiceClient.PushAuditLogAsync(
                     "lead.created", "Lead", result.Id,
                     $"Created lead for '{result.Name}' ({result.Product})",
-                    CurrentUserId(), CurrentUserName(), result.Name);
+                    CurrentUserId(), CurrentUserName(), result.Name,
+                    module: "Leads", page: "create-lead", actionCategory: "CRUD");
 
                 return CreatedAtAction(nameof(GetLeadById), new { id = result.Id }, new ApiResponseDto<LeadRecordDto>
                 {
@@ -80,19 +64,15 @@ namespace LeadManagement.Api.Controllers
                 // it — never collapse this into the generic 500 branch below.
                 return StatusCode(503, new ApiResponseDto<LeadRecordDto> { Success = false, Message = ex.Message });
             }
+            catch (LeadFieldConfigService.FieldFormatException ex)
+            {
+                return BadRequest(new ApiResponseDto<LeadRecordDto> { Success = false, Message = "Some details are not in the right format.", Errors = new Dictionary<string, string>(ex.Errors) });
+            }
             catch (InvalidOperationException ex)
             {
                 // A validation failure the service layer already produced a clear message for (unknown
                 // product, a field-config Required/Editable violation) — 400, not a generic 500.
                 return BadRequest(new ApiResponseDto<LeadRecordDto> { Success = false, Message = ex.Message });
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, new ApiResponseDto<LeadRecordDto>
-                {
-                    Success = false,
-                    Message = ex.Message
-                });
             }
         }
 
@@ -149,23 +129,6 @@ namespace LeadManagement.Api.Controllers
         [RequiresCapability("Lead", "Edit")]
         public async Task<ActionResult<ApiResponseDto<LeadRecordDto>>> UpdateLead(string id, [FromBody] UpdateLeadDto dto)
         {
-            if (!ModelState.IsValid)
-            {
-                var errors = ModelState
-                    .Where(x => x.Value?.Errors.Count > 0)
-                    .ToDictionary(
-                        kvp => kvp.Key,
-                        kvp => kvp.Value!.Errors.First().ErrorMessage
-                    );
-
-                return BadRequest(new ApiResponseDto<LeadRecordDto>
-                {
-                    Success = false,
-                    Message = "Validation failed for lead update.",
-                    Errors = errors
-                });
-            }
-
             try
             {
                 var outcome = await _leadService.UpdateLeadAsync(id, dto, CurrentUserId(), bypassApproval: IsSuperAdmin());
@@ -186,7 +149,8 @@ namespace LeadManagement.Api.Controllers
                 await _authServiceClient.PushAuditLogAsync(
                     "lead.updated", "Lead", id,
                     $"Updated lead '{updated.Name}'",
-                    CurrentUserId(), CurrentUserName(), updated.Name);
+                    CurrentUserId(), CurrentUserName(), updated.Name,
+                    module: "Leads", page: "view-lead", actionCategory: "CRUD");
 
                 return Ok(new ApiResponseDto<LeadRecordDto>
                 {
@@ -207,17 +171,13 @@ namespace LeadManagement.Api.Controllers
             {
                 return StatusCode(503, new ApiResponseDto<LeadRecordDto> { Success = false, Message = ex.Message });
             }
+            catch (LeadFieldConfigService.FieldFormatException ex)
+            {
+                return BadRequest(new ApiResponseDto<LeadRecordDto> { Success = false, Message = "Some details are not in the right format.", Errors = new Dictionary<string, string>(ex.Errors) });
+            }
             catch (InvalidOperationException ex)
             {
                 return BadRequest(new ApiResponseDto<LeadRecordDto> { Success = false, Message = ex.Message });
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, new ApiResponseDto<LeadRecordDto>
-                {
-                    Success = false,
-                    Message = ex.Message
-                });
             }
         }
 
@@ -225,15 +185,6 @@ namespace LeadManagement.Api.Controllers
         [RequiresCapability("Lead", "Delete")]
         public async Task<ActionResult<ApiResponseDto<bool>>> DeleteLead(string id, [FromBody] DeleteLeadDto dto)
         {
-            if (!ModelState.IsValid)
-            {
-                return BadRequest(new ApiResponseDto<bool>
-                {
-                    Success = false,
-                    Message = "Delete reason is required."
-                });
-            }
-
             try
             {
                 // Captured before delete purely for the audit entry's friendly entity name — the
@@ -255,7 +206,8 @@ namespace LeadManagement.Api.Controllers
                 await _authServiceClient.PushAuditLogAsync(
                     "lead.deleted", "Lead", id,
                     $"Deleted lead (Reason: {dto.DeleteReason})",
-                    CurrentUserId(), CurrentUserName(), leadName);
+                    CurrentUserId(), CurrentUserName(), leadName,
+                    module: "Leads", page: "view-lead", actionCategory: "CRUD");
 
                 return Ok(new ApiResponseDto<bool>
                 {
@@ -276,21 +228,52 @@ namespace LeadManagement.Api.Controllers
             {
                 return StatusCode(503, new ApiResponseDto<bool> { Success = false, Message = ex.Message });
             }
-            catch (Exception ex)
-            {
-                return StatusCode(500, new ApiResponseDto<bool>
-                {
-                    Success = false,
-                    Message = ex.Message
-                });
-            }
         }
 
+        /// <summary>
+        /// Records that a lead's full record was opened.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// This endpoint is the one client-initiated audit write left anywhere on the platform, and it
+        /// is a different thing from the ones that were removed. Those took the action, the actor and
+        /// the outcome from the request body and wrote whatever they were handed. This one takes only
+        /// an id: the capability check, the actor and the description all come from the server, and
+        /// the row cannot be written for a lead the caller is not allowed to read.
+        /// </para>
+        /// <para>
+        /// It stays a separate call because a lead's detail view is assembled from data the list
+        /// already returned, so there is no other request that means "this person opened this
+        /// record". Viewing a specific customer's file is exactly the access an audit trail exists to
+        /// record, which is why it is worth a request of its own rather than being dropped.
+        /// </para>
+        /// <para>
+        /// Now dual-written. The local row backs Lead Management's own audit screen; the central push
+        /// is new — views were the one Lead action that never reached the platform trail, so "what did
+        /// this person look at across the platform" silently excluded every lead they opened.
+        /// </para>
+        /// </remarks>
         [HttpPost("{id}/view-audit")]
         [RequiresCapability("Lead", "View")]
-        public async Task<ActionResult<ApiResponseDto<bool>>> LogLeadView(string id)
+        public async Task<ActionResult<ApiResponseDto<bool>>> LogLeadView(string id, CancellationToken ct)
         {
+            var lead = await _leadService.GetLeadByIdAsync(id);
+            if (lead is null)
+            {
+                return NotFound(new ApiResponseDto<bool>
+                {
+                    Success = false,
+                    Message = $"Lead '{id}' was not found."
+                });
+            }
+
             await _leadService.LogLeadViewAsync(id);
+
+            await _authServiceClient.PushAuditLogAsync(
+                "lead.viewed", "Lead", id, $"Viewed the full record for lead '{lead.Name}'.",
+                CurrentUserId(), CurrentUserName(), lead.Name,
+                module: "Leads", page: "view-lead", actionCategory: "ViewDetails", ct: ct);
+
             return Ok(new ApiResponseDto<bool> { Success = true, Data = true });
         }
 

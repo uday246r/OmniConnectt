@@ -11,6 +11,16 @@ import type { CustomPreset, FieldDefinition } from '@omniremit/ui/validation'
  * break this modal — it corrupts UserFieldSchema for every future user created on the platform.
  */
 
+/** The shared rule editor's "Add a format" picker is a searchable combobox, not a native select. */
+const picker = () => screen.getByRole('combobox', { name: 'Add a format' })
+const openPicker = () => fireEvent.mouseDown(picker())
+const closePicker = () => fireEvent.keyDown(picker(), { key: 'Escape' })
+const findOption = (label: string) => screen.queryAllByRole('option').find((o) => o.textContent?.startsWith(label))
+function addFormat(label: string) {
+  openPicker()
+  fireEvent.click(findOption(label)!)
+}
+
 function renderModal(props: Partial<Parameters<typeof FieldEditorModal>[0]> = {}) {
   const onSave = vi.fn()
   const onClose = vi.fn()
@@ -97,7 +107,7 @@ describe('adding a built-in preset rule', () => {
   it('adds a rule card pre-filled with the presets default message', async () => {
     renderModal()
 
-    await userEvent.selectOptions(screen.getByRole('combobox'), 'lettersAndSpaces')
+    addFormat('Letters & spaces')
 
     expect(screen.getByText('Letters & spaces')).toBeInTheDocument()
     expect(screen.getByDisplayValue('Only letters and spaces are allowed.')).toBeInTheDocument()
@@ -105,33 +115,35 @@ describe('adding a built-in preset rule', () => {
 
   it('the live tester reflects a passing and a failing sample value', async () => {
     renderModal()
-    await userEvent.selectOptions(screen.getByRole('combobox'), 'lettersAndSpaces')
+    addFormat('Letters & spaces')
 
-    const tester = screen.getByPlaceholderText(/type a sample value to test this rule/i)
+    const tester = screen.getByPlaceholderText(/type a sample value to try this format/i)
 
     await userEvent.type(tester, 'Jane2')
-    expect(screen.getByText('Only letters and spaces are allowed.')).toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent('Only letters and spaces are allowed.')
 
     await userEvent.clear(tester)
     await userEvent.type(tester, 'Jane Doe')
-    expect(screen.getByText('Passes')).toBeInTheDocument()
+    expect(screen.getByText(/Passes/)).toBeInTheDocument()
   })
 
   it('a preset already added is removed from the dropdown so it cannot be added twice', async () => {
     renderModal()
 
-    await userEvent.selectOptions(screen.getByRole('combobox'), 'lettersAndSpaces')
+    addFormat('Letters & spaces')
 
-    expect(screen.queryByRole('option', { name: 'Letters & spaces' })).not.toBeInTheDocument()
+    openPicker()
+    expect(findOption('Letters & spaces')).toBeUndefined()
   })
 
   it('removing a rule brings its preset back into the dropdown', async () => {
     renderModal()
-    await userEvent.selectOptions(screen.getByRole('combobox'), 'lettersAndSpaces')
+    addFormat('Letters & spaces')
 
-    await userEvent.click(screen.getByRole('button', { name: /remove rule/i }))
+    await userEvent.click(screen.getByRole('button', { name: /remove/i }))
 
-    expect(screen.getByRole('option', { name: 'Letters & spaces' })).toBeInTheDocument()
+    openPicker()
+    expect(findOption('Letters & spaces')).toBeDefined()
   })
 })
 
@@ -148,9 +160,11 @@ describe('adding an admin-defined custom-format rule', () => {
   it('appears in its own "Custom Formats" group and pre-fills its message', async () => {
     renderModal({ customPresets: [employeeIdRange] })
 
-    expect(screen.getByRole('option', { name: 'Employee ID Range' })).toBeInTheDocument()
+    openPicker()
+    expect(findOption('Employee ID Range')).toBeDefined()
+    closePicker()
 
-    await userEvent.selectOptions(screen.getByRole('combobox'), 'employeeIdRange')
+    addFormat('Employee ID Range')
 
     expect(screen.getByText('Employee ID Range')).toBeInTheDocument()
     expect(screen.getByDisplayValue('Employee ID must be between 1000 and 5000.')).toBeInTheDocument()
@@ -161,7 +175,7 @@ describe('the one-off custom regex escape hatch', () => {
   it('shows a pattern input once selected', async () => {
     renderModal()
 
-    await userEvent.selectOptions(screen.getByRole('combobox'), 'custom')
+    addFormat('One-off custom pattern')
 
     expect(screen.getByPlaceholderText('^EMP-[0-9]{4}$')).toBeInTheDocument()
   })
@@ -169,9 +183,10 @@ describe('the one-off custom regex escape hatch', () => {
   it('can only be added once — it disappears from the dropdown after being added', async () => {
     renderModal()
 
-    await userEvent.selectOptions(screen.getByRole('combobox'), 'custom')
+    addFormat('One-off custom pattern')
 
-    expect(screen.queryByRole('option', { name: /one-off custom pattern/i })).not.toBeInTheDocument()
+    openPicker()
+    expect(findOption('One-off custom pattern')).toBeUndefined()
   })
 })
 
@@ -198,7 +213,7 @@ describe('saving', () => {
   it('refuses an empty pattern on a one-off custom regex rule', async () => {
     const { onSave } = renderModal()
     await userEvent.type(screen.getByPlaceholderText(/e\.g\. aadhar number/i), 'Employee Code')
-    await userEvent.selectOptions(screen.getByRole('combobox'), 'custom')
+    addFormat('One-off custom pattern')
 
     await userEvent.click(screen.getByRole('button', { name: 'Add Field' }))
 
@@ -209,7 +224,7 @@ describe('saving', () => {
   it('refuses a syntactically invalid regex pattern', async () => {
     const { onSave } = renderModal()
     await userEvent.type(screen.getByPlaceholderText(/e\.g\. aadhar number/i), 'Employee Code')
-    await userEvent.selectOptions(screen.getByRole('combobox'), 'custom')
+    addFormat('One-off custom pattern')
     // fireEvent.change, not userEvent.type: userEvent parses "{" and "[" as key-sequence syntax, and
     // a raw invalid-regex string like this one is exactly what a real admin could paste in anyway.
     fireEvent.change(screen.getByPlaceholderText('^EMP-[0-9]{4}$'), { target: { value: '[unclosed' } })
@@ -223,7 +238,7 @@ describe('saving', () => {
   it('calls onSave with the assembled field on a valid submission', async () => {
     const { onSave } = renderModal()
     await userEvent.type(screen.getByPlaceholderText(/e\.g\. aadhar number/i), 'Aadhar Number')
-    await userEvent.selectOptions(screen.getByRole('combobox'), 'aadharFormat')
+    addFormat('Aadhar number')
 
     await userEvent.click(screen.getByRole('button', { name: 'Add Field' }))
 

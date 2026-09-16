@@ -80,7 +80,9 @@ public class RefreshTokenCleanupService(
         // LIMIT on DELETE — so batching has to be expressed as "select the ids, then delete those
         // ids". Written as one ExecuteDelete with Take() it compiles cleanly and throws only at
         // runtime, where the sweep's own catch-all would bury it in an hourly log line.
+        // Expired tokens of deleted users are swept too.
         var doomedIds = await db.RefreshTokens
+            .IgnoreQueryFilters()
             .Where(t => t.ExpiresAt < cutoff)
             .OrderBy(t => t.ExpiresAt)
             .Take(settings.BatchSize)
@@ -93,6 +95,7 @@ public class RefreshTokenCleanupService(
         }
 
         var deleted = await db.RefreshTokens
+            .IgnoreQueryFilters()
             .Where(t => doomedIds.Contains(t.Id))
             .ExecuteDeleteAsync(ct);
 

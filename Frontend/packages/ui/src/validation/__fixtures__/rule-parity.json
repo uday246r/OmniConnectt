@@ -1,0 +1,70 @@
+{
+  "description": "One table, two engines. Backend/Shared/OmniRemit.Validation (C#) and packages/ui/src/validation (TypeScript) must both give every case below the expected answer. Add a case whenever either engine changes.",
+  "presets": [
+    { "key": "employeeCode", "label": "Employee code", "kind": "regex", "pattern": "^EMP-[0-9]{4}$", "message": "Use EMP-0000." },
+    { "key": "badRegex", "label": "Broken", "kind": "regex", "pattern": "([", "message": "never shown" },
+    { "key": "shortName", "label": "Short name", "kind": "lengthRange", "minLength": 2, "maxLength": 5, "message": "2 to 5 characters." },
+    { "key": "amount", "label": "Amount", "kind": "numericRange", "minValue": 1000, "maxValue": 50000, "message": "1,000 to 50,000." },
+    { "key": "lettersMode", "label": "Letters", "kind": "textPattern", "textMode": "lettersOnly", "message": "Letters only." },
+    { "key": "noMode", "label": "No mode", "kind": "textPattern", "message": "never shown" },
+    { "key": "futureKind", "label": "Future", "kind": "somethingNew", "message": "never shown" }
+  ],
+  "cases": [
+    { "rule": { "type": "lettersOnly" }, "value": "Jane", "valid": true },
+    { "rule": { "type": "lettersOnly" }, "value": "Jane2", "valid": false },
+    { "rule": { "type": "lettersAndSpaces" }, "value": "Jane Doe", "valid": true },
+    { "rule": { "type": "alphanumeric" }, "value": "EMP-1", "valid": false },
+    { "rule": { "type": "noSpecialCharacters" }, "value": "Room 4B", "valid": true },
+    { "rule": { "type": "digitsOnly" }, "value": "0123", "valid": true },
+    { "rule": { "type": "aadharFormat" }, "value": "1234 5678 9012", "valid": true },
+    { "rule": { "type": "aadharFormat" }, "value": "123456789012", "valid": true },
+    { "rule": { "type": "aadharFormat" }, "value": "١٢٣٤ ٥٦٧٨ ٩٠١٢", "valid": false, "note": "digits in another script" },
+    { "rule": { "type": "panFormat" }, "value": "ABCDE1234F", "valid": true },
+    { "rule": { "type": "pincode" }, "value": "४००००१", "valid": false, "note": "Devanagari digits" },
+    { "rule": { "type": "pincode" }, "value": "400001", "valid": true },
+
+    { "rule": { "type": "emailSmart" }, "value": "jane@example.com", "valid": true },
+    { "rule": { "type": "emailSmart" }, "value": "jane@gmail.comsss", "valid": false },
+    { "rule": { "type": "emailSmart" }, "value": "jane@example", "valid": false },
+
+    { "rule": { "type": "url" }, "value": "https://example.com/a?b=1", "valid": true },
+    { "rule": { "type": "url" }, "value": "http://example.com", "valid": true },
+    { "rule": { "type": "url" }, "value": "ftp://example.com", "valid": false, "note": "not a website" },
+    { "rule": { "type": "url" }, "value": "mailto:jane@example.com", "valid": false },
+    { "rule": { "type": "url" }, "value": "example.com", "valid": false },
+
+    { "rule": { "type": "mobileIN" }, "value": "+91 98765 43210", "valid": true },
+    { "rule": { "type": "mobileIN" }, "value": "+91 98765 4321", "valid": false, "note": "India is exactly 10 national digits" },
+    { "rule": { "type": "mobileIN" }, "value": "+60 12-345 6789", "valid": true },
+    { "rule": { "type": "mobileIN" }, "value": "+60 123 456 789", "valid": true, "note": "Malaysia allows 9" },
+    { "rule": { "type": "mobileIN" }, "value": "+65 8123 45678", "valid": false },
+
+    { "rule": { "type": "minLength", "value": 3 }, "value": "ab", "valid": false },
+    { "rule": { "type": "maxLength", "value": 3 }, "value": "abc", "valid": true },
+    { "rule": { "type": "exactLength", "value": 4 }, "value": "abcd", "valid": true },
+    { "rule": { "type": "exactLength", "value": 4 }, "value": "abc", "valid": false },
+    { "rule": { "type": "exactLength" }, "value": "anything", "valid": true, "note": "no length configured is nothing to enforce" },
+
+    { "rule": { "type": "custom", "pattern": "^[A-Z]{3}$" }, "value": "ABC", "valid": true },
+    { "rule": { "type": "custom", "pattern": "^[A-Z]{3}$" }, "value": "AB1", "valid": false },
+    { "rule": { "type": "custom", "pattern": "([" }, "value": "anything", "valid": true, "note": "a pattern that does not compile fails open" },
+    { "rule": { "type": "custom" }, "value": "anything", "valid": true },
+
+    { "rule": { "type": "employeeCode" }, "value": "EMP-0042", "valid": true },
+    { "rule": { "type": "employeeCode" }, "value": "EMP-42", "valid": false },
+    { "rule": { "type": "badRegex" }, "value": "anything", "valid": true },
+    { "rule": { "type": "shortName" }, "value": "A", "valid": false },
+    { "rule": { "type": "shortName" }, "value": "Anna", "valid": true },
+    { "rule": { "type": "amount" }, "value": "25000", "valid": true },
+    { "rule": { "type": "amount" }, "value": "25,000.50", "valid": true, "note": "thousands separators are accepted on both sides" },
+    { "rule": { "type": "amount" }, "value": "999", "valid": false },
+    { "rule": { "type": "amount" }, "value": "1e4", "valid": false, "note": "scientific notation is not an amount" },
+    { "rule": { "type": "amount" }, "value": "0x2710", "valid": false },
+    { "rule": { "type": "amount" }, "value": "abc", "valid": false },
+    { "rule": { "type": "lettersMode" }, "value": "Jane", "valid": true },
+    { "rule": { "type": "lettersMode" }, "value": "Jane2", "valid": false },
+    { "rule": { "type": "noMode" }, "value": "anything 123", "valid": true, "note": "no mode fails open" },
+    { "rule": { "type": "futureKind" }, "value": "anything", "valid": true, "note": "an unknown kind fails open" },
+    { "rule": { "type": "deletedFormat" }, "value": "anything", "valid": true, "note": "an unknown preset id fails open" }
+  ]
+}

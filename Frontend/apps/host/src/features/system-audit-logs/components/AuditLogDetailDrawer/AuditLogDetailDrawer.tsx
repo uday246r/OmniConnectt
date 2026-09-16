@@ -1,8 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Badge, Button, DetailField, DetailGrid, DetailSection, formatAuditTimestamp, type BadgeTone } from '@omniremit/ui'
 import { Icon } from '../../../../shared/components/Icon/Icon'
+import { permissionsApi } from '../../../../shared/api/permissionsApi'
 import { auditLogsApi, type AuditLogDto } from '../../api/auditLogsApi'
 import { formatActionLabel, formatIpv4 } from '../../utils/auditLogFormatting'
+import { buildPermissionLabels, describePermission, parseAuditDetails } from '../../utils/auditDetails'
 // The same right-side drawer shell Settings and the System Audit Trail deep-link use — this component
 // only fills the panel body, so wherever it is rendered the drawer looks identical to the rest of the host.
 import drawerStyles from '../../../../layout/SettingsDrawer/SettingsDrawer.module.css'
@@ -109,6 +111,24 @@ export function AuditLogDetailDrawer({ log, accessToken, onClose, onViewRelated 
 
   const parsedAgent = parseUserAgent(log.userAgent)
   const hasRelated = relatedCount !== null && relatedCount > 1
+  const parsedDetails = useMemo(() => parseAuditDetails(log.details), [log.details])
+
+  // Names for a permission list, fetched only for a row that has one. Without it — or without access
+  // to the catalog — the keys are still turned into words by describePermission.
+  const [permissionLabels, setPermissionLabels] = useState<ReturnType<typeof buildPermissionLabels>>()
+  useEffect(() => {
+    if (!accessToken || !parsedDetails.hasPermissionChanges) return
+    let cancelled = false
+    permissionsApi
+      .catalog(accessToken, false)
+      .then((catalog) => {
+        if (!cancelled) setPermissionLabels(buildPermissionLabels(catalog))
+      })
+      .catch(() => undefined)
+    return () => {
+      cancelled = true
+    }
+  }, [accessToken, parsedDetails.hasPermissionChanges])
 
   return (
     <div className={drawerStyles.overlayRoot}>
@@ -230,7 +250,7 @@ export function AuditLogDetailDrawer({ log, accessToken, onClose, onViewRelated 
                           <span className={styles.timelineLabel}>{log.result === 'Success' ? 'Finished successfully' : 'Did not complete'}</span>
                           <span className={styles.timelineTime}>
                             <Icon.ShieldCheck width={12} height={12} />
-                            {log.serviceName}
+                            {log.sourceApplication || log.serviceName}
                           </span>
                         </div>
                       </div>
@@ -313,8 +333,32 @@ export function AuditLogDetailDrawer({ log, accessToken, onClose, onViewRelated 
               )}
 
               {log.details && (
-                <DetailSection title="Additional Details" icon={<Icon.FileText width={12} height={12} />}>
-                  <pre className={styles.payloadCodeBox}>{log.details}</pre>
+                <DetailSection title="Details" icon={<Icon.FileText width={12} height={12} />}>
+                  {parsedDetails.headline && <p className={styles.detailsText}>{parsedDetails.headline}</p>}
+                  {parsedDetails.hasPermissionChanges && (
+                    <div className={styles.permissionChanges}>
+                      {parsedDetails.added.length > 0 && (
+                        <div>
+                          <h4 className={styles.permissionChangesTitle}>Added</h4>
+                          <ul className={styles.permissionList}>
+                            {parsedDetails.added.map((p) => (
+                              <li key={p} className={styles.permissionAdded}>{describePermission(p, permissionLabels)}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      {parsedDetails.removed.length > 0 && (
+                        <div>
+                          <h4 className={styles.permissionChangesTitle}>Removed</h4>
+                          <ul className={styles.permissionList}>
+                            {parsedDetails.removed.map((p) => (
+                              <li key={p} className={styles.permissionRemoved}>{describePermission(p, permissionLabels)}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </DetailSection>
               )}
             </div>

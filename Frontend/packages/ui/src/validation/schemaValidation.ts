@@ -98,8 +98,8 @@ function evaluateCustomPreset(preset: CustomPreset, value: string): boolean {
       return true
     }
     case 'numericRange': {
-      const num = Number(value)
-      if (Number.isNaN(num)) return false
+      const num = parsePlainNumber(value)
+      if (num === undefined) return false
       if (preset.minValue != null && num < preset.minValue) return false
       if (preset.maxValue != null && num > preset.maxValue) return false
       return true
@@ -110,6 +110,29 @@ function evaluateCustomPreset(preset: CustomPreset, value: string): boolean {
     }
     default:
       return true
+  }
+}
+
+const PLAIN_NUMBER = /^[+-]?[0-9]+(\.[0-9]+)?$/
+
+/**
+ * A plain decimal number, with optional thousands separators: "1500", "-2.5", "1,500.75".
+ *
+ * `Number()` used to decide this, which refuses "1,500" and accepts "1e3", "0x10" and "" (as 0) —
+ * while the server accepted "1,500". Both sides now accept exactly this shape (FieldRuleEngine.TryParseNumber).
+ */
+export function parsePlainNumber(value: string): number | undefined {
+  const compact = value.trim().replace(/,/g, '')
+  return PLAIN_NUMBER.test(compact) ? Number(compact) : undefined
+}
+
+/** A web address people can open: absolute, http or https, with a host. Mirrors FieldPresets.IsAbsoluteUrl. */
+export function isWebsiteUrl(value: string): boolean {
+  try {
+    const url = new URL(value)
+    return (url.protocol === 'http:' || url.protocol === 'https:') && url.hostname.length > 0
+  } catch {
+    return false
   }
 }
 
@@ -132,12 +155,15 @@ export function evaluateRule(rule: ValidationRule, value: string, customPresets:
       return isEmailSmart(value) ? undefined : rule.message
     case 'mobileIN':
       return validateFullPhone(value) === undefined ? undefined : rule.message
+    case 'url':
+      return isWebsiteUrl(value) ? undefined : rule.message
     case 'minLength':
       return value.length >= (rule.value ?? 0) ? undefined : rule.message
     case 'maxLength':
       return value.length <= (rule.value ?? Number.MAX_SAFE_INTEGER) ? undefined : rule.message
     case 'exactLength':
-      return value.length === rule.value ? undefined : rule.message
+      // No length configured is nothing to enforce, rather than "must be undefined characters long".
+      return rule.value == null || value.length === rule.value ? undefined : rule.message
     case CUSTOM_PRESET_ID: {
       if (!rule.pattern) return undefined
       try {

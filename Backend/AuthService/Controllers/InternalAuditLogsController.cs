@@ -33,7 +33,8 @@ public class InternalAuditLogsController(AuditLogAppService auditLog) : Controll
             : request.UserAgent;
 
         await auditLog.WriteAsync(
-            serviceName: request.ServiceName, 
+            // A service identified by its own key cannot write rows under another service's name.
+            serviceName: InternalCaller.Get(HttpContext) ?? request.ServiceName,
             actorUserId: request.ActorUserId, 
             actorName: request.ActorName, 
             action: request.Action,

@@ -1,0 +1,73 @@
+/* A field's format rules: one card per rule, a live tester on each, a searchable picker to add more. */
+.section { display: flex; flex-direction: column; gap: 10px; }
+.header { display: flex; flex-direction: column; gap: 2px; }
+
+.label {
+  font-size: var(--omni-font-size-xs);
+  font-weight: var(--omni-font-weight-semibold);
+  color: var(--omni-color-text-primary);
+}
+
+.labelSm {
+  font-size: var(--omni-font-size-xs);
+  font-weight: var(--omni-font-weight-medium);
+  color: var(--omni-color-text-secondary);
+}
+
+.hint { font-size: var(--omni-font-size-xs); color: var(--omni-color-text-muted); }
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--omni-color-surface-alt);
+  border: 1px solid var(--omni-color-border);
+  border-radius: var(--omni-radius-md);
+}
+
+.cardHeader { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.name { font-size: var(--omni-font-size-sm); font-weight: var(--omni-font-weight-semibold); color: var(--omni-color-text-primary); }
+
+.remove {
+  border: 0;
+  background: none;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--omni-radius-md);
+  color: var(--omni-color-text-muted);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+.remove:hover { background: var(--omni-color-danger-bg); color: var(--omni-color-danger-text); }
+
+.field { display: flex; flex-direction: column; gap: 4px; }
+
+.input,
+.inputMono,
+.testerInput {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1.5px solid var(--omni-color-border);
+  border-radius: var(--omni-radius-md);
+  background: var(--omni-color-surface);
+  color: var(--omni-color-text-primary);
+  font: inherit;
+  font-size: var(--omni-font-size-sm);
+}
+
+.inputMono { font-family: var(--omni-font-mono); }
+
+.input:focus,
+.inputMono:focus,
+.testerInput:focus { outline: none; border-color: var(--omni-color-primary-600); }
+
+.tester { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.testerInput { flex: 1; min-width: 160px; border-style: dashed; font-size: var(--omni-font-size-xs); }
+
+.pass,
+.fail { font-size: var(--omni-font-size-xs); font-weight: var(--omni-font-weight-semibold); }
+.pass { color: var(--omni-color-success-text); }
+.fail { color: var(--omni-color-danger-text); }

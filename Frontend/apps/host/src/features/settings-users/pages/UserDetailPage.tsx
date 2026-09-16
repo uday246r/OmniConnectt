@@ -14,43 +14,27 @@ import { rolesApi, type RoleDetailDto } from '../../settings-roles/api/rolesApi'
 import { isApprovalPending } from '../../approvals/api/approvalsApi'
 import { asPendingApprovalConflict, type PendingApprovalConflict } from '../../approvals/pendingConflict'
 import { PendingApprovalDialog } from '../../approvals/components/PendingApprovalDialog'
-import { auditLogsApi, type AuditLogDto } from '../../system-audit-logs/api/auditLogsApi'
-import { formatActionLabel, actionBadgeTone, formatIpv4 } from '../../system-audit-logs/utils/auditLogFormatting'
-import { AuditLogDetailDrawer } from '../../system-audit-logs/components/AuditLogDetailDrawer/AuditLogDetailDrawer'
 import { usePermissionCatalog } from '../hooks/usePermissionCatalog'
 import { computeEffectivePermissions } from '../utils/effectivePermissions'
 import { PermissionMatrixTable } from '../components/PermissionMatrixTable/PermissionMatrixTable'
-import { useDebouncedValue } from '../../../shared/hooks/useDebouncedValue'
-import { DateTimeRangeFilter, type DateTimeRangeValue } from '../../../shared/components/DateTimeRangeFilter/DateTimeRangeFilter'
+import { UserActivityTab } from '../components/UserActivityTab/UserActivityTab'
 import {
   Badge,
   Button,
-  ColumnFilter,
-  DataTable,
   DetailField,
   DetailGrid,
   DetailSection,
   DetailSections,
   EMPTY_VALUE,
   EmptyState,
-  FilterBar,
   Modal,
   PageHeader,
-  Pagination,
-  ResponsiveRows,
-  RowAction,
   Tabs,
   TabPanel,
-  formatAuditTimestamp,
   formatDateTime,
-  type ActiveFilter,
-  type ColumnFilterOption,
-  type ResponsiveColumn,
 } from '@omniremit/ui'
 import styles from './UserDetailPage.module.css'
 
-const LOGS_POOL_SIZE = 200
-const LOGS_PAGE_SIZE = 10
 type DetailTab = 'profile' | 'permissions' | 'activity'
 
 export function UserDetailPage() {
@@ -68,7 +52,6 @@ export function UserDetailPage() {
   const canEdit = isAdministrator || hasCapability('host.settings.users', 'Edit')
   const canDelete = isAdministrator || hasCapability('host.settings.users', 'Delete')
   const canDisable = isAdministrator || hasCapability('host.settings.users', 'Disable')
-  const canExportAuditLogs = isAdministrator || hasCapability('host.system.audit-logs', 'Export')
 
   const [detail, setDetail] = useState<UserDetailDto | null>(null)
   const [roleDetail, setRoleDetail] = useState<RoleDetailDto | null>(null)
@@ -85,17 +68,6 @@ export function UserDetailPage() {
   const [deleting, setDeleting] = useState(false)
   const [approvalConflict, setApprovalConflict] = useState<PendingApprovalConflict | null>(null)
 
-  const [logsPool, setLogsPool] = useState<AuditLogDto[] | null>(null)
-  const [logsPage, setLogsPage] = useState(1)
-  const [actionFilter, setActionFilter] = useState('')
-  const [resultFilter, setResultFilter] = useState('')
-  const [appFilter, setAppFilter] = useState('')
-  const [entitySearch, setEntitySearch] = useState('')
-  const [timeRange, setTimeRange] = useState<DateTimeRangeValue>({})
-  const [viewingLog, setViewingLog] = useState<AuditLogDto | null>(null)
-  const [exporting, setExporting] = useState(false)
-
-  const debouncedEntitySearch = useDebouncedValue(entitySearch, 300)
 
   useEffect(() => {
     if (!accessToken || !id) return
@@ -150,145 +122,6 @@ export function UserDetailPage() {
     }
   }, [accessToken])
 
-  // A bounded pool (200), not this user's whole history — matching the Users list. Actor and date
-  // range are narrow enough to push to the server; action/result/entity refine further client-side,
-  // with their own options drawn from this same pool rather than a separate lookup.
-  useEffect(() => {
-    if (!accessToken || !id || tab !== 'activity') return
-    let cancelled = false
-    setLogsPool(null)
-    auditLogsApi
-      .list(accessToken, {
-        actorUserId: id,
-        page: 1,
-        pageSize: LOGS_POOL_SIZE,
-        sortDir: 'desc',
-        from: timeRange.from,
-        to: timeRange.to,
-      })
-      .then((res) => {
-        if (!cancelled) setLogsPool(res.items)
-      })
-      .catch(() => {
-        if (!cancelled) setLogsPool([])
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [accessToken, id, tab, timeRange, dataRevision])
-
-  useEffect(() => {
-    setLogsPage(1)
-  }, [actionFilter, resultFilter, appFilter, debouncedEntitySearch, timeRange])
-
-  const actionOptions: ColumnFilterOption[] = useMemo(() => {
-    if (!logsPool) return []
-    const seen = new Map<string, string>()
-    for (const l of logsPool) {
-      if (!seen.has(l.action)) seen.set(l.action, formatActionLabel(l.action))
-    }
-    return [...seen.entries()]
-      .sort((a, b) => a[1].localeCompare(b[1]))
-      .map(([value, label]) => ({ value, label }))
-  }, [logsPool])
-
-  const appOptions: ColumnFilterOption[] = useMemo(() => {
-    if (!logsPool) return []
-    const seen = new Set<string>()
-    for (const l of logsPool) {
-      const app = l.sourceApplication || l.serviceName
-      if (app) seen.add(app)
-    }
-    return [...seen]
-      .sort((a, b) => a.localeCompare(b))
-      .map((value) => ({ value, label: value }))
-  }, [logsPool])
-
-  const RESULT_OPTIONS: ColumnFilterOption[] = [
-    { value: 'Success', label: 'Success' },
-    { value: 'Failure', label: 'Failure' },
-  ]
-
-  /*
-   * Recommendations for the Entity column, drawn from the same pool the table renders — so the
-   * operator is only ever offered a record that is genuinely in this user's log, and typing costs
-   * no request. Qualified by entity type, since two different records can share a display name.
-   */
-  const entityPool = useMemo(
-    () =>
-      (logsPool ?? []).map((l) => ({
-        value: l.entityLabel ?? l.entityType ?? '',
-        meta: l.entityLabel && l.entityType ? l.entityType : undefined,
-      })),
-    [logsPool],
-  )
-
-  const visibleLogs = useMemo(() => {
-    if (!logsPool) return null
-    const needle = debouncedEntitySearch.trim().toLowerCase()
-    return logsPool.filter((l) => {
-      if (actionFilter && l.action !== actionFilter) return false
-      if (resultFilter && l.result !== resultFilter) return false
-      if (appFilter && (l.sourceApplication || l.serviceName) !== appFilter) return false
-      if (needle && !(l.entityLabel ?? l.entityType ?? '').toLowerCase().includes(needle)) return false
-      return true
-    })
-  }, [logsPool, actionFilter, resultFilter, appFilter, debouncedEntitySearch])
-
-  const logsTotal = visibleLogs?.length ?? 0
-  const pagedLogs = useMemo(() => {
-    if (!visibleLogs) return []
-    const start = (logsPage - 1) * LOGS_PAGE_SIZE
-    return visibleLogs.slice(start, start + LOGS_PAGE_SIZE)
-  }, [visibleLogs, logsPage])
-
-  const activityFilters: ActiveFilter[] = [
-    actionFilter && {
-      key: 'action',
-      label: 'Action',
-      value: formatActionLabel(actionFilter),
-      onRemove: () => setActionFilter(''),
-    },
-    appFilter && {
-      key: 'app',
-      label: 'Application',
-      value: appFilter,
-      onRemove: () => setAppFilter(''),
-    },
-    resultFilter && { key: 'result', label: 'Result', value: resultFilter, onRemove: () => setResultFilter('') },
-    debouncedEntitySearch && {
-      key: 'entity',
-      label: 'Entity',
-      value: `"${debouncedEntitySearch}"`,
-      onRemove: () => setEntitySearch(''),
-    },
-    (timeRange.from || timeRange.to) && {
-      key: 'time',
-      label: 'Time',
-      value: `${timeRange.from ? formatDateTime(timeRange.from) : '…'} → ${timeRange.to ? formatDateTime(timeRange.to) : '…'}`,
-      onRemove: () => setTimeRange({}),
-    },
-  ].filter(Boolean) as ActiveFilter[]
-
-  async function handleExportActivity() {
-    if (!accessToken || !detail) return
-    setExporting(true)
-    try {
-      await auditLogsApi.exportCsv(accessToken, {
-        actorUserId: detail.id,
-        from: timeRange.from,
-        to: timeRange.to,
-        action: actionFilter || undefined,
-        result: (resultFilter as any) || undefined,
-        sourceApplication: appFilter || undefined,
-      })
-      toast.success('Audit log report exported successfully.')
-    } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : 'Failed to export audit report.')
-    } finally {
-      setExporting(false)
-    }
-  }
 
   const effectivePermissions = useMemo(() => {
     if (!detail || detail.isAdministrator) return []
@@ -350,100 +183,6 @@ export function UserDetailPage() {
     }
   }
 
-  const logColumns: ResponsiveColumn<AuditLogDto>[] = [
-    {
-      key: 'time',
-      label: 'Time',
-      priority: 'always',
-      header: <DateTimeRangeFilter label="Time" value={timeRange} onChange={setTimeRange} />,
-      render: (l) => formatAuditTimestamp(l.occurredAt),
-    },
-    {
-      key: 'action',
-      label: 'Action',
-      priority: 'always',
-      header: (
-        <ColumnFilter
-          label="Action"
-          value={actionFilter}
-          onChange={setActionFilter}
-          options={actionOptions}
-          allLabel="All Actions"
-          searchable={actionOptions.length > 6}
-        />
-      ),
-      render: (l) => <Badge tone={actionBadgeTone(l.action)}>{formatActionLabel(l.action)}</Badge>,
-    },
-    {
-      key: 'app',
-      label: 'Application',
-      priority: 'high',
-      header: (
-        <ColumnFilter
-          label="Application"
-          value={appFilter}
-          onChange={setAppFilter}
-          options={appOptions}
-          allLabel="All Apps"
-          searchable={appOptions.length > 6}
-        />
-      ),
-      render: (l) => <Badge tone="neutral">{l.sourceApplication || l.serviceName}</Badge>,
-    },
-    {
-      key: 'entity',
-      label: 'Entity',
-      priority: 'high',
-      header: (
-        <ColumnFilter
-          label="Entity"
-          value={entitySearch}
-          onChange={setEntitySearch}
-          options={[]}
-          freeText
-          filterType="text"
-          searchPlaceholder="Search by affected record..."
-          suggestFrom={entityPool}
-          emptyHint="No matching record in this log."
-        />
-      ),
-      // Human-readable, never a raw id: the record's own name carries the same meaning a GUID would,
-      // qualified by its type when the name alone would be ambiguous (e.g. "Ashok · User").
-      render: (l) =>
-        l.entityLabel ? (
-          <span>
-            {l.entityLabel}
-            {l.entityType && <span className={styles.entityQualifier}> · {l.entityType}</span>}
-          </span>
-        ) : (
-          l.entityType ?? EMPTY_VALUE
-        ),
-    },
-    {
-      key: 'result',
-      label: 'Result',
-      priority: 'always',
-      header: (
-        <ColumnFilter
-          label="Result"
-          value={resultFilter}
-          onChange={setResultFilter}
-          options={RESULT_OPTIONS}
-          allLabel="All Results"
-          searchable={false}
-        />
-      ),
-      render: (l) => <Badge tone={l.result === 'Success' ? 'success' : 'danger'}>{l.result}</Badge>,
-    },
-    { key: 'ip', label: 'Source IP', priority: 'low', render: (l) => formatIpv4(l.sourceIp) },
-    {
-      key: 'actions',
-      label: '',
-      priority: 'always',
-      align: 'right',
-      render: (l) => <RowAction onClick={() => setViewingLog(l)}>View</RowAction>,
-    },
-  ]
 
   if (loading && !detail) {
     return (
@@ -576,38 +315,7 @@ export function UserDetailPage() {
       </TabPanel>
 
       <TabPanel id="user-detail-tabs" tabId="activity" active={tab === 'activity'}>
-        <div className={styles.activityToolbar}>
-          {canExportAuditLogs && (
-            <Button
-              variant="secondary"
-              leadingIcon={<Icon.Download width={15} height={15} />}
-              loading={exporting}
-              onClick={handleExportActivity}
-            >
-              Export Report
-            </Button>
-          )}
-        </div>
-        <FilterBar
-          filters={activityFilters}
-          onClearAll={() => {
-            setActionFilter('')
-            setResultFilter('')
-            setAppFilter('')
-            setEntitySearch('')
-            setTimeRange({})
-          }}
-        />
-        <DataTable reserveHeight footer={<Pagination page={logsPage} pageSize={LOGS_PAGE_SIZE} total={logsTotal} onPageChange={setLogsPage} itemLabel="event" />}>
-          <ResponsiveRows
-            columns={logColumns}
-            rows={pagedLogs}
-            rowKey={(l) => l.id}
-            loading={logsPool === null}
-            loadingRows={LOGS_PAGE_SIZE}
-            empty={<EmptyState compact title="No activity found matching the selected filters." />}
-          />
-        </DataTable>
+        {tab === 'activity' && <UserActivityTab userId={detail.id} userName={detail.name || detail.email} />}
       </TabPanel>
 
       <Modal
@@ -649,15 +357,6 @@ export function UserDetailPage() {
       </Modal>
 
       <PendingApprovalDialog conflict={approvalConflict} onClose={() => setApprovalConflict(null)} />
-
-      {viewingLog && (
-        <AuditLogDetailDrawer
-          log={viewingLog}
-          accessToken={accessToken}
-          onClose={() => setViewingLog(null)}
-          onViewRelated={(cid) => navigate(`/system/audit-logs?correlationId=${encodeURIComponent(cid)}`)}
-        />
-      )}
     </div>
   )
 }

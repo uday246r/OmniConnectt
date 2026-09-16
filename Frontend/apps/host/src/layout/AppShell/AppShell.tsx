@@ -1,8 +1,8 @@
-import { Suspense, useEffect, useState, useCallback, useRef } from 'react'
+import { Suspense, useEffect, useState, useCallback } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 import { Sidebar } from '../Sidebar/Sidebar'
-import { Topbar, type TopbarSettingsAccess } from '../Topbar/Topbar'
-import { isDrawerRoute, useSettingsDrawerStore } from '../../shared/stores/settingsDrawerStore'
+import { Topbar } from '../Topbar/Topbar'
+import { useSettingsDrawerStore } from '../../shared/stores/settingsDrawerStore'
 import { lazyWithPreload, preloadWhenIdle } from '../../shared/utils/lazyWithPreload'
 import styles from './AppShell.module.css'
 
@@ -28,11 +28,10 @@ export interface AppShellProps {
    */
   appHealth?: Record<string, 'Unknown' | 'Healthy' | 'Unreachable'>
   userName?: string
-  settingsAccess?: TopbarSettingsAccess
   onLogout?: () => void
 }
 
-export function AppShell({ appHealth, userName, settingsAccess, onLogout }: AppShellProps) {
+export function AppShell({ appHealth, userName, onLogout }: AppShellProps) {
   // Subscribed so the drawer is only mounted when it is actually open — mounting it unconditionally
   // would resolve the lazy component on first render and negate the split.
   const drawerOpen = useSettingsDrawerStore((s) => s.isOpen)
@@ -48,34 +47,10 @@ export function AppShell({ appHealth, userName, settingsAccess, onLogout }: AppS
   }, [location.pathname, closeSidebar])
 
   /*
-   * The settings drawer follows the URL out of /settings, not just into it.
-   *
-   * SettingsRoute opens it when a /settings/* URL is entered; this is the other half. It covers every
-   * way of leaving — the close button and backdrop (which navigate to "/"), a sidebar link, and the
-   * browser Back button — with one rule instead of each exit remembering to close the store itself.
-   *
-   * An override layer (e.g. UserFormLayer for Add/Edit User) can be opened from a non-drawer page
-   * such as /settings/users or /settings/users/:id. When the route hasn't changed, that layer was
-   * explicitly requested on this page and must not be dismissed immediately. If the user navigates
-   * away to another route, the drawer closes.
+   * Opening and closing the settings drawer from the URL is SettingsDrawerUrlSync's job, not this
+   * component's. AppShell renders inside the page routes, which see the page BEHIND the drawer rather
+   * than the /settings address, so a close-on-leave rule here closed the drawer the moment it opened.
    */
-  const closeDrawer = useSettingsDrawerStore((s) => s.close)
-  const layerStack = useSettingsDrawerStore((s) => s.layerStack)
-  const prevPathRef = useRef(location.pathname)
-
-  useEffect(() => {
-    const routeChanged = prevPathRef.current !== location.pathname
-    prevPathRef.current = location.pathname
-
-    if (!drawerOpen) return
-
-    const isOverrideLayer = layerStack.length > 1
-    if (isOverrideLayer && !routeChanged) return
-
-    if (!isDrawerRoute(location.pathname)) {
-      closeDrawer()
-    }
-  }, [location.pathname, drawerOpen, layerStack.length, closeDrawer])
 
   // Prevent body scroll while mobile sidebar is overlaying the content
   useEffect(() => {
@@ -117,7 +92,6 @@ export function AppShell({ appHealth, userName, settingsAccess, onLogout }: AppS
         {/* Topbar — single source of truth for user identity & profile actions */}
         <Topbar
           userName={userName}
-          settingsAccess={settingsAccess}
           onLogout={onLogout}
           onMobileMenuToggle={() => setSidebarOpen((v) => !v)}
         />

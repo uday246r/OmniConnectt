@@ -25,7 +25,7 @@ public class UserFieldSchemaAppServiceTests : IDisposable
             .Options;
 
         db = new AuthDbContext(options);
-        service = new UserFieldSchemaAppService(db);
+        service = new UserFieldSchemaAppService(db, TestAudit.For(db));
     }
 
     public void Dispose()

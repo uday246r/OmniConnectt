@@ -1,30 +1,30 @@
-﻿import { useEffect, useState } from 'react'
-import { Badge, formatAuditTimestamp } from '@omniremit/ui'
+import { useEffect, useRef, useState } from 'react'
+import {
+  Badge,
+  Button,
+  DetailField,
+  DetailGrid,
+  DetailSection,
+  DetailSections,
+  Drawer,
+  formatAuditTimestamp,
+} from '@omniremit/ui'
 import { Icon } from '../../../../shared/components/Icon/Icon'
-import drawerStyles from '../../../../layout/SettingsDrawer/SettingsDrawer.module.css'
-import styles from './SystemLogDetailDrawer.module.css'
 import type { SystemLogDto } from '../../api/systemLogsApi'
+import {
+  describeStatusCode,
+  environmentTone,
+  formatEventCode,
+  formatServiceName,
+  severityTone,
+  statusCodeTone,
+} from '../../utils/systemLogFormatting'
+import styles from './SystemLogDetailDrawer.module.css'
 
 interface SystemLogDetailDrawerProps {
   log: SystemLogDto | null
   onClose: () => void
   onViewRelated?: (correlationId: string) => void
-}
-
-function getTone(severity: string): 'danger' | 'warning' | 'info' | 'neutral' {
-  const s = severity.toLowerCase()
-  if (s === 'critical' || s === 'error') return 'danger'
-  if (s === 'warning') return 'warning'
-  if (s === 'info') return 'info'
-  return 'neutral'
-}
-
-function getEnvTone(env: string): 'danger' | 'warning' | 'info' | 'neutral' {
-  const e = env.toLowerCase()
-  if (e.includes('prod')) return 'danger'
-  if (e.includes('stag')) return 'warning'
-  if (e.includes('dev')) return 'info'
-  return 'neutral'
 }
 
 function tryPrettyJson(raw: string): string {
@@ -35,233 +35,148 @@ function tryPrettyJson(raw: string): string {
   }
 }
 
+/** How long a copy button shows its confirmation before returning to the copy glyph. */
+const COPIED_FEEDBACK_MS = 1500
+
+/**
+ * One system log, explained for the person reading it first and the engineer second.
+ *
+ * The drawer used to open on event codes, request, correlation, tenant and user GUIDs — useful to
+ * someone grepping a log store, noise to an operator asking "what went wrong?". The top now says what
+ * happened in words (message, severity, service, module, when, the HTTP outcome described). Every raw
+ * identifier, the stack trace and the metadata sit in one collapsed "Technical details" section, each
+ * copyable, so nothing an engineer needs is lost.
+ */
 export function SystemLogDetailDrawer({ log, onClose, onViewRelated }: SystemLogDetailDrawerProps) {
   const [copiedField, setCopiedField] = useState<string | null>(null)
+  const resetTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [onClose])
+  useEffect(() => () => {
+    if (resetTimer.current) clearTimeout(resetTimer.current)
+  }, [])
 
   if (!log) return null
 
-  const tone = getTone(log.severity)
+  const tone = severityTone(log.severity)
+  const statusText = describeStatusCode(log.statusCode)
 
-  const copyToClipboard = (text: string, field: string) => {
-    navigator.clipboard.writeText(text).catch(() => {})
+  const copy = (text: string, field: string) => {
+    navigator.clipboard?.writeText(text).catch(() => {})
     setCopiedField(field)
-    setTimeout(() => setCopiedField(null), 1500)
+    if (resetTimer.current) clearTimeout(resetTimer.current)
+    resetTimer.current = setTimeout(() => setCopiedField(null), COPIED_FEEDBACK_MS)
   }
 
+  const copyButton = (text: string, field: string, label: string) => (
+    <button
+      type="button"
+      className={styles.copyBtn}
+      onClick={() => copy(text, field)}
+      aria-label={copiedField === field ? `${label} copied` : `Copy ${label}`}
+      title={copiedField === field ? 'Copied' : `Copy ${label}`}
+    >
+      {copiedField === field ? <Icon.Check width={12} height={12} /> : <Icon.Copy width={12} height={12} />}
+    </button>
+  )
+
+  const identifier = (value: string | null, field: string, label: string) =>
+    value ? (
+      <span className={styles.idValue}>
+        <span className={styles.monoValue}>{value}</span>
+        {copyButton(value, field, label)}
+      </span>
+    ) : null
+
   return (
-    <div className={drawerStyles.overlayRoot}>
-      <div className={drawerStyles.backdrop} onClick={onClose} />
-      <div className={drawerStyles.drawerContainer}>
-        <div className={drawerStyles.rootPanel}>
-          <div className={drawerStyles.header}>
-            <div className={drawerStyles.headerLeft}>
-              <div className={drawerStyles.headerIcon}>
-                {tone === 'danger' ? (
-                  <Icon.AlertCircle width={20} height={20} />
-                ) : tone === 'warning' ? (
-                  <Icon.AlertTriangle width={20} height={20} />
-                ) : (
-                  <Icon.Info width={20} height={20} />
-                )}
-              </div>
-              <div>
-                <h2 className={drawerStyles.title}>System Log Details</h2>
-                <p className={drawerStyles.subtitle}>Technical and operational event record</p>
-              </div>
-            </div>
-            <button type="button" className={drawerStyles.closeBtn} onClick={onClose} aria-label="Close details">
-              <Icon.X width={20} height={20} />
-            </button>
+    <Drawer
+      open
+      onClose={onClose}
+      closeLabel="Close details"
+      title="System Log Details"
+      subtitle={formatEventCode(log.eventCode)}
+      icon={
+        tone === 'danger' ? <Icon.AlertCircle width={20} height={20} />
+          : tone === 'warning' ? <Icon.AlertTriangle width={20} height={20} />
+            : <Icon.Info width={20} height={20} />
+      }
+    >
+      <DetailSections>
+        <DetailSection title="What Happened" icon={<Icon.FileText width={12} height={12} />}>
+          <div className={styles.messageHeader}>
+            <p className={styles.messageBox}>{log.message}</p>
+            {copyButton(log.message, 'message', 'message')}
           </div>
+          <DetailGrid>
+            <DetailField label="Severity"><Badge tone={tone}>{log.severity}</Badge></DetailField>
+            <DetailField label="Event" icon={<Icon.Activity width={15} height={15} />}>{formatEventCode(log.eventCode)}</DetailField>
+            <DetailField label="Service" icon={<Icon.Layers width={15} height={15} />}>{formatServiceName(log.serviceName)}</DetailField>
+            <DetailField label="Module" icon={<Icon.Box width={15} height={15} />}>{log.module}</DetailField>
+            <DetailField label="When" icon={<Icon.Clock width={15} height={15} />}>{formatAuditTimestamp(log.occurredAt)}</DetailField>
+            <DetailField label="Environment" icon={<Icon.Globe width={15} height={15} />}>
+              {log.environment ? <Badge tone={environmentTone(log.environment)}>{log.environment}</Badge> : null}
+            </DetailField>
+            <DetailField label="Request Outcome">
+              {statusText && log.statusCode !== null ? <Badge tone={statusCodeTone(log.statusCode)}>{statusText}</Badge> : null}
+            </DetailField>
+            <DetailField label="Triggered By">{log.userId ? 'A signed-in user' : 'The system'}</DetailField>
+          </DetailGrid>
+        </DetailSection>
 
-          <div className={drawerStyles.tabBody}>
-            <div className={styles.drawerSections}>
+        {onViewRelated && log.correlationId && (
+          <DetailSection title="Related Activity" icon={<Icon.Link width={12} height={12} />}>
+            <p className={styles.relatedHint}>Every log written while handling the same request.</p>
+            <Button
+              variant="secondary"
+              size="sm"
+              leadingIcon={<Icon.Link width={14} height={14} />}
+              onClick={() => {
+                onViewRelated(log.correlationId)
+                onClose()
+              }}
+            >
+              View Related Logs
+            </Button>
+          </DetailSection>
+        )}
 
-              {/* ── Summary ── */}
-              <section className={styles.drawerSection}>
-                <h3 className={styles.drawerSectionTitle}><Icon.Grid width={12} height={12} />Summary</h3>
-                <dl className={styles.detailList}>
-                  <div className={styles.detailRow}>
-                    <span className={`${styles.detailIcon} ${tone === 'danger' ? styles.detailIconDanger : tone === 'warning' ? styles.detailIconWarning : styles.detailIconInfo}`}>
-                      <Icon.AlertCircle width={15} height={15} />
-                    </span>
-                    <div className={styles.detailRowBody}>
-                      <dt className={styles.detailRowLabel}>Severity</dt>
-                      <dd className={styles.detailRowValue}><Badge tone={tone}>{log.severity}</Badge></dd>
-                    </div>
-                  </div>
+        {/* Collapsed by default: identifiers mean nothing until someone needs to search another system for them. */}
+        <details className={styles.technical}>
+          <summary className={styles.technicalSummary}>
+            <Icon.Settings width={13} height={13} />
+            Technical details
+          </summary>
+          <div className={styles.technicalBody}>
+            <DetailGrid>
+              <DetailField label="Event Code" full>{identifier(log.eventCode, 'eventCode', 'event code')}</DetailField>
+              <DetailField label="Request ID" full>{identifier(log.requestId, 'requestId', 'request ID')}</DetailField>
+              <DetailField label="Correlation ID" full>{identifier(log.correlationId, 'correlationId', 'correlation ID')}</DetailField>
+              <DetailField label="Tenant ID" full>{identifier(log.tenantId, 'tenantId', 'tenant ID')}</DetailField>
+              <DetailField label="User ID" full>{identifier(log.userId, 'userId', 'user ID')}</DetailField>
+              <DetailField label="Service Name" full>{identifier(log.serviceName, 'serviceName', 'service name')}</DetailField>
+            </DetailGrid>
 
-                  <div className={styles.detailRow}>
-                    <span className={`${styles.detailIcon} ${styles.detailIconNeutral}`}><Icon.Layers width={15} height={15} /></span>
-                    <div className={styles.detailRowBody}>
-                      <dt className={styles.detailRowLabel}>Service</dt>
-                      <dd className={styles.detailRowValue}>{log.serviceName}</dd>
-                    </div>
-                  </div>
+            {log.stackTrace && (
+              <div className={styles.codeBlock}>
+                <div className={styles.codeBlockHeader}>
+                  <span>Sanitized stack trace</span>
+                  {copyButton(log.stackTrace, 'stackTrace', 'stack trace')}
+                </div>
+                <pre className={styles.stackTraceBox}>{log.stackTrace}</pre>
+              </div>
+            )}
 
-                  {log.module && (
-                    <div className={styles.detailRow}>
-                      <span className={`${styles.detailIcon} ${styles.detailIconNeutral}`}><Icon.Box width={15} height={15} /></span>
-                      <div className={styles.detailRowBody}>
-                        <dt className={styles.detailRowLabel}>Module</dt>
-                        <dd className={styles.detailRowValue}>{log.module}</dd>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className={styles.detailRow}>
-                    <span className={`${styles.detailIcon} ${styles.detailIconNeutral}`}><Icon.FileText width={15} height={15} /></span>
-                    <div className={styles.detailRowBody}>
-                      <dt className={styles.detailRowLabel}>Event Code</dt>
-                      <dd className={styles.detailRowValue}>
-                        <span className={styles.monoValue}>{log.eventCode}</span>
-                        <button type="button" className={styles.copyBtn} onClick={() => copyToClipboard(log.eventCode, 'eventCode')} title="Copy event code">
-                          {copiedField === 'eventCode' ? <Icon.Check width={12} height={12} /> : <Icon.Copy width={12} height={12} />}
-                        </button>
-                      </dd>
-                    </div>
-                  </div>
-
-                  <div className={styles.detailRow}>
-                    <span className={`${styles.detailIcon} ${styles.detailIconPurple}`}><Icon.Clock width={15} height={15} /></span>
-                    <div className={styles.detailRowBody}>
-                      <dt className={styles.detailRowLabel}>Occurred At</dt>
-                      <dd className={styles.detailRowValue}>{formatAuditTimestamp(log.occurredAt)}</dd>
-                    </div>
-                  </div>
-
-                  {log.environment && (
-                    <div className={styles.detailRow}>
-                      <span className={`${styles.detailIcon} ${styles.detailIconNeutral}`}><Icon.Globe width={15} height={15} /></span>
-                      <div className={styles.detailRowBody}>
-                        <dt className={styles.detailRowLabel}>Environment</dt>
-                        <dd className={styles.detailRowValue}><Badge tone={getEnvTone(log.environment)}>{log.environment}</Badge></dd>
-                      </div>
-                    </div>
-                  )}
-                </dl>
-              </section>
-
-              {/* ── Message ── */}
-              <section className={styles.drawerSection}>
-                <h3 className={styles.drawerSectionTitle}>
-                  <Icon.FileText width={12} height={12} />
-                  Message
-                  <button type="button" className={styles.copyBtnInline} onClick={() => copyToClipboard(log.message, 'message')} title="Copy message">
-                    {copiedField === 'message' ? <><Icon.Check width={11} height={11} /> Copied</> : <><Icon.Copy width={11} height={11} /> Copy</>}
-                  </button>
-                </h3>
-                <p className={styles.messageBox}>{log.message}</p>
-              </section>
-
-              {/* ── Technical Context ── */}
-              <section className={styles.drawerSection}>
-                <h3 className={styles.drawerSectionTitle}><Icon.Settings width={12} height={12} />Technical Context</h3>
-                <dl className={styles.detailList}>
-                  {log.statusCode && (
-                    <div className={styles.detailRow}>
-                      <dt className={styles.detailRowLabel}>Status Code</dt>
-                      <dd className={styles.detailRowValue}>
-                        <Badge tone={log.statusCode >= 500 ? 'danger' : log.statusCode >= 400 ? 'warning' : 'success'}>{log.statusCode}</Badge>
-                      </dd>
-                    </div>
-                  )}
-                  {log.requestId && (
-                    <div className={styles.detailRow}>
-                      <dt className={styles.detailRowLabel}>Request ID</dt>
-                      <dd className={styles.detailRowValue}>
-                        <span className={styles.monoValue}>{log.requestId}</span>
-                        <button type="button" className={styles.copyBtn} onClick={() => copyToClipboard(log.requestId!, 'requestId')}>
-                          {copiedField === 'requestId' ? <Icon.Check width={12} height={12} /> : <Icon.Copy width={12} height={12} />}
-                        </button>
-                      </dd>
-                    </div>
-                  )}
-
-                  {/* Correlation ID — always show */}
-                  <div className={styles.detailRow}>
-                    <dt className={styles.detailRowLabel}>Correlation ID</dt>
-                    <dd className={styles.detailRowValue}>
-                      <span className={styles.monoValue}>{log.correlationId}</span>
-                      <button type="button" className={styles.copyBtn} onClick={() => copyToClipboard(log.correlationId, 'correlationId')}>
-                        {copiedField === 'correlationId' ? <Icon.Check width={12} height={12} /> : <Icon.Copy width={12} height={12} />}
-                      </button>
-                      {onViewRelated && (
-                        <button
-                          type="button"
-                          className={styles.viewRelatedBtn}
-                          onClick={() => { onViewRelated(log.correlationId); onClose() }}
-                        >
-                          <Icon.Link width={12} height={12} />
-                          View Related Logs
-                        </button>
-                      )}
-                    </dd>
-                  </div>
-                </dl>
-              </section>
-
-              {/* ── Tenant / User Context ── */}
-              <section className={styles.drawerSection}>
-                <h3 className={styles.drawerSectionTitle}><Icon.Users width={12} height={12} />Tenant & User Context</h3>
-                <dl className={styles.detailList}>
-                  <div className={styles.detailRow}>
-                    <dt className={styles.detailRowLabel}>Tenant ID</dt>
-                    <dd className={styles.detailRowValue}>
-                      {log.tenantId
-                        ? <><span className={styles.monoValue}>{log.tenantId}</span><button type="button" className={styles.copyBtn} onClick={() => copyToClipboard(log.tenantId!, 'tenantId')}><Icon.Copy width={12} height={12} /></button></>
-                        : <span className={styles.mutedValue}>N/A</span>}
-                    </dd>
-                  </div>
-                  <div className={styles.detailRow}>
-                    <dt className={styles.detailRowLabel}>User ID</dt>
-                    <dd className={styles.detailRowValue}>
-                      {log.userId
-                        ? <><span className={styles.monoValue}>{log.userId}</span><button type="button" className={styles.copyBtn} onClick={() => copyToClipboard(log.userId!, 'userId')}><Icon.Copy width={12} height={12} /></button></>
-                        : <span className={styles.mutedValue}>N/A — system event</span>}
-                    </dd>
-                  </div>
-                </dl>
-              </section>
-
-              {/* ── Stack Trace ── */}
-              {log.stackTrace && (
-                <section className={styles.drawerSection}>
-                  <h3 className={styles.drawerSectionTitle}>
-                    <Icon.AlertCircle width={12} height={12} />
-                    Sanitized Stack Trace
-                    <button type="button" className={styles.copyBtnInline} onClick={() => copyToClipboard(log.stackTrace!, 'stackTrace')}>
-                      {copiedField === 'stackTrace' ? <><Icon.Check width={11} height={11} /> Copied</> : <><Icon.Copy width={11} height={11} /> Copy</>}
-                    </button>
-                  </h3>
-                  <pre className={styles.stackTraceBox}>{log.stackTrace}</pre>
-                </section>
-              )}
-
-              {/* ── Metadata ── */}
-              {log.metadata && (
-                <section className={styles.drawerSection}>
-                  <h3 className={styles.drawerSectionTitle}>
-                    <Icon.Activity width={12} height={12} />
-                    Metadata
-                    <button type="button" className={styles.copyBtnInline} onClick={() => copyToClipboard(log.metadata!, 'metadata')}>
-                      {copiedField === 'metadata' ? <><Icon.Check width={11} height={11} /> Copied</> : <><Icon.Copy width={11} height={11} /> Copy</>}
-                    </button>
-                  </h3>
-                  <pre className={styles.metadataBox}>{tryPrettyJson(log.metadata)}</pre>
-                </section>
-              )}
-
-            </div>
+            {log.metadata && (
+              <div className={styles.codeBlock}>
+                <div className={styles.codeBlockHeader}>
+                  <span>Metadata</span>
+                  {copyButton(log.metadata, 'metadata', 'metadata')}
+                </div>
+                <pre className={styles.metadataBox}>{tryPrettyJson(log.metadata)}</pre>
+              </div>
+            )}
           </div>
-        </div>
-      </div>
-    </div>
+        </details>
+      </DetailSections>
+    </Drawer>
   )
 }

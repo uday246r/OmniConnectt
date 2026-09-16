@@ -132,7 +132,20 @@ public class RoleAppService(
         // fine-grained sets have to go, and this service cannot enumerate who they are.
         await fineCapabilities.InvalidateAllAsync(ct);
 
-        await WriteAuditAsync(actingUserId, "role.created", role.Id, $"Created role '{role.Name}'", role.Name, ct);
+        // A new role's whole grant set is "added" — there is no previous state to diff against, so
+        // the record is the set itself. That matters: a role created WITH Delete on Users is exactly
+        // as significant as one that gained it later, and the old "Created role 'X'" row said nothing
+        // about what the role could do.
+        var createdGrants = new PermissionDiffDto(
+            [.. request.Permissions.Select(g => new PermissionChangeDto(g.FeatureKey, g.Capability))], []);
+
+        await WriteAuditAsync(
+            actingUserId, "role.created", role.Id,
+            createdGrants.ToDetails(
+                $"Created role '{role.Name}'" +
+                (role.IsAdministrator ? " with Platform Administrator Access" : "") +
+                $" — {createdGrants.Summarise()}."),
+            role.Name, ct);
 
         var permissions = await LoadPermissionsAsync(role.Id, ct);
         return MutationResult<RoleDetailDto>.Ok(ToDetailDto(role, permissions));
@@ -205,19 +218,44 @@ public class RoleAppService(
             return MutationResult<RoleDetailDto>.PendingApproval(pending);
         }
 
+        // Captured before the fields are overwritten — an audit row that only names the new value
+        // cannot answer "what did this used to be", which is half of what a change record is for.
+        var previousName = role.Name;
+        var previousIsAdministrator = role.IsAdministrator;
+
         role.Name = name;
         role.Description = request.Description?.Trim();
         role.IsAdministrator = request.IsAdministrator;
         role.UpdatedAt = DateTimeOffset.UtcNow;
 
-        await SyncPermissionsAsync(id, request.Permissions, ct);
+        var diff = await SyncPermissionsAsync(id, request.Permissions, ct);
 
         await db.SaveChangesAsync(ct);
         // A role's grants just changed, and every user holding it is affected. Their cached
         // fine-grained sets have to go, and this service cannot enumerate who they are.
         await fineCapabilities.InvalidateAllAsync(ct);
 
-        await WriteAuditAsync(actingUserId, "role.updated", role.Id, $"Updated role '{role.Name}' — permissions modified", role.Name, ct);
+        var changes = new List<string>();
+        if (!string.Equals(previousName, role.Name, StringComparison.Ordinal))
+        {
+            changes.Add($"renamed from '{previousName}'");
+        }
+
+        // Called out separately from the grant diff, and first, because it is not one permission
+        // among many — it is the flag that makes every per-capability check moot.
+        if (previousIsAdministrator != role.IsAdministrator)
+        {
+            changes.Add(role.IsAdministrator
+                ? "GRANTED Platform Administrator Access"
+                : "revoked Platform Administrator Access");
+        }
+
+        changes.Add(diff.Summarise());
+
+        await WriteAuditAsync(
+            actingUserId, "role.updated", role.Id,
+            diff.ToDetails($"Updated role '{role.Name}' — {string.Join("; ", changes)}."),
+            role.Name, ct);
 
         var permissions = await LoadPermissionsAsync(id, ct);
         return MutationResult<RoleDetailDto>.Ok(ToDetailDto(role, permissions));
@@ -287,6 +325,12 @@ public class RoleAppService(
                 oldSnapshot, "{}", actingUserId.Value, ct);
         }
 
+        // Read with the feature key before the rows go, for the audit record below.
+        var deletedPermissions = await db.RolePermissions
+            .Where(rp => rp.RoleId == id)
+            .Select(rp => new { FeatureKey = rp.Feature!.Key, rp.Capability })
+            .ToListAsync(ct);
+
         var grants = await db.RolePermissions.Where(rp => rp.RoleId == id).ToListAsync(ct);
         db.RolePermissions.RemoveRange(grants);
 
@@ -322,7 +366,18 @@ public class RoleAppService(
         // fine-grained sets have to go, and this service cannot enumerate who they are.
         await fineCapabilities.InvalidateAllAsync(ct);
 
-        await WriteAuditAsync(actingUserId, "role.deleted", id, $"Deleted role '{role.Name}'", role.Name, ct);
+        // Deletion revokes the whole grant set from everyone who held the role, so the set is recorded
+        // as removed — otherwise the only record of what those users could do until a moment ago
+        // disappears with the row.
+        var lostGrants = new PermissionDiffDto(
+            [],
+            [.. deletedPermissions.Select(p => new PermissionChangeDto(p.FeatureKey, p.Capability))]);
+
+        await WriteAuditAsync(
+            actingUserId, "role.deleted", id,
+            lostGrants.ToDetails(
+                $"Deleted role '{role.Name}' — {deletedHolders.Count} user(s) unassigned, {lostGrants.Summarise()}."),
+            role.Name, ct);
         return null;
     }
 
@@ -331,7 +386,11 @@ public class RoleAppService(
         var actorName = actingUserId is null
             ? null
             : await db.Users.AsNoTracking().Where(u => u.Id == actingUserId).Select(u => u.Name).FirstOrDefaultAsync(ct);
-        await auditLog.WriteAsync(ServiceName, actingUserId, actorName, action, "Role", roleId.ToString(), details, SourceIp, userAgent: UserAgent, entityLabel: entityLabel, ct: ct);
+        await auditLog.WriteHostAsync(
+            actingUserId, actorName, action,
+            AuditLogAppService.Modules.Roles, AuditLogAppService.Categories.Crud,
+            entityType: "Role", entityId: roleId.ToString(), details: details,
+            entityLabel: entityLabel, sourceIp: SourceIp, userAgent: UserAgent, ct: ct);
     }
 
     /// <summary>
@@ -372,7 +431,13 @@ public class RoleAppService(
     /// also writes far fewer rows — editing a role's name previously rewrote every one of its
     /// permissions.
     /// </summary>
-    private async Task SyncPermissionsAsync(Guid roleId, IReadOnlyList<RolePermissionGrantDto> grants, CancellationToken ct)
+    /// <returns>
+    /// What the diff actually moved, so the audit row can say which permissions were granted and
+    /// which were revoked rather than only that "permissions were modified". The diff is already
+    /// computed here; returning it costs nothing and is the only place the before-and-after sets
+    /// exist together.
+    /// </returns>
+    private async Task<PermissionDiffDto> SyncPermissionsAsync(Guid roleId, IReadOnlyList<RolePermissionGrantDto> grants, CancellationToken ct)
     {
         var existing = await db.RolePermissions
             .Include(rp => rp.Feature)
@@ -387,11 +452,16 @@ public class RoleAppService(
             .Select(r => (r.FeatureId, r.Capability))
             .ToHashSet();
 
+        var removed = new List<PermissionChangeDto>();
         foreach (var row in existing)
         {
             if (!requested.Contains((row.FeatureId, row.Capability)))
             {
                 db.RolePermissions.Remove(row);
+                // Feature is Included above, so the key is available without a second round-trip —
+                // and the key is what the audit row must record. A FeatureId means nothing to anyone
+                // reading the trail later, and the row it points at may have been deactivated since.
+                removed.Add(new PermissionChangeDto(row.Feature?.Key ?? row.FeatureId.ToString(), row.Capability));
             }
         }
 
@@ -399,6 +469,7 @@ public class RoleAppService(
             .Select(r => (r.FeatureId, r.Capability))
             .ToHashSet();
 
+        var addedFeatureIds = new List<(Guid FeatureId, string Capability)>();
         foreach (var (featureId, capability) in resolved)
         {
             if (!kept.Contains((featureId, capability)))
@@ -410,8 +481,35 @@ public class RoleAppService(
                     FeatureId = featureId,
                     Capability = capability,
                 });
+                addedFeatureIds.Add((featureId, capability));
             }
         }
+
+        var added = await ResolveFeatureKeysAsync(addedFeatureIds, ct);
+        return new PermissionDiffDto(added, removed);
+    }
+
+    /// <summary>
+    /// Turns newly-added (FeatureId, Capability) pairs into the feature KEYS the audit row records.
+    /// One query for the whole batch; an empty input skips it entirely, which is the common case for
+    /// an edit that only removed grants.
+    /// </summary>
+    private async Task<List<PermissionChangeDto>> ResolveFeatureKeysAsync(
+        IReadOnlyList<(Guid FeatureId, string Capability)> pairs, CancellationToken ct)
+    {
+        if (pairs.Count == 0)
+        {
+            return [];
+        }
+
+        var ids = pairs.Select(p => p.FeatureId).Distinct().ToList();
+        var keys = await db.PermissionFeatures.AsNoTracking()
+            .Where(f => ids.Contains(f.Id))
+            .ToDictionaryAsync(f => f.Id, f => f.Key, ct);
+
+        return pairs
+            .Select(p => new PermissionChangeDto(keys.GetValueOrDefault(p.FeatureId, p.FeatureId.ToString()), p.Capability))
+            .ToList();
     }
 
     /// <summary>

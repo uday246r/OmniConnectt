@@ -39,7 +39,10 @@ export { Input } from './primitives/Input/Input'
 export type { InputProps } from './primitives/Input/Input'
 
 export { Select } from './primitives/Select/Select'
-export type { SelectProps, SelectOption } from './primitives/Select/Select'
+export type { SelectProps, SelectOption, SelectChangeEvent } from './primitives/Select/Select'
+
+export { Combobox } from './primitives/Combobox/Combobox'
+export type { ComboboxProps, ComboboxOption } from './primitives/Combobox/Combobox'
 
 export { SearchField } from './primitives/SearchField/SearchField'
 export type { SearchFieldProps, SearchFieldSuggestion } from './primitives/SearchField/SearchField'
@@ -133,3 +136,28 @@ export type { FilterInputType } from './utils/filterInput'
 
 export { DetailSection, DetailSections, DetailGrid, DetailField, isEmptyDetailValue } from './data/DetailPanel/DetailPanel'
 export type { DetailSectionProps, DetailFieldProps } from './data/DetailPanel/DetailPanel'
+
+// ── Date range ───────────────────────────────────────────────────────────────
+export { DateRangeColumnFilter } from './data/DateRange/DateRangeColumnFilter'
+export type { DateRangeColumnFilterProps } from './data/DateRange/DateRangeColumnFilter'
+export { DateRangeFilterButton } from './data/DateRange/DateRangeFilterButton'
+export type { DateRangeFilterButtonProps } from './data/DateRange/DateRangeFilterButton'
+export { DateRangeFields } from './data/DateRange/DateRangeFields'
+export type { DateRangeFieldsProps } from './data/DateRange/DateRangeFields'
+export {
+  DATE_RANGE_PRESETS,
+  EMPTY_DATE_RANGE,
+  describeDateRange,
+  isDateRangeActive,
+  parseDateRange,
+  resolveDateRange,
+  serializeDateRange,
+} from './data/DateRange/dateRange'
+export type { DateRangeInstants, DateRangePreset, DateRangeValue } from './data/DateRange/dateRange'
+
+export { useAnchoredPopover } from './hooks/useAnchoredPopover'
+export type { AnchoredPopover, AnchoredPopoverOptions } from './hooks/useAnchoredPopover'
+
+// ── Export ───────────────────────────────────────────────────────────────────
+export { downloadCsv, describeTruncation, CsvExportError } from './utils/downloadCsv'
+export type { CsvDownloadRequest, CsvDownloadResult } from './utils/downloadCsv'

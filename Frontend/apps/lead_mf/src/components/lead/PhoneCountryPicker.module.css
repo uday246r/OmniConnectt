@@ -1,0 +1,14 @@
+/* Sits flush inside the phone field's border, where the fixed prefix label used to be. */
+.picker {
+  flex: 0 0 116px;
+  display: flex;
+  border-right: 1px solid var(--border-input);
+}
+
+.picker > div {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  height: 100%;
+}

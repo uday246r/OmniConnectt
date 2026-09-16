@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { isSettingsDrawerPath } from '../settings/settingsSections'
 
 export type SettingsTab = 'users' | 'roles' | 'applications' | 'departments' | 'general' | 'checker-assignment'
 
@@ -27,15 +28,8 @@ function getStoredReturnPath(): string {
  * a return target; see `returnPath`.
  */
 export function isDrawerRoute(pathname: string): boolean {
-  if (!pathname) return false
-  const clean = pathname.split('?')[0].replace(/\/+$/, '')
-  return (
-    clean === '/settings' ||
-    clean === '/settings/users/new' ||
-    clean.startsWith('/settings/roles') ||
-    clean.startsWith('/settings/applications') ||
-    clean.startsWith('/settings/checker-assignment')
-  )
+  // Derived from the one settings registry, so a new section is a drawer route without editing this.
+  return isSettingsDrawerPath(pathname)
 }
 
 interface SettingsDrawerState {

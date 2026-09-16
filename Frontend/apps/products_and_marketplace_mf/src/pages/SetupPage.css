@@ -1,0 +1,236 @@
+.pm-setup-layout {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 20px;
+  align-items: start;
+}
+
+@media (max-width: 960px) {
+  .pm-setup-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.pm-setup-list {
+  padding: 16px;
+  background: var(--omni-color-surface);
+  border: 1px solid var(--omni-color-border);
+  border-radius: 14px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.pm-setup-list-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  padding: 0 4px;
+}
+
+.pm-setup-list-head h3 {
+  font-size: 12.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #64748b;
+  margin: 0;
+}
+
+.pm-setup-list ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pm-setup-list-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid transparent;
+  background: transparent;
+  border-radius: 10px;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+  transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+}
+
+.pm-setup-list-item:hover {
+  background: var(--omni-color-surface-alt);
+  border-color: var(--omni-color-border);
+  transform: translateX(2px);
+}
+
+.pm-setup-list-item.active {
+  background: var(--omni-color-primary-50);
+  border-color: var(--omni-color-primary-200);
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.08);
+}
+
+.pm-setup-list-item.active strong {
+  color: var(--omni-color-primary-700);
+}
+
+.pm-setup-list-item.active .pm-setup-chevron {
+  color: var(--omni-color-primary-600);
+  transform: translateX(2px);
+}
+
+.pm-setup-item-squircle {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: #f1f5f9;
+  color: var(--omni-color-text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 150ms ease;
+}
+
+.pm-setup-list-item:hover .pm-setup-item-squircle {
+  background: var(--omni-color-border);
+  color: var(--omni-color-text-primary);
+}
+
+.pm-setup-list-item.active .pm-setup-item-squircle {
+  background: var(--omni-color-primary-600);
+  color: #ffffff;
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.25);
+}
+
+.pm-setup-item-squircle-lg {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: var(--omni-color-primary-50);
+  color: var(--omni-color-primary-600);
+  border: 1px solid var(--omni-color-primary-200);
+}
+
+.pm-setup-chevron {
+  color: var(--omni-color-text-muted);
+  flex-shrink: 0;
+  transition: transform 150ms ease;
+}
+
+.pm-setup-list-item .pm-flex-1 {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.pm-setup-list li strong {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #1e293b;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pm-setup-detail {
+  padding: 20px 24px;
+  min-height: 360px;
+  background: var(--omni-color-surface);
+  border: 1px solid var(--omni-color-border);
+  border-radius: 14px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.pm-setup-detail-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 16px;
+  margin-bottom: 18px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.pm-setup-detail-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.pm-setup-detail-head h3 {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--omni-color-text-primary);
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+.pm-setup-detail-head p {
+  margin: 3px 0 0;
+  font-size: 13px;
+}
+
+.pm-setup-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pm-setup-fields-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.pm-setup-fields-head h4 {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #334155;
+  margin: 0;
+}
+
+.pm-setup-table tbody tr {
+  transition: all 130ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.pm-setup-table tbody tr:hover {
+  background: var(--omni-color-surface-alt);
+  transform: translateX(1px);
+}
+
+.pm-field-flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.pm-setup-statuses {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+@media (max-width: 768px) {
+  .pm-setup-detail-head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .pm-setup-actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+  .pm-setup-fields-head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+}
+

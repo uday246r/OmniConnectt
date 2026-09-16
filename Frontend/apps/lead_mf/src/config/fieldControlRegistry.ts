@@ -1,3 +1,5 @@
+import type { ValidationRule } from '@omniremit/ui/validation'
+
 /**
  * A field's backend config (label/visibility/required/editable/order/sensitive/masking) says nothing
  * about which INPUT CONTROL renders it — Customer360's FieldConfig doesn't need this either, since it
@@ -45,6 +47,8 @@ export interface LeadFieldConfig {
   sensitive: boolean
   maskingRule: 'None' | 'HideFirstShowLast' | 'HideLastShowFirst' | 'HideMiddleShowFirstAndLast' | 'FullMask'
   visibleCharCount: number
+  /** The field's format rules — built-in presets, Manage Formats keys, or one-off patterns. See config/leadFormats.ts. */
+  validations: ValidationRule[]
 }
 
 function findField(config: LeadFieldConfig[], apiField: string): LeadFieldConfig | undefined {

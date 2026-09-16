@@ -12,8 +12,9 @@ namespace AuthService.Domain.Entities;
 /// once and only its SHA-256 hash is persisted, so a database disclosure yields nothing usable. The
 /// same reasoning applies to both — see RefreshTokenService for the shared hashing approach.
 ///
-/// The existing encrypted temporary-password flow is unchanged and remains the fallback for users
-/// who cannot receive mail; the two coexist rather than one replacing the other.
+/// This is now the only way a local account becomes usable — the encrypted temporary-password
+/// handoff it replaced is gone. When mail fails or a link expires, an administrator issues a fresh
+/// invite (POST /api/users/{id}/resend-invite) rather than recovering a stored credential.
 /// </summary>
 public class SetPasswordInvite
 {

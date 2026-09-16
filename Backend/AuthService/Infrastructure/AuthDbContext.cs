@@ -76,16 +76,21 @@ public class AuthDbContext(DbContextOptions<AuthDbContext> options) : DbContext(
         modelBuilder.Entity<UserFieldSchema>(entity =>
         {
             entity.Property(s => s.SchemaJson).HasColumnType("jsonb");
+            // Concurrent saves: the second write fails instead of silently undoing the first.
+            entity.Property(s => s.Version).IsConcurrencyToken();
         });
 
         modelBuilder.Entity<ValidationPresetCatalog>(entity =>
         {
             entity.Property(c => c.PresetsJson).HasColumnType("jsonb");
+            entity.Property(c => c.Version).IsConcurrencyToken();
         });
 
         modelBuilder.Entity<SalutationCatalog>(entity =>
         {
             entity.Property(c => c.SalutationsJson).HasColumnType("jsonb");
+            // Two admins saving at once: the second write fails instead of silently undoing the first.
+            entity.Property(c => c.Version).IsConcurrencyToken();
         });
 
         modelBuilder.Entity<PermissionFeature>(entity =>
@@ -233,6 +238,10 @@ public class AuthDbContext(DbContextOptions<AuthDbContext> options) : DbContext(
 
         modelBuilder.Entity<UserPermissionOverride>(entity =>
         {
+            // Matches the soft-delete filter on User. Without it EF warns that a required relationship to a
+            // filtered principal gives unexpected results — and it did: rows of a deleted user were half-visible.
+            // Security paths that must still see them (token-reuse detection, cleanup) opt out explicitly.
+            entity.HasQueryFilter(o => !o.User!.IsDeleted);
             entity.HasIndex(o => new { o.UserId, o.FeatureId, o.Capability }).IsUnique();
             entity.Property(o => o.Capability).HasMaxLength(50);
             entity.Property(o => o.Effect).HasConversion<string>().HasMaxLength(20);
@@ -253,6 +262,7 @@ public class AuthDbContext(DbContextOptions<AuthDbContext> options) : DbContext(
         // and any future cleanup sweep.
         modelBuilder.Entity<SetPasswordInvite>(entity =>
         {
+            entity.HasQueryFilter(i => !i.User!.IsDeleted);
             entity.HasIndex(i => i.TokenHash).IsUnique();
             entity.Property(i => i.TokenHash).HasMaxLength(200);
             entity.HasIndex(i => i.ExpiresAt);
@@ -268,6 +278,7 @@ public class AuthDbContext(DbContextOptions<AuthDbContext> options) : DbContext(
 
         modelBuilder.Entity<RefreshToken>(entity =>
         {
+            entity.HasQueryFilter(t => !t.User!.IsDeleted);
             entity.HasIndex(t => t.TokenHash).IsUnique();
             entity.Property(t => t.TokenHash).HasMaxLength(200);
             entity.Property(t => t.CreatedByIp).HasMaxLength(64);
@@ -297,6 +308,11 @@ public class AuthDbContext(DbContextOptions<AuthDbContext> options) : DbContext(
 
             // ActorUserId backs SummaryAsync's Distinct().Count() for the active-users card.
             entity.HasIndex(a => a.ActorUserId);
+
+            // The user audit tab asks "done by this person OR done to them". Each side of that OR needs
+            // its own index (this one, and ActorUserId+OccurredAt below) for Postgres to answer it with
+            // a bitmap OR instead of a scan.
+            entity.HasIndex(a => new { a.EntityType, a.EntityId });
 
             // Composite, and ordered deliberately: the audit page filters by ServiceName/Result and
             // then sorts by OccurredAt descending. Two separate single-column indexes cannot serve
@@ -358,9 +374,6 @@ public class AuthDbContext(DbContextOptions<AuthDbContext> options) : DbContext(
             entity.Property(a => a.RejectionReason).HasMaxLength(1000);
             entity.Property(a => a.SourceService).HasMaxLength(100);
             entity.Property(a => a.CallbackUrl).HasMaxLength(500);
-            // 512 comfortably covers base64(12 + 16 + 14 bytes); sized generously so a longer
-            // generated password in future does not need a second migration.
-            entity.Property(a => a.TempPasswordCiphertext).HasMaxLength(512);
 
             // Approval Center's default view: pending, newest first.
             entity.HasIndex(a => new { a.Status, a.RequestedAt }).IsDescending(false, true);
@@ -370,6 +383,8 @@ public class AuthDbContext(DbContextOptions<AuthDbContext> options) : DbContext(
             entity.HasIndex(a => new { a.MakerId, a.RequestedAt }).IsDescending(false, true);
             // Approval Center's module/application filter.
             entity.HasIndex(a => new { a.Module, a.Status });
+            // "Approvals about this user", for the user's own audit tab.
+            entity.HasIndex(a => new { a.EntityType, a.EntityId });
 
             /*
              * ONE open approval request per record — enforced by the database, not just by the

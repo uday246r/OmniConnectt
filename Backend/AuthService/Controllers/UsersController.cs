@@ -10,17 +10,28 @@ namespace AuthService.Controllers;
 [ApiController]
 [Route("api/users")]
 [Authorize]
-public class UsersController(UserAppService users) : ControllerBase
+public class UsersController(UserAppService users, SetPasswordInviteService invites) : ControllerBase
 {
     private const string Feature = AuthDbSeeder.HostFeatureKeys.SettingsUsers;
 
     [HttpGet]
     [RequirePermission(Feature, "View")]
     public async Task<ActionResult<PagedResult<UserListItemDto>>> List(
-        [FromQuery] int page = 1, [FromQuery] int pageSize = 25,
-        [FromQuery] string? search = null, [FromQuery] bool? isActive = null, [FromQuery] Guid? roleId = null,
+        [FromQuery] UserListFilter filter, [FromQuery] int page = 1, [FromQuery] int pageSize = 25,
         CancellationToken ct = default)
-        => Ok(await users.ListAsync(Math.Max(page, 1), Math.Clamp(pageSize, 1, 100), search, isActive, roleId, ct));
+        => Ok(await users.ListAsync(Math.Max(page, 1), Math.Clamp(pageSize, 1, 100), filter, ct));
+
+    /// <summary>The whole directory's counts for the cards above the Users table.</summary>
+    [HttpGet("summary")]
+    [RequirePermission(Feature, "View")]
+    public async Task<ActionResult<UserDirectorySummaryDto>> Summary(CancellationToken ct)
+        => Ok(await users.SummaryAsync(ct));
+
+    /// <summary>The Role filter's options, from the directory itself under the other filters applied.</summary>
+    [HttpGet("facets")]
+    [RequirePermission(Feature, "View")]
+    public async Task<ActionResult<UserListFacetsDto>> Facets([FromQuery] UserListFilter filter, CancellationToken ct)
+        => Ok(await users.FacetsAsync(filter, ct));
 
     [HttpGet("{id:guid}")]
     [RequirePermission(Feature, "View")]
@@ -63,6 +74,20 @@ public class UsersController(UserAppService users) : ControllerBase
         var pending = await users.DeleteAsync(id, CurrentUserId(), ct, bypassApproval: IsSuperAdmin());
         return pending is null ? NoContent() : Accepted(pending);
     }
+
+    /// <summary>
+    /// Sends the user a fresh set-password link, replacing any earlier one.
+    ///
+    /// Deliberately NOT maker-checker gated, unlike every mutation above. An invite is a
+    /// time-limited link, not a change to the account: gating it would mean the link is issued
+    /// whenever the checker gets round to approving, which is exactly the delay that made the
+    /// original invite expire. The action is permission-checked and audited instead
+    /// (<c>auth.invite_resent</c>), and it cannot reach an account that already has a password.
+    /// </summary>
+    [HttpPost("{id:guid}/resend-invite")]
+    [RequirePermission(Feature, "Edit")]
+    public async Task<ActionResult<ResendInviteResponse>> ResendInvite(Guid id, CancellationToken ct)
+        => Ok(new ResendInviteResponse(await invites.ResendAsync(id, CurrentUserId(), ct)));
 
     [HttpGet("{id:guid}/permission-overrides")]
     [RequirePermission(Feature, "View")]

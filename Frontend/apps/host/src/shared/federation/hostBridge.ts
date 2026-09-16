@@ -52,7 +52,14 @@ export interface OmniRemitHostBridge {
     /** One token's computed value, e.g. token('--omni-color-danger-600') → '#dc2626'. Returns '' if undefined. */
     token: (name: string) => string
   }
-  trackActivity?: (event: { page: string; module?: string; sourceApplication?: string; action?: string }) => void
+  /*
+   * Deliberately NO activity member either.
+   *
+   * A remote used to be able to write an audit row through this bridge. Audit rows are now written
+   * exclusively by the service that performs the action, from the identity on the verified token —
+   * a trail whose contents the browser can choose is not a trail. A remote that wants an action
+   * recorded makes the action a real request; the endpoint records it.
+   */
   /*
    * Deliberately NO navigation member.
    *
@@ -90,23 +97,6 @@ export function installHostBridge() {
         const property = name.startsWith('--') ? name : `--${name}`
         return getComputedStyle(document.documentElement).getPropertyValue(property).trim()
       },
-    },
-    trackActivity: (event) => {
-      useAuthStore
-        .getState()
-        .ensureFreshAccessToken()
-        .then((token) => {
-          if (!token) return
-          fetch(`${env.authServiceUrl}/api/audit-logs/activity`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify(event),
-          }).catch(() => {})
-        })
-        .catch(() => {})
     },
   }
 }

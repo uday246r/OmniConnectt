@@ -12,7 +12,7 @@ import { Icon } from '../../../shared/components/Icon/Icon'
 import { required, email as emailRule, firstError } from '../../../shared/validation/rules'
 import { validateFullPhone } from '@omniremit/ui/validation'
 import styles from './ProfilePage.module.css'
-import { Button, Input } from '@omniremit/ui'
+import { Button, Input, Select } from '@omniremit/ui'
 
 function formatDateTime(iso: string | null) {
   if (!iso) return 'Never'
@@ -429,18 +429,17 @@ export function ProfilePage() {
                   )}
 
                   <div className={styles.fieldGroup}>
-                    <label className={styles.fieldLabel}>Salutation</label>
-                    <select
-                      className={styles.selectInput}
+                    <label className={styles.fieldLabel} htmlFor="profile-salutation">Salutation</label>
+                    <Select
+                      id="profile-salutation"
                       value={salutation}
                       onChange={(e) => setSalutation(e.target.value)}
                       disabled={savingProfile}
-                    >
-                      <option value="">-- None --</option>
-                      {salutationOptions.map((s) => (
-                        <option key={s} value={s}>{s}</option>
-                      ))}
-                    </select>
+                      placeholder="None"
+                      clearLabel="None"
+                      // A title since removed from the list stays selectable for the person who already has it.
+                      options={(salutation && !salutationOptions.includes(salutation) ? [...salutationOptions, salutation] : salutationOptions).map((s) => ({ value: s, label: s }))}
+                    />
                   </div>
 
                   <Input

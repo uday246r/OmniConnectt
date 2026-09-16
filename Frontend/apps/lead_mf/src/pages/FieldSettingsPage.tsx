@@ -1,9 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { Settings, Save, AlertCircle, CheckCircle2, Eye, EyeOff, RefreshCw } from '@omniremit/ui/icons';
-import { Button, Checkbox, DataTable, PageHeader, Select, TableSkeleton, Tabs } from '@omniremit/ui';
+import { Button, Checkbox, DataTable, Modal, PageHeader, Select, TableSkeleton, Tabs } from '@omniremit/ui';
+import { CUSTOM_PRESET_ID, findPreset, type CustomPreset, type ValidationRule } from '@omniremit/ui/validation';
+import { ValidationRulesEditor, describeRuleProblem } from '@omniremit/ui/validation-editor';
 import styles from './FieldSettingsPage.module.css';
 import shell from '../shared/leadPage.module.css';
 import { apiClient, isApprovalPending } from '../api/apiClient';
+import { canManageFieldSettings } from '../api/hostBridge';
 import type { LeadFieldConfig } from '../config/fieldControlRegistry';
 
 /**
@@ -21,7 +24,19 @@ const MASKING_RULE_OPTIONS = [
   { value: 'FullMask', label: 'Full Mask' },
 ];
 
+/** "Email address", "Custom pattern + 1 more", or "No format" — what the Format column shows. */
+export function describeFormats(rules: ValidationRule[], presets: CustomPreset[]): string {
+  if (rules.length === 0) return 'No format';
+  const first = rules[0];
+  const name =
+    first.type === CUSTOM_PRESET_ID
+      ? 'Custom pattern'
+      : findPreset(first.type)?.label ?? presets.find((p) => p.key === first.type)?.label ?? 'Format removed';
+  return rules.length > 1 ? `${name} + ${rules.length - 1} more` : name;
+}
+
 export const FieldSettingsPage: React.FC = () => {
+  const canManage = canManageFieldSettings();
   const [products, setProducts] = useState<{ id: string; name: string }[]>([]);
   const [selectedProductId, setSelectedProductId] = useState<string>('');
   const [fields, setFields] = useState<LeadFieldConfig[]>([]);
@@ -30,9 +45,15 @@ export const FieldSettingsPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [savedMessage, setSavedMessage] = useState<string | null>(null);
   const [pendingMessage, setPendingMessage] = useState<string | null>(null);
+  const [formatPresets, setFormatPresets] = useState<CustomPreset[]>([]);
+  /** The version of the settings on screen, sent with Save so two administrators cannot overwrite each other. */
+  const [version, setVersion] = useState<string | null>(null);
+  /** The field whose formats are being edited, with the draft rules. Applied to the page only on "Done". */
+  const [editingFormats, setEditingFormats] = useState<{ field: LeadFieldConfig; rules: ValidationRule[]; problem: string | null } | null>(null);
 
   useEffect(() => {
     (async () => {
+      setFormatPresets(await apiClient.getFormatPresets());
       const list = await apiClient.getProductsWithId();
       setProducts(list);
       if (list.length > 0) setSelectedProductId(list[0].id);
@@ -48,8 +69,9 @@ export const FieldSettingsPage: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const data = await apiClient.getFieldConfig(productId);
+      const { fields: data, version: loadedVersion } = await apiClient.getFieldConfigForEditing(productId);
       setFields([...data].sort((a, b) => a.displayOrder - b.displayOrder));
+      setVersion(loadedVersion);
     } catch {
       setError('Could not load field settings for this product.');
     } finally {
@@ -69,7 +91,7 @@ export const FieldSettingsPage: React.FC = () => {
     setSavedMessage(null);
     setPendingMessage(null);
     try {
-      const res = await apiClient.updateFieldConfig(selectedProductId, fields);
+      const res = await apiClient.updateFieldConfig(selectedProductId, fields, version);
       if (isApprovalPending(res.data)) {
         // Nothing was actually changed yet — do NOT refetch, or the admin's unsaved edits under
         // their cursor would be silently replaced by the still-old server state.
@@ -78,6 +100,7 @@ export const FieldSettingsPage: React.FC = () => {
       }
       if (res.success) {
         setFields([...(res.data as LeadFieldConfig[])].sort((a, b) => a.displayOrder - b.displayOrder));
+        setVersion(res.version ?? null);
         setSavedMessage('Field settings saved.');
         setTimeout(() => setSavedMessage(null), 4000);
       } else {
@@ -106,7 +129,8 @@ export const FieldSettingsPage: React.FC = () => {
             type="button"
             variant="onHeader"
             onClick={handleSave}
-            disabled={saving || loading || fields.length === 0}
+            disabled={!canManage || saving || loading || fields.length === 0}
+            title={canManage ? undefined : 'You can view field settings but not change them.'}
             loading={saving}
             leadingIcon={<Save size={15} />}
           >
@@ -148,12 +172,12 @@ export const FieldSettingsPage: React.FC = () => {
         <DataTable bare minWidth={820}>
             <thead>
               <tr>
-                {Array.from({ length: 9 }, (_, i) => (
+                {Array.from({ length: 10 }, (_, i) => (
                   <th key={i}>&nbsp;</th>
                 ))}
               </tr>
             </thead>
-            <TableSkeleton rows={8} columns={9} />
+            <TableSkeleton rows={8} columns={10} />
           </DataTable>
       ) : (
         sections.map((section) => (
@@ -167,7 +191,7 @@ export const FieldSettingsPage: React.FC = () => {
               <DataTable minWidth={820} bare>
                 <thead>
                   <tr>
-                    {['Field', 'Label', 'Order', 'Visible', 'Required', 'Editable', 'Sensitive', 'Masking Rule', 'Visible Chars'].map((h) => (
+                    {['Field', 'Label', 'Order', 'Visible', 'Required', 'Editable', 'Format', 'Sensitive', 'Masking Rule', 'Visible Chars'].map((h) => (
                       <th key={h}>
                         {h}
                       </th>
@@ -223,6 +247,16 @@ export const FieldSettingsPage: React.FC = () => {
                           />
                         </td>
                         <td className={styles.cell}>
+                          <button
+                            type="button"
+                            className={styles.formatButton}
+                            onClick={() => setEditingFormats({ field: f, rules: f.validations ?? [], problem: null })}
+                            aria-label={`Formats for `}
+                          >
+                            {describeFormats(f.validations ?? [], formatPresets)}
+                          </button>
+                        </td>
+                        <td className={styles.cell}>
                           <Checkbox
                             checked={f.sensitive}
                             onChange={(e) =>
@@ -260,6 +294,46 @@ export const FieldSettingsPage: React.FC = () => {
           </div>
         ))
       )}
+
+      <Modal
+        open={editingFormats !== null}
+        title={editingFormats ? `Formats for ` : ''}
+        onClose={() => setEditingFormats(null)}
+        actions={
+          <>
+            <Button variant="secondary" onClick={() => setEditingFormats(null)}>Cancel</Button>
+            <Button
+              disabled={!canManage}
+              onClick={() => {
+                if (!editingFormats) return;
+                const problem = describeRuleProblem(editingFormats.rules);
+                if (problem) {
+                  setEditingFormats({ ...editingFormats, problem });
+                  return;
+                }
+                updateField(editingFormats.field.id, { validations: editingFormats.rules });
+                setEditingFormats(null);
+              }}
+            >
+              Done
+            </Button>
+          </>
+        }
+      >
+        {editingFormats && (
+          <div className={styles.formatEditor}>
+            <p className={styles.formatIntro}>
+              A value entered for this field must meet every format below. Changes take effect when you save the field settings.
+            </p>
+            {editingFormats.problem && <div role="alert" className={`${styles.banner} ${styles.bannerError}`}>{editingFormats.problem}</div>}
+            <ValidationRulesEditor
+              rules={editingFormats.rules}
+              customPresets={formatPresets}
+              onChange={(rules) => setEditingFormats({ ...editingFormats, rules, problem: null })}
+            />
+          </div>
+        )}
+      </Modal>
     </div>
   );
 };

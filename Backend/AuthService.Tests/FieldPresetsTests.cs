@@ -59,17 +59,28 @@ public class FieldPresetsTests
 
     [Theory]
     [InlineData("+91 98765 43210", true)]
-    [InlineData("098765-43210", true)]
-    [InlineData("(022) 2222 3333", true)]
-    [InlineData("1", false)] // too few digits to be dialable
-    [InlineData("12345678901234567890", false)] // exceeds E.164's 15-digit cap
-    [InlineData("abc-def-ghij", false)]
-    public void Mobile_default_shape_is_digit_count_bounded_not_just_character_checked(string value, bool shouldMatch)
+    [InlineData("+60 12-345 6789", true)]      // Malaysia allows 9 or 10 national digits
+    [InlineData("+65 8123 4567", true)]
+    [InlineData("+91 98765 4321", false)]      // 9 digits is not an Indian mobile number
+    [InlineData("+65 8123 45678", false)]      // Singapore is exactly 8
+    [InlineData("98765 43210", true)]          // no dial code: the default country, so old records stay editable
+    [InlineData("1", false)]
+    [InlineData("+91 abc-def-ghij", false)]
+    public void The_mobile_preset_checks_the_digit_count_for_the_numbers_own_country(string value, bool shouldPass)
     {
-        // The old rule only validated the alphabet, so "1" and a 40-digit string both passed. This is
-        // the exact regression this shape check exists to prevent — see the doc comment on
-        // FieldPresets.MobileInDefaultShape.
-        Assert.Equal(shouldMatch, FieldPresets.MobileInDefaultShape.IsMatch(value));
+        // It used to be a country-agnostic "7 to 15 digits" here while the form checked the chosen
+        // country, so a 9-digit Indian number passed an API call and failed the form.
+        Assert.Equal(shouldPass, PhoneNumbers.ValidateFull(value) is null);
+    }
+
+    [Theory]
+    [InlineData(FieldPresets.AadharFormat, "١٢٣٤ ٥٦٧٨ ٩٠١٢")] // Arabic-Indic digits
+    [InlineData(FieldPresets.Pincode, "४००००१")]              // Devanagari digits
+    public void Digit_presets_accept_only_the_digits_the_browser_accepts(string presetId, string value)
+    {
+        // .NET's \d matches every script's digits; the browser's matches 0-9 only.
+        Assert.True(FieldPresets.TryGetRegex(presetId, out var regex));
+        Assert.DoesNotMatch(regex, value);
     }
 
     [Theory]

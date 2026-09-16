@@ -1,6 +1,4 @@
-import type { SelectHTMLAttributes } from 'react'
-import { classNames } from '../../utils/classNames'
-import styles from './Select.module.css'
+import { Combobox } from '../Combobox/Combobox'
 
 export interface SelectOption {
   value: string
@@ -8,47 +6,53 @@ export interface SelectOption {
   disabled?: boolean
 }
 
-export interface SelectProps extends Omit<SelectHTMLAttributes<HTMLSelectElement>, 'size'> {
-  options: SelectOption[]
-  size?: 'sm' | 'md' | 'lg'
-  /** Shown as a disabled first entry when the value is empty. */
-  placeholder?: string
-  className?: string
+/** The part of a change event Select's callers read. Kept so every existing `e.target.value` handler works unchanged. */
+export interface SelectChangeEvent {
+  target: { value: string }
+  currentTarget: { value: string }
 }
 
-function ChevronIcon() {
-  return (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <polyline points="6 9 12 15 18 9" />
-    </svg>
-  )
+export interface SelectProps {
+  options: SelectOption[]
+  value?: string | number | null
+  onChange?: (event: SelectChangeEvent) => void
+  onBlur?: () => void
+  size?: 'sm' | 'md' | 'lg'
+  /** Shown when nothing is selected. */
+  placeholder?: string
+  disabled?: boolean
+  id?: string
+  className?: string
+  'aria-label'?: string
+  'aria-labelledby'?: string
+  /** Offer a clearing row with this label, e.g. "All statuses". */
+  clearLabel?: string
 }
 
 /**
- * The platform dropdown.
+ * The platform dropdown, for a fixed list of choices.
  *
- * Both remotes' Field Settings rendered a bare `<select>` for the masking rule, so it kept the
- * browser's own border, radius and arrow and read as an OS control dropped into the page — beside
- * inputs that were fully styled. The host had its own `.select` rule; this is that rule, shared.
+ * It was a styled native `<select>`, which can only be searched by typing the first letter. It now
+ * renders the shared searchable {@link Combobox}, so every Select across the host and the remotes can
+ * be searched by any part of an option's name — with the same props it always took, including an
+ * `onChange` that hands over `e.target.value`, so no caller had to change.
  */
-export function Select({ options, size = 'md', placeholder, className, value, ...rest }: SelectProps) {
+export function Select({ options, value, onChange, onBlur, size = 'md', placeholder, disabled, id, className, clearLabel, ...aria }: SelectProps) {
+  const current = value === null || value === undefined ? '' : String(value)
   return (
-    <span className={classNames(styles.wrap, className)}>
-      <select className={classNames(styles.select, styles[size])} value={value} {...rest}>
-        {placeholder !== undefined && (
-          <option value="" disabled>
-            {placeholder}
-          </option>
-        )}
-        {options.map((o) => (
-          <option key={o.value} value={o.value} disabled={o.disabled}>
-            {o.label}
-          </option>
-        ))}
-      </select>
-      <span className={styles.chevron}>
-        <ChevronIcon />
-      </span>
-    </span>
+    <Combobox
+      id={id}
+      className={className}
+      size={size}
+      options={options}
+      value={current}
+      placeholder={placeholder}
+      disabled={disabled}
+      clearLabel={clearLabel}
+      aria-label={aria['aria-label']}
+      aria-labelledby={aria['aria-labelledby']}
+      onBlur={onBlur}
+      onChange={(next) => onChange?.({ target: { value: next }, currentTarget: { value: next } })}
+    />
   )
 }

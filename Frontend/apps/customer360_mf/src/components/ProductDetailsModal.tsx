@@ -1,4 +1,4 @@
-import React, { useState, useEffect, type ReactNode } from 'react';
+import React, { useState, type ReactNode } from 'react';
 import { useProductStore } from '../store/productStore';
 import { useCustomerStore } from '../store/customerStore';
 import {
@@ -112,29 +112,9 @@ export default function ProductDetailsModal() {
   const profileCountry = (profile as CorporateProfile | null)?.country;
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
-  // Track product detail view for audit log
-  useEffect(() => {
-    if (!modalOpen || !selectedProductDetails) return;
-    const d = selectedProductDetails as AnyProductFields | null;
-    const accountNoStr = String(
-      d?.accountNumber || d?.accountNo || d?.cardNo || d?.goldAccountNo ||
-      d?.investmentAccountNo || d?.willWritingRefNo || d?.policyNo || ''
-    ).trim();
-    const productName = d?.productName || d?.planName || d?.fundName || d?.cardTypeDesc || d?.type || '';
-    const entityLabel = productName || accountNoStr || 'Product';
-    window.dispatchEvent(new CustomEvent('omni:track-activity', {
-      detail: {
-        page: 'all-products',
-        module: 'Customer 360',
-        sourceApplication: 'Customer 360',
-        action: 'customer.details_viewed',
-        actionCategory: 'ViewDetails',
-        entityType: 'Product',
-        entityLabel,
-        entityId: accountNoStr || undefined,
-      },
-    }));
-  }, [modalOpen, selectedProductDetails]);
+  // No audit dispatch on open — see CaseDetailsModal. The product data was fetched, and audited,
+  // when the endpoint that returned it served the request.
+
 
   const formatCurrency = (val: unknown) => formatMoney(val, profileCountry);
 
@@ -645,9 +625,6 @@ export default function ProductDetailsModal() {
               </button>
             )}
           </div>
-          <Button type="button" variant="secondary" onClick={closeProductModal}>
-            Close Details
-          </Button>
         </div>
       }
     >

@@ -216,3 +216,38 @@
   outline: 2px solid var(--omni-color-primary-600);
   outline-offset: 1px;
 }
+
+/* The Format column: a compact button naming the field's first format; opens the shared rule editor. */
+.formatButton {
+  max-width: 180px;
+  padding: 4px 10px;
+  border: 1px dashed var(--omni-color-border);
+  border-radius: var(--omni-radius-md);
+  background: var(--omni-color-surface);
+  color: var(--omni-color-text-secondary);
+  font: inherit;
+  font-size: var(--omni-font-size-xs);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.formatButton:hover {
+  border-style: solid;
+  border-color: var(--omni-color-primary-600);
+  color: var(--omni-color-primary-600);
+}
+
+.formatEditor {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: min(520px, 80vw);
+}
+
+.formatIntro {
+  margin: 0;
+  font-size: var(--omni-font-size-sm);
+  color: var(--omni-color-text-secondary);
+}

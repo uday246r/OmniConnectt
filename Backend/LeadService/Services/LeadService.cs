@@ -42,9 +42,11 @@ namespace LeadManagement.Api.Services
         private readonly AuthServiceClient _authServiceClient;
         private readonly SelfOptions _selfOptions;
         private readonly LeadFieldConfigService _fieldConfigService;
+        private readonly ValidationPresetClient _presets;
 
-        public LeadService(ApplicationDbContext db, IAuditLogService auditLogService, AuthServiceClient authServiceClient, IOptions<SelfOptions> selfOptions, LeadFieldConfigService fieldConfigService)
+        public LeadService(ApplicationDbContext db, IAuditLogService auditLogService, AuthServiceClient authServiceClient, IOptions<SelfOptions> selfOptions, LeadFieldConfigService fieldConfigService, ValidationPresetClient presets)
         {
+            _presets = presets;
             _db = db;
             _auditLogService = auditLogService;
             _authServiceClient = authServiceClient;
@@ -103,6 +105,10 @@ namespace LeadManagement.Api.Services
             // stay on the DTO and still apply once a value IS present).
             var fieldConfigs = await _fieldConfigService.GetByProductAsync(product.Id);
             LeadFieldConfigService.EnsureRequiredFieldsPresent(fieldConfigs, dto, product.Name);
+
+            // Field Settings' formats (IC number, phone, email and anything an administrator added), checked
+            // before the approval gate and again when an approved request is replayed through here.
+            LeadFieldConfigService.EnsureFormatsValid(fieldConfigs, dto, await _presets.GetAsync());
 
             /*
              * A Create has no entity id yet, so it must supply a natural key or AuthService's
@@ -501,6 +507,7 @@ namespace LeadManagement.Api.Services
             var fieldConfigs = await _fieldConfigService.GetByProductAsync(product.Id);
             LeadFieldConfigService.EnsureRequiredFieldsPresent(fieldConfigs, dto, product.Name);
             LeadFieldConfigService.EnsureEditableFieldsUnchanged(fieldConfigs, dto, previousDto!);
+            LeadFieldConfigService.EnsureFormatsValid(fieldConfigs, dto, await _presets.GetAsync(), previousDto);
 
             var oldSnapshot = System.Text.Json.JsonSerializer.Serialize(previousDto);
             var pending = await TrySubmitForApprovalAsync("Update", id, lead.CustomerName, oldSnapshot, dto, actingUserId, bypassApproval);

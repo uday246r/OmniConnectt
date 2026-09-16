@@ -66,41 +66,118 @@ public class UserAppService(
         }
     }
 
+    public Task<PagedResult<UserListItemDto>> ListAsync(
+        int page, int pageSize, string? search, bool? isActive, Guid? roleId, CancellationToken ct = default) =>
+        ListAsync(page, pageSize, new UserListFilter { Search = search, IsActive = isActive, RoleId = roleId }, ct);
+
+    /// <summary>One page of the directory, every filter applied in the database — see <see cref="UserListFilter"/>.</summary>
     public async Task<PagedResult<UserListItemDto>> ListAsync(
-        int page, int pageSize, string? search, bool? isActive, Guid? roleId, CancellationToken ct = default)
+        int page, int pageSize, UserListFilter filter, CancellationToken ct = default)
     {
-        var query = db.Users.Include(u => u.Role).AsNoTracking().AsQueryable();
-
-        if (!string.IsNullOrWhiteSpace(search))
-        {
-            var term = search.Trim().ToLowerInvariant();
-            query = query.Where(u =>
-                u.Name.ToLower().Contains(term) ||
-                u.Email.ToLower().Contains(term) ||
-                (u.PhoneNumber != null && u.PhoneNumber.Contains(term)));
-        }
-
-        if (isActive is not null)
-        {
-            var status = isActive.Value ? UserStatus.Active : UserStatus.Inactive;
-            query = query.Where(u => u.Status == status);
-        }
-
-        if (roleId is not null)
-        {
-            query = query.Where(u => u.RoleId == roleId);
-        }
+        var query = ApplyFilter(db.Users.Include(u => u.Role).AsNoTracking(), filter);
 
         var total = await query.CountAsync(ct);
         var items = await query
             .OrderBy(u => u.Status)
             .ThenBy(u => u.Name)
+            // Two people can share a name; without a unique tiebreaker a row could appear on two pages or none.
+            .ThenBy(u => u.Id)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .Select(u => ToListItemDto(u))
             .ToListAsync(ct);
 
-        return new PagedResult<UserListItemDto>(items, total, page, pageSize);
+        return new PagedResult<UserListItemDto>(await MarkAwaitingSetupAsync(items, ct), total, page, pageSize);
+    }
+
+    /// <summary>Headline counts for the whole directory, computed by the database.</summary>
+    public async Task<UserDirectorySummaryDto> SummaryAsync(CancellationToken ct = default)
+    {
+        // Three index-friendly counts rather than one grouped aggregate over a navigation, which not every
+        // provider translates. A DbContext runs one command at a time, so they are awaited in turn.
+        var users = db.Users.AsNoTracking();
+        var total = await users.CountAsync(ct);
+        var active = await users.CountAsync(u => u.Status == UserStatus.Active, ct);
+        var administrators = await users.CountAsync(u => u.Role != null && u.Role.IsAdministrator, ct);
+
+        return new UserDirectorySummaryDto(total, active, total - active, administrators);
+    }
+
+    /// <summary>The roles the Role filter can offer, under the other filters applied.</summary>
+    public async Task<UserListFacetsDto> FacetsAsync(UserListFilter filter, CancellationToken ct = default)
+    {
+        var scoped = ApplyFilter(db.Users.AsNoTracking(), filter with { Role = null, RoleId = null });
+
+        var roleNames = await scoped.Where(u => u.Role != null).Select(u => u.Role!.Name).Distinct().OrderBy(n => n).Take(200).ToListAsync(ct);
+        var anyWithoutRole = await scoped.AnyAsync(u => u.RoleId == null, ct);
+
+        return new UserListFacetsDto(anyWithoutRole ? [.. roleNames, NoRoleLabel] : roleNames);
+    }
+
+    /// <summary>How the list labels a user with no role. The Role filter accepts it as a value.</summary>
+    public const string NoRoleLabel = "No Role";
+
+    private static IQueryable<User> ApplyFilter(IQueryable<User> query, UserListFilter filter)
+    {
+        if (!string.IsNullOrWhiteSpace(filter.Search))
+        {
+            var term = filter.Search.Trim().ToLowerInvariant();
+            var digits = new string(term.Where(char.IsAsciiDigit).ToArray());
+            query = query.Where(u =>
+                u.Name.ToLower().Contains(term) ||
+                u.Email.ToLower().Contains(term) ||
+                (u.Role != null && u.Role.Name.ToLower().Contains(term)) ||
+                (digits.Length > 0 && u.PhoneNumber != null &&
+                 System.Text.RegularExpressions.Regex.Replace(u.PhoneNumber, "[^0-9]", "").Contains(digits)));
+        }
+
+        if (!string.IsNullOrWhiteSpace(filter.Name))
+        {
+            var name = filter.Name.Trim().ToLowerInvariant();
+            query = query.Where(u => u.Name.ToLower().Contains(name) || u.Email.ToLower().Contains(name));
+        }
+
+        if (!string.IsNullOrWhiteSpace(filter.Phone))
+        {
+            // Stored numbers carry formatting the operator won't type — compare digits only, in the database.
+            var digits = new string(filter.Phone.Where(char.IsAsciiDigit).ToArray());
+            if (digits.Length > 0)
+            {
+                query = query.Where(u => u.PhoneNumber != null &&
+                    System.Text.RegularExpressions.Regex.Replace(u.PhoneNumber, "[^0-9]", "").Contains(digits));
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(filter.Role))
+        {
+            var role = filter.Role.Trim();
+            query = string.Equals(role, NoRoleLabel, StringComparison.OrdinalIgnoreCase)
+                ? query.Where(u => u.RoleId == null)
+                : query.Where(u => u.Role != null && u.Role.Name == role);
+        }
+
+        if (filter.RoleId is not null)
+        {
+            query = query.Where(u => u.RoleId == filter.RoleId);
+        }
+
+        if (filter.IsActive is not null)
+        {
+            var status = filter.IsActive.Value ? UserStatus.Active : UserStatus.Inactive;
+            query = query.Where(u => u.Status == status);
+        }
+
+        if (filter.LastLoginFrom is not null)
+        {
+            query = query.Where(u => u.LastLoginAt != null && u.LastLoginAt >= filter.LastLoginFrom);
+        }
+
+        if (filter.LastLoginTo is not null)
+        {
+            query = query.Where(u => u.LastLoginAt != null && u.LastLoginAt <= filter.LastLoginTo);
+        }
+
+        return query;
     }
 
     public async Task<UserDetailDto> GetAsync(Guid id, CancellationToken ct = default)
@@ -193,14 +270,14 @@ public class UserAppService(
             UpdatedBy = actingUserId,
         };
 
-        // Local: generate + hash a temporary password so the account has valid credentials in the
-        // database. This value is NEVER returned to the caller — the user sets their own password
-        // through the invitation email link (SetPasswordInviteService.IssueAsync below).
+        // Local: hash a random value nobody ever sees, so the row is never "no password set" — only
+        // the invite link below can turn this account into a usable login. The generated value is
+        // deliberately discarded rather than returned: credentials never travel back to the caller.
         // Google: PasswordHash stays null — this account can never sign in with a local password,
-        // see AuthAppService.LoginAsync's null-guard. if (isLocal)
+        // see AuthAppService.LoginAsync's null-guard.
+        if (isLocal)
         {
-            var tempPassword = TemporaryPasswordGenerator.Generate();
-            user.PasswordHash = passwordHasher.Hash(user, tempPassword);
+            user.PasswordHash = passwordHasher.Hash(user, TemporaryPasswordGenerator.Generate());
         }
 
         db.Users.Add(user);
@@ -208,7 +285,7 @@ public class UserAppService(
 
         // Bundled from the same submission that created this account — see
         // CreateUserWithOverridesRequest's doc comment for why this can't be a separate follow-up call
-        // the way it used to be.c
+        // the way it used to be.
         if (overrides is { Count: > 0 })
         {
             await ApplyOverridesAsync(user.Id, overrides, actingUserId, ct);
@@ -222,9 +299,9 @@ public class UserAppService(
          *
          * Best-effort by design: IssueAsync returns false rather than throwing when SMTP is
          * unconfigured or delivery fails, because the account already exists by this point and a mail
-         * problem must not undo it. The encrypted temporary password above stays available in every
-         * case, retrievable by the maker from My Requests — the two mechanisms coexist rather than
-         * one replacing the other.
+         * problem must not undo it. A false here is reported to the caller as InviteEmailed = false so
+         * the maker knows the account cannot be logged into yet, and an administrator can retry with
+         * POST /api/users/{id}/resend-invite once mail is working.
          *
          * Local accounts only: a Google-provisioned account has no local password to set.
          */
@@ -239,7 +316,11 @@ public class UserAppService(
         var auditDetail = inviteEmailed
             ? $"Created {user.Email} (set-password invite emailed)"
             : $"Created {user.Email}";
-        await auditLog.WriteAsync(ServiceName, actingUserId, actorName, "user.created", "User", user.Id.ToString(), auditDetail, SourceIp, userAgent: UserAgent, entityLabel: user.Name, ct: ct);
+        await auditLog.WriteHostAsync(
+            actingUserId, actorName, "user.created",
+            AuditLogAppService.Modules.Users, AuditLogAppService.Categories.Crud,
+            entityType: "User", entityId: user.Id.ToString(), details: auditDetail,
+            entityLabel: user.Name, sourceIp: SourceIp, userAgent: UserAgent, ct: ct);
 
         return MutationResult<CreateUserResponse>.Ok(new CreateUserResponse(ToDetailDto(saved, savedOverrides), inviteEmailed));
     }
@@ -309,7 +390,7 @@ public class UserAppService(
         var customFieldsForValidation = request.CustomFields ?? DeserializeExtraAttributes(user.ExtraAttributes);
         var extraAttributesJson = await ValidateAndBuildExtraAttributesAsync(
             request.Name.Trim(), email, request.PhoneNumber?.Trim(), customFieldsForValidation, ct);
-        var salutation = await ValidateSalutationAsync(request.Salutation, ct);
+        var salutation = await ValidateSalutationAsync(request.Salutation, ct, currentValue: user.Salutation);
 
         await gating.EnsureActorIdentifiedAsync(ApprovalModuleKeys.Users, actingUserId, ct);
 
@@ -331,6 +412,25 @@ public class UserAppService(
                 JsonSerializer.Serialize(oldSnapshot), JsonSerializer.Serialize(newSnapshot), actingUserId.Value, ct);
             return MutationResult<UserDetailDto>.PendingApproval(pending);
         }
+
+        /*
+         * Captured before the assignments below, so the audit row can say WHAT changed.
+         *
+         * "Updated alice@example.com" was the entire record of an edit. It could not distinguish a
+         * corrected phone number from a move onto the administrator role, which is the difference
+         * between routine housekeeping and a privilege escalation — and the role change in particular
+         * left no trace anywhere, because moving a user between roles touches no permission row and so
+         * never appeared in any grant diff either.
+         */
+        var previousFields = new Dictionary<string, string?>
+        {
+            ["salutation"] = user.Salutation,
+            ["name"] = user.Name,
+            ["email"] = user.Email,
+            ["phoneNumber"] = user.PhoneNumber,
+            ["role"] = user.Role?.Name ?? (user.RoleId?.ToString() ?? "(none)"),
+            ["customFields"] = user.ExtraAttributes,
+        };
 
         user.Salutation = salutation;
         user.Name = request.Name.Trim();
@@ -373,15 +473,49 @@ public class UserAppService(
         }
 
         var actorName = await ResolveActorNameAsync(actingUserId, ct);
-        await auditLog.WriteAsync(ServiceName, actingUserId, actorName, "user.updated", "User", user.Id.ToString(), $"Updated {user.Email}", SourceIp, userAgent: UserAgent, entityLabel: user.Name, ct: ct);
+
+        var newRoleNameForAudit = request.RoleId is null
+            ? "(none)"
+            : await db.Roles.AsNoTracking().Where(r => r.Id == request.RoleId).Select(r => r.Name).FirstOrDefaultAsync(ct)
+              ?? request.RoleId.ToString();
+
+        var currentFields = new Dictionary<string, string?>
+        {
+            ["salutation"] = user.Salutation,
+            ["name"] = user.Name,
+            ["email"] = user.Email,
+            ["phoneNumber"] = user.PhoneNumber,
+            ["role"] = newRoleNameForAudit,
+            ["customFields"] = user.ExtraAttributes,
+        };
+
+        // Values, not just field names. "email changed" leaves a reviewer to go looking for what it
+        // used to be; by the time they look, the old value only exists in this row.
+        var fieldChanges = previousFields
+            .Where(kv => !string.Equals(kv.Value, currentFields[kv.Key], StringComparison.Ordinal))
+            .Select(kv => $"{kv.Key}: '{kv.Value ?? "(empty)"}' → '{currentFields[kv.Key] ?? "(empty)"}'")
+            .ToList();
+
+        await auditLog.WriteHostAsync(
+            actingUserId, actorName, "user.updated",
+            AuditLogAppService.Modules.Users, AuditLogAppService.Categories.Crud,
+            entityType: "User", entityId: user.Id.ToString(), entityLabel: user.Name,
+            details: fieldChanges.Count == 0
+                // Reached when the only thing that moved was the status or the overrides, both of
+                // which get their own rows. Saying so is more useful than an unqualified "Updated".
+                ? $"Saved {user.Email} — no core field changed."
+                : $"Updated {user.Email} — {string.Join("; ", fieldChanges)}.",
+            sourceIp: SourceIp, userAgent: UserAgent, ct: ct);
 
         if (statusChanged)
         {
-            await auditLog.WriteAsync(
-                ServiceName, actingUserId, actorName,
+            await auditLog.WriteHostAsync(
+                actingUserId, actorName,
                 request.IsActive ? "user.activated" : "user.deactivated",
-                "User", user.Id.ToString(),
-                $"{user.Email} was {(request.IsActive ? "activated" : "deactivated")}.", SourceIp, userAgent: UserAgent, entityLabel: user.Name, ct: ct);
+                AuditLogAppService.Modules.Users, AuditLogAppService.Categories.Crud,
+                entityType: "User", entityId: user.Id.ToString(), entityLabel: user.Name,
+                details: $"{user.Email} was {(request.IsActive ? "activated" : "deactivated")}.",
+                sourceIp: SourceIp, userAgent: UserAgent, ct: ct);
         }
 
         var savedOverrides = await LoadOverridesAsync(id, ct);
@@ -427,7 +561,12 @@ public class UserAppService(
         await db.SaveChangesAsync(ct);
 
         var actorName = await ResolveActorNameAsync(actingUserId, ct);
-        await auditLog.WriteAsync(ServiceName, actingUserId, actorName, isActive ? "user.activated" : "user.deactivated", "User", user.Id.ToString(), $"{(isActive ? "Activated" : "Deactivated")} {user.Email}", SourceIp, userAgent: UserAgent, entityLabel: user.Name, ct: ct);
+        await auditLog.WriteHostAsync(
+            actingUserId, actorName, isActive ? "user.activated" : "user.deactivated",
+            AuditLogAppService.Modules.Users, AuditLogAppService.Categories.Crud,
+            entityType: "User", entityId: user.Id.ToString(),
+            details: $"{(isActive ? "Activated" : "Deactivated")} {user.Email}",
+            entityLabel: user.Name, sourceIp: SourceIp, userAgent: UserAgent, ct: ct);
 
         var overrides = await LoadOverridesAsync(id, ct);
         return MutationResult<UserDetailDto>.Ok(ToDetailDto(user, overrides));
@@ -470,7 +609,11 @@ public class UserAppService(
         await db.SaveChangesAsync(ct);
 
         var actorName = await ResolveActorNameAsync(actingUserId, ct);
-        await auditLog.WriteAsync(ServiceName, actingUserId, actorName, "user.deleted", "User", user.Id.ToString(), $"Deleted {user.Email}", SourceIp, userAgent: UserAgent, entityLabel: user.Name, ct: ct);
+        await auditLog.WriteHostAsync(
+            actingUserId, actorName, "user.deleted",
+            AuditLogAppService.Modules.Users, AuditLogAppService.Categories.Crud,
+            entityType: "User", entityId: user.Id.ToString(), details: $"Deleted {user.Email}",
+            entityLabel: user.Name, sourceIp: SourceIp, userAgent: UserAgent, ct: ct);
         return null;
     }
 
@@ -583,6 +726,22 @@ public class UserAppService(
         var now = DateTimeOffset.UtcNow;
         var requested = resolved.ToDictionary(r => (r.FeatureId, r.Capability), r => r.Effect);
 
+        // Feature keys for everything this call touches, so the audit row names permissions the way
+        // the Role editor and the JWT do rather than by an opaque FeatureId. One lookup for the union
+        // of the existing and requested sets — the requested half is already in `features` above, but
+        // the EXISTING half may reference features this request never mentioned.
+        var touchedFeatureIds = existing.Select(r => r.FeatureId)
+            .Concat(resolved.Select(r => r.FeatureId))
+            .Distinct()
+            .ToList();
+        var featureKeyById = await db.PermissionFeatures.AsNoTracking()
+            .Where(f => touchedFeatureIds.Contains(f.Id))
+            .ToDictionaryAsync(f => f.Id, f => f.Key, ct);
+        string KeyOf(Guid featureId) => featureKeyById.GetValueOrDefault(featureId, featureId.ToString());
+
+        var addedOverrides = new List<PermissionChangeDto>();
+        var removedOverrides = new List<PermissionChangeDto>();
+
         foreach (var row in existing)
         {
             if (requested.TryGetValue((row.FeatureId, row.Capability), out var effect))
@@ -591,12 +750,18 @@ public class UserAppService(
                 // deleting and re-adding the same unique key.
                 if (row.Effect != effect)
                 {
+                    // A flip is recorded as both halves. "Revoke became Grant" is a privilege
+                    // ESCALATION on that capability, and collapsing it to a single "changed" line
+                    // would hide the direction, which is the only part that matters.
+                    removedOverrides.Add(new PermissionChangeDto(KeyOf(row.FeatureId), row.Capability, row.Effect.ToString()));
+                    addedOverrides.Add(new PermissionChangeDto(KeyOf(row.FeatureId), row.Capability, effect.ToString()));
                     row.Effect = effect;
                 }
             }
             else
             {
                 db.UserPermissionOverrides.Remove(row);
+                removedOverrides.Add(new PermissionChangeDto(KeyOf(row.FeatureId), row.Capability, row.Effect.ToString()));
             }
         }
 
@@ -618,12 +783,46 @@ public class UserAppService(
                 CreatedAt = now,
                 CreatedBy = actingUserId,
             });
+            addedOverrides.Add(new PermissionChangeDto(KeyOf(featureId), capability, effect.ToString()));
         }
 
         await db.SaveChangesAsync(ct);
 
         // This user's overrides changed and nobody else's did, so the targeted eviction is enough.
         await fineCapabilities.InvalidateAsync(userId, ct);
+
+        /*
+         * This wrote no audit row at all until now, on either the direct or the replay path.
+         *
+         * A per-user override is the sharpest privilege instrument in the system: it grants or revokes
+         * one capability for one person, outside their role, and it is exactly how an exception gets
+         * made permanently and quietly. The trail recorded the role edits around it and stayed silent
+         * about this — so "who gave this account Delete on Users, and when?" was unanswerable whenever
+         * the answer was an override rather than a role.
+         *
+         * Written after SaveChanges so it only records changes that actually committed, and skipped
+         * entirely when the diff is empty: a Save that re-sent an unchanged set is not an event.
+         */
+        var diff = new PermissionDiffDto(addedOverrides, removedOverrides);
+        if (!diff.IsEmpty)
+        {
+            var subject = await db.Users.AsNoTracking()
+                .Where(u => u.Id == userId)
+                .Select(u => new { u.Name, u.Email })
+                .FirstOrDefaultAsync(ct);
+            var actorName = actingUserId is null
+                ? null
+                : await db.Users.AsNoTracking().Where(u => u.Id == actingUserId).Select(u => u.Name).FirstOrDefaultAsync(ct);
+
+            await auditLog.WriteHostAsync(
+                actingUserId, actorName, "user.permission_overrides_replaced",
+                AuditLogAppService.Modules.Users, AuditLogAppService.Categories.Crud,
+                entityType: "UserPermissionOverrides", entityId: userId.ToString(),
+                entityLabel: subject?.Email ?? subject?.Name,
+                details: diff.ToDetails(
+                    $"Changed per-user permission overrides for {subject?.Name ?? "a user"} — {diff.Summarise()}."),
+                sourceIp: SourceIp, userAgent: UserAgent, ct: ct);
+        }
 
         return await LoadOverridesAsync(userId, ct);
     }
@@ -682,12 +881,20 @@ public class UserAppService(
     /// <summary>Null/empty is always fine (Salutation is optional); a non-empty value must match one of
     /// the admin-configured SalutationCatalog entries — a stray value from a stale client must not be
     /// able to introduce a title the catalog no longer offers.</summary>
-    private async Task<string?> ValidateSalutationAsync(string? salutation, CancellationToken ct)
+    /// <param name="currentValue">The user's saved salutation, on an edit. Keeping it is always allowed, even
+    /// if it has since been removed from the list — otherwise removing a title made every user who held
+    /// it impossible to save until someone changed their title too.</param>
+    private async Task<string?> ValidateSalutationAsync(string? salutation, CancellationToken ct, string? currentValue = null)
     {
         var trimmed = salutation?.Trim();
         if (string.IsNullOrEmpty(trimmed))
         {
             return null;
+        }
+
+        if (string.Equals(trimmed, currentValue, StringComparison.Ordinal))
+        {
+            return trimmed;
         }
 
         var allowed = await salutations.GetSalutationsAsync(ct);
@@ -712,6 +919,38 @@ public class UserAppService(
             .Where(o => o.UserId == userId)
             .Select(o => new PermissionOverrideDto(o.Feature!.Key, o.Capability, o.Effect.ToString()))
             .ToListAsync(ct);
+
+    /// <summary>
+    /// Flags the rows on this page that have never had an invite redeemed, in one extra query rather
+    /// than a correlated subquery per row — the projection above runs through a static helper EF
+    /// translates, and a per-row EXISTS cannot be expressed there.
+    ///
+    /// A Google account is never awaiting a password (it has none), and a disabled one is not either:
+    /// resending would be refused, and offering it on the row would be a lie.
+    /// </summary>
+    private async Task<List<UserListItemDto>> MarkAwaitingSetupAsync(
+        List<UserListItemDto> items, CancellationToken ct)
+    {
+        var candidateIds = items
+            .Where(i => i.AuthProvider == nameof(AuthProvider.Local) && i.IsActive)
+            .Select(i => i.Id)
+            .ToList();
+
+        if (candidateIds.Count == 0) return items;
+
+        var alreadySetUp = await db.SetPasswordInvites
+            .Where(i => candidateIds.Contains(i.UserId) && i.UsedAt != null)
+            .Select(i => i.UserId)
+            .Distinct()
+            .ToListAsync(ct);
+
+        return items
+            .Select(i => i with
+            {
+                AwaitingPasswordSetup = candidateIds.Contains(i.Id) && !alreadySetUp.Contains(i.Id),
+            })
+            .ToList();
+    }
 
     private static UserListItemDto ToListItemDto(User u) => new(
         u.Id, u.Salutation, u.Name, u.Email, u.PhoneNumber, u.RoleId, u.Role?.Name,

@@ -125,9 +125,11 @@ public class ApprovalGatingService(AuthDbContext db, AuditLogAppService auditLog
                 "Another change to this record was submitted at the same moment. Please refresh and try again.");
         }
 
-        await auditLog.WriteAsync(
-            ServiceName, makerId, makerName, "approval.requested", "ApprovalRequest", request.Id.ToString(),
-            $"Requested {action} on {module}" + (entityLabel is not null ? $" ({entityLabel})" : "") + $" — assigned to {checkerName ?? "an eligible checker"}.",
+        await auditLog.WriteHostAsync(
+            makerId, makerName, "approval.requested",
+            AuditLogAppService.Modules.Approvals, AuditLogAppService.Categories.Approval,
+            entityType: "ApprovalRequest", entityId: request.Id.ToString(),
+            details: $"Requested {action} on {module}" + (entityLabel is not null ? $" ({entityLabel})" : "") + $" — assigned to {checkerName ?? "an eligible checker"}.",
             entityLabel: entityLabel, correlationId: correlationId, ct: ct);
 
         var interestedUsers = new List<Guid> { makerId, checkerId };
@@ -178,6 +180,29 @@ public class ApprovalGatingService(AuthDbContext db, AuditLogAppService auditLog
         var subject = existing.EntityLabel is not null ? $" on '{existing.EntityLabel}'" : "";
         var raisedBy = isOwn ? "You" : existing.MakerName ?? "Another user";
         var verb = isOwn ? "have" : "has";
+
+        /*
+         * A refused duplicate is worth recording, and the two shapes it comes in are worth telling
+         * apart.
+         *
+         * A maker re-submitting their own pending change is usually a UI misunderstanding — nothing
+         * visibly happened, so they clicked again. TWO DIFFERENT makers racing the same record is a
+         * different thing entirely: two people believe they own a change to the same entity, and only
+         * one of them will find out. Neither left any trace before, so a checker approving one of them
+         * had no way to know the other had been attempted at all.
+         */
+        var attemptingMakerName = await db.Users.AsNoTracking()
+            .Where(u => u.Id == makerId).Select(u => u.Name).FirstOrDefaultAsync(ct);
+
+        await auditLog.WriteHostAsync(
+            makerId, attemptingMakerName, "approval.submit_conflicted",
+            AuditLogAppService.Modules.Approvals, AuditLogAppService.Categories.Approval,
+            entityType: "ApprovalRequest", entityId: existing.Id.ToString(),
+            details: isOwn
+                ? $"A second {existing.Action} request{subject} on '{module}' was refused — this maker already has one pending."
+                : $"A {existing.Action} request{subject} on '{module}' was refused — {existing.MakerName ?? "another user"} already has one pending, awaiting {existing.CheckerName ?? "a checker"}.",
+            entityLabel: existing.EntityLabel, result: "Failure",
+            failureReason: "A request against this record is already pending", ct: ct);
 
         throw new PendingApprovalConflictException(
             $"{raisedBy} already {verb} a pending {existing.Action} request{subject} awaiting approval" +
@@ -283,9 +308,11 @@ public class ApprovalGatingService(AuthDbContext db, AuditLogAppService auditLog
             request.CheckerId = newCheckerId;
             request.CheckerName = newCheckerName;
 
-            await auditLog.WriteAsync(
-                ServiceName, actingUserId, actorName, "approval.reassigned", "ApprovalRequest", request.Id.ToString(),
-                $"Reassigned from {oldCheckerName ?? "Unknown"} to {newCheckerName ?? "Unknown"} on '{request.Module}' — {reason}.",
+            await auditLog.WriteHostAsync(
+                actingUserId, actorName, "approval.reassigned",
+                AuditLogAppService.Modules.Approvals, AuditLogAppService.Categories.Approval,
+                entityType: "ApprovalRequest", entityId: request.Id.ToString(),
+                details: $"Reassigned from {oldCheckerName ?? "Unknown"} to {newCheckerName ?? "Unknown"} on '{request.Module}' — {reason}.",
                 entityLabel: request.EntityLabel, correlationId: request.CorrelationId, ct: ct);
         }
 

@@ -53,12 +53,12 @@ public class UserAppServiceTests : IDisposable
         var invites = new SetPasswordInviteService(
             db, new NoOpEmailSender(), passwordHasher,
             MsOptions.Create(new SmtpOptions()), MsOptions.Create(new PasswordPolicyOptions()),
-            NullLogger<SetPasswordInviteService>.Instance);
+            auditLog, NullLogger<SetPasswordInviteService>.Instance);
         var fineCapabilities = new FineCapabilityService(db, new MemoryPlatformCache(new MemoryCache(new MemoryCacheOptions())));
-        var fieldSchema = new UserFieldSchemaAppService(db);
+        var fieldSchema = new UserFieldSchemaAppService(db, auditLog);
         var schemaValidator = new UserSchemaValidator();
-        var validationPresets = new ValidationPresetAppService(db);
-        var salutations = new SalutationAppService(db);
+        var validationPresets = new ValidationPresetAppService(db, auditLog);
+        var salutations = new SalutationAppService(db, auditLog);
 
         service = new UserAppService(
             db, passwordHasher, auditLog, new HttpContextAccessor(), gating, invites,

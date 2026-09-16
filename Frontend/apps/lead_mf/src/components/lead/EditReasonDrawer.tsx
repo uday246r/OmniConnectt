@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { AlertCircle } from '@omniremit/ui/icons';
-import { Button, Drawer } from '@omniremit/ui';
+import { Button, Drawer, Select } from '@omniremit/ui';
 import form from '../../shared/formField.module.css';
 import { useLeadStore } from '../../store/useLeadStore';
 
@@ -61,24 +61,19 @@ export const EditReasonDrawer: React.FC = () => {
     >
       <form id={FORM_ID} onSubmit={handleProceed}>
             <div className={`form-group ${form.group}`}>
-              <label className={`form-label ${form.label}`}>
+              <label className={`form-label ${form.label}`} htmlFor="edit-reason">
                 Select Edit Reason <span className={form.required}>*</span>
               </label>
-              <select
+              <Select
+                id="edit-reason"
                 value={selectedReason}
                 onChange={(e) => {
                   setSelectedReason(e.target.value);
                   setError('');
                 }}
-                className={`form-input ${form.select}${error ? ` ${form.selectError}` : ''}`}
-              >
-                <option value="">-- Choose a reason --</option>
-                {PREDEFINED_REASONS.map((r) => (
-                  <option key={r} value={r}>
-                    {r}
-                  </option>
-                ))}
-              </select>
+                placeholder="Choose a reason"
+                options={PREDEFINED_REASONS.map((r) => ({ value: r, label: r }))}
+              />
             </div>
 
             {(selectedReason === 'Other' || selectedReason === '') && (

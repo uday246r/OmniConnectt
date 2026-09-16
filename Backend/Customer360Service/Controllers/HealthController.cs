@@ -45,5 +45,12 @@ namespace backend.Controllers
 
             return Ok(new { status = "healthy" });
         }
+
+        // GET /health/live
+        // Liveness: the process is up and serving. No configuration or database check, so a frequent
+        // probe does not take a database connection from the pool real requests need (/health above
+        // does, on every call). Readiness decisions belong to /health.
+        [HttpGet("health/live")]
+        public IActionResult GetLiveness() => Ok(new { status = "alive" });
     }
 }

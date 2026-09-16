@@ -68,9 +68,11 @@ public class AuthAppService(
 
         var result = await IssueSessionAsync(user, clientIp, ct);
 
-        await auditLog.WriteAsync(
-            ServiceName, user.Id, user.Name, "auth.login_succeeded", "User", user.Id.ToString(),
-            $"{user.Email} signed in.", clientIp, authMethod: "Local", userAgent: userAgent, ct: ct);
+        await auditLog.WriteHostAsync(
+            user.Id, user.Name, "auth.login_succeeded",
+            AuditLogAppService.Modules.Authentication, AuditLogAppService.Categories.Auth,
+            entityType: "User", entityId: user.Id.ToString(), details: $"{user.Email} signed in.",
+            entityLabel: user.Email, sourceIp: clientIp, authMethod: "Local", userAgent: userAgent, ct: ct);
 
         return result;
     }
@@ -134,9 +136,11 @@ public class AuthAppService(
 
         var result = await IssueSessionAsync(user, clientIp, ct);
 
-        await auditLog.WriteAsync(
-            ServiceName, user.Id, user.Name, "auth.login_succeeded", "User", user.Id.ToString(),
-            $"{user.Email} signed in via Google.", clientIp, authMethod: "Google", userAgent: userAgent, ct: ct);
+        await auditLog.WriteHostAsync(
+            user.Id, user.Name, "auth.login_succeeded",
+            AuditLogAppService.Modules.Authentication, AuditLogAppService.Categories.Auth,
+            entityType: "User", entityId: user.Id.ToString(), details: $"{user.Email} signed in via Google.",
+            entityLabel: user.Email, sourceIp: clientIp, authMethod: "Google", userAgent: userAgent, ct: ct);
 
         return result;
     }
@@ -154,20 +158,52 @@ public class AuthAppService(
     /// real account — never a fabricated name.
     /// </summary>
     private Task LogLoginFailureAsync(string attemptedEmail, User? user, string failureReason, string? clientIp, string? userAgent, string authMethod, CancellationToken ct) =>
-        auditLog.WriteAsync(
-            ServiceName, user?.Id, user?.Name ?? attemptedEmail, "auth.login_failed", "User", user?.Id.ToString(),
-            $"Sign-in failed for {attemptedEmail}: {failureReason}", clientIp,
-            authMethod: authMethod, result: "Failure", userAgent: userAgent, failureReason: failureReason, ct: ct);
+        auditLog.WriteHostAsync(
+            user?.Id, user?.Name ?? attemptedEmail, "auth.login_failed",
+            AuditLogAppService.Modules.Authentication, AuditLogAppService.Categories.Auth,
+            entityType: "User", entityId: user?.Id.ToString(),
+            details: $"Sign-in failed for {attemptedEmail}: {failureReason}",
+            entityLabel: attemptedEmail, sourceIp: clientIp, result: "Failure",
+            failureReason: failureReason, authMethod: authMethod, userAgent: userAgent, ct: ct);
 
-    public async Task<AuthResult> RefreshAsync(string rawRefreshToken, string? clientIp, CancellationToken ct = default)
+    public async Task<AuthResult> RefreshAsync(string rawRefreshToken, string? clientIp, string? userAgent = null, CancellationToken ct = default)
     {
         var rotated = await refreshTokenService.RotateAsync(rawRefreshToken, clientIp, ct);
-        if (rotated is null)
+        if (!rotated.Succeeded)
         {
+            /*
+             * A refused rotation is not automatically interesting — a token expiring overnight is the
+             * system working. Reuse is the exception, and it is the most serious authentication event
+             * this service can observe: an already-rotated token was presented a second time, which
+             * means either the legitimate cookie was replayed or someone else holds a copy. Those are
+             * indistinguishable from here, so RotateAsync treats it as theft and revokes every active
+             * session for the account.
+             *
+             * Until now that happened in complete silence. The user was signed out of every device at
+             * once, support had nothing to look at, and the strongest available indicator of a stolen
+             * credential left no record anywhere.
+             */
+            if (rotated.Failure == RefreshFailureReason.Reused)
+            {
+                var victim = rotated.AffectedUserId;
+                var victimName = victim is null
+                    ? null
+                    : await db.Users.AsNoTracking().Where(u => u.Id == victim).Select(u => u.Name).FirstOrDefaultAsync(ct);
+
+                await auditLog.WriteHostAsync(
+                    victim, victimName, "auth.refresh_reuse_detected",
+                    AuditLogAppService.Modules.Authentication, AuditLogAppService.Categories.Auth,
+                    entityType: "User", entityId: victim?.ToString(), entityLabel: victimName,
+                    details: $"A refresh token that had already been rotated was presented again. Every active session for this account was revoked as a precaution ({rotated.SessionsRevoked} ended).",
+                    sourceIp: clientIp, userAgent: userAgent, result: "Failure",
+                    failureReason: "Refresh token reuse detected", authMethod: "Local", ct: ct);
+            }
+
             throw new InvalidRefreshTokenException();
         }
 
-        var (user, newToken) = rotated.Value;
+        var user = rotated.User!;
+        var newToken = rotated.NewToken!;
         if (user.Status != UserStatus.Active)
         {
             throw new AccountInactiveException();
@@ -229,9 +265,11 @@ public class AuthAppService(
         {
             // Audited: repeated failures here are a signal that someone is using a hijacked access
             // token and guessing at the password to make their access permanent.
-            await auditLog.WriteAsync(
-                ServiceName, user.Id, user.Name, "auth.password_change_failed", "User", user.Id.ToString(),
-                "Current password did not match.", clientIp, result: "Failure",
+            await auditLog.WriteHostAsync(
+                user.Id, user.Name, "auth.password_change_failed",
+                AuditLogAppService.Modules.Authentication, AuditLogAppService.Categories.Auth,
+                entityType: "User", entityId: user.Id.ToString(), details: "Current password did not match.",
+                entityLabel: user.Email, sourceIp: clientIp, result: "Failure",
                 authMethod: "Local", userAgent: userAgent, ct: ct);
 
             throw new PasswordChangeRejectedException("Your current password is incorrect.");
@@ -255,12 +293,14 @@ public class AuthAppService(
 
         var sessionsEnded = await refreshTokenService.RevokeAllForUserExceptAsync(user.Id, currentRawRefreshToken, ct);
 
-        await auditLog.WriteAsync(
-            ServiceName, user.Id, user.Name, "auth.password_changed", "User", user.Id.ToString(),
-            sessionsEnded > 0
+        await auditLog.WriteHostAsync(
+            user.Id, user.Name, "auth.password_changed",
+            AuditLogAppService.Modules.Authentication, AuditLogAppService.Categories.Auth,
+            entityType: "User", entityId: user.Id.ToString(),
+            details: sessionsEnded > 0
                 ? $"Password changed. {sessionsEnded} other session(s) signed out."
                 : "Password changed.",
-            clientIp, authMethod: "Local", userAgent: userAgent, ct: ct);
+            entityLabel: user.Email, sourceIp: clientIp, authMethod: "Local", userAgent: userAgent, ct: ct);
 
         return new ChangePasswordResponse(
             sessionsEnded > 0
@@ -269,8 +309,38 @@ public class AuthAppService(
             sessionsEnded);
     }
 
-    public Task LogoutAsync(string rawRefreshToken, CancellationToken ct = default) =>
-        refreshTokenService.RevokeAsync(rawRefreshToken, ct);
+    /// <summary>
+    /// Ends the session the presented refresh token belongs to.
+    /// </summary>
+    /// <remarks>
+    /// Audited, which it was not before. A sign-in was recorded and a sign-out was not, so the trail
+    /// could show an account signing in five times and never leaving — sessions appeared to
+    /// accumulate indefinitely, and "was this person still working at 21:40?" had no answer. It also
+    /// makes the reuse-detection event above interpretable: a rotation refused shortly after a
+    /// deliberate sign-out reads very differently from one with no sign-out before it.
+    ///
+    /// The token is resolved to its owner BEFORE revocation, because afterwards the only link from
+    /// the cookie to an account is the row being revoked.
+    /// </remarks>
+    public async Task LogoutAsync(string rawRefreshToken, string? clientIp = null, string? userAgent = null, CancellationToken ct = default)
+    {
+        var owner = await refreshTokenService.FindOwnerAsync(rawRefreshToken, ct);
+
+        await refreshTokenService.RevokeAsync(rawRefreshToken, ct);
+
+        // An unrecognised cookie is not an event worth a row — it is a stale browser, and recording
+        // one would let anyone fill the trail by posting junk to an anonymous endpoint.
+        if (owner is null)
+        {
+            return;
+        }
+
+        await auditLog.WriteHostAsync(
+            owner.Value.UserId, owner.Value.Name, "auth.logout",
+            AuditLogAppService.Modules.Authentication, AuditLogAppService.Categories.Auth,
+            entityType: "User", entityId: owner.Value.UserId.ToString(), entityLabel: owner.Value.Name,
+            details: "Signed out.", sourceIp: clientIp, userAgent: userAgent, ct: ct);
+    }
 
     public async Task<CurrentUserDto?> GetCurrentUserAsync(Guid userId, CancellationToken ct = default)
     {

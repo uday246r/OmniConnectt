@@ -1,0 +1,178 @@
+.popover {
+  min-width: 260px;
+  width: 280px;
+}
+
+.currentSummary {
+  margin: 0;
+  padding: 6px 8px;
+  background: var(--omni-color-primary-50);
+  border-radius: var(--omni-radius-md);
+  font-size: var(--omni-font-size-2xs-plus);
+  font-weight: var(--omni-font-weight-semibold);
+  color: var(--omni-color-primary-700);
+  text-align: center;
+}
+
+.fieldGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.fieldLabel {
+  font-size: var(--omni-font-size-2xs-plus);
+  font-weight: var(--omni-font-weight-bold);
+  color: var(--omni-color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.fieldRow {
+  display: flex;
+  gap: 6px;
+}
+
+.dateInput,
+.timeInput {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 7px 8px;
+  background: var(--omni-color-surface-alt);
+  border: 1.5px solid var(--omni-color-border);
+  border-radius: var(--omni-radius-md);
+  font-size: var(--omni-font-size-2xs-plus);
+  color: var(--omni-color-text-primary);
+  outline: none;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+
+.dateInput {
+  flex: 1.3 1 0;
+}
+
+.dateInput:focus,
+.timeInput:focus {
+  border-color: var(--omni-color-primary-600);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+  background: var(--omni-color-surface);
+}
+
+.timeInput:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.applyBtn {
+  margin-top: 2px;
+  padding: 8px 12px;
+  background: var(--omni-color-primary-600);
+  color: #ffffff;
+  border: none;
+  border-radius: var(--omni-radius-md);
+  font-size: var(--omni-font-size-xs);
+  font-weight: var(--omni-font-weight-bold);
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 120ms ease;
+}
+
+.applyBtn:hover {
+  background: var(--omni-color-primary-700);
+}
+
+/* ── The preset list ──────────────────────────────────────────────────────── */
+
+/*
+ * Presets and the custom fields share one popover rather than living behind a "Custom" toggle. A
+ * toggle was what three of the previous screens did, and it hid the fields behind an extra click
+ * on the one path an operator reaches for when the presets have already failed them.
+ */
+.presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.preset {
+  flex: 1 1 auto;
+  padding: 5px 8px;
+  background: var(--omni-color-surface-alt);
+  border: 1.5px solid var(--omni-color-border);
+  border-radius: var(--omni-radius-md);
+  font-size: var(--omni-font-size-2xs-plus);
+  font-weight: var(--omni-font-weight-semibold);
+  color: var(--omni-color-text-secondary);
+  cursor: pointer;
+  font-family: inherit;
+  white-space: nowrap;
+  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+
+.preset:hover {
+  border-color: var(--omni-color-primary-600);
+  color: var(--omni-color-text-primary);
+}
+
+.presetActive,
+.presetActive:hover {
+  background: var(--omni-color-primary-600);
+  border-color: var(--omni-color-primary-600);
+  color: #ffffff;
+}
+
+/* The custom date/time fields, dimmed until the Custom preset is chosen — visible so an operator
+   can see what choosing it would offer, inert so they cannot half-fill a range that is not applied. */
+.customFields {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.customFieldsInactive {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+/* ── The standalone (non-column-header) placement ─────────────────────────── */
+
+.buttonRoot {
+  display: inline-flex;
+}
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 10px;
+  background: var(--omni-color-surface);
+  border: 1.5px solid var(--omni-color-border);
+  border-radius: var(--omni-radius-md);
+  font-size: var(--omni-font-size-xs);
+  font-weight: var(--omni-font-weight-semibold);
+  color: var(--omni-color-text-secondary);
+  cursor: pointer;
+  font-family: inherit;
+  white-space: nowrap;
+  transition: border-color 120ms ease, color 120ms ease;
+}
+
+.button:hover {
+  border-color: var(--omni-color-primary-600);
+  color: var(--omni-color-text-primary);
+}
+
+.buttonActive {
+  border-color: var(--omni-color-primary-600);
+  color: var(--omni-color-primary-700);
+  background: var(--omni-color-primary-50);
+}
+
+.buttonChevron {
+  transition: transform 140ms ease;
+}
+
+.buttonChevronOpen {
+  transform: rotate(180deg);
+}

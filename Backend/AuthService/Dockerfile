@@ -13,8 +13,11 @@ WORKDIR /src
 # Copy manifests first so the restore layer caches independently of source edits.
 COPY Directory.Build.props ./
 COPY AuthService/AuthService.csproj AuthService/
+# The platform field-format engine, shared with LeadService.
+COPY Shared/OmniRemit.Validation/OmniRemit.Validation.csproj Shared/OmniRemit.Validation/
 RUN dotnet restore AuthService/AuthService.csproj
 
+COPY Shared/ Shared/
 COPY AuthService/ AuthService/
 RUN dotnet publish AuthService/AuthService.csproj -c Release -o /app/publish --no-restore
 

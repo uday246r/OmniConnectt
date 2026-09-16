@@ -12,6 +12,8 @@ export interface ValidationPresetCatalogDto {
 
 export interface UpdateValidationPresetCatalogRequest {
   presets: CustomPreset[]
+  /** The version this page loaded; a save based on an older one is refused (409) instead of overwriting someone else's. */
+  expectedVersion?: number
 }
 
 export const customPresetsApi = {

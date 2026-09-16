@@ -50,7 +50,10 @@ public static class AuthDbSeeder
     // feature — "only users with Manage Checker Assignment permission" per the requirement, kept apart
     // from Approvals' own View/Approve so a checker doesn't automatically get to reconfigure who the
     // checkers are.
-    private static readonly string[] ApprovalsCapabilities = ["View", "Approve"];
+    // Export is separate from View for the same reason it is on the two log features: reading the
+    // approval queue on screen and taking a copy of it off the platform are different decisions, and
+    // an organisation may well grant the first widely and the second narrowly.
+    private static readonly string[] ApprovalsCapabilities = ["View", "Approve", "Export"];
     private static readonly string[] CheckerAssignmentCapabilities = ["View", "Manage"];
 
     /// <summary>Pre-rename feature key. Its absence is the marker that legacy data migrations are already done.</summary>
@@ -322,7 +325,10 @@ public static class AuthDbSeeder
                 [HostFeatureKeys.SettingsApplications] = ["View", "Register", "Edit", "Disable"],
                 [HostFeatureKeys.SystemAuditLogs] = ["View", "Export"],
                 [HostFeatureKeys.SystemLogs] = ["View", "Export"],
-                [HostFeatureKeys.SystemApprovals] = ["View", "Approve"],
+                // Export matches what Admin already holds on the two log features — this role exists
+                // to run the platform day to day, and producing evidence of a period's approvals is
+                // part of that.
+                [HostFeatureKeys.SystemApprovals] = ["View", "Approve", "Export"],
                 // Manage stays Super-Admin-only, per "only users with Manage Checker Assignment
                 // permission" — Admin can see who's assigned but not reassign checkers.
                 [HostFeatureKeys.SystemCheckerAssignment] = ["View"],

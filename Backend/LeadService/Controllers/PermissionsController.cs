@@ -104,21 +104,26 @@ public class PermissionsController(ILogger<PermissionsController> logger) : Cont
                 continue;
             }
 
-            var attributes = type.GetCustomAttributes<RequiresCapabilityAttribute>(true)
-                .Concat(type
-                    .GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)
-                    .SelectMany(m => m.GetCustomAttributes<RequiresCapabilityAttribute>(true)));
+            var methods = type.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly);
 
-            foreach (var attribute in attributes)
+            var attributes = type.GetCustomAttributes<RequiresCapabilityAttribute>(true)
+                .Concat(methods.SelectMany(m => m.GetCustomAttributes<RequiresCapabilityAttribute>(true)))
+                .Select(a => (a.Module, a.Capability))
+                // Every alternative of an any-of guard is a capability something enforces.
+                .Concat(type.GetCustomAttributes<RequiresAnyCapabilityAttribute>(true)
+                    .Concat(methods.SelectMany(m => m.GetCustomAttributes<RequiresAnyCapabilityAttribute>(true)))
+                    .SelectMany(a => a.Alternatives));
+
+            foreach (var (module, capability) in attributes)
             {
-                var moduleKey = attribute.Module.ToLowerInvariant();
+                var moduleKey = module.ToLowerInvariant();
                 if (!modules.TryGetValue(moduleKey, out var entry))
                 {
-                    entry = (attribute.Module, new SortedSet<string>(StringComparer.Ordinal));
+                    entry = (module, new SortedSet<string>(StringComparer.Ordinal));
                     modules[moduleKey] = entry;
                 }
 
-                entry.Capabilities.Add(attribute.Capability);
+                entry.Capabilities.Add(capability);
             }
         }
 

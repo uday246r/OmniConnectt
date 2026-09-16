@@ -3,11 +3,11 @@
 Measured on the local stack (five .NET services on one Windows machine) against the live Neon
 Postgres databases, 2026-08-24. Numbers are from a real load test, not estimates.
 
-> ⚠️ **These numbers predate the move to Microsoft SQL Server** and the removal of EmployeeService.
-> The dominant term below is round-trip latency to a *remote* managed database; against local SQL
-> Server that term largely disappears, so these figures are no longer a valid baseline for the
-> current stack. The *analysis* — where time goes and which infrastructure work matters — still
-> holds. Re-run the load test before quoting any number here.
+> ⚠️ **Superseded by [LOAD-TEST-RESULTS.md](LOAD-TEST-RESULTS.md) (2026-09-15)**, a re-run on the current
+> four-service Postgres stack with 220k generated rows and verified cleanup. The numbers below are from
+> 2026-08-24, when EmployeeService and the ModuleRegistry service still existed; do not quote them. The
+> analysis still holds and was confirmed by the re-run: round-trip latency to the remote database is the
+> dominant term (~285 ms per query from the test machine).
 
 ## What was measured
 

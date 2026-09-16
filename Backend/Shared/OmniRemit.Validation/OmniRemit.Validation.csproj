@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The platform's one server-side field-format engine: the built-in presets, the admin-defined
+    "Manage Formats" kinds, email and phone checks. AuthService validates users with it, LeadService
+    validates leads with it, and any future service references it instead of copying it.
+
+    Its TypeScript twin is Frontend/packages/ui/src/validation. The two are held together by the shared
+    table in Frontend/packages/ui/src/validation/__fixtures__/rule-parity.json, which both test suites
+    run: a case that passes on one side and fails on the other breaks a build.
+
+    No dependencies on purpose. Target framework, nullable and implicit usings come from
+    Backend/Directory.Build.props.
+  -->
+
+</Project>

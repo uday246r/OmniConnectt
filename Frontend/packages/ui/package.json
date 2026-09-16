@@ -8,6 +8,7 @@
     ".": "./src/index.ts",
     "./icons": "./src/icons.tsx",
     "./validation": "./src/validation/index.ts",
+    "./validation-editor": "./src/validation-editor/index.ts",
     "./tokens.css": "./src/tokens/tokens.css"
   },
   "dependencies": {

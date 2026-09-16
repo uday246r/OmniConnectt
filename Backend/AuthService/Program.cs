@@ -50,7 +50,6 @@ builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(JwtOptio
 builder.Services.Configure<AuthCookieOptions>(builder.Configuration.GetSection(AuthCookieOptions.SectionName));
 builder.Services.Configure<InternalApiOptions>(builder.Configuration.GetSection(InternalApiOptions.SectionName));
 builder.Services.Configure<GoogleAuthOptions>(builder.Configuration.GetSection(GoogleAuthOptions.SectionName));
-builder.Services.Configure<SecretProtectionOptions>(builder.Configuration.GetSection(SecretProtectionOptions.SectionName));
 builder.Services.Configure<SmtpOptions>(builder.Configuration.GetSection(SmtpOptions.SectionName));
 
 var connectionString = builder.Configuration.GetConnectionString("AuthDb");
@@ -78,7 +77,6 @@ builder.Services.AddDbContextPool<AuthDbContext>(options =>
             errorCodesToAdd: null)));
 
 builder.Services.AddScoped<PasswordHasher>();
-builder.Services.AddScoped<SecretProtector>();
 builder.Services.AddScoped<JwtTokenService>();
 builder.Services.AddScoped<RefreshTokenService>();
 builder.Services.AddScoped<PermissionClaimsBuilder>();
@@ -107,6 +105,7 @@ builder.Services.AddScoped<DashboardAppService>();
 builder.Services.AddScoped<SearchAppService>();
 builder.Services.AddMemoryCache();
 builder.Services.AddScoped<NavigationAppService>();
+builder.Services.AddScoped<PageViewAuditService>();
 
 /*
  * Redis, when configured — and only then.
@@ -203,7 +202,11 @@ builder.Services.AddCors(options =>
         policy.WithOrigins(allowedOrigins)
             .AllowAnyHeader()
             .AllowAnyMethod()
-            .AllowCredentials(); // required: refresh token travels as an httpOnly cookie
+            .AllowCredentials() // required: refresh token travels as an httpOnly cookie
+            // Without this the CSV exports still download, but the browser cannot read the row-count
+            // headers — so a truncated file arrives with no warning, which is the exact failure those
+            // headers exist to prevent.
+            .WithExposedHeaders(AuthService.Infrastructure.ExportHeaders.All);
     });
 });
 
@@ -331,6 +334,22 @@ builder.Services.AddRateLimiter(options =>
                 QueueLimit = 0,
                 QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
             }));
+
+    // Per user, like Sensitive. A rejected page view costs the operator nothing: the page still opens.
+    options.AddPolicy(RateLimitPolicies.PageViews, httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: rateLimits.Enabled
+                ? httpContext.User.FindFirstValue("sub")
+                  ?? httpContext.Connection.RemoteIpAddress?.ToString()
+                  ?? "unknown"
+                : "disabled",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = rateLimits.Enabled ? rateLimits.PageViewPermitLimit : int.MaxValue,
+                Window = TimeSpan.FromSeconds(Math.Max(1, rateLimits.PageViewWindowSeconds)),
+                QueueLimit = 0,
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+            }));
 });
 
 builder.Services.Configure<PasswordPolicyOptions>(builder.Configuration.GetSection(PasswordPolicyOptions.SectionName));
@@ -433,12 +452,12 @@ if (string.IsNullOrWhiteSpace(configuredPublicKeyPem))
 
 using (var scope = app.Services.CreateScope())
 {
-    if (!scope.ServiceProvider.GetRequiredService<SecretProtector>().IsConfigured)
+    if (!scope.ServiceProvider.GetRequiredService<IEmailSender>().IsEnabled)
     {
         app.Logger.LogWarning(
-            "Security__TempPasswordKey is not set — approving a gated Create-User request will be " +
-            "refused, because the generated temporary password could not be stored for the maker to " +
-            "collect. Set it in Backend/AuthService/.env (openssl rand -base64 32).");
+            "Smtp__* is not configured — a newly created local account cannot be emailed its " +
+            "set-password link, which is the only way it can ever be signed into. Set the Smtp " +
+            "settings in Backend/AuthService/.env, then use Resend Invite on the affected users.");
     }
 }
 
@@ -491,5 +510,11 @@ app.MapHub<PlatformHub>("/hubs/platform", options =>
 // Real check — reports Unhealthy (503) when the database is unreachable, instead of the previous
 // hardcoded "ok" that could never fail.
 app.MapHealthChecks("/health").WithName("HealthCheck");
+// Liveness: the process is up and serving, with no dependency checks. /health (above) is readiness and
+// opens a database connection per call; the load test showed a probe hitting it at a few hundred
+// requests a second saturating the connection pool that real requests need. Point frequent liveness
+// probes here and reserve /health for readiness.
+app.MapHealthChecks("/health/live", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions { Predicate = _ => false })
+    .WithName("LivenessCheck");
 
 app.Run();

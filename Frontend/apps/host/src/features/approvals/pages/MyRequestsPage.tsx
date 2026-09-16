@@ -1,12 +1,12 @@
-import { useCallback, useEffect, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useAuthStore } from '../../auth/store/authStore'
 import { Badge, Button, ColumnFilter, DataTable, EMPTY_VALUE, FilterBar, Icon, PageHeader, Pagination, ResponsiveRows, RowsPerPage, readStoredPageSize, type ActiveFilter, type BadgeTone } from '@omniremit/ui'
-import { approvalsApi, type ApprovalRequestListItemDto, type ApprovalStatus} from '../api/approvalsApi'
+import { approvalsApi, type ApprovalFacetsDto, type ApprovalRequestListItemDto, type ApprovalStatus, type MyRequestsParams } from '../api/approvalsApi'
 import { useApprovalRequests } from '../hooks/useApprovalRequests'
-import { ApiError } from '../../../shared/api/httpClient'
 import styles from './MyRequestsPage.module.css'
-import { TOPICS } from '../../../shared/stores/invalidationStore'
-import { useLiveRevision } from '../../../shared/hooks/useLiveRevision'
+import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useLiveRefetchInterval } from '../../../shared/query/invalidationBridge'
+import { queryKeys } from '../../../shared/query/queryKeys'
 
 const DEFAULT_PAGE_SIZE = 10
 
@@ -173,9 +173,9 @@ export function MyRequestsPage() {
 
   const [statusFilter, setStatusFilter] = useState<ApprovalStatus | 'all'>('all')
   /*
-   * Per-column filters, matching Approval Center. Status stays SERVER-side (the endpoint takes it);
-   * the rest narrow the fetched page, and each offers the values actually present rather than an
-   * empty box.
+   * Per-column filters, matching Approval Center — all applied by the server. They used to narrow only
+   * the page already fetched, so a request on another page could not be found by filtering for it,
+   * and each dropdown listed only what that page happened to contain.
    */
   const [moduleFilter, setModuleFilter] = useState('')
   const [actionFilter, setActionFilter] = useState('')
@@ -183,45 +183,44 @@ export function MyRequestsPage() {
   const [page, setPage] = useState(1)
   // Opens at whatever size this user last chose here — see RowsPerPage's storageKey.
   const [pageSize, setPageSize] = useState(() => readStoredPageSize('host.myRequests', DEFAULT_PAGE_SIZE))
-  const [refreshKey, setRefreshKey] = useState(0)
-  const dataRevision = useLiveRevision(TOPICS.approvals)
+  const queryClient = useQueryClient()
+  const refetchInterval = useLiveRefetchInterval()
 
-  const fetcher = useCallback(
-    (token: string, signal?: AbortSignal) =>
-      approvalsApi.listMine(token, { page, pageSize, status: statusFilter === 'all' ? undefined : statusFilter }, signal),
-    [page, pageSize, statusFilter],
+  const filterParams = useMemo<MyRequestsParams>(
+    () => ({
+      status: statusFilter === 'all' ? undefined : statusFilter,
+      module: moduleFilter || undefined,
+      action: (actionFilter || undefined) as MyRequestsParams['action'],
+      checkerName: checkerFilter || undefined,
+    }),
+    [statusFilter, moduleFilter, actionFilter, checkerFilter],
   )
-  const { items, total, error } = useApprovalRequests(accessToken, fetcher, [page, pageSize, statusFilter, refreshKey], [dataRevision])
+  const listParams = useMemo(() => ({ ...filterParams, page, pageSize }), [filterParams, page, pageSize])
+  const fetcher = useCallback(
+    (token: string, signal?: AbortSignal) => approvalsApi.listMine(token, listParams, signal),
+    [listParams],
+  )
+  const { items, total, error } = useApprovalRequests(accessToken, queryKeys.approvals.mine(listParams), fetcher)
+
+  // Options are a convenience; losing them must not look like losing the requests.
+  const facetsQuery = useQuery({
+    queryKey: queryKeys.approvals.mineFacets(filterParams),
+    enabled: Boolean(accessToken),
+    placeholderData: keepPreviousData,
+    refetchInterval,
+    queryFn: ({ signal }) => approvalsApi.mineFacets(accessToken!, filterParams, signal),
+  })
+  const facets: ApprovalFacetsDto | null = facetsQuery.data ?? null
 
   useEffect(() => {
     setPage(1)
-  }, [statusFilter])
+  }, [filterParams])
 
- 
 
-  const optionsFrom = (pick: (r: ApprovalRequestListItemDto) => string | null | undefined) => {
-    if (items === null) return []
-    const seen = new Map<string, string>()
-    for (const r of items) {
-      const v = (pick(r) ?? '').trim()
-      if (v && !seen.has(v.toLowerCase())) seen.set(v.toLowerCase(), v)
-    }
-    return [...seen.values()].sort((a, b) => a.localeCompare(b)).map((v) => ({ value: v, label: v }))
-  }
-  const moduleOptions = optionsFrom((r) => formatModuleName(r.module))
-  const actionOptions = optionsFrom((r) => r.action)
-  const checkerOptions = optionsFrom((r) => r.checkerName)
-
-  /* Narrows the page already fetched — the endpoint takes status and paging only. */
-  const visibleItems =
-    items === null
-      ? null
-      : items.filter((r) => {
-          if (moduleFilter && formatModuleName(r.module) !== moduleFilter) return false
-          if (actionFilter && r.action !== actionFilter) return false
-          if (checkerFilter && (r.checkerName ?? '') !== checkerFilter) return false
-          return true
-        })
+  const moduleOptions = (facets?.modules ?? []).map((m) => ({ value: m, label: formatModuleName(m) }))
+  const actionOptions = (facets?.actions ?? []).map((a) => ({ value: a, label: ACTION_LABELS[a] ?? a }))
+  const checkerOptions = (facets?.checkers ?? []).map((c) => ({ value: c, label: c }))
+  const visibleItems = items
 
 
   return (
@@ -242,7 +241,7 @@ export function MyRequestsPage() {
           <Button
             type="button"
             variant="onHeader"
-            onClick={() => setRefreshKey((k) => k + 1)}
+            onClick={() => void queryClient.invalidateQueries({ queryKey: queryKeys.approvals.all() })}
             leadingIcon={<Icon.Activity width={15} height={15} />}
           >
             Refresh
@@ -302,8 +301,8 @@ export function MyRequestsPage() {
 
       <FilterBar
         filters={[
-          moduleFilter && { key: 'module', label: 'Module', value: moduleFilter, onRemove: () => setModuleFilter('') },
-          actionFilter && { key: 'action', label: 'Action', value: actionFilter, onRemove: () => setActionFilter('') },
+          moduleFilter && { key: 'module', label: 'Module', value: formatModuleName(moduleFilter), onRemove: () => setModuleFilter('') },
+          actionFilter && { key: 'action', label: 'Action', value: ACTION_LABELS[actionFilter] ?? actionFilter, onRemove: () => setActionFilter('') },
           checkerFilter && { key: 'checker', label: 'Checker', value: checkerFilter, onRemove: () => setCheckerFilter('') },
         ].filter(Boolean) as ActiveFilter[]}
         onClearAll={() => {
@@ -349,7 +348,7 @@ export function MyRequestsPage() {
                   onChange={setModuleFilter}
                   options={moduleOptions}
                   allLabel="All Modules"
-                  searchable={moduleOptions.length > 6}
+                  searchable
                 />
               ),
               render: (r) => <Badge tone="info">{formatModuleName(r.module)}</Badge>,
@@ -366,7 +365,7 @@ export function MyRequestsPage() {
                   onChange={setActionFilter}
                   options={actionOptions}
                   allLabel="All Actions"
-                  searchable={actionOptions.length > 6}
+                  searchable
                 />
               ),
               render: (r) => {
@@ -402,7 +401,7 @@ export function MyRequestsPage() {
                   onChange={setCheckerFilter}
                   options={checkerOptions}
                   allLabel="Everyone"
-                  searchable={checkerOptions.length > 6}
+                  searchable
                   filterType="alpha"
                 />
               ),

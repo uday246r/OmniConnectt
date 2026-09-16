@@ -25,11 +25,27 @@ namespace LeadManagement.Api.Controllers;
 [Route("internal/approvals")]
 [AllowAnonymous]
 [TypeFilter(typeof(InternalApiKeyFilter))]
-public class InternalApprovalsController(ILeadService leadService, AuthServiceClient authServiceClient, LeadFieldConfigService fieldConfigService) : ControllerBase
+public class InternalApprovalsController(
+    ILeadService leadService, AuthServiceClient authServiceClient, LeadFieldConfigService fieldConfigService,
+    AuditActorContext auditActor) : ControllerBase
 {
     [HttpPost("apply")]
     public async Task<IActionResult> Apply([FromBody] ApplyApprovedMutationRequest request)
     {
+        /*
+         * Attribute everything this replay writes to the MAKER.
+         *
+         * The request arrives from AuthService carrying the internal API key and no user token, so
+         * the LOCAL audit rows written deep inside the lead services below have no caller to resolve
+         * and would be recorded as unattributed. Setting the override once here covers every write
+         * the replay performs, including those in code with no idea an approval is involved.
+         *
+         * The central rows pushed further down already name the maker explicitly; this makes the two
+         * trails agree, so an approved change reads the same whether you look at Lead Management's
+         * own audit screen or the platform's.
+         */
+        auditActor.AttributeTo(request.ActingUserId, request.ActingUserName);
+
         // LeadFieldConfig replays are also submitted with Action="Update" (see
         // LeadFieldConfigService.TrySubmitForApprovalAsync) — branch on EntityType FIRST so this never
         // collides with the Lead-update case in the switch below.
@@ -48,7 +64,8 @@ public class InternalApprovalsController(ILeadService leadService, AuthServiceCl
                 var created = await leadService.CreateLeadAsync(createDto, request.ActingUserId, bypassApproval: true);
                 await authServiceClient.PushAuditLogAsync(
                     "lead.created", "Lead", created.Applied!.Id, $"Created lead for '{created.Applied.Name}' ({created.Applied.Product})",
-                    request.ActingUserId, request.ActingUserName, created.Applied.Name);
+                    request.ActingUserId, request.ActingUserName, created.Applied.Name,
+                    module: "Leads", page: "create-lead", actionCategory: "CRUD");
                 break;
 
             case "Update":
@@ -56,7 +73,8 @@ public class InternalApprovalsController(ILeadService leadService, AuthServiceCl
                 var updated = await leadService.UpdateLeadAsync(request.EntityId!, updateDto, request.ActingUserId, bypassApproval: true);
                 await authServiceClient.PushAuditLogAsync(
                     "lead.updated", "Lead", request.EntityId, $"Updated lead '{updated.Applied!.Name}'",
-                    request.ActingUserId, request.ActingUserName, updated.Applied.Name);
+                    request.ActingUserId, request.ActingUserName, updated.Applied.Name,
+                    module: "Leads", page: "view-lead", actionCategory: "CRUD");
                 break;
 
             case "Delete":
@@ -64,7 +82,8 @@ public class InternalApprovalsController(ILeadService leadService, AuthServiceCl
                 await leadService.DeleteLeadAsync(request.EntityId!, deleteDto, request.ActingUserId, bypassApproval: true);
                 await authServiceClient.PushAuditLogAsync(
                     "lead.deleted", "Lead", request.EntityId, $"Deleted lead (Reason: {deleteDto.DeleteReason})",
-                    request.ActingUserId, request.ActingUserName, null);
+                    request.ActingUserId, request.ActingUserName, null,
+                    module: "Leads", page: "view-lead", actionCategory: "CRUD");
                 break;
 
             default:

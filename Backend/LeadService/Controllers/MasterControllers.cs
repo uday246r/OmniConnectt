@@ -36,7 +36,8 @@ namespace LeadManagement.Api.Controllers
         /// deliberately returns name-only dropdown options, which every existing consumer (lead
         /// submission, filters) matches by name, not id.</summary>
         [HttpGet("full")]
-        [RequiresCapability("FieldSettings", "View")]
+        // The lead forms resolve a product's field configuration by this id too, not only Field Settings.
+        [RequiresAnyCapability("FieldSettings:View", "Lead:View", "Lead:Create", "Lead:Edit")]
         public async Task<ActionResult<ApiResponseDto<List<ProductWithIdDto>>>> GetProductsWithId()
         {
             var data = await _masterDataService.GetProductsWithIdAsync();

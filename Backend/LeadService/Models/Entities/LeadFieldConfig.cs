@@ -1,5 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace LeadManagement.Api.Models.Entities
 {
@@ -62,5 +64,55 @@ namespace LeadManagement.Api.Models.Entities
         public string MaskingRule { get; set; } = "None";
 
         public int VisibleCharCount { get; set; } = 4;
+
+        /// <summary>
+        /// The field's format rules, as JSON — the same rule shape user fields use in Manage Fields: a
+        /// built-in preset ("emailSmart", "mobileIN", "minLength" with a value), a format an
+        /// administrator defined in Settings → Manage Formats (by its key), or a one-off pattern.
+        /// </summary>
+        /// <remarks>
+        /// Stored rather than coded so a format is an administrator's decision. The IC number, phone and
+        /// email checks used to be regexes typed into CreateLeadDto and three places in the form store,
+        /// which nobody could change without a release and which approval replay never re-ran.
+        /// </remarks>
+        [Column(TypeName = "jsonb")]
+        [JsonIgnore]
+        public string? ValidationsJson { get; set; }
+
+        [NotMapped]
+        public List<LeadFieldRule> Validations
+        {
+            get => LeadFieldRule.Parse(ValidationsJson);
+            set => ValidationsJson = value is { Count: > 0 } ? JsonSerializer.Serialize(value, LeadFieldRule.JsonOptions) : null;
+        }
+    }
+
+    /// <summary>One format rule on a lead field. Same shape as a user field's rule, so one engine evaluates both.</summary>
+    public sealed class LeadFieldRule
+    {
+        public string Type { get; set; } = string.Empty;
+        public string? Pattern { get; set; }
+        public int? Value { get; set; }
+        public string Message { get; set; } = string.Empty;
+
+        internal static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+
+        /// <summary>A malformed stored value reads as "no rules" — a bad row must not stop anyone creating leads.</summary>
+        public static List<LeadFieldRule> Parse(string? json)
+        {
+            if (string.IsNullOrWhiteSpace(json)) return [];
+            try
+            {
+                return (JsonSerializer.Deserialize<List<LeadFieldRule>>(json, JsonOptions) ?? [])
+                    .Where(r => !string.IsNullOrWhiteSpace(r.Type))
+                    .ToList();
+            }
+            catch (JsonException)
+            {
+                return [];
+            }
+        }
+
+        public OmniRemit.Validation.FieldRule ToEngineRule() => new(Type, Pattern, Value, Message);
     }
 }

@@ -1,0 +1,155 @@
+/*
+ * The platform dropdown's chrome — the same field border, radius and focus ring as Input and Select,
+ * so a searchable dropdown sits beside a text box without looking like a different control.
+ */
+.wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  border: 1.5px solid var(--omni-color-border);
+  border-radius: var(--omni-radius-md);
+  background: var(--omni-color-surface);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.wrap:focus-within {
+  border-color: var(--omni-color-primary-600);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.invalid {
+  border-color: var(--omni-color-danger);
+}
+
+.disabled {
+  background: var(--omni-color-surface-alt);
+  cursor: not-allowed;
+}
+
+.input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--omni-color-text-primary);
+  font: inherit;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.input:focus {
+  cursor: text;
+}
+
+.input::placeholder {
+  color: var(--omni-color-text-muted);
+}
+
+.input:disabled {
+  color: var(--omni-color-text-muted);
+  cursor: not-allowed;
+}
+
+.sm { height: 32px; padding: 0 28px 0 10px; font-size: var(--omni-font-size-xs); }
+.md { height: 36px; padding: 0 30px 0 12px; font-size: var(--omni-font-size-sm); }
+.lg { height: 42px; padding: 0 32px 0 14px; font-size: var(--omni-font-size-md); }
+
+.prefix {
+  display: inline-flex;
+  align-items: center;
+  margin-right: 6px;
+  flex-shrink: 0;
+}
+
+.chevron {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  color: var(--omni-color-text-muted);
+  pointer-events: none;
+}
+
+/* Portalled to <body>: positioned in viewport coordinates, above drawers and modals. */
+.list {
+  position: fixed;
+  z-index: 10050;
+  box-sizing: border-box;
+  max-width: min(420px, calc(100vw - 16px));
+  max-height: 280px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  background: var(--omni-color-surface);
+  border: 1px solid var(--omni-color-border);
+  border-radius: var(--omni-radius-md);
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.12), 0 2px 6px rgba(15, 23, 42, 0.06);
+  font-size: var(--omni-font-size-sm);
+}
+
+.group {
+  padding: 8px 10px 4px;
+  font-size: var(--omni-font-size-xs);
+  font-weight: var(--omni-font-weight-semibold);
+  color: var(--omni-color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 10px;
+  border-radius: var(--omni-radius-sm, 6px);
+  color: var(--omni-color-text-primary);
+  cursor: pointer;
+}
+
+.active {
+  background: var(--omni-color-surface-alt);
+}
+
+.selected {
+  font-weight: var(--omni-font-weight-semibold);
+  color: var(--omni-color-primary-600);
+}
+
+.optionDisabled {
+  color: var(--omni-color-text-muted);
+  cursor: not-allowed;
+}
+
+.clear {
+  color: var(--omni-color-text-secondary);
+}
+
+.optionText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.optionLabel {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.optionDescription {
+  font-size: var(--omni-font-size-xs);
+  color: var(--omni-color-text-muted);
+}
+
+.status {
+  padding: 10px;
+  color: var(--omni-color-text-muted);
+  text-align: center;
+}

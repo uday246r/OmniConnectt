@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Generates run-tagged volume in the service databases for a load test, and deletes it afterwards.
+    It references the services' own DbContexts, so the rows it writes always match the current schema
+    (a hand-written COPY column list would silently drift from the migrations).
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <!-- The referenced web projects each ship an appsettings.json; this tool reads none of them. -->
+    <ErrorOnDuplicatePublishOutputFiles>false</ErrorOnDuplicatePublishOutputFiles>
+    <NoWarn>$(NoWarn);MSB3277</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\AuthService\AuthService.csproj" />
+    <ProjectReference Include="..\..\LeadService\LeadManagement.Api.csproj" />
+    <ProjectReference Include="..\..\ProductsService\src\ProductMarketplace.Infrastructure\ProductMarketplace.Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>

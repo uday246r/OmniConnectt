@@ -1,5 +1,6 @@
-import { validateFullPhone } from '@omniremit/ui/validation';
+import type { CustomPreset } from '@omniremit/ui/validation';
 import { create } from 'zustand';
+import { apiFieldFor, defaultPhoneCountry, formatErrorFor, formatErrorsFor, splitStoredPhone } from '../config/leadFormats';
 import { LeadFormData, FormValidationErrors, NavigationPage, LeadRecord, DropdownOption, AuditRecord } from '../types/lead';
 import {
   apiClient,
@@ -12,7 +13,7 @@ import {
 } from '../api/apiClient';
 import { isFieldRequired, type LeadFieldConfig } from '../config/fieldControlRegistry';
 import { canSeeDashboardCapability } from '../api/hostBridge';
-import { readStoredPageSize } from '@omniremit/ui';
+import { EMPTY_DATE_RANGE, readStoredPageSize, resolveDateRange, type DateRangeValue } from '@omniremit/ui';
 
 /** LeadFormData's field names match the backend's apiField catalog 1:1 with exactly one exception —
  * the form calls it `preferredBranch`, the catalog calls it `branch`. Central so both validateField
@@ -82,6 +83,8 @@ interface LeadStoreState {
   fieldConfig: LeadFieldConfig[];
   isLoadingFieldConfig: boolean;
   fetchFieldConfigForProduct: (productName: string) => Promise<void>;
+  /** Formats administrators defined in Settings → Manage Formats, which a field's rules may refer to by key. */
+  formatPresets: CustomPreset[];
 
   /** The View Leads table shows leads from every product at once, so its columns can't reflect any
    * ONE product's config the way the Create/Edit forms do — they're driven by the common-field
@@ -175,6 +178,8 @@ interface LeadStoreState {
   isEditReasonOpen: boolean;
   isEditLeadOpen: boolean;
   editLeadTarget: LeadRecord | null;
+  /** The edit form as it was opened — values left unchanged are not re-checked against formats. */
+  editInitialFormData: LeadFormData;
   editReason: string;
   editFormData: LeadFormData;
   editErrors: FormValidationErrors;
@@ -209,6 +214,20 @@ interface LeadStoreState {
   auditPageSize: number;
   auditSearchQuery: string;
   auditActionFilter: string;
+  /**
+   * Performed By and Outcome. Filtered in the browser over one fetched page until the audit endpoint
+   * accepted them, which left matches on other pages unreachable and the export ignoring both.
+   */
+  auditActorFilter: string;
+  auditStatusFilter: string;
+  /**
+   * The shared date range, held as a preset rather than as resolved instants — so "Last 7 Days" on a
+   * page left open overnight still means the last seven days.
+   *
+   * New. This screen offered no date filter at all, alone among the platform's log surfaces, even
+   * though the endpoint behind it had accepted date parameters the whole time.
+   */
+  auditDateRange: DateRangeValue;
   isLoadingAuditLogs: boolean;
   selectedAuditLog: AuditRecord | null;
   isAuditDetailsOpen: boolean;
@@ -220,7 +239,10 @@ interface LeadStoreState {
   /** Rows per page for the audit table. The page size was fixed at 10 with no way to change it. */
   setAuditPageSize: (size: number) => void;
   setAuditSearchQuery: (query: string) => void;
+  setAuditDateRange: (range: DateRangeValue) => void;
   setAuditActionFilter: (action: string) => void;
+  setAuditActorFilter: (actor: string) => void;
+  setAuditStatusFilter: (status: string) => void;
 }
 
 const FIELD_DISPLAY_NAMES: Record<string, string> = {
@@ -248,16 +270,11 @@ export const getEmptyErrorMessage = (field: string): string => {
   return `Please enter the ${name}`;
 };
 
-export const getIncorrectErrorMessage = (field: string): string => {
-  const name = FIELD_DISPLAY_NAMES[field] || field;
-  return `Please enter the ${name} correctly.`;
-};
-
 const initialFormData: LeadFormData = {
   product: '',
   customerName: '',
   icNumber: '',
-  phoneCountryCode: '+60',
+  phoneCountryCode: defaultPhoneCountry().dialCode,
   phoneNumber: '',
   email: '',
   state: '',
@@ -298,6 +315,7 @@ export const useLeadStore = create<LeadStoreState>((set, get) => ({
   productIdByName: {},
   fieldConfig: [],
   isLoadingFieldConfig: false,
+  formatPresets: [],
   fetchFieldConfigForProduct: async (productName) => {
     const productId = get().productIdByName[productName];
     if (!productId) {
@@ -306,8 +324,12 @@ export const useLeadStore = create<LeadStoreState>((set, get) => ({
     }
     set({ isLoadingFieldConfig: true });
     try {
-      const config = await apiClient.getFieldConfig(productId);
-      set({ fieldConfig: config, isLoadingFieldConfig: false });
+      // The Manage Formats catalog travels with the config: a field's rule can name one of its formats.
+      const [config, formatPresets] = await Promise.all([
+        apiClient.getFieldConfig(productId),
+        apiClient.getFormatPresets(),
+      ]);
+      set({ fieldConfig: config, formatPresets, isLoadingFieldConfig: false });
     } catch {
       set({ fieldConfig: [], isLoadingFieldConfig: false });
     }
@@ -451,40 +473,15 @@ export const useLeadStore = create<LeadStoreState>((set, get) => ({
         return { errors };
       }
 
-      switch (field) {
-        case 'icNumber':
-          if (val && typeof val === 'string' && val.trim()) {
-            if (!/^\d{6}-\d{2}-\d{4}$/.test(val.trim())) {
-              errors.icNumber = getIncorrectErrorMessage('icNumber');
-            } else {
-              delete errors.icNumber;
-            }
-          }
-          break;
-        case 'phoneNumber':
-          if (val && typeof val === 'string' && val.trim()) {
-            const fullPhone = `${state.formData.phoneCountryCode}${val.trim().replace(/\s|-/g, '')}`;
-            if (validateFullPhone(fullPhone) !== undefined) {
-              errors.phoneNumber = getIncorrectErrorMessage('phoneNumber');
-            } else {
-              delete errors.phoneNumber;
-            }
-          }
-          break;
-        case 'email':
-          if (val && typeof val === 'string' && val.trim()) {
-            if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val.trim())) {
-              errors.email = getIncorrectErrorMessage('email');
-            } else {
-              delete errors.email;
-            }
-          }
-          break;
-        default:
-          if (val && typeof val === 'string' && val.trim()) {
-            delete errors[field];
-          }
-          break;
+      // Formats come from the field's own Field Settings rules — see config/leadFormats.ts. Changing the
+      // country re-checks the number against the new country's rules.
+      const checked = field === 'phoneCountryCode' ? 'phoneNumber' : field;
+      const form = { ...state.formData, [field]: val };
+      const message = formatErrorFor(state.fieldConfig, apiFieldFor(checked), form, state.formatPresets);
+      if (message) {
+        errors[checked] = message;
+      } else if (checked !== field || (val && typeof val === 'string' && val.trim())) {
+        delete errors[checked];
       }
 
       return { errors };
@@ -518,23 +515,14 @@ export const useLeadStore = create<LeadStoreState>((set, get) => ({
 
     if (isFieldRequired(fieldConfig, 'icNumber') && !formData.icNumber.trim()) {
       errors.icNumber = getEmptyErrorMessage('icNumber');
-    } else if (formData.icNumber.trim() && !/^\d{6}-\d{2}-\d{4}$/.test(formData.icNumber.trim())) {
-      errors.icNumber = getIncorrectErrorMessage('icNumber');
     }
 
     if (isFieldRequired(fieldConfig, 'phoneNumber') && !formData.phoneNumber.trim()) {
       errors.phoneNumber = getEmptyErrorMessage('phoneNumber');
-    } else if (formData.phoneNumber.trim()) {
-      const fullPhone = `${formData.phoneCountryCode}${formData.phoneNumber.trim().replace(/\s|-/g, '')}`;
-      if (validateFullPhone(fullPhone) !== undefined) {
-        errors.phoneNumber = getIncorrectErrorMessage('phoneNumber');
-      }
     }
 
     if (isFieldRequired(fieldConfig, 'email') && !formData.email.trim()) {
       errors.email = getEmptyErrorMessage('email');
-    } else if (formData.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
-      errors.email = getIncorrectErrorMessage('email');
     }
 
     if (isFieldRequired(fieldConfig, 'state') && !formData.state) {
@@ -580,6 +568,11 @@ export const useLeadStore = create<LeadStoreState>((set, get) => ({
 
     if (isFieldRequired(fieldConfig, 'agreedToPrivacyPolicy') && !formData.agreedToPrivacyPolicy) {
       errors.agreedToPrivacyPolicy = getEmptyErrorMessage('agreedToPrivacyPolicy');
+    }
+
+    // Every configured format, for fields that are not already missing.
+    for (const [field, message] of Object.entries(formatErrorsFor(fieldConfig, formData, get().formatPresets))) {
+      errors[field as keyof LeadFormData] ??= message;
     }
 
     set({ errors });
@@ -1050,26 +1043,21 @@ export const useLeadStore = create<LeadStoreState>((set, get) => ({
   isEditReasonOpen: false,
   isEditLeadOpen: false,
   editLeadTarget: null,
+  editInitialFormData: initialFormData,
   editReason: '',
   editFormData: initialFormData,
   editErrors: {},
   isConfirmingEdit: false,
 
   openEditWorkflow: (lead) => {
-    // Populate form data from lead
-    const phoneNo = lead.phone ? lead.phone.replace(/^\+60\s?/, '') : '';
-    set({
-      editLeadTarget: lead,
-      isEditReasonOpen: true,
-      editReason: '',
-      isConfirmingEdit: false,
-      editErrors: {},
-      editFormData: {
+    // The stored phone carries its own country code; the form shows it in the country picker.
+    const phone = splitStoredPhone(lead.phone);
+    const editFormData: LeadFormData = {
         product: lead.product || '',
         customerName: lead.name || '',
         icNumber: lead.icNumber || '',
-        phoneCountryCode: '+60',
-        phoneNumber: phoneNo,
+        phoneCountryCode: phone.phoneCountryCode,
+        phoneNumber: phone.phoneNumber,
         email: lead.email || '',
         state: lead.state || '',
         preferredBranch: lead.branch && lead.branch !== 'Not Assigned' ? lead.branch : '',
@@ -1084,7 +1072,15 @@ export const useLeadStore = create<LeadStoreState>((set, get) => ({
         entityType: lead.entityType || '',
         marketingConsent: (lead.marketingConsent as any) || 'CONSENT',
         agreedToPrivacyPolicy: true,
-      },
+    };
+    set({
+      editLeadTarget: lead,
+      isEditReasonOpen: true,
+      editReason: '',
+      isConfirmingEdit: false,
+      editErrors: {},
+      editFormData,
+      editInitialFormData: editFormData,
     });
     if (lead.product) {
       void get().fetchFieldConfigForProduct(lead.product);
@@ -1128,16 +1124,10 @@ export const useLeadStore = create<LeadStoreState>((set, get) => ({
     if (!editFormData.product) errors.product = getEmptyErrorMessage('product');
     if (isFieldRequired(fieldConfig, 'customerName') && !editFormData.customerName.trim()) errors.customerName = getEmptyErrorMessage('customerName');
     if (isFieldRequired(fieldConfig, 'icNumber') && !editFormData.icNumber.trim()) errors.icNumber = getEmptyErrorMessage('icNumber');
-    else if (editFormData.icNumber.trim() && !/^\d{6}-\d{2}-\d{4}$/.test(editFormData.icNumber.trim())) errors.icNumber = getIncorrectErrorMessage('icNumber');
 
     if (isFieldRequired(fieldConfig, 'phoneNumber') && !editFormData.phoneNumber.trim()) errors.phoneNumber = getEmptyErrorMessage('phoneNumber');
-    else if (editFormData.phoneNumber.trim()) {
-      const fullPhone = `${editFormData.phoneCountryCode}${editFormData.phoneNumber.trim().replace(/\s|-/g, '')}`;
-      if (validateFullPhone(fullPhone) !== undefined) errors.phoneNumber = getIncorrectErrorMessage('phoneNumber');
-    }
 
     if (isFieldRequired(fieldConfig, 'email') && !editFormData.email.trim()) errors.email = getEmptyErrorMessage('email');
-    else if (editFormData.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(editFormData.email.trim())) errors.email = getIncorrectErrorMessage('email');
 
     if (isFieldRequired(fieldConfig, 'state') && !editFormData.state) errors.state = getEmptyErrorMessage('state');
     if (isFieldRequired(fieldConfig, 'employerName') && !editFormData.employerName.trim()) errors.employerName = getEmptyErrorMessage('employerName');
@@ -1157,6 +1147,10 @@ export const useLeadStore = create<LeadStoreState>((set, get) => ({
     }
 
     if (isFieldRequired(fieldConfig, 'marketingConsent') && !editFormData.marketingConsent) errors.marketingConsent = getEmptyErrorMessage('marketingConsent');
+
+    for (const [field, message] of Object.entries(formatErrorsFor(fieldConfig, editFormData, get().formatPresets, get().editInitialFormData))) {
+      errors[field as keyof LeadFormData] ??= message;
+    }
 
     set({ editErrors: errors });
     const isValid = Object.keys(errors).length === 0;
@@ -1221,6 +1215,9 @@ export const useLeadStore = create<LeadStoreState>((set, get) => ({
           title: 'Update Failed',
           message: res.message || 'Failed to update lead.',
         });
+        if (res.errors) {
+          set({ editErrors: res.errors as FormValidationErrors });
+        }
         return false;
       }
     } catch (err: any) {
@@ -1325,6 +1322,9 @@ export const useLeadStore = create<LeadStoreState>((set, get) => ({
   auditPageSize: readStoredPageSize('lead.audit', 10),
   auditSearchQuery: '',
   auditActionFilter: '',
+  auditActorFilter: '',
+  auditStatusFilter: '',
+  auditDateRange: EMPTY_DATE_RANGE,
   isLoadingAuditLogs: false,
   selectedAuditLog: null,
   isAuditDetailsOpen: false,
@@ -1338,6 +1338,10 @@ export const useLeadStore = create<LeadStoreState>((set, get) => ({
         pageSize: state.auditPageSize,
         search: state.auditSearchQuery,
         actionType: state.auditActionFilter,
+        actor: state.auditActorFilter,
+        status: state.auditStatusFilter,
+        // Resolved at the point of use, never stored.
+        ...resolveDateRange(state.auditDateRange),
       });
 
       set({
@@ -1369,8 +1373,23 @@ export const useLeadStore = create<LeadStoreState>((set, get) => ({
     get().fetchAuditLogs();
   },
 
+  setAuditDateRange: (range) => {
+    set({ auditDateRange: range, auditPage: 1 });
+    get().fetchAuditLogs();
+  },
+
   setAuditActionFilter: (action) => {
     set({ auditActionFilter: action, auditPage: 1 });
+    get().fetchAuditLogs();
+  },
+
+  setAuditActorFilter: (actor) => {
+    set({ auditActorFilter: actor, auditPage: 1 });
+    get().fetchAuditLogs();
+  },
+
+  setAuditStatusFilter: (status) => {
+    set({ auditStatusFilter: status, auditPage: 1 });
     get().fetchAuditLogs();
   },
 }));

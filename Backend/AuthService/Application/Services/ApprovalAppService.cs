@@ -20,19 +20,17 @@ namespace AuthService.Application.Services;
 public class ApprovalAppService(
     AuthDbContext db, AuditLogAppService auditLog, UserAppService userAppService, RoleAppService roleAppService,
     RemoteAppAppService remoteAppService, RemoteApprovalCallbackClient callbackClient,
-    SecretProtector secretProtector, IPlatformEventPublisher events)
+    IPlatformEventPublisher events)
 {
     private const string ServiceName = "AuthService";
 
     public async Task<PagedResult<ApprovalRequestListItemDto>> ListAsync(
-        int page, int pageSize, string? module, string? status, Guid? makerId, Guid? checkerId,
-        DateTimeOffset? from, DateTimeOffset? to, CancellationToken ct = default)
+        int page, int pageSize, ApprovalFilter filter, CancellationToken ct = default)
     {
-        var query = BuildFilteredQuery(module, status, makerId, checkerId, from, to);
+        var query = BuildFilteredQuery(filter);
 
         var total = await query.CountAsync(ct);
-        var items = await query
-            .OrderByDescending(r => r.RequestedAt)
+        var items = await Order(query, filter)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .Select(r => ToListItemDto(r))
@@ -40,6 +38,34 @@ public class ApprovalAppService(
 
         return new PagedResult<ApprovalRequestListItemDto>(items, total, page, pageSize);
     }
+
+    /// <summary>
+    /// The distinct modules, actions, makers and checkers present under <paramref name="filter"/>.
+    /// </summary>
+    /// <remarks>
+    /// These dropdowns were built from the 200 rows the page had fetched, so they could only ever
+    /// offer what happened to be loaded. Makers and checkers are bounded by the user base, so a
+    /// DISTINCT over them is cheap; the cap is a guard, not an expectation.
+    /// </remarks>
+    public async Task<ApprovalFacetsDto> FacetsAsync(ApprovalFilter filter, CancellationToken ct = default)
+    {
+        const int maxOptions = 200;
+        var query = BuildFilteredQuery(filter);
+
+        var modules = await query.Select(r => r.Module).Distinct().OrderBy(v => v).Take(maxOptions).ToListAsync(ct);
+        var actions = await query.Select(r => r.Action).Distinct().OrderBy(v => v).Take(maxOptions).ToListAsync(ct);
+        var makers = await query.Where(r => r.MakerName != null).Select(r => r.MakerName!)
+            .Distinct().OrderBy(v => v).Take(maxOptions).ToListAsync(ct);
+        var checkers = await query.Where(r => r.CheckerName != null).Select(r => r.CheckerName!)
+            .Distinct().OrderBy(v => v).Take(maxOptions).ToListAsync(ct);
+
+        return new ApprovalFacetsDto(modules, actions, makers, checkers);
+    }
+
+    private static IQueryable<ApprovalRequest> Order(IQueryable<ApprovalRequest> query, ApprovalFilter filter) =>
+        string.Equals(filter.SortBy, "decided", StringComparison.OrdinalIgnoreCase)
+            ? query.OrderByDescending(r => r.DecidedAt ?? r.RequestedAt).ThenByDescending(r => r.RequestedAt)
+            : query.OrderByDescending(r => r.RequestedAt);
 
     public async Task<ApprovalRequestDetailDto> GetAsync(Guid id, CancellationToken ct = default)
     {
@@ -70,7 +96,7 @@ public class ApprovalAppService(
     public async Task<ApprovalRequestDetailDto> ApproveAsync(Guid id, Guid checkerUserId, bool isAdministrator = false, CancellationToken ct = default)
     {
         var request = await db.ApprovalRequests.FirstOrDefaultAsync(r => r.Id == id, ct) ?? throw NotFound(id);
-        EnsureDecidable(request, checkerUserId, isAdministrator);
+        await EnsureDecidableAsync(request, checkerUserId, isAdministrator, "approve", ct);
 
         // Every audit row this decision produces — including the replayed mutation several call
         // frames down inside UserAppService/RoleAppService — should read as part of the SAME
@@ -119,36 +145,73 @@ public class ApprovalAppService(
          * are deliberately NOT guarded, because those really are rolled back and really must re-run.
          */
         var remoteReplay = new RemoteReplayGuard();
-        await db.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
+        try
         {
-            await using var transaction = await db.Database.BeginTransactionAsync(ct);
-
-            request.Status = ApprovalStatus.Approved;
-            request.DecidedAt = DateTimeOffset.UtcNow;
-
-            try
+            await db.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
             {
-                await db.SaveChangesAsync(ct);
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                // Someone else decided this request between our read and our write. Their outcome stands.
-                throw new ConflictAppException(
-                    "This request was just decided by someone else. Refresh to see its current status.");
-            }
+                await using var transaction = await db.Database.BeginTransactionAsync(ct);
 
-            // Replay the original mutation through the same validated method a direct call uses.
-            // For a Create-User, SetPasswordInviteService.IssueAsync inside CreateAsync sends the
-            // invitation email to the new user automatically — no temp password is stored or returned.
-            await ReplayAsync(request, remoteReplay, ct);
+                request.Status = ApprovalStatus.Approved;
+                request.DecidedAt = DateTimeOffset.UtcNow;
 
-            await transaction.CommitAsync(ct);
-        });
+                try
+                {
+                    await db.SaveChangesAsync(ct);
+                }
+                catch (DbUpdateConcurrencyException)
+                {
+                    // Someone else decided this request between our read and our write. Their outcome stands.
+                    throw new ConflictAppException(
+                        "This request was just decided by someone else. Refresh to see its current status.");
+                }
+
+                // Replay runs the original mutation through the same validated method a direct call
+                // uses. A Create-User replay emails the new account its set-password link from inside
+                // CreateAsync, so the replay has nothing secret to hand back here.
+                await ReplayAsync(request, remoteReplay, ct);
+
+                await transaction.CommitAsync(ct);
+            });
+        }
+        catch (Exception ex) when (ex is not ConflictAppException)
+        {
+            /*
+             * The replay failed, so the whole unit rolled back — including the status flip — and the
+             * request is genuinely still Pending. That rollback is the correct behaviour and it is
+             * also what made this case invisible: nothing was written, so nothing could be written
+             * ABOUT it either. The checker saw an error, the request sat unchanged, and the trail had
+             * no record that a decision had even been attempted.
+             *
+             * Recorded outside the transaction, which is the point — this row must survive the very
+             * rollback it is describing. The exception is then rethrown unchanged so the caller's
+             * error handling is unaffected.
+             *
+             * A replay fails when the world moved while the request waited: the email was taken, the
+             * role was renamed, the target was deleted, the remote refused the callback. Each of those
+             * is a real operational event, and a run of them against one module is a signal.
+             */
+            var actorName = await db.Users.AsNoTracking()
+                .Where(u => u.Id == checkerUserId).Select(u => u.Name).FirstOrDefaultAsync(ct);
+
+            await auditLog.WriteHostAsync(
+                checkerUserId, actorName, "approval.replay_failed",
+                AuditLogAppService.Modules.Approvals, AuditLogAppService.Categories.Approval,
+                entityType: "ApprovalRequest", entityId: request.Id.ToString(),
+                details: $"Approving {request.Action} on {request.Module}" +
+                         (request.EntityLabel is not null ? $" ({request.EntityLabel})" : "") +
+                         $" could not be applied, so the request is still Pending. Requested by {request.MakerName}.",
+                entityLabel: request.EntityLabel, result: "Failure",
+                failureReason: ex.Message, correlationId: request.CorrelationId, ct: ct);
+
+            throw;
+        }
 
         var checkerName = await db.Users.AsNoTracking().Where(u => u.Id == checkerUserId).Select(u => u.Name).FirstOrDefaultAsync(ct);
-        await auditLog.WriteAsync(
-            ServiceName, checkerUserId, checkerName, "approval.approved", "ApprovalRequest", request.Id.ToString(),
-            $"Approved {request.Action} on {request.Module}" + (request.EntityLabel is not null ? $" ({request.EntityLabel})" : "") + $" — requested by {request.MakerName}.",
+        await auditLog.WriteHostAsync(
+            checkerUserId, checkerName, "approval.approved",
+            AuditLogAppService.Modules.Approvals, AuditLogAppService.Categories.Approval,
+            entityType: "ApprovalRequest", entityId: request.Id.ToString(),
+            details: $"Approved {request.Action} on {request.Module}" + (request.EntityLabel is not null ? $" ({request.EntityLabel})" : "") + $" — requested by {request.MakerName}.",
             entityLabel: request.EntityLabel, correlationId: request.CorrelationId, ct: ct);
 
 
@@ -164,7 +227,7 @@ public class ApprovalAppService(
     public async Task<ApprovalRequestDetailDto> RejectAsync(Guid id, Guid checkerUserId, string reason, bool isAdministrator = false, CancellationToken ct = default)
     {
         var request = await db.ApprovalRequests.FirstOrDefaultAsync(r => r.Id == id, ct) ?? throw NotFound(id);
-        EnsureDecidable(request, checkerUserId, isAdministrator);
+        await EnsureDecidableAsync(request, checkerUserId, isAdministrator, "reject", ct);
 
         if (!string.IsNullOrWhiteSpace(request.CorrelationId))
         {
@@ -189,9 +252,11 @@ public class ApprovalAppService(
         }
 
         var checkerName = await db.Users.AsNoTracking().Where(u => u.Id == checkerUserId).Select(u => u.Name).FirstOrDefaultAsync(ct);
-        await auditLog.WriteAsync(
-            ServiceName, checkerUserId, checkerName, "approval.rejected", "ApprovalRequest", request.Id.ToString(),
-            $"Rejected {request.Action} on {request.Module}" + (request.EntityLabel is not null ? $" ({request.EntityLabel})" : "") + $" — requested by {request.MakerName}. Reason: {reason}",
+        await auditLog.WriteHostAsync(
+            checkerUserId, checkerName, "approval.rejected",
+            AuditLogAppService.Modules.Approvals, AuditLogAppService.Categories.Approval,
+            entityType: "ApprovalRequest", entityId: request.Id.ToString(),
+            details: $"Rejected {request.Action} on {request.Module}" + (request.EntityLabel is not null ? $" ({request.EntityLabel})" : "") + $" — requested by {request.MakerName}. Reason: {reason}",
             entityLabel: request.EntityLabel, correlationId: request.CorrelationId, ct: ct);
 
         var interestedUsers = new List<Guid> { request.MakerId, request.CheckerId };
@@ -204,71 +269,42 @@ public class ApprovalAppService(
     }
 
     /// <summary>
-    /// Hands the maker — and only the maker — the one-time temporary password produced when their
-    /// Create-User request was approved, then destroys it.
-    ///
-    /// Ownership is enforced HERE, server-side, from the caller's own token-derived id; there is no
-    /// permission attribute on the endpoint. Same shape as GET /api/approvals/mine: every user must
-    /// be able to collect the credential for an account they themselves created, whether or not they
-    /// hold Approval Center access, and makerId is never client-supplied.
-    ///
-    /// The secret is destroyed and COMMITTED before this method returns — deliberately before the
-    /// response is written. A crash between destroy and respond loses the password (recoverable only
-    /// by an administrator re-creating the account, but exposes nothing and cannot be replayed); the
-    /// reverse order would let a crash between respond and destroy leave the secret retrievable a
-    /// second time, defeating the entire one-time property. A credential that must be re-issued is an
-    /// operational annoyance; a credential that can be served twice is a security defect.
+    /// <see cref="EnsureDecidable"/>, with every refusal written to the audit trail before it is rethrown.
     /// </summary>
-    public async Task<RevealTempPasswordResponse> RevealTempPasswordAsync(Guid id, Guid callerUserId, CancellationToken ct = default)
+    /// <remarks>
+    /// A refused decision used to leave no trace at all. The most important of these is a maker trying
+    /// to approve their own request: that is an attempt to defeat segregation of duties, the one thing
+    /// Maker-Checker exists to enforce, and the trail showed nothing — only the eventual legitimate
+    /// approval. A checker acting on a request assigned to someone else, and a second decision on an
+    /// already-decided request, are recorded under the same key for the same reason: each is someone
+    /// trying to decide something they may not.
+    ///
+    /// The row carries the request's correlation id, so it appears in that operation's Related Activity
+    /// next to the request it tried to decide.
+    /// </remarks>
+    private async Task EnsureDecidableAsync(ApprovalRequest request, Guid checkerUserId, bool isAdministrator, string decision, CancellationToken ct)
     {
-        var request = await db.ApprovalRequests.FirstOrDefaultAsync(r => r.Id == id, ct) ?? throw NotFound(id);
-
-        if (request.MakerId != callerUserId)
+        try
         {
-            throw new ForbiddenAppException("Only the person who submitted this request can view its temporary password.");
+            EnsureDecidable(request, checkerUserId, isAdministrator);
         }
-
-        if (request.TempPasswordCiphertext is null)
+        catch (Exception ex) when (ex is ConflictAppException or ForbiddenAppException)
         {
-            throw request.TempPasswordRevealedAt is not null
-                ? new GoneAppException("This temporary password has already been viewed once and is no longer available.")
-                : new NotFoundAppException("This request has no temporary password to view.");
+            var actorName = await db.Users.AsNoTracking()
+                .Where(u => u.Id == checkerUserId).Select(u => u.Name).FirstOrDefaultAsync(ct);
+
+            await auditLog.WriteHostAsync(
+                checkerUserId, actorName, "approval.decision_refused",
+                AuditLogAppService.Modules.Approvals, AuditLogAppService.Categories.Approval,
+                entityType: "ApprovalRequest", entityId: request.Id.ToString(),
+                details: $"Refused an attempt to {decision} {request.Action} on {request.Module}" +
+                         (request.EntityLabel is not null ? $" ({request.EntityLabel})" : "") +
+                         $" — requested by {request.MakerName}, currently {request.Status}.",
+                entityLabel: request.EntityLabel, result: "Failure",
+                failureReason: ex.Message, correlationId: request.CorrelationId, ct: ct);
+
+            throw;
         }
-
-        var plaintext = secretProtector.Unprotect(request.TempPasswordCiphertext);
-
-        // Unrecoverable ciphertext (key rotated, column tampered with). Clear it anyway — leaving an
-        // undecryptable value behind would make this row answer 404 "no password" forever while the
-        // list still advertised one.
-        if (plaintext is null)
-        {
-            request.TempPasswordCiphertext = null;
-            request.TempPasswordRevealedAt = DateTimeOffset.UtcNow;
-            await db.SaveChangesAsync(ct);
-            throw new GoneAppException("This temporary password can no longer be decrypted on this server and must be re-issued by an administrator.");
-        }
-
-        request.TempPasswordCiphertext = null;
-        request.TempPasswordRevealedAt = DateTimeOffset.UtcNow;
-        await db.SaveChangesAsync(ct);
-
-        var makerName = await db.Users.AsNoTracking().Where(u => u.Id == callerUserId).Select(u => u.Name).FirstOrDefaultAsync(ct);
-        await auditLog.WriteAsync(
-            ServiceName, callerUserId, makerName, "user.temp_password_revealed", "ApprovalRequest", request.Id.ToString(),
-            $"Collected the one-time temporary password for {request.EntityLabel ?? "a new account"}. It is no longer retrievable.",
-            entityLabel: request.EntityLabel, correlationId: request.CorrelationId, ct: ct);
-
-        await events.PublishToUsersAsync([callerUserId], new PlatformEvent("approvals", "temp-password-collected"), ct);
-
-        // EntityId is null on a Create request, so the snapshot's email is the only link back to the
-        // account actually created by the replay.
-        var snapshot = JsonSerializer.Deserialize<UserSnapshotDto>(request.NewDataJson)!;
-        var account = await db.Users.AsNoTracking()
-            .Where(u => u.Email == snapshot.Email)
-            .Select(u => new { u.Name, u.Email })
-            .FirstOrDefaultAsync(ct);
-
-        return new RevealTempPasswordResponse(plaintext, account?.Name ?? snapshot.Name, account?.Email ?? snapshot.Email);
     }
 
     /// <summary>Server-side enforcement of both confirmed rules, defense in depth even though the maker
@@ -471,7 +507,8 @@ public class ApprovalAppService(
                     new ApplyApprovedMutationRequest(
                         request.Module, request.Action, request.EntityType, request.EntityId, request.NewDataJson,
                         request.MakerId, request.MakerName, request.CorrelationId),
-                    ct);
+                    ct,
+                    request.SourceService);
                 remoteReplay.Fired = true;
                 break;
         }
@@ -479,25 +516,101 @@ public class ApprovalAppService(
         return null;
     }
 
-    private IQueryable<ApprovalRequest> BuildFilteredQuery(
-        string? module, string? status, Guid? makerId, Guid? checkerId, DateTimeOffset? from, DateTimeOffset? to)
+    /// <summary>
+    /// The approval queue as a CSV file.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The Approval Center is the most compliance-relevant table on the platform — every gated change
+    /// anyone made, who asked for it, who decided, and why — and it was the one screen with no export
+    /// at all. Producing evidence of a period's approvals meant screenshots.
+    /// </para>
+    /// <para>
+    /// One pair of columns is deliberately absent. <c>OldDataJson</c>/<c>NewDataJson</c> carry the
+    /// entire payload of the change: a Create-User snapshot is a whole account record, including its
+    /// permission overrides. An export is read by a wider audience than the maker, and that does not
+    /// belong in a file that leaves the platform. The diff stays visible in the detail pane to
+    /// anyone holding <c>host.system.approvals:View</c>.
+    /// </para>
+    /// </remarks>
+    public async Task<CsvExport> ExportCsvAsync(ApprovalFilter filter, CancellationToken ct = default)
+    {
+        const int maxRows = 10_000;
+        var query = BuildFilteredQuery(filter);
+
+        var matched = await query.CountAsync(ct);
+        var rows = await Order(query, filter).Take(maxRows).ToListAsync(ct);
+
+        var csv = new CsvBuilder(
+            "RequestedAt", "DecidedAt", "Module", "Action", "EntityType", "EntityLabel",
+            "Status", "Maker", "Checker", "RejectionReason", "SourceService", "Id");
+
+        foreach (var r in rows)
+        {
+            csv.AppendRow(
+                r.RequestedAt.ToString("O"), r.DecidedAt?.ToString("O"), r.Module, r.Action,
+                r.EntityType, r.EntityLabel, r.Status, r.MakerName, r.CheckerName,
+                r.RejectionReason, r.SourceService, r.Id.ToString());
+        }
+
+        return new CsvExport(csv.ToString(), rows.Count, matched, maxRows);
+    }
+
+    /// <summary>The one query builder behind the list, the facets and the export.</summary>
+    /// <remarks>
+    /// The three substring filters lower-case both sides so they match the way the browser's
+    /// client-side filters used to — Postgres <c>LIKE</c> is case-sensitive, and a search for "asha"
+    /// that stopped finding "Asha" once it moved server-side would read as data loss.
+    /// </remarks>
+    private IQueryable<ApprovalRequest> BuildFilteredQuery(ApprovalFilter f)
     {
         var query = db.ApprovalRequests.AsNoTracking().AsQueryable();
 
-        if (!string.IsNullOrWhiteSpace(module)) query = query.Where(r => r.Module == module);
-        if (!string.IsNullOrWhiteSpace(status)) query = query.Where(r => r.Status == status);
-        if (makerId is not null) query = query.Where(r => r.MakerId == makerId);
-        if (checkerId is not null) query = query.Where(r => r.CheckerId == checkerId);
-        if (from is not null) query = query.Where(r => r.RequestedAt >= from);
-        if (to is not null) query = query.Where(r => r.RequestedAt <= to);
+        if (!string.IsNullOrWhiteSpace(f.Module)) query = query.Where(r => r.Module == f.Module);
+
+        // An array, not the IReadOnlyList itself: array Contains is what every provider translates to IN.
+        var statuses = f.Statuses.ToArray();
+        if (statuses.Length == 1)
+        {
+            var only = statuses[0];
+            query = query.Where(r => r.Status == only);
+        }
+        else if (statuses.Length > 1)
+        {
+            query = query.Where(r => statuses.Contains(r.Status));
+        }
+
+        if (!string.IsNullOrWhiteSpace(f.Action)) query = query.Where(r => r.Action == f.Action);
+        if (f.MakerId is not null) query = query.Where(r => r.MakerId == f.MakerId);
+        if (f.CheckerId is not null) query = query.Where(r => r.CheckerId == f.CheckerId);
+
+        if (!string.IsNullOrWhiteSpace(f.MakerName))
+        {
+            var needle = f.MakerName.Trim().ToLower();
+            query = query.Where(r => r.MakerName != null && r.MakerName.ToLower().Contains(needle));
+        }
+        if (!string.IsNullOrWhiteSpace(f.CheckerName))
+        {
+            var needle = f.CheckerName.Trim().ToLower();
+            query = query.Where(r => r.CheckerName != null && r.CheckerName.ToLower().Contains(needle));
+        }
+        if (!string.IsNullOrWhiteSpace(f.EntityLabel))
+        {
+            var needle = f.EntityLabel.Trim().ToLower();
+            query = query.Where(r => r.EntityLabel != null && r.EntityLabel.ToLower().Contains(needle));
+        }
+
+        if (f.From is not null) query = query.Where(r => r.RequestedAt >= f.From);
+        if (f.To is not null) query = query.Where(r => r.RequestedAt <= f.To);
+        if (f.DecidedFrom is not null) query = query.Where(r => r.DecidedAt >= f.DecidedFrom);
+        if (f.DecidedTo is not null) query = query.Where(r => r.DecidedAt <= f.DecidedTo);
 
         return query;
     }
 
     private static ApprovalRequestListItemDto ToListItemDto(ApprovalRequest r) => new(
         r.Id, r.Module, r.Action, r.EntityType, r.EntityLabel, r.Status,
-        r.MakerId, r.MakerName, r.CheckerId, r.CheckerName, r.RequestedAt, r.DecidedAt, r.RejectionReason,
-        r.TempPasswordCiphertext is not null);
+        r.MakerId, r.MakerName, r.CheckerId, r.CheckerName, r.RequestedAt, r.DecidedAt, r.RejectionReason);
 
     private static ApprovalRequestDetailDto ToDetailDto(ApprovalRequest r) => new(
         r.Id, r.Module, r.Action, r.EntityType, r.EntityId, r.EntityLabel, r.OldDataJson, r.NewDataJson,

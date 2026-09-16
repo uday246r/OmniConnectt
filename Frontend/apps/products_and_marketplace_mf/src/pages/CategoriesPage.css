@@ -1,0 +1,193 @@
+.pm-categories-page {
+  width: 100%;
+}
+
+.pm-categories-filter-bar,
+.pm-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: nowrap;
+  width: 100%;
+}
+
+@media (max-width: 768px) {
+  .pm-categories-filter-bar,
+  .pm-filter-bar {
+    flex-wrap: wrap;
+  }
+}
+
+.pm-categories-filter-bar .pm-search-input,
+.pm-filter-bar .pm-search-input {
+  flex: 1 1 240px;
+  min-width: 200px;
+  height: 40px;
+  box-sizing: border-box;
+}
+
+.pm-categories-filter-bar .pm-select:not(.pm-select-sm),
+.pm-filter-bar .pm-select:not(.pm-select-sm) {
+  width: 190px;
+  flex: 0 0 190px;
+  height: 40px;
+  box-sizing: border-box;
+}
+
+.pm-page-size-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  flex: 0 0 auto;
+  background: var(--omni-color-surface);
+  border: 1.5px solid var(--omni-color-text-muted);
+  border-radius: var(--radius-md, 10px);
+  padding: 0 12px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+  box-sizing: border-box;
+}
+
+.pm-filter-label {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.pm-page-size-picker .pm-select-sm {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1e293b;
+  padding: 4px 26px 4px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--omni-color-border-strong);
+  background-color: var(--omni-color-surface);
+  min-width: 72px;
+  height: 28px;
+  box-shadow: none;
+}
+
+.pm-custom-page-size-input {
+  width: 64px !important;
+  min-width: 64px !important;
+  padding: 4px 8px !important;
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  color: #1e293b !important;
+  text-align: center !important;
+  border-radius: 8px !important;
+  border: 1.5px solid var(--omni-color-primary-500) !important;
+  background: var(--omni-color-surface-alt) !important;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1) !important;
+  box-sizing: border-box !important;
+}
+
+.pm-categories-filter-bar .pm-btn,
+.pm-filter-bar .pm-btn {
+  height: 40px;
+  flex: 0 0 auto;
+  box-sizing: border-box;
+}
+
+.pm-categories-table-card {
+  padding: 0;
+  overflow: hidden;
+}
+
+.pm-cat-name-cell {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.pm-cat-name-cell strong {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--omni-color-text-primary);
+  transition: color 130ms ease;
+}
+
+.pm-table tbody tr:hover .pm-cat-name-cell strong {
+  color: var(--omni-color-primary-600);
+}
+
+.pm-cat-icon-squircle {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--omni-color-primary-50);
+  border: 1px solid var(--omni-color-primary-100);
+  color: var(--omni-color-primary-600);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: transform 150ms ease, background 150ms ease;
+}
+
+.pm-table tbody tr:hover .pm-cat-icon-squircle {
+  transform: scale(1.06);
+  background: var(--omni-color-primary-100);
+}
+
+.pm-sort-order-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pm-order-num-input {
+  width: 58px !important;
+  min-width: 58px !important;
+  padding: 6px 8px !important;
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  color: #1e293b !important;
+  text-align: center !important;
+  border-radius: 8px !important;
+  border: 1px solid var(--omni-color-border-strong) !important;
+  background: var(--omni-color-surface) !important;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.pm-order-num-input:focus {
+  border-color: var(--omni-color-primary-600) !important;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15) !important;
+}
+
+.pm-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pm-row-actions .pm-icon-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: var(--omni-color-surface-alt);
+  border: 1px solid #eaecf0;
+  color: #64748b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 130ms ease;
+  cursor: pointer;
+}
+
+.pm-row-actions .pm-icon-btn:hover {
+  background: var(--omni-color-primary-50);
+  border-color: var(--omni-color-primary-200);
+  color: var(--omni-color-primary-600);
+  transform: translateY(-1px);
+}
+
+.pm-row-actions .pm-icon-btn-delete:hover {
+  background: var(--omni-color-danger-50);
+  border-color: var(--omni-color-danger-200);
+  color: var(--omni-color-danger-600);
+}
+

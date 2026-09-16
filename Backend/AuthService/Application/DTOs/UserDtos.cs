@@ -13,7 +13,13 @@ public record UserListItemDto(
     bool IsAdministrator,
     bool IsActive,
     DateTimeOffset? LastLoginAt,
-    string AuthProvider);
+    string AuthProvider,
+    /// <summary>
+    /// The account exists but no invite has ever been redeemed for it, so nobody can sign in yet.
+    /// Drives whether Users offers Resend Invite — an action the server refuses for an account that
+    /// already has a password, and one there is no point showing on a row it cannot apply to.
+    /// </summary>
+    bool AwaitingPasswordSetup = false);
 
 public record PermissionOverrideDto(string FeatureKey, string Capability, string Effect);
 
@@ -91,13 +97,20 @@ public record CreateUserRequest(
 ///
 /// <paramref name="InviteEmailed"/> is true when a set-password invitation email was successfully
 /// delivered to the new user's email address. When false (SMTP not configured, or delivery failed)
-/// the user has no way to log in yet — the administrator should check SMTP settings and re-trigger
-/// an invite, or contact their email provider.
+/// the user has no way to log in yet, and an administrator recovers it with
+/// POST /api/users/{id}/resend-invite once mail is working.
 ///
-/// TemporaryPassword has been removed: credentials are never returned to the caller. The user sets
-/// their own password by clicking the link in the invitation email.
+/// No credential is ever returned to the caller: the user sets their own password by following the
+/// link in the invitation email, which is the only thing that turns the account into a usable login.
 /// </summary>
 public record CreateUserResponse(UserDetailDto User, bool InviteEmailed = false);
+
+/// <summary>
+/// <paramref name="Emailed"/> is false only when SMTP accepted the request but delivery failed — an
+/// ineligible account (already set up, disabled, Google-backed, still inside the resend cooldown) is
+/// refused outright rather than reported here, so the caller gets a reason instead of a silent no-op.
+/// </summary>
+public record ResendInviteResponse(bool Emailed);
 
 public record UpdateUserRequest(
     [Required(AllowEmptyStrings = false, ErrorMessage = "Name is required.")]

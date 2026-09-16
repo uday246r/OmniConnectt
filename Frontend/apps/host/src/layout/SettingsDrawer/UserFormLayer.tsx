@@ -31,7 +31,7 @@ import {
 import { CapabilityPicker } from '../../shared/permissions/CapabilityPicker'
 import styles from './UserFormLayer.module.css'
 import { TOPICS, invalidate } from '../../shared/stores/invalidationStore'
-import { Switch } from '@omniremit/ui'
+import { Select, Switch } from '@omniremit/ui'
 
 /*
  * Name/Email/Phone are no longer hardcoded here — they're the "core" entries of the admin-configurable
@@ -814,17 +814,16 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
                     {/* Salutation — like Role, a fixed dropdown backed by an admin-editable value list
                         (Settings > Manage Fields > Salutations), not part of UserFieldSchema itself. */}
                     <div className={styles.inputGroup}>
-                      <label className={styles.label}>Salutation</label>
-                      <select
-                        className={styles.select}
+                      <label className={styles.label} htmlFor="user-form-salutation">Salutation</label>
+                      <Select
+                        id="user-form-salutation"
                         value={salutation}
                         onChange={(e) => setSalutation(e.target.value)}
-                      >
-                        <option value="">-- None --</option>
-                        {salutationOptions.map((s) => (
-                          <option key={s} value={s}>{s}</option>
-                        ))}
-                      </select>
+                        placeholder="None"
+                        clearLabel="None"
+                        // A title since removed from the list stays selectable for the person who already has it.
+                        options={(salutation && !salutationOptions.includes(salutation) ? [...salutationOptions, salutation] : salutationOptions).map((s) => ({ value: s, label: s }))}
+                      />
                     </div>
 
                     {fields.map((field) => {

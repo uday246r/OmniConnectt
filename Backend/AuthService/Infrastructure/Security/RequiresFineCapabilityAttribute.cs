@@ -76,6 +76,9 @@ public class RequiresFineCapabilityAttribute(string featureKey, string capabilit
                     Status = StatusCodes.Status403Forbidden,
                 })
                 { StatusCode = StatusCodes.Status403Forbidden };
+
+                await AuthorizationAudit.RecordDeniedAsync(
+                    context, "authz.denied", required, $"The caller does not hold '{required}'");
             }
         }
     }

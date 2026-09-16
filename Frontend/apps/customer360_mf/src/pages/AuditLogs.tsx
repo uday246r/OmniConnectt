@@ -27,7 +27,9 @@ import type { AuditLog } from '../types/api';
 import { getFriendlyErrorMessage } from '../utils/errorMessages';
 import styles from './AuditLogs.module.css';
 import cc from '../shared/c360Common.module.css';
-import { ActorCell, Badge, Button, ColumnFilter, DataTable, DetailField, DetailGrid, DetailSection, DetailSections, Drawer, EMPTY_VALUE, FilterBar, PageHeader, Pagination, ResponsiveRows, RowAction, RowsPerPage, SearchField, formatAuditTimestamp, readStoredPageSize, useDebouncedValue, type ActiveFilter, type BadgeTone } from '@omniremit/ui';
+import { ActorCell, Badge, Button, ColumnFilter, CsvExportError, DataTable, DateRangeColumnFilter, DetailField, DetailGrid, DetailSection, DetailSections, Drawer, EMPTY_DATE_RANGE, EMPTY_VALUE, FilterBar, PageHeader, Pagination, ResponsiveRows, RowAction, RowsPerPage, SearchField, describeTruncation, formatAuditTimestamp, readStoredPageSize, resolveDateRange, useDebouncedValue, type ActiveFilter, type BadgeTone, type DateRangeValue } from '@omniremit/ui';
+import { remoteDownloadCsv } from '../services/exportCsv';
+import { API_BASE_URL } from '../services/api';
 import { resolveActor } from '../shared/resolveActor';
 
 /* Action -> platform badge tone. Was four hardcoded {bg,text,border,dot} palettes handed to the
@@ -102,11 +104,14 @@ export default function AuditLogs() {
   const [searchInput, setSearchInput] = useState('');
   const searchQuery = useDebouncedValue(searchInput, 300);
   const [actionFilter, setActionFilter] = useState('');
-  // Status has no server-side parameter, so it narrows the page already fetched. Kept explicit so
-  // nobody later assumes it paginates like `action` and `search` do.
+  // The shared date range, held as a preset so it keeps meaning what it says over time.
+  const [dateRange, setDateRange] = useState<DateRangeValue>(EMPTY_DATE_RANGE);
+  const [exporting, setExporting] = useState(false);
+  const [exportNotice, setExportNotice] = useState<string | null>(null);
+  // Status, actor, customer and description are query parameters like `action` and `search` —
+  // they were filtered here over the page already fetched, which left matches on other pages
+  // unreachable and the export ignoring them. See AuditQuery on the server.
   const [statusFilter, setStatusFilter] = useState('');
-  // Client-side, like status: GET /v1/audit accepts `search` and `action` only, so these narrow the
-  // page already fetched rather than the query.
   const [actorFilter, setActorFilter] = useState('');
   const [customerFilter, setCustomerFilter] = useState('');
   const [descFilter, setDescFilter] = useState('');
@@ -125,41 +130,47 @@ export default function AuditLogs() {
     return [...seen.values()].sort((a, b) => a.localeCompare(b)).map((v) => ({ value: v, label: v }));
   };
 
-  /*
-   * Status, Actor and Customer filter CLIENT-SIDE — GET /v1/audit accepts `search` and `action`
-   * only — while paging is server-side. With a client filter on, the pager would claim
-   * "Showing 11 to 13 of 13" above rows that had all been filtered out. It now describes what is
-   * on screen instead, and server paging is suppressed while one is active.
+  /**
+   * Every filter on this screen, as the query the server applies — shared by the list and the
+   * export so the CSV always answers the question the table is answering.
    */
-  const visibleLogs = logs.filter((log) => {
-    if (statusFilter && (isSuccessStatus(log.status) ? 'SUCCESS' : 'FAILED') !== statusFilter) return false;
-    if (descFilter && !(log.description || '').toLowerCase().includes(descFilter.toLowerCase())) return false;
-    if (actorFilter) {
-      const actor = resolveActor(log.user);
-      const hay = `${actor.name ?? ''} ${actor.id ?? ''} ${log.user ?? ''}`.toLowerCase();
-      if (!hay.includes(actorFilter.toLowerCase())) return false;
-    }
-    if (customerFilter) {
-      const hay = `${log.customerName ?? ''} ${log.customerId ?? ''}`.toLowerCase();
-      if (!hay.includes(customerFilter.toLowerCase())) return false;
-    }
-    return true;
+  const filterQuery = () => ({
+    search: searchQuery || undefined,
+    action: actionFilter || undefined,
+    status: statusFilter || undefined,
+    actor: actorFilter || undefined,
+    customer: customerFilter || undefined,
+    description: descFilter || undefined,
+    // Resolved at the point of use, so a preset keeps meaning what it says rather than freezing
+    // into whichever window it happened to denote when it was picked.
+    ...resolveDateRange(dateRange),
   });
-  const clientFiltered = Boolean(statusFilter || actorFilter || customerFilter || descFilter);
 
-  const actorOptions = React.useMemo(
-    () => distinct((l) => resolveActor(l.user).name ?? l.user),
-    [logs]
-  );
+  /*
+   * Actor options. A row written before the actor-name fix stores "User <id>", and even when the
+   * host can put a name to that id the server only knows the id — so the option filters by id and
+   * shows the name.
+   */
+  const actorOptions = React.useMemo(() => {
+    const seen = new Map<string, { value: string; label: string }>();
+    for (const log of logs) {
+      const actor = resolveActor(log.user);
+      const value = (actor.id ?? log.user ?? '').trim();
+      if (value && !seen.has(value.toLowerCase())) {
+        seen.set(value.toLowerCase(), { value, label: actor.name ?? value });
+      }
+    }
+    return [...seen.values()].sort((a, b) => a.label.localeCompare(b.label));
+  }, [logs]);
   const customerOptions = React.useMemo(
     () => distinct((l) => l.customerName || l.customerId),
     [logs]
   );
 
   /*
-   * Description recommendations, from the page of logs already loaded — the same scope this
-   * column's filter itself works over, since GET /v1/audit accepts `search` and `action` only and
-   * description is filtered client-side. Actor qualifies otherwise near-identical descriptions.
+   * Description recommendations, from the page of logs already loaded. The SUGGESTIONS narrow to
+   * this page; the FILTER itself is applied by the server across the whole trail. Actor qualifies
+   * otherwise near-identical descriptions.
    */
   const descPool = React.useMemo(
     () =>
@@ -224,12 +235,7 @@ export default function AuditLogs() {
     setLoading(true);
     setError(null);
     try {
-      const res = await api.getAuditLogs({
-        search: searchQuery,
-        action: actionFilter,
-        pageNumber,
-        pageSize,
-      });
+      const res = await api.getAuditLogs({ ...filterQuery(), pageNumber, pageSize });
       setLogs(res.data || []);
       setTotalCount(res.totalCount || 0);
       setTotalPages(res.totalPages || 1);
@@ -242,56 +248,47 @@ export default function AuditLogs() {
     }
   };
 
+  // Any filter change returns to page 1. The date range and the four formerly client-side filters
+  // were missing here, so narrowing from page 5 could land on an empty page 5 of a shorter result.
   useEffect(() => {
     setPageNumber(1);
-  }, [searchQuery, actionFilter]);
+  }, [searchQuery, actionFilter, statusFilter, actorFilter, customerFilter, descFilter, dateRange]);
 
   useEffect(() => {
     fetchLogs();
-  }, [pageNumber, pageSize, actionFilter, searchQuery]);
+  }, [pageNumber, pageSize, actionFilter, searchQuery, dateRange, statusFilter, actorFilter, customerFilter, descFilter]);
 
+  /**
+   * Exports the whole filtered trail, from the server.
+   *
+   * @remarks
+   * The version this replaces re-fetched with `pageSize: 1000` and built the CSV here — and the list
+   * endpoint clamps page size to 100, as it must, so "export everything" had always meant "export at
+   * most a hundred rows". The file said otherwise, and nothing anywhere reported the difference.
+   *
+   * The export endpoint has its own, much larger cap and reports when it reaches it.
+   */
   const handleExportCSV = async () => {
+    setExporting(true);
+    setExportNotice(null);
     try {
-      setLoading(true);
-      const res = await api.getAuditLogs({
-        search: searchQuery,
-        action: actionFilter,
-        pageNumber: 1,
-        pageSize: 1000,
-      });
-      const allLogs = res.data || [];
+      const query = new URLSearchParams();
+      for (const [key, value] of Object.entries(filterQuery())) {
+        if (value) query.append(key, value);
+      }
 
-      const headers = ['Timestamp', 'User', 'Action', 'Description', 'Status', 'Customer Name', 'Customer Type', 'Customer ID', 'Field'];
-      const rows = allLogs.map((l) => [
-        l.timestamp,
-        l.user,
-        l.action,
-        l.description,
-        l.status,
-        l.customerName || '',
-        l.customerType || '',
-        l.customerId || '',
-        l.field || '',
-      ]);
+      const result = await remoteDownloadCsv(
+        `${API_BASE_URL}/v1/audit/export?${query.toString()}`,
+        `customer360-audit-logs-${new Date().toISOString().split('T')[0]}.csv`,
+      );
 
-      const csvContent = [
-        headers.join(','),
-        ...rows.map((r) => r.map((val) => `"${String(val).replace(/"/g, '""')}"`).join(',')),
-      ].join('\n');
-
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.setAttribute('href', url);
-      link.setAttribute('download', `Customer360_AuditLogs_${new Date().toISOString().split('T')[0]}.csv`);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
+      setExportNotice(describeTruncation(result));
     } catch (err) {
-      console.error('Failed to export CSV:', err);
+      setExportNotice(
+        err instanceof CsvExportError ? err.message : 'The audit log could not be exported.',
+      );
     } finally {
-      setLoading(false);
+      setExporting(false);
     }
   };
 
@@ -324,10 +321,10 @@ export default function AuditLogs() {
             <Button
               variant="onHeader"
               onClick={handleExportCSV}
-              disabled={logs.length === 0}
+              disabled={exporting}
               leadingIcon={<Download size={15} />}
             >
-              Export CSV
+              {exporting ? 'Exporting…' : 'Export CSV'}
             </Button>
           ) : null
         }
@@ -341,7 +338,13 @@ export default function AuditLogs() {
             value: ACTION_FILTER_OPTIONS.find((o) => o.value === actionFilter)?.label ?? actionFilter,
             onRemove: () => setActionFilter(''),
           },
-          actorFilter && { key: 'actor', label: 'Performed By', value: actorFilter, onRemove: () => setActorFilter('') },
+          actorFilter && {
+            key: 'actor',
+            label: 'Performed By',
+            // The filter value may be an id (see actorOptions); the chip shows the name for it.
+            value: actorOptions.find((o) => o.value === actorFilter)?.label ?? actorFilter,
+            onRemove: () => setActorFilter(''),
+          },
           customerFilter && { key: 'customer', label: 'Customer', value: customerFilter, onRemove: () => setCustomerFilter('') },
           statusFilter && {
             key: 'status',
@@ -404,6 +407,18 @@ export default function AuditLogs() {
         )}
 
         {/*
+          A capped or refused export, reported rather than swallowed. The previous export logged its
+          failures to the console and silently truncated its successes, so neither outcome reached
+          the person who asked for the file.
+        */}
+        {exportNotice && (
+          <div className={styles.row4} role="status">
+            <AlertTriangle size={18} className={styles.rule2} />
+            <span>{exportNotice}</span>
+          </div>
+        )}
+
+        {/*
           * Table / Empty State.
           *
           * The table uses priority columns + a row expander: as the window narrows, What Happened
@@ -411,11 +426,11 @@ export default function AuditLogs() {
           * underneath, rather than the table scrolling sideways with half its columns off screen.
           * `minWidth` is deliberately gone — the point is that it no longer needs a scroller.
           */}
-        <DataTable bare footer={<Pagination page={clientFiltered ? 1 : pageNumber} pageSize={clientFiltered ? Math.max(visibleLogs.length, 1) : pageSize} total={clientFiltered ? visibleLogs.length : totalCount} itemLabel="event" onPageChange={setPageNumber} />}>
+        <DataTable bare footer={<Pagination page={pageNumber} pageSize={pageSize} total={totalCount} itemLabel="event" onPageChange={setPageNumber} />}>
             <ResponsiveRows
               loading={loading && logs.length === 0}
               loadingRows={pageSize}
-              rows={visibleLogs}
+              rows={logs}
               rowKey={(log, i) => String(log.id ?? i)}
               empty={
                 searchQuery || actionFilter || actorFilter || customerFilter || descFilter || statusFilter
@@ -427,6 +442,17 @@ export default function AuditLogs() {
                   key: 'timestamp',
                   label: 'Date & Time',
                   priority: 'always',
+                  // The date filter this screen never had — and could not have had. The column it
+                  // filters on was local wall-clock TEXT until the migration that turned it into a
+                  // real instant, so there was nothing to compare a range against.
+                  header: (
+                    <DateRangeColumnFilter
+                      key="timestamp"
+                      label="Date & Time"
+                      value={dateRange}
+                      onChange={setDateRange}
+                    />
+                  ),
                   render: (log) => (
                     <span className={styles.text6}>{formatAuditTimestamp(log.timestamp)}</span>
                   ),

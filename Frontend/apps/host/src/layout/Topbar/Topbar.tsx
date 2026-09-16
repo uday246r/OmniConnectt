@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { isDrawerRoute, useSettingsDrawerStore } from '../../shared/stores/settingsDrawerStore'
+import { useSettingsDrawerStore } from '../../shared/stores/settingsDrawerStore'
+import { visibleSettingsSections } from '../../shared/settings/settingsSections'
 import { useClickOutside } from '../../shared/hooks/useClickOutside'
 import { useMenuKeyboardNav } from '../../shared/hooks/useMenuKeyboardNav'
 import { useAuthStore } from '../../features/auth/store/authStore'
@@ -10,15 +11,8 @@ import { ApprovalsMenu } from '../../features/notifications/components/Approvals
 import { Icon } from '../../shared/components/Icon/Icon'
 import styles from './Topbar.module.css'
 
-export interface TopbarSettingsAccess {
-  users: boolean
-  roles: boolean
-  applications: boolean
-}
-
 export interface TopbarProps {
   userName?: string
-  settingsAccess?: TopbarSettingsAccess
   onLogout?: () => void
   /** Mobile: callback to toggle the sidebar open/closed */
   onMobileMenuToggle?: () => void
@@ -34,29 +28,32 @@ function getUserInitials(name?: string | null): string {
   return name.slice(0, 2).toUpperCase()
 }
 
-export function Topbar({ userName, settingsAccess, onLogout, onMobileMenuToggle }: TopbarProps) {
+export function Topbar({ userName, onLogout, onMobileMenuToggle }: TopbarProps) {
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef      = useRef<HTMLDivElement>(null)
   const triggerRef   = useRef<HTMLButtonElement>(null)
 
+  // Inside the page routes this is the page on screen — while the drawer is open, the page behind it —
+  // which is exactly where closing Settings should return to.
   const location = useLocation()
   const navigate = useNavigate()
   // Navigates rather than opening the store directly, so the gear icon produces a real URL.
   const openSettings = () => {
-    if (!isDrawerRoute(location.pathname)) {
-      useSettingsDrawerStore.getState().setReturnPath(`${location.pathname}${location.search}`)
-    }
+    useSettingsDrawerStore.getState().setReturnPath(`${location.pathname}${location.search}`)
     navigate('/settings')
   }
   // The signed-in user's real role, for the menu header. See the comment on that header below.
   const user = useAuthStore((s) => s.user)
+  const hasCapability = useAuthStore((s) => s.hasCapability)
 
   useClickOutside([menuRef], () => setMenuOpen(false), menuOpen)
   const handleKeyDown = useMenuKeyboardNav(menuRef, () => setMenuOpen(false), triggerRef)
 
-  const canAccessSettings = Boolean(
-    settingsAccess?.users || settingsAccess?.roles || settingsAccess?.applications
-  )
+  // The gear shows when any settings section is visible to this user — the same registry that builds
+  // the drawer's tabs, so the gear can never hide a section the drawer would have offered.
+  const canAccessSettings =
+    visibleSettingsSections((featureKey, capability = 'View') => Boolean(user?.isAdministrator) || hasCapability(featureKey, capability))
+      .length > 0
   const displayName = userName || user?.name || '—'
   // Salutation prefixes the rendered text only — initials (getUserInitials(userName) below) stay
   // derived from the plain name, or "Mr. John Doe" would initial to "MJ" instead of "JD".

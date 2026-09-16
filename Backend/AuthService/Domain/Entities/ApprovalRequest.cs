@@ -70,18 +70,4 @@ public class ApprovalRequest
     public string? CallbackUrl { get; set; }
 
     public string? CorrelationId { get; set; }
-
-    // ---- One-time temporary password custody (Create-User approvals only) ----
-
-    /// <summary>AES-256-GCM ciphertext (see SecretProtector) of the temporary password generated
-    /// when this request was approved and replayed. Null for every request that isn't an approved
-    /// (Users, Create) for a Local account — and null again the instant the maker reveals it.
-    /// Nulling on reveal is what actually enforces one-time semantics: the secret stops existing,
-    /// so a replayed request has nothing to return regardless of any flag.</summary>
-    public string? TempPasswordCiphertext { get; set; }
-
-    /// <summary>When the maker collected the password. Carries no secret — it exists so the reveal
-    /// endpoint can tell "already collected" (410 Gone) apart from "there was never one here" (404),
-    /// which a null ciphertext alone cannot distinguish.</summary>
-    public DateTimeOffset? TempPasswordRevealedAt { get; set; }
 }

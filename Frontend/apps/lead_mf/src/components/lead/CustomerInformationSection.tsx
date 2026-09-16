@@ -2,8 +2,8 @@ import React from 'react';
 import { User } from '@omniremit/ui/icons';
 import { useLeadStore } from '../../store/useLeadStore';
 import { SearchableDropdown } from '../common/SearchableDropdown';
+import { PhoneCountryPicker } from './PhoneCountryPicker';
 import { isFieldVisible, isFieldRequired, isFieldEditable, getFieldLabel } from '../../config/fieldControlRegistry';
-import styles from './CustomerInformationSection.module.css';
 
 interface CustomerInformationSectionProps {
   isEdit?: boolean;
@@ -67,13 +67,10 @@ export const CustomerInformationSection: React.FC<CustomerInformationSectionProp
               onChange={(e) => setFieldValue('icNumber', e.target.value)}
               onBlur={() => validateField('icNumber')}
             />
+            {/* The message comes from the field's own format rule in Field Settings, so it already
+                says what shape the number takes — no fixed format hint here to contradict it. */}
             {errors.icNumber && (
-              <div className={`field-error-message ${styles.hintSpacer}`}>
-                <div>{errors.icNumber}</div>
-                <div className={styles.hint}>
-                  Format: <span className={styles.monoValue}>YYMMDD-PB-XXXX</span>
-                </div>
-              </div>
+              <div className="field-error-message">{errors.icNumber}</div>
             )}
           </div>
         )}
@@ -85,10 +82,11 @@ export const CustomerInformationSection: React.FC<CustomerInformationSectionProp
               {getFieldLabel(config, 'phoneNumber', 'Phone')} <RequiredAsterisk show={isFieldRequired(config, 'phoneNumber')} />
             </label>
             <div className={`phone-input-container ${errors.phoneNumber ? 'has-error' : ''}`}>
-              <div className="phone-prefix-box">
-                <span className={styles.largeText}>🇲🇾</span>
-                <span>+60</span>
-              </div>
+              <PhoneCountryPicker
+                value={formData.phoneCountryCode}
+                disabled={isEdit && !isFieldEditable(config, 'phoneNumber')}
+                onChange={(dialCode) => setFieldValue('phoneCountryCode', dialCode)}
+              />
               <input
                 type="tel"
                 className="form-input phone-input-field"
