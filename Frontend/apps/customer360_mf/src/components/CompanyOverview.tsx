@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Building2, Phone, DollarSign, Eye, EyeOff } from '@omniremit/ui/icons';
+import { Building2, Phone, DollarSign, Eye, EyeOff } from '@omniconnect/ui/icons';
 import type { CorporateProfile, ContactDetail } from '../types/api';
 import { maskPhone, maskTIN } from '../utils/masking';
 import styles from './CompanyOverview.module.css';

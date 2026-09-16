@@ -8,7 +8,7 @@ namespace AuthService.Application.DTOs;
 ///  - "numericRange": MinValue/MaxValue bound the value parsed as a number (either may be null = open-ended).
 ///  - "textPattern": TextMode picks a character-class constraint (letters only, digits only, ...) —
 ///    the "string" option for an admin who doesn't want to write a regex. See
-///    OmniRemit.Validation.FieldPresets.TextPatternModes for the allowed values.
+///    OmniConnect.Validation.FieldPresets.TextPatternModes for the allowed values.
 /// </summary>
 public record CustomPresetDto(
     string Key,

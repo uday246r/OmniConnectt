@@ -1,6 +1,6 @@
 import React from 'react';
-import { Layers, UserPlus, Sparkles } from '@omniremit/ui/icons';
-import { Button, PageHeader } from '@omniremit/ui';
+import { Layers, UserPlus, Sparkles } from '@omniconnect/ui/icons';
+import { Button, PageHeader } from '@omniconnect/ui';
 import { TimeRangeFilterDropdown } from './TimeRangeFilterDropdown';
 import { useLeadStore } from '../../store/useLeadStore';
 import { useHostNavigate } from '../../navigation/HostNavigation';
@@ -9,7 +9,7 @@ import { canCreateLead } from '../../api/hostBridge';
 /**
  * Lead Management dashboard banner.
  *
- * Now @omniremit/ui's PageHeader, so it is literally the same banner the host renders on Audit Logs
+ * Now @omniconnect/ui's PageHeader, so it is literally the same banner the host renders on Audit Logs
  * and Approval Center rather than a near-copy. That removed, in one go: the hand-rolled gradient and
  * its two decorative circles, the glass icon tile, the title/pill/subtitle typography, a white CTA
  * with a JS-driven hover, and an injected `<style>` tag that duplicated the host's 768px hero

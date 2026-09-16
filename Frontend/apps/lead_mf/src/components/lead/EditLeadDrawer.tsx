@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
-import { Save, ArrowLeft, CheckCircle2 } from '@omniremit/ui/icons';
-import { Button, Drawer, EmptyState, Select } from '@omniremit/ui';
+import { Save, ArrowLeft, CheckCircle2 } from '@omniconnect/ui/icons';
+import { Button, Drawer, EmptyState, Select } from '@omniconnect/ui';
 import { LeadDiffTable } from '../../shared/LeadDiffTable';
 import { useLeadStore } from '../../store/useLeadStore';
 import drawerLayout from '../../shared/drawerLayout.module.css';

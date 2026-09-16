@@ -11,7 +11,7 @@
  * for a brand name (it never changes between requests) and avoids an extra network round trip on
  * first paint just to learn what to call ourselves.
  *
- * NOTE: the Module Federation bridge names (`OmniConnectHostBridge`, `window.__omniremitHost__`) are
+ * NOTE: the Module Federation bridge names (`OmniConnectHostBridge`, `window.__omniconnectHost__`) are
  * deliberately NOT derived from this. They are a published API contract that remote applications
  * compile against, so renaming the product must not silently break every remote.
  */

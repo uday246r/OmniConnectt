@@ -1,7 +1,7 @@
 import { loadRemote, registerRemotes } from '@module-federation/runtime'
 import type { RemoteAppModule } from './types'
 
-// The host's ModuleFederation instance (name: "omniremit_host") is auto-initialized by the
+// The host's ModuleFederation instance (name: "omniconnect_host") is auto-initialized by the
 // @module-federation/vite plugin as part of the app's bootstrap (see vite.config.ts) — we never
 // call init() ourselves, only register/load against the instance that's already there.
 

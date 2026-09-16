@@ -6,8 +6,8 @@ import { Icon } from '../../../shared/components/Icon/Icon'
 import { SkeletonBlock } from '../../../shared/components/Skeleton'
 import { ApiError } from '../../../shared/api/httpClient'
 import { toast } from '../../../shared/stores/toastStore'
-import { Button, PageHeader } from '@omniremit/ui'
-import { FIELD_PRESETS, PRESET_GROUP_LABELS, type CustomPreset, type CustomPresetKind } from '@omniremit/ui/validation'
+import { Button, PageHeader } from '@omniconnect/ui'
+import { FIELD_PRESETS, PRESET_GROUP_LABELS, type CustomPreset, type CustomPresetKind } from '@omniconnect/ui/validation'
 import styles from './ManageFormatsPage.module.css'
 
 const KIND_BADGE_LABELS: Record<CustomPresetKind, string> = {

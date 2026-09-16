@@ -1,7 +1,7 @@
 /*
  * Create Lead page.
  *
- * The banner now comes from @omniremit/ui's PageHeader and the page column from the app-level
+ * The banner now comes from @omniconnect/ui's PageHeader and the page column from the app-level
  * leadPage shell, so only the form card's own spacing remains here.
  */
 

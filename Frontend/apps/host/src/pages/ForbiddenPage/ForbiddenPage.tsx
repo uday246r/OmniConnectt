@@ -1,4 +1,4 @@
-import { Button } from '@omniremit/ui'
+import { Button } from '@omniconnect/ui'
 import { useNavigate } from 'react-router-dom'
 import { Icon } from '../../shared/components/Icon/Icon'
 import styles from './ForbiddenPage.module.css'

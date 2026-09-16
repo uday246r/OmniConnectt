@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { Settings, Eye, EyeOff, Save, RefreshCw, GripVertical, AlertCircle, CheckCircle2 } from '@omniremit/ui/icons';
+import { Settings, Eye, EyeOff, Save, RefreshCw, GripVertical, AlertCircle, CheckCircle2 } from '@omniconnect/ui/icons';
 import { api } from '../services/api';
 import { isApprovalPending } from '../types/api';
 import type { FieldConfig, FieldConfigProfileType, MaskingRule } from '../types/api';
-import { Button, Checkbox, DataTable, PageHeader, Select, TableSkeleton } from '@omniremit/ui';
+import { Button, Checkbox, DataTable, PageHeader, Select, TableSkeleton } from '@omniconnect/ui';
 import styles from './FieldSettings.module.css';
 import cc from '../shared/c360Common.module.css';
 

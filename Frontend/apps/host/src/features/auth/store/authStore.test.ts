@@ -7,7 +7,7 @@ import type { CurrentUserDto } from '../../../shared/api/authServiceClient'
  *
  * API capabilities ride in the access token; widgets, charts, exports and panels are fetched
  * separately so the token cannot grow past what a proxy will forward. Every caller in the host, and
- * every remote reaching through `window.__omniremitHost__`, asks the same question either way — so
+ * every remote reaching through `window.__omniconnectHost__`, asks the same question either way — so
  * the merge is the whole contract, and these tests are what stop it silently coming apart.
  */
 

@@ -9,7 +9,7 @@ const SCOPE_ID = 'products-mf-scope';
 
 function scopeKeyframes() {
   return {
-    postcssPlugin: 'omniremit-scope-keyframes-products',
+    postcssPlugin: 'omniconnect-scope-keyframes-products',
     OnceExit(root) {
       const declared = new Set();
 

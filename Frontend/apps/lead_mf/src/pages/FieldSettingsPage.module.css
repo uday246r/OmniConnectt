@@ -1,7 +1,7 @@
 /*
  * Field Settings page.
  *
- * Banner comes from @omniremit/ui's PageHeader and the table from DataTable (`bare`, since each
+ * Banner comes from @omniconnect/ui's PageHeader and the table from DataTable (`bare`, since each
  * section card already draws its own frame). What remains here is the product tab strip, the
  * status banners and the per-cell form controls.
  */

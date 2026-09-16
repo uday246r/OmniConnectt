@@ -31,7 +31,7 @@
 
 /* ── Shape variants ─────────────────────────────────────────── */
 .block  { width: 100%; height: 100%; }
-/* Runtime dimensions arrive as custom properties, matching @omniremit/ui's Skeleton. These
+/* Runtime dimensions arrive as custom properties, matching @omniconnect/ui's Skeleton. These
    defaults MUST live with the shape variant, not at the end of the file: a trailing copy sat after
    every per-instance modifier (.sdcNum, .suc9 and ~60 others), and at equal specificity source
    order won — so every one of those hand-sized skeleton parts was silently overridden back to the

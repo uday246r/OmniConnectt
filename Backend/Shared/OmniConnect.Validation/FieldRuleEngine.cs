@@ -1,7 +1,7 @@
 using System.Globalization;
 using System.Text.RegularExpressions;
 
-namespace OmniRemit.Validation;
+namespace OmniConnect.Validation;
 
 /// <summary>
 /// One validation rule on a field: a built-in preset id ("emailSmart", "minLength" with a Value), an

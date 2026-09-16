@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, X } from '@omniremit/ui/icons';
+import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, X } from '@omniconnect/ui/icons';
 import styles from './DatePicker.module.css';
 
 interface DatePickerProps {

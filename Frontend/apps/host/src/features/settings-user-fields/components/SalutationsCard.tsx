@@ -4,7 +4,7 @@ import { salutationsApi, type SalutationCatalogDto } from '../api/salutationsApi
 import { Icon } from '../../../shared/components/Icon/Icon'
 import { ApiError } from '../../../shared/api/httpClient'
 import { toast } from '../../../shared/stores/toastStore'
-import { Button, Modal } from '@omniremit/ui'
+import { Button, Modal } from '@omniconnect/ui'
 import styles from './SalutationsCard.module.css'
 
 interface SalutationsCardProps {

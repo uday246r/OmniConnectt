@@ -10,7 +10,7 @@ public class JwtValidationOptions
     /// </summary>
     public string? SigningKeyPublic { get; set; }
 
-    public string Issuer { get; set; } = "omniremit-auth-service";
+    public string Issuer { get; set; } = "omniconnect-auth-service";
 
-    public string Audience { get; set; } = "omniremit-host";
+    public string Audience { get; set; } = "omniconnect-host";
 }

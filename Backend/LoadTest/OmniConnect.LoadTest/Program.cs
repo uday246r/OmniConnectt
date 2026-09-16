@@ -13,7 +13,7 @@ using ProductEntity = ProductMarketplace.Domain.Entities.Product;
 using ProductTypeEntity = ProductMarketplace.Domain.Entities.ProductType;
 
 /*
- * OmniRemit load-test data tool.
+ * OmniConnect load-test data tool.
  *
  *   dotnet run -- seed    --run <id> [--audit 100000] [--users 20000] [--leads 50000] [--applications 50000]
  *   dotnet run -- count   --run <id>
@@ -107,7 +107,7 @@ static async Task SeedAuthAsync(string backend, Tags tags, int auditRows, int us
                 Page = "load-test",
                 ActionCategory = action.StartsWith("page") ? "Navigation" : action.StartsWith("auth") ? "Auth" : "CRUD",
                 SourceIp = $"10.{i % 250}.{i / 250 % 250}.1",
-                UserAgent = "OmniRemit.LoadTest",
+                UserAgent = "OmniConnect.LoadTest",
             });
         }
     });
@@ -317,9 +317,9 @@ static string FindBackendDirectory()
 {
     for (var dir = new DirectoryInfo(AppContext.BaseDirectory); dir is not null; dir = dir.Parent)
     {
-        if (File.Exists(Path.Combine(dir.FullName, "OmniRemit.slnx"))) return dir.FullName;
+        if (File.Exists(Path.Combine(dir.FullName, "OmniConnect.slnx"))) return dir.FullName;
     }
-    throw new InvalidOperationException("Could not find the Backend folder (OmniRemit.slnx) above the tool.");
+    throw new InvalidOperationException("Could not find the Backend folder (OmniConnect.slnx) above the tool.");
 }
 
 static Dictionary<string, string> ParseOptions(string[] args)

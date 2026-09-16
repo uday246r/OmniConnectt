@@ -8,9 +8,9 @@ public class JwtValidationOptions
     /// <summary>PEM public key (SPKI or PKCS#1). Literal "\n" sequences are accepted from .env.</summary>
     public string? SigningKeyPublic { get; set; }
 
-    public string Issuer { get; set; } = "omniremit-auth-service";
+    public string Issuer { get; set; } = "omniconnect-auth-service";
 
-    public string Audience { get; set; } = "omniremit-host";
+    public string Audience { get; set; } = "omniconnect-host";
 }
 
 /// <summary>Bound from "AuthService". Where AuthService lives and the key this service presents to it.</summary>

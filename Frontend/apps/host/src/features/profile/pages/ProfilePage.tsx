@@ -10,9 +10,9 @@ import { isApprovalPending } from '../../approvals/api/approvalsApi'
 import { ChangePasswordForm } from '../components/ChangePasswordForm'
 import { Icon } from '../../../shared/components/Icon/Icon'
 import { required, email as emailRule, firstError } from '../../../shared/validation/rules'
-import { validateFullPhone } from '@omniremit/ui/validation'
+import { validateFullPhone } from '@omniconnect/ui/validation'
 import styles from './ProfilePage.module.css'
-import { Button, Input, Select } from '@omniremit/ui'
+import { Button, Input, Select } from '@omniconnect/ui'
 
 function formatDateTime(iso: string | null) {
   if (!iso) return 'Never'

@@ -418,7 +418,7 @@
   white-space: nowrap;
 }
 
-/* The input, its icon and its clear button now come from @omniremit/ui's SearchField (which also
+/* The input, its icon and its clear button now come from @omniconnect/ui's SearchField (which also
    brings the suggestion popover), so the local .searchInput/.searchIcon/.clearSearchBtn rules that
    duplicated them are gone. .searchWrap above is still passed to SearchField for its flex sizing. */
 

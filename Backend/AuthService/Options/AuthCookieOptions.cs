@@ -5,7 +5,7 @@ public class AuthCookieOptions
 {
     public const string SectionName = "Auth";
 
-    public string RefreshCookieName { get; set; } = "omniremit_refresh";
+    public string RefreshCookieName { get; set; } = "omniconnect_refresh";
 
     /// <summary>
     /// Leave empty for localhost development (browser infers the current host).

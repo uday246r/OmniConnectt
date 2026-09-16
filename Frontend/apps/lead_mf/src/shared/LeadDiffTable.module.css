@@ -2,7 +2,7 @@
  * Before/after change table.
  *
  * The red/green column semantics are what make this a DIFF rather than a data listing, so it is
- * deliberately not folded into @omniremit/ui's DataTable — but it renders THROUGH DataTable in
+ * deliberately not folded into @omniconnect/ui's DataTable — but it renders THROUGH DataTable in
  * `bare` mode, so it still inherits the platform's header treatment, row rhythm and hover.
  *
  * Colours now come from the platform ramps. The two previous implementations had drifted apart on

@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "concurrently --kill-others \"vite build --watch\" \"vite preview\"",
+    "dev": "vite build && concurrently --kill-others \"vite build --watch\" \"vite preview\"",
     "build": "tsc --noEmit -p tsconfig.app.json && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.app.json",
@@ -14,8 +14,8 @@
   },
   "dependencies": {
     "@microsoft/signalr": "^10.0.11",
-    "@omniremit/federation-config": "workspace:*",
-    "@omniremit/ui": "workspace:*",
+    "@omniconnect/federation-config": "workspace:*",
+    "@omniconnect/ui": "workspace:*",
     "axios": "^1.19.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",

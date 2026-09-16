@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useInteractionStore } from '../store/interactionStore';
-import { FileText, User, ShieldAlert, Check, Copy, Hash, Calendar, Layers, Activity } from '@omniremit/ui/icons';
-import { Button, Badge, DetailField, DetailGrid, DetailSection, Drawer, EMPTY_VALUE } from '@omniremit/ui';
+import { FileText, User, ShieldAlert, Check, Copy, Hash, Calendar, Layers, Activity } from '@omniconnect/ui/icons';
+import { Button, Badge, DetailField, DetailGrid, DetailSection, Drawer, EMPTY_VALUE } from '@omniconnect/ui';
 import { formatValue } from '../shared/formatValue';
 import styles from './ProductDetailsModal.module.css';
 

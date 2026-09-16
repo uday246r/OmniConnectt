@@ -24,7 +24,7 @@ import {
   type ColumnFilterOption,
   type DateRangeValue,
   type ResponsiveColumn,
-} from '@omniremit/ui'
+} from '@omniconnect/ui'
 import { useAuthStore } from '../../../auth/store/authStore'
 import { ApiError } from '../../../../shared/api/httpClient'
 import { Icon } from '../../../../shared/components/Icon/Icon'

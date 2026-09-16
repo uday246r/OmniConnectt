@@ -1,5 +1,5 @@
 import React from 'react';
-import { User } from '@omniremit/ui/icons';
+import { User } from '@omniconnect/ui/icons';
 import { useLeadStore } from '../../store/useLeadStore';
 import { SearchableDropdown } from '../common/SearchableDropdown';
 import { PhoneCountryPicker } from './PhoneCountryPicker';

@@ -6,7 +6,7 @@ import { HostNavigationProvider, type NavigateToPage } from './navigation/HostNa
 // runs outside the host — `vite preview`, a Vercel preview URL, or any standalone render. Inside the
 // host shell this file is inert: it is wrapped in a cascade layer, and the host's unlayered :root
 // always wins, so the host stays the single source of truth for the live theme.
-import '@omniremit/ui/tokens.css';
+import '@omniconnect/ui/tokens.css';
 import './index.css';
 
 export interface Customer360AppProps {

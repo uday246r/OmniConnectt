@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { Button, PageHeader, formatDate } from "@omniremit/ui";
+import { Button, PageHeader, formatDate } from "@omniconnect/ui";
 import { CustomSelect } from "../components/common/CustomSelect";
 import { Icon, type IconName } from "../components/common/Icon";
 import { KpiCard } from "../components/common/KpiCard";

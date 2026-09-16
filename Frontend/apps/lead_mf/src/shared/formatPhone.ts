@@ -1,4 +1,4 @@
-import { EMPTY_VALUE } from '@omniremit/ui'
+import { EMPTY_VALUE } from '@omniconnect/ui'
 
 /**
  * Renders a stored phone number as a single clean Malaysian number.

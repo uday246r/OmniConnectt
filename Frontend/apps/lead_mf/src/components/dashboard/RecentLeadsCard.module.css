@@ -1,7 +1,7 @@
 /*
  * Recent Leads dashboard card — the table's surrounding frame only.
  *
- * The table itself uses @omniremit/ui's DataTable in `bare` mode: it takes the platform's header
+ * The table itself uses @omniconnect/ui's DataTable in `bare` mode: it takes the platform's header
  * treatment, row rhythm and hover, but not the outer card chrome, because this card already draws
  * its own lighter frame below. Using the full chrome here would nest two bordered boxes.
  */

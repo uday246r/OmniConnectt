@@ -1,5 +1,5 @@
 import React from 'react';
-import { Building2 } from '@omniremit/ui/icons';
+import { Building2 } from '@omniconnect/ui/icons';
 import { useLeadStore } from '../../../store/useLeadStore';
 import { DatePicker } from '../../common/DatePicker';
 import { SearchableDropdown } from '../../common/SearchableDropdown';

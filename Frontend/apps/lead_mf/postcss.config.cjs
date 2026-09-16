@@ -9,7 +9,7 @@ const SCOPE_ID = 'lead-mf-scope';
 
 function scopeKeyframes() {
   return {
-    postcssPlugin: 'omniremit-scope-keyframes-lead',
+    postcssPlugin: 'omniconnect-scope-keyframes-lead',
     OnceExit(root) {
       const declared = new Set();
 

@@ -1,8 +1,8 @@
 import React from 'react';
-import { Users, UserPlus, Hourglass, CheckCircle2, TrendingUp } from '@omniremit/ui/icons';
+import { Users, UserPlus, Hourglass, CheckCircle2, TrendingUp } from '@omniconnect/ui/icons';
 import { useLeadStore } from '../../store/useLeadStore';
 import { canSeeDashboardCapability } from '../../api/hostBridge';
-import { SkeletonBlock } from '@omniremit/ui';
+import { SkeletonBlock } from '@omniconnect/ui';
 import styles from './KpiCardSection.module.css';
 
 const formatKpiValue = (val: number | null | undefined, isPercentage = false): string => {

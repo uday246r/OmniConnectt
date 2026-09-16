@@ -1,6 +1,6 @@
 # Build context is Backend/, NOT Backend/AuthService/.
 #
-#   docker build -f AuthService/Dockerfile -t omniremit-auth .
+#   docker build -f AuthService/Dockerfile -t omniconnect-auth .
 #
 # This matters: TargetFramework (net10.0) is declared once in Backend/Directory.Build.props, which
 # every service csproj inherits and none redeclare. With the service folder as context that file is
@@ -14,7 +14,7 @@ WORKDIR /src
 COPY Directory.Build.props ./
 COPY AuthService/AuthService.csproj AuthService/
 # The platform field-format engine, shared with LeadService.
-COPY Shared/OmniRemit.Validation/OmniRemit.Validation.csproj Shared/OmniRemit.Validation/
+COPY Shared/OmniConnect.Validation/OmniConnect.Validation.csproj Shared/OmniConnect.Validation/
 RUN dotnet restore AuthService/AuthService.csproj
 
 COPY Shared/ Shared/

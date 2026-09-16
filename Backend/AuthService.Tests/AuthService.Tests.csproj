@@ -19,7 +19,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Using Include="OmniRemit.Validation" />
+    <Using Include="OmniConnect.Validation" />
   </ItemGroup>
 
 </Project>

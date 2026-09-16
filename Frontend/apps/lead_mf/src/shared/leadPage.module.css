@@ -4,7 +4,7 @@
  * View Leads and Audit Trail Logs render the same frame: a page column, a white table card, a
  * search/actions toolbar and a pagination footer. Both had their own copy of every rule. This is
  * application-level rather than global — the host composes its pages differently, so promoting it to
- * @omniremit/ui would be inventing a shared abstraction for a single consumer.
+ * @omniconnect/ui would be inventing a shared abstraction for a single consumer.
  */
 
 .page {

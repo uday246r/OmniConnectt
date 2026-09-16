@@ -1,5 +1,5 @@
 {
-  "description": "One table, two engines. Backend/Shared/OmniRemit.Validation (C#) and packages/ui/src/validation (TypeScript) must both give every case below the expected answer. Add a case whenever either engine changes.",
+  "description": "One table, two engines. Backend/Shared/OmniConnect.Validation (C#) and packages/ui/src/validation (TypeScript) must both give every case below the expected answer. Add a case whenever either engine changes.",
   "presets": [
     { "key": "employeeCode", "label": "Employee code", "kind": "regex", "pattern": "^EMP-[0-9]{4}$", "message": "Use EMP-0000." },
     { "key": "badRegex", "label": "Broken", "kind": "regex", "pattern": "([", "message": "never shown" },

@@ -5,11 +5,11 @@
   "type": "module",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Ashok-2004/OmniRemit.git",
+    "url": "https://github.com/Ashok-2004/OmniConnect.git",
     "directory": "Frontend/apps/customer360_mf"
   },
   "scripts": {
-    "dev": "concurrently --kill-others \"vite build --watch\" \"vite preview\"",
+    "dev": "vite build && concurrently --kill-others \"vite build --watch\" \"vite preview\"",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
@@ -17,8 +17,8 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@omniremit/federation-config": "workspace:*",
-    "@omniremit/ui": "workspace:*",
+    "@omniconnect/federation-config": "workspace:*",
+    "@omniconnect/ui": "workspace:*",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "zustand": "^5.0.15"

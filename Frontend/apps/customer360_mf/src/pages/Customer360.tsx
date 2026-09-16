@@ -13,7 +13,7 @@ import ProductDetailsModal from '../components/ProductDetailsModal';
 import DynamicProfileSection, { groupBySection } from '../components/DynamicProfileSection';
 import { useFieldReveal } from '../hooks/useFieldReveal';
 import { useRecentLookups } from '../hooks/useRecentLookups';
-import { Eye, EyeOff, ChevronRight, ChevronDown, SlidersHorizontal, Building2, Layers, User, Briefcase, Globe, Shield, FileText, Calendar, DollarSign, MapPin, Mail, Phone, TrendingUp, Search, RotateCcw, RefreshCw, AlertCircle, Loader2 } from '@omniremit/ui/icons';
+import { Eye, EyeOff, ChevronRight, ChevronDown, SlidersHorizontal, Building2, Layers, User, Briefcase, Globe, Shield, FileText, Calendar, DollarSign, MapPin, Mail, Phone, TrendingUp, Search, RotateCcw, RefreshCw, AlertCircle, Loader2 } from '@omniconnect/ui/icons';
 import { useHostNavigate } from '../navigation/HostNavigation';
 import type {
   IndividualProfile,
@@ -27,7 +27,7 @@ import type {
 import { DEFAULT_INDIVIDUAL_FIELD_CONFIGS, DEFAULT_CORPORATE_FIELD_CONFIGS } from '../constants/defaultFieldConfigs';
 import styles from './Customer360.module.css';
 import cc from '../shared/c360Common.module.css';
-import { Button, ColumnFilter, DataTable, EMPTY_VALUE, FilterBar, Input, PageHeader, Pagination, ResponsiveRows, RowAction, RowsPerPage, SearchField, Select, getInitials, sanitizeFilterInput, useDebouncedValue, type ActiveFilter, type FilterInputType } from '@omniremit/ui';
+import { Button, ColumnFilter, DataTable, EMPTY_VALUE, FilterBar, Input, PageHeader, Pagination, ResponsiveRows, RowAction, RowsPerPage, SearchField, Select, getInitials, sanitizeFilterInput, useDebouncedValue, type ActiveFilter, type FilterInputType } from '@omniconnect/ui';
 import { StatusBadge } from '../shared/StatusBadge';
 import { formatValue, formatCurrency as formatMoney, resolveProductStatus } from '../shared/formatValue';
 

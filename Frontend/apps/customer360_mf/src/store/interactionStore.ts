@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { api, ApiError } from '../services/api';
 import type { Interaction } from '../types/api';
-import { readStoredPageSize } from '@omniremit/ui';
+import { readStoredPageSize } from '@omniconnect/ui';
 
 // Stale-response guard for loadInteractions — see productStore.ts for the
 // full rationale (mirrors customerStore's _searchVersion pattern).

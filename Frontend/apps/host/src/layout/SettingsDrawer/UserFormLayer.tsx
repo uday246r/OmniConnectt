@@ -18,7 +18,7 @@ import { Icon } from '../../shared/components/Icon/Icon'
 import { SkeletonBlock } from '../../shared/components/Skeleton'
 import { resolveIcon } from '../../shared/components/Icon/resolveIcon'
 import { toast } from '../../shared/stores/toastStore'
-import { validateFields, type FieldDefinition } from '@omniremit/ui/validation'
+import { validateFields, type FieldDefinition } from '@omniconnect/ui/validation'
 import { isValid } from '../../shared/validation/rules'
 import { userSchemaApi } from '../../features/settings-user-fields/api/userSchemaApi'
 import { salutationsApi } from '../../features/settings-user-fields/api/salutationsApi'
@@ -31,7 +31,7 @@ import {
 import { CapabilityPicker } from '../../shared/permissions/CapabilityPicker'
 import styles from './UserFormLayer.module.css'
 import { TOPICS, invalidate } from '../../shared/stores/invalidationStore'
-import { Select, Switch } from '@omniremit/ui'
+import { Select, Switch } from '@omniconnect/ui'
 
 /*
  * Name/Email/Phone are no longer hardcoded here — they're the "core" entries of the admin-configurable

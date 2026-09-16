@@ -11,7 +11,7 @@ namespace AuthService.Infrastructure.Security;
 /// </remarks>
 public static class InternalCaller
 {
-    private const string ItemKey = "OmniRemit.InternalCaller";
+    private const string ItemKey = "OmniConnect.InternalCaller";
 
     public static void Set(HttpContext context, string? serviceName) => context.Items[ItemKey] = serviceName;
 

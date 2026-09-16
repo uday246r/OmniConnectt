@@ -1,4 +1,4 @@
-# Deploying OmniRemit
+# Deploying OmniConnect
 
 > ⚠️ **Parts of this document are stale.** It was written against an older topology that had an
 > EmployeeService and a separate ModuleRegistry service, and at one point described a move to SQL
@@ -131,11 +131,11 @@ Environment:
 
 ```
 ConnectionStrings__AuthDb=<neon auth connection string>
-Jwt__Issuer=omniremit-auth-service
-Jwt__Audience=omniremit-host
+Jwt__Issuer=omniconnect-auth-service
+Jwt__Audience=omniconnect-host
 Jwt__SigningKeyPrivate=<production private key>
 Jwt__SigningKeyPublic=<production public key>
-Auth__RefreshCookieName=omniremit_refresh
+Auth__RefreshCookieName=omniconnect_refresh
 Auth__RefreshCookieDomain=
 Auth__SameSite=Lax
 Internal__ApiKey=<shared secret>
@@ -154,7 +154,7 @@ Verify: `https://<render-url>/health` → **200**.
 
 On its **first** boot against an empty database, `AuthDbSeeder` creates:
 
-- email `superadmin@omniremit.local`
+- email `superadmin@omniconnect.com`
 - a **randomly generated password, written to the logs exactly once**
 
 Copy it out of the Render logs immediately. It is not recoverable afterwards and it is the only way
@@ -167,8 +167,8 @@ Same pattern, context `Backend`, Dockerfiles `Backend/ModuleRegistry/Dockerfile`
 
 ```
 ConnectionStrings__RegistryDb=<neon registry>     # EmployeeService: ConnectionStrings__EmployeeDb
-Jwt__Issuer=omniremit-auth-service                # identical across all three
-Jwt__Audience=omniremit-host
+Jwt__Issuer=omniconnect-auth-service                # identical across all three
+Jwt__Audience=omniconnect-host
 Jwt__SigningKeyPublic=<public key only>
 AuthService__BaseUrl=https://api.yourdomain.com
 AuthService__InternalApiKey=<same Internal__ApiKey>
@@ -190,7 +190,7 @@ continuing — the frontends will be built against these URLs.
 New project from this repo.
 
 - **Root Directory:** `Frontend` ← **required**. Both apps depend on the
-  `@omniremit/federation-config` workspace package, which will not resolve if the root is the app
+  `@omniconnect/federation-config` workspace package, which will not resolve if the root is the app
   folder.
 - Build command, install command and output directory are already declared in
   `Frontend/apps/employee_mf/vercel.json`.

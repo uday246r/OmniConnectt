@@ -1,6 +1,6 @@
 import { getAccessToken, ensureFreshAccessToken, isRunningInHost } from './hostBridge';
 import type { LeadFieldConfig } from '../config/fieldControlRegistry';
-import type { CustomPreset } from '@omniremit/ui/validation';
+import type { CustomPreset } from '@omniconnect/ui/validation';
 
 export const API_BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL || 'http://localhost:5046/api/lead-service';
 

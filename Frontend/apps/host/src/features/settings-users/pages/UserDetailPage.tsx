@@ -9,7 +9,7 @@ import { Icon } from '../../../shared/components/Icon/Icon'
 import { toast } from '../../../shared/stores/toastStore'
 import { usersApi, type UserDetailDto } from '../api/usersApi'
 import { userSchemaApi } from '../../settings-user-fields/api/userSchemaApi'
-import type { FieldDefinition } from '@omniremit/ui/validation'
+import type { FieldDefinition } from '@omniconnect/ui/validation'
 import { rolesApi, type RoleDetailDto } from '../../settings-roles/api/rolesApi'
 import { isApprovalPending } from '../../approvals/api/approvalsApi'
 import { asPendingApprovalConflict, type PendingApprovalConflict } from '../../approvals/pendingConflict'
@@ -32,7 +32,7 @@ import {
   Tabs,
   TabPanel,
   formatDateTime,
-} from '@omniremit/ui'
+} from '@omniconnect/ui'
 import styles from './UserDetailPage.module.css'
 
 type DetailTab = 'profile' | 'permissions' | 'activity'

@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Calendar, ChevronDown, Check, RotateCcw } from '@omniremit/ui/icons';
+import { Calendar, ChevronDown, Check, RotateCcw } from '@omniconnect/ui/icons';
 import styles from './TimeRangeFilterDropdown.module.css';
 import { useLeadStore } from '../../store/useLeadStore';
 

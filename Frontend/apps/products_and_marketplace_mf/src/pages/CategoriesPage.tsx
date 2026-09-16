@@ -1,4 +1,4 @@
-import { Button, PageHeader } from "@omniremit/ui";
+import { Button, PageHeader } from "@omniconnect/ui";
 import { Icon } from "../components/common/Icon";
 import { CategoryManagementPanel } from "../components/category/CategoryManagementPanel";
 import { useDrawerStore } from "../stores/useDrawerStore";

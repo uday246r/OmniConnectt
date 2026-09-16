@@ -1,5 +1,5 @@
 import { useId, useMemo, useState } from 'react'
-import { useDebouncedValue } from '@omniremit/ui'
+import { useDebouncedValue } from '@omniconnect/ui'
 import { Icon } from '../components/Icon/Icon'
 import { isBusinessCapability, type PermissionRow } from './catalog'
 import type { CapabilityDto } from '../api/permissionsApi'

@@ -1,4 +1,4 @@
-import { Button, DetailField, DetailGrid, Modal } from "@omniremit/ui";
+import { Button, DetailField, DetailGrid, Modal } from "@omniconnect/ui";
 import { Icon } from "./Icon";
 import "./ConfirmModal.css";
 

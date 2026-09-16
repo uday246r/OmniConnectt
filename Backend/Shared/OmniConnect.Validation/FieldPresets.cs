@@ -1,6 +1,6 @@
 using System.Text.RegularExpressions;
 
-namespace OmniRemit.Validation;
+namespace OmniConnect.Validation;
 
 /// <summary>
 /// The fixed preset catalog admins pick from when adding a validation rule to a field — mirrors

@@ -1,6 +1,6 @@
 using System.Text.RegularExpressions;
 
-namespace OmniRemit.Validation;
+namespace OmniConnect.Validation;
 
 /// <summary>
 /// Country-aware phone validation — the server half of Frontend/packages/ui/src/validation/phone.ts,

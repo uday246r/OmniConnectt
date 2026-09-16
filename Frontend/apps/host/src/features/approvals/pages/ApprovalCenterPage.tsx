@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useAuthStore } from '../../auth/store/authStore'
-import { Badge, Button, CsvExportError, DataTable, DateRangeColumnFilter, DateRangeFilterButton, EMPTY_DATE_RANGE, EMPTY_VALUE, PageHeader, Pagination, ResponsiveRows, RowAction, RowsPerPage, describeDateRange, describeTruncation, isDateRangeActive, readStoredPageSize, resolveDateRange, sanitizeFilterInput, filterTypeBlockedMessage, useCommittedFilter, type BadgeTone, type CommittedFilter, type DateRangeValue } from '@omniremit/ui'
+import { Badge, Button, CsvExportError, DataTable, DateRangeColumnFilter, DateRangeFilterButton, EMPTY_DATE_RANGE, EMPTY_VALUE, PageHeader, Pagination, ResponsiveRows, RowAction, RowsPerPage, describeDateRange, describeTruncation, isDateRangeActive, readStoredPageSize, resolveDateRange, sanitizeFilterInput, filterTypeBlockedMessage, useCommittedFilter, type BadgeTone, type CommittedFilter, type DateRangeValue } from '@omniconnect/ui'
 import { PermissionGate } from '../../../shared/components/PermissionGate/PermissionGate'
 import { SkeletonBlock } from '../../../shared/components/Skeleton'
 import { ApiError } from '../../../shared/api/httpClient'
@@ -1004,7 +1004,7 @@ export function ApprovalCenterPage() {
 
       {/* Table — shared chrome. This page's own `.tableContainer`/`.logTable` were a byte-for-byte
           copy of the Audit Logs pair (only min-width differed), which is exactly the duplication
-          @omniremit/ui's DataTable exists to remove. */}
+          @omniconnect/ui's DataTable exists to remove. */}
       <DataTable reserveHeight footer={<Pagination page={page} pageSize={pageSize} total={total ?? 0} itemLabel="request" onPageChange={setPage} />}>
           <ResponsiveRows
             rows={items ?? []}

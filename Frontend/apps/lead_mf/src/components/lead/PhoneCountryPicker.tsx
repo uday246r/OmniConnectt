@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
-import { Combobox, type ComboboxOption } from '@omniremit/ui';
-import { COUNTRY_PHONE_LIST } from '@omniremit/ui/validation';
+import { Combobox, type ComboboxOption } from '@omniconnect/ui';
+import { COUNTRY_PHONE_LIST } from '@omniconnect/ui/validation';
 import styles from './PhoneCountryPicker.module.css';
 
 interface PhoneCountryPickerProps {

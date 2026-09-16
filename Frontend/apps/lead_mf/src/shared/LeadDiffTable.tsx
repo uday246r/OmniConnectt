@@ -1,5 +1,5 @@
 import React from 'react';
-import { DataTable } from '@omniremit/ui';
+import { DataTable } from '@omniconnect/ui';
 import styles from './LeadDiffTable.module.css';
 
 export interface LeadFieldDiff {
@@ -19,7 +19,7 @@ export interface LeadDiffTableProps {
 /**
  * Before/after view of changed fields.
  *
- * APPLICATION-LEVEL SHARED, deliberately — it lives in lead_mf rather than @omniremit/ui because
+ * APPLICATION-LEVEL SHARED, deliberately — it lives in lead_mf rather than @omniconnect/ui because
  * only this app renders it, in two places: the Edit Lead confirmation step and the Audit Record
  * details drawer. Both had their own copy, and they had drifted (different greens, different
  * paddings, one monospaced and one not). Promote this to the shared package only if a second

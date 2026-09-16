@@ -4,7 +4,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <RepositoryUrl>https://github.com/Ashok-2004/OmniRemit</RepositoryUrl>
+    <RepositoryUrl>https://github.com/Ashok-2004/OmniConnect</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
   </PropertyGroup>
 

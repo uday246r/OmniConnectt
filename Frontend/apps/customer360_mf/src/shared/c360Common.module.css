@@ -3,7 +3,7 @@
  *
  * Application-level, not global: these are the recurring controls on this app's own list pages
  * (search box, pagination arrows, status pills, monospaced identifiers). The host composes its
- * equivalents differently, so promoting them to @omniremit/ui would be inventing a shared
+ * equivalents differently, so promoting them to @omniconnect/ui would be inventing a shared
  * abstraction for a single consumer.
  *
  * Every rule here replaces an inline block that was repeated across two or more pages.
@@ -90,7 +90,7 @@
 }
 
 /*
- * Button sitting ON the blue page banner. Mirrors @omniremit/ui's Button `onHeader` variant; kept
+ * Button sitting ON the blue page banner. Mirrors @omniconnect/ui's Button `onHeader` variant; kept
  * local because these call sites are plain <button> elements wired to this app's own handlers.
  */
 
@@ -102,7 +102,7 @@
 
 
 /* A value that is genuinely absent, as opposed to one that is merely empty. Pairs with
-   EMPTY_VALUE (the em dash) from @omniremit/ui so a missing value reads the same here as in the
+   EMPTY_VALUE (the em dash) from @omniconnect/ui so a missing value reads the same here as in the
    host. */
 .mutedText {
   color: var(--omni-color-text-muted);

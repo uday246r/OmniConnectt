@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { Settings, Save, AlertCircle, CheckCircle2, Eye, EyeOff, RefreshCw } from '@omniremit/ui/icons';
-import { Button, Checkbox, DataTable, Modal, PageHeader, Select, TableSkeleton, Tabs } from '@omniremit/ui';
-import { CUSTOM_PRESET_ID, findPreset, type CustomPreset, type ValidationRule } from '@omniremit/ui/validation';
-import { ValidationRulesEditor, describeRuleProblem } from '@omniremit/ui/validation-editor';
+import { Settings, Save, AlertCircle, CheckCircle2, Eye, EyeOff, RefreshCw } from '@omniconnect/ui/icons';
+import { Button, Checkbox, DataTable, Modal, PageHeader, Select, TableSkeleton, Tabs } from '@omniconnect/ui';
+import { CUSTOM_PRESET_ID, findPreset, type CustomPreset, type ValidationRule } from '@omniconnect/ui/validation';
+import { ValidationRulesEditor, describeRuleProblem } from '@omniconnect/ui/validation-editor';
 import styles from './FieldSettingsPage.module.css';
 import shell from '../shared/leadPage.module.css';
 import { apiClient, isApprovalPending } from '../api/apiClient';

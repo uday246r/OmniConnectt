@@ -3,7 +3,7 @@ import type { AxiosAdapter, InternalAxiosRequestConfig } from 'axios'
 import { ApprovalPendingError, httpClient, isApprovalPending } from './httpClient'
 import { useDrawerStore } from '../stores/useDrawerStore'
 import { useToastStore } from '../stores/useToastStore'
-import type { OmniRemitHostBridge } from '../api/hostBridge'
+import type { OmniConnectHostBridge } from '../api/hostBridge'
 
 /**
  * How this remote talks to its API: who it says it is, and what it does with the platform's answers.
@@ -14,8 +14,8 @@ import type { OmniRemitHostBridge } from '../api/hostBridge'
  * approval outcome, and the single refresh-and-retry on an expired token.
  */
 
-function installBridge(over: Partial<OmniRemitHostBridge> = {}) {
-  window.__omniremitHost__ = {
+function installBridge(over: Partial<OmniConnectHostBridge> = {}) {
+  window.__omniconnectHost__ = {
     getAccessToken: () => 'token-1',
     ensureFreshAccessToken: () => Promise.resolve('token-2'),
     hasCapability: () => false,
@@ -48,7 +48,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  delete window.__omniremitHost__
+  delete window.__omniconnectHost__
 })
 
 describe('identity', () => {

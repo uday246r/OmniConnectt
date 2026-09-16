@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { EMPTY_DATE_RANGE, isDateRangeActive, resolveDateRange, type DateRangeValue } from "@omniremit/ui";
+import { EMPTY_DATE_RANGE, isDateRangeActive, resolveDateRange, type DateRangeValue } from "@omniconnect/ui";
 import { auditLogApi, type AuditLogQuery } from "../services/auditLogApi";
 import type { AuditActionOption, AuditLog, AuditLogSummary } from "../types/domain";
 

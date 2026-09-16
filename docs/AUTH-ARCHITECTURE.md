@@ -1,6 +1,6 @@
-# OmniRemit Authentication & Authorization — Complete Deep-Dive Guide
+# OmniConnect Authentication & Authorization — Complete Deep-Dive Guide
 
-A step-by-step map of how authentication and authorization work across the OmniRemit host + remote micro-frontend architecture, with exact file references, organized as a buildable tutorial: what exists, where it lives, why it was built that way, and how to reproduce the same design in a new system. Covers three layers: (1) backend authentication (AuthService), (2) backend authorization/RBAC, (3) frontend + module-federation wiring.
+A step-by-step map of how authentication and authorization work across the OmniConnect host + remote micro-frontend architecture, with exact file references, organized as a buildable tutorial: what exists, where it lives, why it was built that way, and how to reproduce the same design in a new system. Covers three layers: (1) backend authentication (AuthService), (2) backend authorization/RBAC, (3) frontend + module-federation wiring.
 
 > ⚠️ **Two topology changes postdate this document; the concepts are unchanged.**
 >
@@ -28,7 +28,7 @@ A step-by-step map of how authentication and authorization work across the OmniR
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │  Browser                                                          │
-│  ┌───────────────┐   window.__omniremitHost__ bridge             │
+│  ┌───────────────┐   window.__omniconnectHost__ bridge             │
 │  │  Host shell     │──────────────┬──────────────┬───────────────│
 │  │  (Vite MF host) │              │              │               │
 │  └───────┬─────────┘   ┌──────────▼──┐  ┌────────▼───┐  ┌────────▼───┐
@@ -58,7 +58,7 @@ Key architectural decisions to internalize before the details:
 - **One identity provider, many resource servers.** AuthService is the only thing that authenticates users and issues tokens. Every other backend (EmployeeService, LeadService, Customer360Service, ModuleRegistry) independently *validates* the same JWT using an **RSA public key** — no shared secret, no network call back to AuthService per request.
 - **Permissions are computed once, server-side, and shipped inside the JWT** as a flat `"featureKey:Capability"` string array. Enforcement everywhere else is pure in-memory string matching against that claim — zero DB/network calls per authorization check.
 - **The permission catalog is dynamic, not hardcoded.** Each remote backend declares its own permissions via attributes on its controllers; ModuleRegistry discovers them and pushes them into AuthService's catalog, so the host's Role editor and every enforcement point "just knows" about new remote capabilities without code changes in AuthService or the host.
-- **The frontend token never touches localStorage.** It lives in memory in a Zustand store; a `window.__omniremitHost__` bridge object exposes it (live-read, not copied) to every mounted remote micro-frontend.
+- **The frontend token never touches localStorage.** It lives in memory in a Zustand store; a `window.__omniconnectHost__` bridge object exposes it (live-read, not copied) to every mounted remote micro-frontend.
 
 ---
 
@@ -269,8 +269,8 @@ All approval state is centralized in AuthService, even for remote services' muta
 
 - `accessToken` is **kept in memory only** — line 10's comment is explicit: "never written to localStorage/sessionStorage." The refresh token never reaches JS at all; it's an httpOnly cookie the browser manages automatically.
 - `login`/`loginWithGoogle` (136-160), `logout` (162-171), `hydrate` (173-186 — silently calls `/api/auth/refresh` on page load using the cookie, to restore a session after a hard reload with no in-memory token yet), `ensureFreshAccessToken` (188-204 — refreshes only if <30s of life left), `refreshSession` (206-220 — force-refreshes regardless of expiry, used after permission-affecting saves), `hasCapability` (222-227).
-- Cross-tab logout sync via `BroadcastChannel('omniremit-auth')`.
-- Refresh is deduped within a tab and **serialized across tabs** via the Web Locks API (`navigator.locks.request('omniremit-token-refresh', ...)`) — necessary because the server rotates the refresh cookie on every use, so two tabs racing the same refresh call would trip the reuse-detection kill-switch from §1.5.
+- Cross-tab logout sync via `BroadcastChannel('omniconnect-auth')`.
+- Refresh is deduped within a tab and **serialized across tabs** via the Web Locks API (`navigator.locks.request('omniconnect-token-refresh', ...)`) — necessary because the server rotates the refresh cookie on every use, so two tabs racing the same refresh call would trip the reuse-detection kill-switch from §1.5.
 
 **To build this yourself:** in-memory-only access tokens + httpOnly-cookie refresh tokens is the standard mitigation against XSS-stolen tokens (an XSS payload can read `localStorage` but not an httpOnly cookie). The Web Locks cross-tab serialization is a subtle but important detail once you add rotate-on-use refresh tokens to a multi-tab SPA.
 
@@ -309,7 +309,7 @@ All approval state is centralized in AuthService, even for remote services' muta
 pnpm workspace (`Frontend/pnpm-workspace.yaml`, `packages: ["apps/*", "packages/*"]`):
 - `Frontend/apps/host` — shell app (React 19 + Vite + `@module-federation/vite`)
 - `Frontend/apps/employee_mf`, `Frontend/apps/lead_mf`, `Frontend/apps/customer360_mf` — remotes, each a self-contained app with its own backend
-- `Frontend/packages/federation-config` — shared MF contract package (`@omniremit/federation-config`)
+- `Frontend/packages/federation-config` — shared MF contract package (`@omniconnect/federation-config`)
 
 ### 4.2 The shared MF contract
 
@@ -322,7 +322,7 @@ pnpm workspace (`Frontend/pnpm-workspace.yaml`, `packages: ["apps/*", "packages/
 
 Not a prop, not localStorage. A global object, installed once at host boot, **live-read** (not snapshotted) by every remote:
 
-- [`Frontend/apps/host/src/shared/federation/hostBridge.ts`](Frontend/apps/host/src/shared/federation/hostBridge.ts) — `OmniRemitHostBridge` interface: `getAccessToken()`, `ensureFreshAccessToken()`, `hasCapability(featureKey, capability)`, `getUser()`, `apiBaseUrls`, `theme.token()`. `installHostBridge()` sets `window.__omniremitHost__`, reading straight from `useAuthStore.getState()` on each call.
+- [`Frontend/apps/host/src/shared/federation/hostBridge.ts`](Frontend/apps/host/src/shared/federation/hostBridge.ts) — `OmniConnectHostBridge` interface: `getAccessToken()`, `ensureFreshAccessToken()`, `hasCapability(featureKey, capability)`, `getUser()`, `apiBaseUrls`, `theme.token()`. `installHostBridge()` sets `window.__omniconnectHost__`, reading straight from `useAuthStore.getState()` on each call.
 - Installed in [`Frontend/apps/host/src/main.tsx`](Frontend/apps/host/src/main.tsx) (line 15) — **before** `createRoot(...).render(<App/>)`, guaranteeing the bridge exists before any remote can possibly mount.
 - Each remote has its own thin accessor mirroring the contract, e.g. [`Frontend/apps/employee_mf/src/api/hostBridge.js`](Frontend/apps/employee_mf/src/api/hostBridge.js), [`Frontend/apps/customer360_mf/src/api/hostBridge.ts`](Frontend/apps/customer360_mf/src/api/hostBridge.ts).
 

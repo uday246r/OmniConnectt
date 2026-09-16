@@ -11,7 +11,7 @@ import {
   getCurrentUser,
   hasCapability,
   isRunningInHost,
-  type OmniRemitHostBridge,
+  type OmniConnectHostBridge,
 } from './hostBridge'
 
 /**
@@ -22,8 +22,8 @@ import {
  * load-bearing and invisible from the call sites, so it is what most of this file is about.
  */
 
-function installBridge(over: Partial<OmniRemitHostBridge> = {}) {
-  const bridge: OmniRemitHostBridge = {
+function installBridge(over: Partial<OmniConnectHostBridge> = {}) {
+  const bridge: OmniConnectHostBridge = {
     getAccessToken: () => 'token',
     ensureFreshAccessToken: () => Promise.resolve('token'),
     hasCapability: () => false,
@@ -37,7 +37,7 @@ function installBridge(over: Partial<OmniRemitHostBridge> = {}) {
     }),
     ...over,
   }
-  window.__omniremitHost__ = bridge
+  window.__omniconnectHost__ = bridge
   return bridge
 }
 
@@ -49,7 +49,7 @@ function bridgeGranting(...granted: string[]) {
 }
 
 beforeEach(() => {
-  delete window.__omniremitHost__
+  delete window.__omniconnectHost__
 })
 
 afterEach(() => {

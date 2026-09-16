@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useAuthStore } from '../../auth/store/authStore'
-import { Badge, Button, ColumnFilter, DataTable, EMPTY_VALUE, FilterBar, Icon, PageHeader, Pagination, ResponsiveRows, RowsPerPage, readStoredPageSize, type ActiveFilter, type BadgeTone } from '@omniremit/ui'
+import { Badge, Button, ColumnFilter, DataTable, EMPTY_VALUE, FilterBar, Icon, PageHeader, Pagination, ResponsiveRows, RowsPerPage, readStoredPageSize, type ActiveFilter, type BadgeTone } from '@omniconnect/ui'
 import { approvalsApi, type ApprovalFacetsDto, type ApprovalRequestListItemDto, type ApprovalStatus, type MyRequestsParams } from '../api/approvalsApi'
 import { useApprovalRequests } from '../hooks/useApprovalRequests'
 import styles from './MyRequestsPage.module.css'

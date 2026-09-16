@@ -45,10 +45,10 @@ namespace LeadManagement.Api.Controllers
         /// </summary>
         [HttpGet("formats")]
         [RequiresAnyCapability("FieldSettings:View", "Lead:View", "Lead:Create", "Lead:Edit")]
-        public async Task<ActionResult<ApiResponseDto<IReadOnlyList<OmniRemit.Validation.FormatPreset>>>> Formats(
+        public async Task<ActionResult<ApiResponseDto<IReadOnlyList<OmniConnect.Validation.FormatPreset>>>> Formats(
             [FromServices] ValidationPresetClient presets, CancellationToken ct)
         {
-            return Ok(new ApiResponseDto<IReadOnlyList<OmniRemit.Validation.FormatPreset>> { Success = true, Data = await presets.GetAsync(ct) });
+            return Ok(new ApiResponseDto<IReadOnlyList<OmniConnect.Validation.FormatPreset>> { Success = true, Data = await presets.GetAsync(ct) });
         }
 
         [HttpPut("{productId:guid}")]

@@ -21,13 +21,13 @@ import {
   Copy,
   Check,
   LayoutGrid,
-} from '@omniremit/ui/icons';
+} from '@omniconnect/ui/icons';
 import { api, ApiError } from '../services/api';
 import type { AuditLog } from '../types/api';
 import { getFriendlyErrorMessage } from '../utils/errorMessages';
 import styles from './AuditLogs.module.css';
 import cc from '../shared/c360Common.module.css';
-import { ActorCell, Badge, Button, ColumnFilter, CsvExportError, DataTable, DateRangeColumnFilter, DetailField, DetailGrid, DetailSection, DetailSections, Drawer, EMPTY_DATE_RANGE, EMPTY_VALUE, FilterBar, PageHeader, Pagination, ResponsiveRows, RowAction, RowsPerPage, SearchField, describeTruncation, formatAuditTimestamp, readStoredPageSize, resolveDateRange, useDebouncedValue, type ActiveFilter, type BadgeTone, type DateRangeValue } from '@omniremit/ui';
+import { ActorCell, Badge, Button, ColumnFilter, CsvExportError, DataTable, DateRangeColumnFilter, DetailField, DetailGrid, DetailSection, DetailSections, Drawer, EMPTY_DATE_RANGE, EMPTY_VALUE, FilterBar, PageHeader, Pagination, ResponsiveRows, RowAction, RowsPerPage, SearchField, describeTruncation, formatAuditTimestamp, readStoredPageSize, resolveDateRange, useDebouncedValue, type ActiveFilter, type BadgeTone, type DateRangeValue } from '@omniconnect/ui';
 import { remoteDownloadCsv } from '../services/exportCsv';
 import { API_BASE_URL } from '../services/api';
 import { resolveActor } from '../shared/resolveActor';

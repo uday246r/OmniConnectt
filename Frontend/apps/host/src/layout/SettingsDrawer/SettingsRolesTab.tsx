@@ -12,7 +12,7 @@ import { ApiError } from '../../shared/api/httpClient'
 import { toast } from '../../shared/stores/toastStore'
 import styles from './SettingsRolesTab.module.css'
 import { TOPICS, invalidate, useDataRevision } from '../../shared/stores/invalidationStore'
-import { Button, EmptyState, Modal, Pagination, SearchField, type SearchFieldSuggestion } from '@omniremit/ui'
+import { Button, EmptyState, Modal, Pagination, SearchField, type SearchFieldSuggestion } from '@omniconnect/ui'
 
 const PAGE_SIZE = 10
 

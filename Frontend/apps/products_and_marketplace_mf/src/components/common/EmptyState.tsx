@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Button, EmptyState as SharedEmptyState, SkeletonBlock } from "@omniremit/ui";
+import { Button, EmptyState as SharedEmptyState, SkeletonBlock } from "@omniconnect/ui";
 import { Icon, type IconName } from "./Icon";
 
 /*

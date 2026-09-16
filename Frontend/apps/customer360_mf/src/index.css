@@ -1,6 +1,6 @@
 /* ==========================================================================
    Customer 360 Remote App — Host Design System Tokens & Foundation
-   Conforms 100% with OmniRemit Host App & Lead Management Design Standard
+   Conforms 100% with OmniConnect Host App & Lead Management Design Standard
    ========================================================================== */
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Outfit:wght@400;500;600;700;800&display=swap');
@@ -623,7 +623,7 @@
 }
 
 /* ---- buttons ----
-   Nothing here any more. Every button in this app renders `<Button>` from @omniremit/ui, so the
+   Nothing here any more. Every button in this app renders `<Button>` from @omniconnect/ui, so the
    gradient, sizes, hover and focus rings are the host's, not a copy of them. */
 
 /* ---- spinners / loading / empty / error states ---- */
@@ -1420,7 +1420,7 @@
 /*
  * Card frames around tables.
  *
- * These were removed with the .c360-table rules when those tables moved to @omniremit/ui's
+ * These were removed with the .c360-table rules when those tables moved to @omniconnect/ui's
  * DataTable, but they are the surrounding CARD, not the table — without them the tables lost their
  * white surface, border and shadow. Restored, now pointing at the platform tokens.
  */

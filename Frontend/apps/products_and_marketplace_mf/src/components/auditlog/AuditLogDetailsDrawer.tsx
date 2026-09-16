@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Badge, Button, DetailField, DetailGrid, EmptyState, SkeletonBlock, formatAuditTimestamp } from "@omniremit/ui";
+import { Badge, Button, DetailField, DetailGrid, EmptyState, SkeletonBlock, formatAuditTimestamp } from "@omniconnect/ui";
 import { Drawer, DrawerSection } from "../drawer/Drawer";
 import { Icon } from "../common/Icon";
 import { useAuditLogStore } from "../../stores/useAuditLogStore";

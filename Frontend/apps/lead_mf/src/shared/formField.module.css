@@ -4,7 +4,7 @@
  * The lead drawers and the create/edit forms all declared these same blocks inline: a field group,
  * a bold label with a red required marker, a tinted textarea/input with a focus ring, and an error
  * line. Application-level rather than global — the host's own form controls come from
- * @omniremit/ui's Input/Checkbox, which these screens do not use because they are wired to this
+ * @omniconnect/ui's Input/Checkbox, which these screens do not use because they are wired to this
  * app's own validation and field-config system.
  */
 

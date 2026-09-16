@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /*
- * HTTP load driver for the local OmniRemit stack. No dependencies (Node 20+ built-in fetch).
+ * HTTP load driver for the local OmniConnect stack. No dependencies (Node 20+ built-in fetch).
  *
  *   node scripts/loadtest/http-load.mjs                       # default ramp 10,50,100,200 × 15s
  *   node scripts/loadtest/http-load.mjs --steps 10,50 --seconds 10 --out results.json
@@ -132,7 +132,7 @@ const results = []
 const auth = await signIn()
 const scenarios = [...anonymous, ...(auth.token ? signedIn(auth.token) : [])].filter((s) => !only || s.name.includes(only))
 
-console.log(`OmniRemit HTTP load — steps ${steps.join(', ')} × ${seconds}s, ${scenarios.length} scenarios`)
+console.log(`OmniConnect HTTP load — steps ${steps.join(', ')} × ${seconds}s, ${scenarios.length} scenarios`)
 if (auth.skipped) console.log(`signed-in scenarios skipped: ${auth.skipped}`)
 console.log('scenario'.padEnd(42), 'conc'.padStart(5), 'req/s'.padStart(7), 'p50'.padStart(7), 'p95'.padStart(7), 'p99'.padStart(7), 'bad'.padStart(5), '429'.padStart(5), 'err'.padStart(5))
 

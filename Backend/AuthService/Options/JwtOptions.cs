@@ -10,8 +10,8 @@ public class JwtOptions
 {
     public const string SectionName = "Jwt";
 
-    public string Issuer { get; set; } = "omniremit-auth-service";
-    public string Audience { get; set; } = "omniremit-host";
+    public string Issuer { get; set; } = "omniconnect-auth-service";
+    public string Audience { get; set; } = "omniconnect-host";
     public int AccessTokenMinutes { get; set; } = 15;
     public int RefreshTokenDays { get; set; } = 14;
 

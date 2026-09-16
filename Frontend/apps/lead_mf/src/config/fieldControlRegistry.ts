@@ -1,4 +1,4 @@
-import type { ValidationRule } from '@omniremit/ui/validation'
+import type { ValidationRule } from '@omniconnect/ui/validation'
 
 /**
  * A field's backend config (label/visibility/required/editable/order/sensitive/masking) says nothing

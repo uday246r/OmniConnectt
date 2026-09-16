@@ -27,7 +27,7 @@ import {
   resolveDateRange,
   type DateRangeValue,
   Select,
-} from '@omniremit/ui'
+} from '@omniconnect/ui'
 import { PermissionGate } from '../../../shared/components/PermissionGate/PermissionGate'
 import { ApiError } from '../../../shared/api/httpClient'
 import { useDebouncedValue } from '../../../shared/hooks/useDebouncedValue'

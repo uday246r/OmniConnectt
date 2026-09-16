@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { api, ApiError } from '../services/api';
 import { useCustomerStore } from './customerStore';
 import type { CustomerProduct, ProductDetail } from '../types/api';
-import { readStoredPageSize } from '@omniremit/ui';
+import { readStoredPageSize } from '@omniconnect/ui';
 
 // ---------------------------------------------------------------------------
 // Stale-response guard for loadProducts, mirroring customerStore's

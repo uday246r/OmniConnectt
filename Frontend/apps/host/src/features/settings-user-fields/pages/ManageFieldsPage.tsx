@@ -8,8 +8,8 @@ import { Icon } from '../../../shared/components/Icon/Icon'
 import { SkeletonBlock } from '../../../shared/components/Skeleton'
 import { ApiError } from '../../../shared/api/httpClient'
 import { toast } from '../../../shared/stores/toastStore'
-import { Button, PageHeader } from '@omniremit/ui'
-import type { CustomPreset, FieldDefinition } from '@omniremit/ui/validation'
+import { Button, PageHeader } from '@omniconnect/ui'
+import type { CustomPreset, FieldDefinition } from '@omniconnect/ui/validation'
 import styles from './ManageFieldsPage.module.css'
 
 export function ManageFieldsPage() {

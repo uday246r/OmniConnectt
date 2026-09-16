@@ -6,7 +6,7 @@ import {
   type CountryPhoneConfig,
   type CustomPreset,
   type FieldDefinition,
-} from '@omniremit/ui/validation'
+} from '@omniconnect/ui/validation'
 import type { LeadFormData } from '../types/lead'
 import type { LeadFieldConfig } from './fieldControlRegistry'
 

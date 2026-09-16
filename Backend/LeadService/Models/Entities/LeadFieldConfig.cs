@@ -113,6 +113,6 @@ namespace LeadManagement.Api.Models.Entities
             }
         }
 
-        public OmniRemit.Validation.FieldRule ToEngineRule() => new(Type, Pattern, Value, Message);
+        public OmniConnect.Validation.FieldRule ToEngineRule() => new(Type, Pattern, Value, Message);
     }
 }

@@ -509,7 +509,7 @@ if (context.Exception is FieldValidationException fieldValidation)
 
 ---
 
-### Step 8 — Frontend shared engine (`@omniremit/ui`)
+### Step 8 — Frontend shared engine (`@omniconnect/ui`)
 
 Lives in `packages/ui` so the host **and** every remote micro-frontend judge a value identically.
 
@@ -1100,7 +1100,7 @@ public static class EmailSmartValidator
 }
 ```
 
-### 12.3 Frontend — `@omniremit/ui` shared package
+### 12.3 Frontend — `@omniconnect/ui` shared package
 
 **`Frontend/packages/ui/src/validation/fieldPresets.ts`** — the exact TypeScript twin of
 `FieldPresets.cs`, but shaped as data AJV can compile directly (`schema` fragments) rather than a C#
@@ -1193,7 +1193,7 @@ shared `apiFetch` helper (`shared/api/httpClient.ts`), which attaches the bearer
 ```ts
 import { env } from '../../../config/env'
 import { apiFetch } from '../../../shared/api/httpClient'
-import type { FieldDefinition } from '@omniremit/ui/validation'
+import type { FieldDefinition } from '@omniconnect/ui/validation'
 
 const base = env.authServiceUrl
 
@@ -1562,7 +1562,7 @@ recognisable core fields:
 ```
 
 `const fieldErrors = validateFields(fields, fieldValues)` runs on every render — this is the
-`@omniremit/ui/validation` AJV engine from §5 step 8, called with the live field list and live values.
+`@omniconnect/ui/validation` AJV engine from §5 step 8, called with the live field list and live values.
 
 **Submitting** — split core columns from the custom-fields bag:
 
@@ -1629,7 +1629,7 @@ UserFormLayer.tsx         : useEffect load — userSchemaApi.get() + salutations
 UserSchemaController.cs   : Get()  →  UserFieldSchemaAppService.GetAsync()  →  JSON.Deserialize(SchemaJson)
 UserFormLayer.tsx         : setFields(sorted); setFieldValues({ ...blank map })
   (user types into inputs — onChange per field)
-UserFormLayer.tsx         : validateFields(fields, fieldValues)   — @omniremit/ui, AJV, on every render
+UserFormLayer.tsx         : validateFields(fields, fieldValues)   — @omniconnect/ui, AJV, on every render
   (user clicks the wizard's final submit)
 UserFormLayer.tsx         : handleSubmit()
   build customFields = { aadharNumber: "1234 5678 9012", ... }    — every non-core field, always present

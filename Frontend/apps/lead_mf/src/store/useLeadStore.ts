@@ -1,4 +1,4 @@
-import type { CustomPreset } from '@omniremit/ui/validation';
+import type { CustomPreset } from '@omniconnect/ui/validation';
 import { create } from 'zustand';
 import { apiFieldFor, defaultPhoneCountry, formatErrorFor, formatErrorsFor, splitStoredPhone } from '../config/leadFormats';
 import { LeadFormData, FormValidationErrors, NavigationPage, LeadRecord, DropdownOption, AuditRecord } from '../types/lead';
@@ -13,7 +13,7 @@ import {
 } from '../api/apiClient';
 import { isFieldRequired, type LeadFieldConfig } from '../config/fieldControlRegistry';
 import { canSeeDashboardCapability } from '../api/hostBridge';
-import { EMPTY_DATE_RANGE, readStoredPageSize, resolveDateRange, type DateRangeValue } from '@omniremit/ui';
+import { EMPTY_DATE_RANGE, readStoredPageSize, resolveDateRange, type DateRangeValue } from '@omniconnect/ui';
 
 /** LeadFormData's field names match the backend's apiField catalog 1:1 with exactly one exception —
  * the form calls it `preferredBranch`, the catalog calls it `branch`. Central so both validateField

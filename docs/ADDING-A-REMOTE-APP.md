@@ -1,6 +1,6 @@
 # Adding a New Remote App
 
-How to put a new micro-frontend and its backend on OmniRemit so that it signs people in with the
+How to put a new micro-frontend and its backend on OmniConnect so that it signs people in with the
 platform's token, enforces the permissions the Role editor grants, records everything in the central
 audit trail, goes through maker-checker approval, and looks like the rest of the product.
 
@@ -33,7 +33,7 @@ in **Setup → Applications**.
 
 Copy `Frontend/apps/lead_mf` to `Frontend/apps/<app>_mf`, then:
 
-- **`package.json`** — a unique `name`; keep `@omniremit/ui` and `@omniremit/federation-config` as
+- **`package.json`** — a unique `name`; keep `@omniconnect/ui` and `@omniconnect/federation-config` as
   `workspace:*`. Keep the `test` / `build` scripts; `build` must type-check the app's real tsconfig.
 - **`vite.config.ts`** — `federation(remoteFederationConfig('<app>_mf', './src/App.tsx', ['zustand']))`.
   List every shared package you actually import (`zustand`, `react-router-dom`, `@tanstack/react-query`).
@@ -41,13 +41,13 @@ Copy `Frontend/apps/lead_mf` to `Frontend/apps/<app>_mf`, then:
   failure. Listing one you did not install fails the build.
 - **`postcss.config.cjs`** — change `SCOPE_ID`; keep both plugins (selectors and `@keyframes` names).
 - **`App.tsx`** — the root element carries only the scope id.
-- **Styles** — import `@omniremit/ui/tokens.css` before your own CSS, never the host's global CSS.
-  Build screens from `@omniremit/ui`: `Drawer`, `Modal`, `DataTable`, `Pagination`, `ColumnFilter`,
+- **Styles** — import `@omniconnect/ui/tokens.css` before your own CSS, never the host's global CSS.
+  Build screens from `@omniconnect/ui`: `Drawer`, `Modal`, `DataTable`, `Pagination`, `ColumnFilter`,
   `Select` / `Combobox` (every dropdown is type-to-search), `Badge`, `Button`. Read
   `docs/SHARED-UI-REFACTOR-STATUS.md` first.
 - **Drawers** — one close control (the header X), no footer "Close" button, and no database ids,
   GUIDs, raw JSON or action keys shown to people. Show names and plain-language descriptions.
-- **Identity** — never run a login. `src/api/hostBridge.ts` reads `window.__omniremitHost__`:
+- **Identity** — never run a login. `src/api/hostBridge.ts` reads `window.__omniconnectHost__`:
   `getAccessToken()`, `ensureFreshAccessToken()`, `hasCapability(featureKey, capability)`, `getUser()`.
   Send `Authorization: Bearer <token>` on every call, refresh once on a 401, and send nothing that
   names the user (no `X-Actor-*` headers — the server reads the actor from the token).
@@ -55,12 +55,12 @@ Copy `Frontend/apps/lead_mf` to `Frontend/apps/<app>_mf`, then:
   `hasCapability('remote.<key>.<module>', 'Create')`. Never grant everything in a mock provider.
 - **Approvals** — a gated change answers `202` with `{ approvalRequestId, checkerName, message }`.
   Treat it as "sent for approval": close the form, say who must approve it, and do not show "saved".
-- **Exports** — download server-side CSVs with `downloadCsv` from `@omniremit/ui`; never build CSV in
+- **Exports** — download server-side CSVs with `downloadCsv` from `@omniconnect/ui`; never build CSV in
   the browser from the rows on screen.
 - **Page views** — nothing to do. Every page change inside a remote is a host URL change, and the host
   records it (`usePageViewTracking`); the page name comes from your navigation manifest.
 - **Field formats** — to validate against Settings → Manage Formats, use `validateFieldValue` from
-  `@omniremit/ui/validation` and `ValidationRulesEditor` from `@omniremit/ui/validation-editor`.
+  `@omniconnect/ui/validation` and `ValidationRulesEditor` from `@omniconnect/ui/validation-editor`.
 
 Every remote default-exports a React component from `./src/App.tsx`; the host always loads `<key>/App`.
 
@@ -78,8 +78,8 @@ Copy `Backend/LeadService` (or `ProductsService`). Build context for its Dockerf
 
 ```
 Jwt__SigningKeyPublic=<the platform public key — same value every service uses>
-Jwt__Issuer=omniremit-auth-service
-Jwt__Audience=omniremit-host
+Jwt__Issuer=omniconnect-auth-service
+Jwt__Audience=omniconnect-host
 AuthService__BaseUrl=http://localhost:5155
 AuthService__InternalApiKey=<this service's own key>
 Internal__ApiKey=<the same key — AuthService presents it when replaying an approval here>

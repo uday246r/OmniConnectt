@@ -17,11 +17,11 @@ import {
   CheckCircle2,
   Building,
   Layers,
-} from '@omniremit/ui/icons';
+} from '@omniconnect/ui/icons';
 import type { AnyProductFields, ProductDetailType, CorporateProfile } from '../types/api';
 import { StatusBadge } from '../shared/StatusBadge';
 import { formatValue, formatCurrency as formatMoney, resolveProductStatus } from '../shared/formatValue';
-import { Button, Badge, DetailField, DetailGrid, DetailSection, Drawer, EMPTY_VALUE, isEmptyDetailValue } from '@omniremit/ui';
+import { Button, Badge, DetailField, DetailGrid, DetailSection, Drawer, EMPTY_VALUE, isEmptyDetailValue } from '@omniconnect/ui';
 import styles from './ProductDetailsModal.module.css';
 
 // ---------------------------------------------------------------------------

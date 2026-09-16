@@ -12,7 +12,7 @@ import { TOPICS } from '../../../../shared/stores/invalidationStore'
 import { useLiveRevision } from '../../../../shared/hooks/useLiveRevision'
 
 const ITEM_LIMIT = 8
-const DISMISSED_APPROVALS_KEY = 'omniremit:dismissed-approvals'
+const DISMISSED_APPROVALS_KEY = 'omniconnect:dismissed-approvals'
 
 function readDismissed(userId: string): Set<string> {
   try {

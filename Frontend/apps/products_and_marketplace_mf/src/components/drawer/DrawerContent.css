@@ -1,7 +1,7 @@
 /*
  * Content blocks inside Products drawers that the platform DetailPanel does not provide (lists of
  * benefits, documents, reviews, a status timeline). The drawer chrome and section cards come from
- * @omniremit/ui; everything here uses platform tokens so the two read as one design. Rows no longer
+ * @omniconnect/ui; everything here uses platform tokens so the two read as one design. Rows no longer
  * jump on hover — they are read-only information, not controls.
  */
 

@@ -12,7 +12,7 @@ import {
   getCurrentUser,
   hasCapability,
   isRunningInHost,
-  type OmniRemitHostBridge,
+  type OmniConnectHostBridge,
 } from './hostBridge'
 
 /**
@@ -24,7 +24,7 @@ import {
  * one. That asymmetry is invisible at the call sites, so it is what most of this file is about.
  */
 
-function installBridge(over: Partial<OmniRemitHostBridge> = {}) {
+function installBridge(over: Partial<OmniConnectHostBridge> = {}) {
   const bridge = {
     getAccessToken: () => 'token',
     ensureFreshAccessToken: () => Promise.resolve('token'),
@@ -38,9 +38,9 @@ function installBridge(over: Partial<OmniRemitHostBridge> = {}) {
       permissions: [],
     }),
     ...over,
-  } as OmniRemitHostBridge
+  } as OmniConnectHostBridge
 
-  window.__omniremitHost__ = bridge
+  window.__omniconnectHost__ = bridge
   return bridge
 }
 
@@ -53,7 +53,7 @@ function bridgeGranting(...granted: string[]) {
 }
 
 beforeEach(() => {
-  delete window.__omniremitHost__
+  delete window.__omniconnectHost__
 })
 
 afterEach(() => {

@@ -1,5 +1,5 @@
 import styles from './IdleWarningModal.module.css'
-import { Button, Modal } from '@omniremit/ui'
+import { Button, Modal } from '@omniconnect/ui'
 
 export interface IdleWarningModalProps {
   open: boolean

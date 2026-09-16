@@ -13,8 +13,8 @@ import styles from './SecurityAlertsMenu.module.css'
 
 const ALERT_LIMIT = 8
 /** Persisted per user so the unread count survives reloads without needing a server-side read model. */
-const LAST_SEEN_KEY = 'omniremit:alerts-last-seen'
-const DISMISSED_ALERTS_KEY = 'omniremit:dismissed-alerts'
+const LAST_SEEN_KEY = 'omniconnect:alerts-last-seen'
+const DISMISSED_ALERTS_KEY = 'omniconnect:dismissed-alerts'
 
 function readLastSeen(userId: string): number {
   try {

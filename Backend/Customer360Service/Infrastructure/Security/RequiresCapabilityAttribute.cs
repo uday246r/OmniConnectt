@@ -8,7 +8,7 @@ namespace backend.Infrastructure.Security;
 /// <summary>
 /// Server-side capability enforcement and dynamic permission discovery source for Customer360Service.
 /// Reads the cached `perms` claim in the RS256 JWT without network round-trips.
-/// Conforms with OmniRemit Host, EmployeeService, and LeadService security standards.
+/// Conforms with OmniConnect Host, EmployeeService, and LeadService security standards.
 /// </summary>
 [AttributeUsage(AttributeTargets.Method | AttributeTargets.Class, AllowMultiple = true)]
 public class RequiresCapabilityAttribute : Attribute, IAsyncAuthorizationFilter

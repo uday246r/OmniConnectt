@@ -1,4 +1,4 @@
-import type { PasswordPolicy } from '@omniremit/ui/validation'
+import type { PasswordPolicy } from '@omniconnect/ui/validation'
 import { env } from '../../config/env'
 import { apiFetch } from './httpClient'
 

@@ -13,7 +13,7 @@ import { useToastStore } from "../stores/useToastStore";
 import { usePermissions } from "../permissions/PermissionContext";
 import { PERMISSIONS } from "../permissions/permissions";
 import { productApi } from "../services/productApi";
-import { CsvExportError, describeTruncation, Pagination, Button, PageHeader } from "@omniremit/ui";
+import { CsvExportError, describeTruncation, Pagination, Button, PageHeader } from "@omniconnect/ui";
 import { downloadServerCsv } from "../services/exportCsv";
 import type { ProductStatus, SortOption, TopPerformer } from "../types/domain";
 import "./ProductsPage.css";

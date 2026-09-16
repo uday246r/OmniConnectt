@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Combobox, type ComboboxOption } from "@omniremit/ui";
+import { Combobox, type ComboboxOption } from "@omniconnect/ui";
 
 export interface CustomSelectOption {
   value: string;
@@ -27,7 +27,7 @@ interface CustomSelectProps {
  * It was a hand-built copy with its own markup, stylesheet and keyboard handling, searchable only past
  * three options, and styled differently from the same control in the host and the other remotes. The
  * props are unchanged, so no caller had to change; the look, keyboard behaviour and accessibility now
- * come from `@omniremit/ui`.
+ * come from `@omniconnect/ui`.
  */
 export function CustomSelect({ options, value, onChange, placeholder = "Select...", disabled, error, className, id, ...aria }: CustomSelectProps) {
   const items = useMemo<ComboboxOption[]>(

@@ -1,4 +1,4 @@
-import { EMPTY_VALUE, formatDate as platformFormatDate } from "@omniremit/ui";
+import { EMPTY_VALUE, formatDate as platformFormatDate } from "@omniconnect/ui";
 import type { FieldDataType } from "../types/domain";
 
 export function formatFieldValue(dataType: FieldDataType, value: string, unit?: string | null): string {

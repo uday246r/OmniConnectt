@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { ColumnFilter, FilterBar, useDebouncedValue, type ActiveFilter, type ColumnFilterOption } from '@omniremit/ui'
+import { ColumnFilter, FilterBar, useDebouncedValue, type ActiveFilter, type ColumnFilterOption } from '@omniconnect/ui'
 import { Icon } from '../../../../shared/components/Icon/Icon'
 import type { PermissionFeatureDto } from '../../../../shared/api/permissionsApi'
 import type { HealthEntryDto } from '../../../settings-applications/api/remoteAppsApi'

@@ -79,7 +79,7 @@
   transform: translateY(0);
 }
 
-/* The search box is @omniremit/ui's SearchField, which carries its own wrapper, icon, clear button
+/* The search box is @omniconnect/ui's SearchField, which carries its own wrapper, icon, clear button
    and suggestion popover — the local .searchWrap/.searchInput/.searchIcon rules that used to live
    here duplicated it and are gone. */
 

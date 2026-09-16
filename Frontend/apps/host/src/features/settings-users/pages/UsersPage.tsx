@@ -36,7 +36,7 @@ import {
   isDateRangeActive,
   resolveDateRange,
   type DateRangeValue,
-} from '@omniremit/ui'
+} from '@omniconnect/ui'
 import styles from './UsersPage.module.css'
 
 /** How many matches a type-ahead dropdown shows. */

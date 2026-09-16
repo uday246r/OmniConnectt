@@ -1,7 +1,7 @@
 /*
  * Delete Lead drawer — step-specific layout only.
  *
- * The overlay, panel, header, body and footer chrome all come from @omniremit/ui's Drawer
+ * The overlay, panel, header, body and footer chrome all come from @omniconnect/ui's Drawer
  * (`tone="danger"`). What remains here is the two-step confirmation's own layout.
  */
 

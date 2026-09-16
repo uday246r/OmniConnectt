@@ -14,7 +14,7 @@ import { useStatusConfigStore } from './stores/useStatusConfigStore';
 
 // Standalone fallback tokens. Imported BEFORE this app's own stylesheet so tokens resolve
 // gracefully both inside and outside the host shell.
-import '@omniremit/ui/tokens.css';
+import '@omniconnect/ui/tokens.css';
 import './styles/global.css';
 
 export interface ProductsAppProps {

@@ -1,6 +1,6 @@
 import { env } from '../../../config/env'
 import { apiFetch } from '../../../shared/api/httpClient'
-import type { CustomPreset } from '@omniremit/ui/validation'
+import type { CustomPreset } from '@omniconnect/ui/validation'
 
 const base = env.authServiceUrl
 

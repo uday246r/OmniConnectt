@@ -28,7 +28,7 @@ export function RequirePasswordChange({ children }: { children: ReactNode }) {
         <h1 className={styles.title}>Choose your password</h1>
         <p className={styles.subtitle}>
           Your account is still using the temporary password you were given. Set your own password to
-          continue — you won't be able to use OmniRemit until you do.
+          continue — you won't be able to use OmniConnect until you do.
         </p>
         <ChangePasswordForm
           submitLabel="Set my password"

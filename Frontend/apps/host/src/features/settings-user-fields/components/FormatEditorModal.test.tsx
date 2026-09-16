@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { FormatEditorModal } from './FormatEditorModal'
-import type { CustomPreset } from '@omniremit/ui/validation'
+import type { CustomPreset } from '@omniconnect/ui/validation'
 
 /**
  * The "Add Format" / "Edit Format" builder — Settings > Manage Formats. Every reusable format a

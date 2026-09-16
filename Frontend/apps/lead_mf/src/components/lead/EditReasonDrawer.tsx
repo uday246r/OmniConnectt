@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { AlertCircle } from '@omniremit/ui/icons';
-import { Button, Drawer, Select } from '@omniremit/ui';
+import { AlertCircle } from '@omniconnect/ui/icons';
+import { Button, Drawer, Select } from '@omniconnect/ui';
 import form from '../../shared/formField.module.css';
 import { useLeadStore } from '../../store/useLeadStore';
 

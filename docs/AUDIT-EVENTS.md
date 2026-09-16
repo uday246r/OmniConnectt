@@ -179,7 +179,7 @@ migration for the assumption and how to change it.
 ## Filtering and export — the same on every log screen
 
 All five log screens (host Audit Logs, System Logs, Approval Center, Lead Audit Logs, Customer 360
-Audit Trail) and the per-user Activity tab use one date-range control from `@omniremit/ui`
+Audit Trail) and the per-user Activity tab use one date-range control from `@omniconnect/ui`
 (`DateRangeColumnFilter` / `DateRangeFilterButton`, backed by `resolveDateRange`):
 
 - **Local-time semantics.** Presets snap to calendar-day boundaries in the viewer's timezone. The

@@ -1,4 +1,4 @@
-import { validateFullPhone } from '@omniremit/ui/validation'
+import { validateFullPhone } from '@omniconnect/ui/validation'
 /**
  * Form validation rules, in one place, mirroring the server's data annotations.
  *
@@ -78,7 +78,7 @@ const COMMON_DOMAINS = [
  * accepted "1" or a 40-digit string.
  */
 // The generic 7–15 digit constants that used to live here are gone: the shared country-aware
-// validator in @omniremit/ui owns those limits now, per country rather than one range for the world.
+// validator in @omniconnect/ui owns those limits now, per country rather than one range for the world.
 
 export function email(value: string | null | undefined): string | undefined {
   if (value == null || value.trim() === '') return undefined

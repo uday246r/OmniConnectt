@@ -3,7 +3,7 @@ import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from 'recharts';
 import card from '../../shared/dashboardCard.module.css';
 import styles from './LeadsByProductCard.module.css';
 import { useLeadStore } from '../../store/useLeadStore';
-import { SkeletonAvatar, SkeletonText } from '@omniremit/ui';
+import { SkeletonAvatar, SkeletonText } from '@omniconnect/ui';
 
 export const LeadsByProductCard: React.FC = () => {
   const { leadsByProduct, kpiSummary, isLoadingDashboard } = useLeadStore();

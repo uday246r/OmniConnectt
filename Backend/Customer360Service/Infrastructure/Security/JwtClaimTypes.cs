@@ -1,7 +1,7 @@
 namespace backend.Infrastructure.Security;
 
 /// <summary>
-/// Claim type constants matching OmniRemit platform standards.
+/// Claim type constants matching OmniConnect platform standards.
 /// </summary>
 public static class JwtClaimTypes
 {

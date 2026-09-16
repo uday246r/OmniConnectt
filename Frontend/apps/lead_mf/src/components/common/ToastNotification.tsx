@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { X, CheckCircle2, AlertTriangle, AlertCircle, Info } from '@omniremit/ui/icons';
+import { X, CheckCircle2, AlertTriangle, AlertCircle, Info } from '@omniconnect/ui/icons';
 import { useLeadStore } from '../../store/useLeadStore';
 import styles from './ToastNotification.module.css';
 

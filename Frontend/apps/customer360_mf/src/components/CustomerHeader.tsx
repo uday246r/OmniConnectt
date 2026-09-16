@@ -1,10 +1,10 @@
 import React from 'react';
 import { useCustomerStore } from '../store/customerStore';
-import { User, Building2, Phone, Mail, Edit3, Layers, Sparkles } from '@omniremit/ui/icons';
+import { User, Building2, Phone, Mail, Edit3, Layers, Sparkles } from '@omniconnect/ui/icons';
 import type { IndividualProfile, CorporateProfile } from '../types/api';
 import styles from './CustomerHeader.module.css';
 import cc from '../shared/c360Common.module.css';
-import { Button } from '@omniremit/ui';
+import { Button } from '@omniconnect/ui';
 
 interface CustomerHeaderProps {
   activeTab: string;

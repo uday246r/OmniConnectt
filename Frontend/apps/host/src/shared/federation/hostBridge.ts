@@ -10,7 +10,7 @@ import { env } from '../../config/env'
  * this instead of managing its own login/permission-check flow — see the host README's "Contract
  * for future remote apps" for the equivalent Module Federation contract.
  */
-export interface OmniRemitHostBridge {
+export interface OmniConnectHostBridge {
   /** Current in-memory access token, or null if not authenticated. Never persisted — see authStore's doc comment on why. */
   getAccessToken: () => string | null
   /** Same dedup'd refresh-then-return-token flow the host's own pages use before a mutation. Prefer this over getAccessToken() right before an API call, in case the token expired while the remote's UI (e.g. a modal) sat open. */
@@ -73,13 +73,13 @@ export interface OmniRemitHostBridge {
 
 declare global {
   interface Window {
-    __omniremitHost__?: OmniRemitHostBridge
+    __omniconnectHost__?: OmniConnectHostBridge
   }
 }
 
 /** Called once at boot (see main.tsx), before any remote can possibly load. */
 export function installHostBridge() {
-  window.__omniremitHost__ = {
+  window.__omniconnectHost__ = {
     getAccessToken: () => useAuthStore.getState().accessToken,
     ensureFreshAccessToken: () => useAuthStore.getState().ensureFreshAccessToken(),
     hasCapability: (featureKey, capability) => useAuthStore.getState().hasCapability(featureKey, capability),

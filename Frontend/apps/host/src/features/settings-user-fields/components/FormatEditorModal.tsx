@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { testCustomPreset, type CustomPreset, type CustomPresetKind, type TextPatternMode } from '@omniremit/ui/validation'
-import { Button, Modal, Select } from '@omniremit/ui'
+import { testCustomPreset, type CustomPreset, type CustomPresetKind, type TextPatternMode } from '@omniconnect/ui/validation'
+import { Button, Modal, Select } from '@omniconnect/ui'
 import styles from './FieldEditorModal.module.css'
 
 const TEXT_PATTERN_MODE_LABELS: Record<TextPatternMode, string> = {

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-OmniRemit is an enterprise micro-frontend platform: a central **host** React app that authenticated
+OmniConnect is an enterprise micro-frontend platform: a central **host** React app that authenticated
 users land in, which dynamically loads independently-deployed **remote** micro-frontends at runtime
 from a database-backed registry — no remote is ever hard-coded into the host's build. Four .NET 10
 backend services, one PostgreSQL database each; a pnpm-workspace frontend (host + three remotes + a
@@ -18,14 +18,14 @@ Frontend/apps/host              shell — login, sidebar, settings, approvals, a
 Frontend/apps/lead_mf            Lead Management remote (5002)
 Frontend/apps/customer360_mf     Customer 360 remote (5003)
 Frontend/apps/products_and_marketplace_mf  Products & Marketplace remote, app key "products" (5004)
-Frontend/packages/ui             @omniremit/ui — shared component library, workspace:* dep, NOT a Module Federation share
+Frontend/packages/ui             @omniconnect/ui — shared component library, workspace:* dep, NOT a Module Federation share
                                    (subpaths: /validation field-format engine, /validation-editor rule editor)
 Backend/AuthService               users/roles/permissions/JWT/maker-checker/audit hub, remote-app
                                    registry, capability discovery, health probing, sidebar (5155)
 Backend/LeadService                 leads CRUD; path base /api/lead-service (5046)
 Backend/Customer360Service           customer profile/CRM proxy; no path base (5059)
 Backend/ProductsService              products marketplace; clean architecture (src/ProductMarketplace.*) (5266)
-Backend/Shared/OmniRemit.Validation  the server field-format engine, referenced by AuthService and LeadService
+Backend/Shared/OmniConnect.Validation  the server field-format engine, referenced by AuthService and LeadService
 ```
 
 Each service has its **own** internal API key (`Internal__Services__<Service>__ApiKey` in AuthService's
@@ -59,7 +59,7 @@ into its own `bin/`. Either stop the running instance first, or redirect output 
 never touches the locked folder: `dotnet test -o ./bin/TestRunTemp`.
 **Gotcha 2 — `-o` outside the repo breaks `LicensingRemovedTests`:** that test's `RepoRoot()` walks up
 from the test binary's own directory looking for a sibling `Backend` folder. Point `-o` at a path
-*inside* the OmniRemit tree (e.g. `Backend/AuthService.Tests/bin/TestRunTemp`), not `/tmp` or anywhere
+*inside* the OmniConnect tree (e.g. `Backend/AuthService.Tests/bin/TestRunTemp`), not `/tmp` or anywhere
 outside it, or that one test fails on a false negative. Delete the temp output dir after.
 
 Test conventions: xUnit `[Fact]`/`[Theory]`, no mocking library — hand-written fakes/stubs
@@ -87,7 +87,7 @@ the surface is worth testing — match this, don't invent a new style.
 in the desktop Browser pane use the `backends-all` + `remotes-all` + `frontend-dev` launch entries (the
 pane allows five dev servers, which is why the backends and remotes are grouped).
 Load testing — procedure and last results in `docs/LOAD-TEST-RESULTS.md`:
-`Backend/LoadTest/OmniRemit.LoadTest` (`seed|count|cleanup --run <id>`, every row tagged with the run id,
+`Backend/LoadTest/OmniConnect.LoadTest` (`seed|count|cleanup --run <id>`, every row tagged with the run id,
 cleanup re-counts to prove 0 remain — the Neon databases are shared), `scripts/loadtest/http-load.mjs`
 (concurrency ramp) and `scripts/loadtest/browser-bench.js` (signed-in latency from a host tab).
 
@@ -154,13 +154,13 @@ bumps `Version`) with a matching frontend page under **Settings → Manage Field
 - **`ValidationPresetCatalog`** ("Manage Formats") — admin-defined reusable validation rules
   (`regex` / `lengthRange` / `numericRange` / `textPattern`) a field's rule can reference by key,
   layered alongside the fixed, code-defined preset catalog
-  (`Backend/Shared/OmniRemit.Validation/FieldPresets.cs` ↔ `packages/ui/src/validation/fieldPresets.ts` —
+  (`Backend/Shared/OmniConnect.Validation/FieldPresets.cs` ↔ `packages/ui/src/validation/fieldPresets.ts` —
   **keep these two in sync**; `rule-parity.json` below catches a mismatch).
 - **`SalutationCatalog`** — the Mr./Ms./Dr./... list offered on Create/Edit User and shown on a
   profile. Same "fixed dropdown, admin-editable value list" shape as Role, not a `UserFieldSchema`
   field.
 
-`Backend/Shared/OmniRemit.Validation` (`FieldRuleEngine`, used by AuthService's `UserSchemaValidator` and by
+`Backend/Shared/OmniConnect.Validation` (`FieldRuleEngine`, used by AuthService's `UserSchemaValidator` and by
 LeadService for lead fields) and `schemaValidation.ts` (`packages/ui`) are two implementations of the
 *same* rule engine — a request that skips the browser must be held to identical rules as one that
 didn't. Both run the shared table `packages/ui/src/validation/__fixtures__/rule-parity.json`
@@ -171,8 +171,8 @@ under it) — preserve that when adding a new preset kind.
 ### Module Federation contract for a remote app
 See `docs/ADDING-A-REMOTE-APP.md`. A remote: publishes `mf-manifest.json`, exposes `./App`, uses a
 globally-unique MF container name, never imports the host's global CSS (imports
-`@omniremit/ui/tokens.css` before its own `index.css` instead), treats `react`/`react-dom` as shared
-singletons, reads auth state from `window.__omniremitHost__` (`getAccessToken()`,
+`@omniconnect/ui/tokens.css` before its own `index.css` instead), treats `react`/`react-dom` as shared
+singletons, reads auth state from `window.__omniconnectHost__` (`getAccessToken()`,
 `hasCapability(featureKey, capability)`, `getUser()`) instead of running its own login, and declares
 its capability set dynamically via `GET /permissions`.
 
@@ -184,7 +184,7 @@ CRM's own database, not a bug in this repo; verify with a direct `curl` against 
 token via `POST {baseUrl}token` with `client_id`/`client_secret`/`grant_type=client_credentials`) before
 assuming the fault is here.
 
-### `@omniremit/ui`
+### `@omniconnect/ui`
 Consumed by all three frontend apps as a pnpm `workspace:*` dependency — deliberately **not** a Module
 Federation `exposes` and not an MF shared singleton, so the host keeps zero build-time remotes and every
 remote stays independently buildable. Read `docs/SHARED-UI-REFACTOR-STATUS.md` before touching any CSS

@@ -1,4 +1,4 @@
-import { downloadCsv, type CsvDownloadResult } from '@omniremit/ui';
+import { downloadCsv, type CsvDownloadResult } from '@omniconnect/ui';
 import { ensureFreshAccessToken, getAccessToken, isRunningInHost } from '../api/hostBridge';
 import { API_BASE_URL } from './httpClient';
 

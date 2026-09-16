@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { DetailSection, DetailSections, Drawer as SharedDrawer } from "@omniremit/ui";
+import { DetailSection, DetailSections, Drawer as SharedDrawer } from "@omniconnect/ui";
 import { Icon, type IconName } from "../common/Icon";
 import "./DrawerContent.css";
 
@@ -8,7 +8,7 @@ import "./DrawerContent.css";
  *
  * Products used to ship its own drawer — its own overlay, header, close button, animation and 220
  * lines of CSS — so it looked and behaved unlike every other drawer on the platform. The chrome now
- * comes entirely from `@omniremit/ui`'s `Drawer` (one close control, Escape to close, in-tree
+ * comes entirely from `@omniconnect/ui`'s `Drawer` (one close control, Escape to close, in-tree
  * rendering so the `#products-mf-scope` prefix still matches). This adapter only keeps the call
  * sites' vocabulary: `isOpen` is the shared `open`, and `badge` — which the shared header has no slot
  * for — is shown as the first line of the body.

@@ -1,5 +1,5 @@
 {
-  "name": "@omniremit/federation-config",
+  "name": "@omniconnect/federation-config",
   "version": "0.0.0",
   "private": true,
   "type": "module",

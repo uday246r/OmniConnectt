@@ -1,5 +1,5 @@
 /**
- * @omniremit/ui — the platform's shared component layer.
+ * @omniconnect/ui — the platform's shared component layer.
  *
  * WHAT BELONGS HERE
  * -----------------
@@ -18,7 +18,7 @@
  * Design tokens are NOT bundled with these components. The host defines every `--omni-*` on `:root`,
  * and because custom properties inherit, a remote rendered inside the host document picks them up
  * automatically — which means a token change in the host propagates to every remote at runtime with
- * no rebuild. Import `@omniremit/ui/tokens.css` only for standalone rendering (a remote's own
+ * no rebuild. Import `@omniconnect/ui/tokens.css` only for standalone rendering (a remote's own
  * `vite preview`, a Vercel preview URL); it is layered so it can never override the host.
  *
  * CONVENTION

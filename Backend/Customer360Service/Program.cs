@@ -112,12 +112,12 @@ builder.Services.AddCors(options =>
 });
 
 // ---------------------------------------------------------------------------
-// Authentication — RS256 JWT Token Validation (OmniRemit Platform Standard)
+// Authentication — RS256 JWT Token Validation (OmniConnect Platform Standard)
 // ---------------------------------------------------------------------------
 var jwtSection = builder.Configuration.GetSection("Jwt");
 var configuredPublicKeyPem = jwtSection["SigningKeyPublic"] ?? Environment.GetEnvironmentVariable("JWT_SIGNING_KEY_PUBLIC") ?? Environment.GetEnvironmentVariable("Jwt__SigningKeyPublic");
-var jwtIssuer = jwtSection["Issuer"] ?? "omniremit-auth-service";
-var jwtAudience = jwtSection["Audience"] ?? "omniremit-host";
+var jwtIssuer = jwtSection["Issuer"] ?? "omniconnect-auth-service";
+var jwtAudience = jwtSection["Audience"] ?? "omniconnect-host";
 
 RSA validationRsa;
 if (!string.IsNullOrWhiteSpace(configuredPublicKeyPem))

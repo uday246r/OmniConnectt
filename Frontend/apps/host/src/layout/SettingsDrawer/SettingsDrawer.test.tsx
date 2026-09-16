@@ -100,7 +100,7 @@ describe('SettingsDrawer close button and backdrop click', () => {
       user: {
         id: 'admin-1',
         name: 'Super Admin',
-        email: 'admin@omniremit.com',
+        email: 'admin@omniconnect.com',
         isAdministrator: true,
       },
       status: 'authenticated',
@@ -180,7 +180,7 @@ describe('SettingsDrawer user-form override layer and popLayer', () => {
       user: {
         id: 'admin-1',
         name: 'Super Admin',
-        email: 'admin@omniremit.com',
+        email: 'admin@omniconnect.com',
         isAdministrator: true,
       },
       status: 'authenticated',

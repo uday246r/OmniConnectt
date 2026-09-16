@@ -9,7 +9,7 @@ using Microsoft.AspNetCore.SignalR;
 namespace AuthService.Hubs;
 
 /// <summary>
-/// Central real-time SignalR Hub for the OmniRemit platform (/hubs/platform).
+/// Central real-time SignalR Hub for the OmniConnect platform (/hubs/platform).
 /// <para>
 /// Security Notice:
 /// Group membership is a JWT snapshot evaluated on connection in <see cref="OnConnectedAsync"/>.

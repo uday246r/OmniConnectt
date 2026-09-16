@@ -1,4 +1,4 @@
-import { Pagination } from "@omniremit/ui";
+import { Pagination } from "@omniconnect/ui";
 import { isApprovalPending } from "../../services/httpClient";
 import { useEffect, useMemo, useState } from "react";
 import { Icon } from "../common/Icon";

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Badge, Button, DetailField, DetailGrid, DetailSection, formatAuditTimestamp, type BadgeTone } from '@omniremit/ui'
+import { Badge, Button, DetailField, DetailGrid, DetailSection, formatAuditTimestamp, type BadgeTone } from '@omniconnect/ui'
 import { Icon } from '../../../../shared/components/Icon/Icon'
 import { permissionsApi } from '../../../../shared/api/permissionsApi'
 import { auditLogsApi, type AuditLogDto } from '../../api/auditLogsApi'

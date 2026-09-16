@@ -1,4 +1,4 @@
-import { EMPTY_VALUE } from '@omniremit/ui'
+import { EMPTY_VALUE } from '@omniconnect/ui'
 
 /**
  * Customer360's value formatters.
@@ -8,7 +8,7 @@ import { EMPTY_VALUE } from '@omniremit/ui'
  * twice, differing only in how each sourced the country. All six were declared *inside* the
  * component body, so they were reallocated on every render.
  *
- * The placeholder now comes from `@omniremit/ui`'s `EMPTY_VALUE` (an em dash), which is what the
+ * The placeholder now comes from `@omniconnect/ui`'s `EMPTY_VALUE` (an em dash), which is what the
  * host renders for a missing value. c360 previously used an ASCII hyphen, so identical data read
  * differently depending on which app you were looking at.
  */

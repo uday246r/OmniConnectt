@@ -2,8 +2,8 @@ import React from 'react';
 import {
   User, MapPin, Phone, Mail, Calendar, Globe, Shield, BookOpen, DollarSign, AlertTriangle,
   Hash, CreditCard, Building2, CheckSquare, TrendingUp, FileText, Briefcase, Eye, EyeOff,
-} from '@omniremit/ui/icons';
-import { DetailField, DetailGrid, DetailSection, isEmptyDetailValue } from '@omniremit/ui';
+} from '@omniconnect/ui/icons';
+import { DetailField, DetailGrid, DetailSection, isEmptyDetailValue } from '@omniconnect/ui';
 import type { ContactDetail, CustomerProfile, FieldConfig } from '../types/api';
 import { applyMaskingRule, formatFieldValue, hasRevealableValue } from '../utils/fieldMasking';
 import styles from './DynamicProfileSection.module.css';

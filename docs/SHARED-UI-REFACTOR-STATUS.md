@@ -10,11 +10,11 @@ session does not rediscover them the hard way.
 
 ## 1. What this refactor did
 
-Introduced `@omniremit/ui` (`Frontend/packages/ui`), a pnpm workspace package consumed as
+Introduced `@omniconnect/ui` (`Frontend/packages/ui`), a pnpm workspace package consumed as
 `workspace:*` by host, `lead_mf` and `customer360_mf`, and migrated all three apps onto it.
 
 **Deliberately NOT via Module Federation `exposes`.** The host keeps declaring zero build-time
-remotes; remotes stay independently buildable and deployable. `@omniremit/ui` is also NOT an MF
+remotes; remotes stay independently buildable and deployable. `@omniconnect/ui` is also NOT an MF
 shared singleton — it holds no cross-instance state and `loadShare` carries real bundle cost.
 
 ### Shared components — 17 at the start of the refactor, 20+ now
@@ -35,7 +35,7 @@ touching any filter: the query/applied split there is load-bearing, not stylisti
 - `lead_mf/src/shared/` — `LeadDiffTable`, `leadPage`, `drawerLayout`, `formField`, `dashboardCard`
 - `customer360_mf/src/shared/` — `c360Common`
 
-Each is used 2+ times inside one app only. Promote to `@omniremit/ui` only when a second app needs it.
+Each is used 2+ times inside one app only. Promote to `@omniconnect/ui` only when a second app needs it.
 
 ### Inconsistencies eliminated
 - **Seven** different table header treatments → one `DataTable`
@@ -62,7 +62,7 @@ Each is used 2+ times inside one app only. Promote to `@omniremit/ui` only when 
 
 ## 2. ⚠️ Traps that already caused breakage — read before touching CSS
 
-### 2.1 Remotes MUST import `@omniremit/ui/tokens.css`
+### 2.1 Remotes MUST import `@omniconnect/ui/tokens.css`
 Shared components use bare `var(--omni-*)` with **no fallback**. Without this import a remote running
 standalone (`vite preview`, Vercel preview) has **no tokens at all** and renders with no background,
 padding or radius — it looks completely unstyled.
@@ -198,7 +198,7 @@ copy. That is now fixed for both remotes.
 
 **1. lead_mf's reset was flattening every shared component.** `index.css` had a plain `* { margin:0;
 padding:0 }`, which `postcss-prefix-selector` rewrote to `#lead-mf-scope *` — specificity 1-0-0 on
-the id, beating EVERY single-class rule in the remote, `@omniremit/ui` included. PageHeader's
+the id, beating EVERY single-class rule in the remote, `@omniconnect/ui` included. PageHeader's
 28/32px padding, Button's `0 18px`, Badge's `2px 12px` and DataTable's cell padding were all being
 zeroed, which is why lead_mf's banner sat flush against the card edge while the identical component
 rendered correctly in the host and in customer360_mf (whose reset sets only `box-sizing`). Fixed by
@@ -217,7 +217,7 @@ drawer, and the dashboard had no "Contacted" case at all, so a contacted lead re
   pending statuses **pink**, a fourth status palette inside a single app.
 - `customer360_mf/src/shared/formatValue.ts` — `formatValue` was byte-identical in FOUR components
   and `formatCurrency` in two, all declared inside the component body so they reallocated every
-  render. Now uses `EMPTY_VALUE` (em dash) from `@omniremit/ui`; c360 previously showed an ASCII
+  render. Now uses `EMPTY_VALUE` (em dash) from `@omniconnect/ui`; c360 previously showed an ASCII
   hyphen where the host showed an em dash.
 - `lead_mf/src/shared/LeadStatusBadge.tsx` — see bug 2 above.
 
@@ -509,7 +509,7 @@ Three audit tables had three formats:
 | lead_mf | `Sep 02, 2026, 03:46:34 AM` (2-digit day + seconds) |
 | customer360_mf | `Sep 2, 2026, 09:03:50 AM` (seconds) |
 
-`formatAuditTimestamp` in `@omniremit/ui` is now the single source, matching the host byte for byte.
+`formatAuditTimestamp` in `@omniconnect/ui` is now the single source, matching the host byte for byte.
 Seconds are deliberately dropped: an audit table is read by scanning a column of times, and the
 extra field widens every row for precision nobody scans for. Both local formatters are deleted —
 `grep "toLocaleString('en-US'" ` across the three audit pages returns **0**.
@@ -856,7 +856,7 @@ shared `Button` and `Pagination` are **strict supersets** (Button only adds `onH
 existed solely in a host copy, so consolidation could not regress the host.
 
 - 8 folders deleted, ~45 imports repointed across 13 files.
-- **`Skeleton` was re-based, not deleted** — its 4 primitives now re-export from `@omniremit/ui`
+- **`Skeleton` was re-based, not deleted** — its 4 primitives now re-export from `@omniconnect/ui`
   while the 8 **card-level** skeletons (`SkeletonUserCard`, `SkeletonDonutChart`…) stay local:
   each is shape-matched to a specific host card for zero layout shift, so they describe host
   layouts and are not shareable. Every existing `from '…/shared/components/Skeleton'` import keeps
@@ -1110,7 +1110,7 @@ The host drew 57 inline SVGs (371 usages); both remotes imported `lucide-react` 
 Both sets turned out to be drawn to the **same grid** — 24×24 viewBox, `stroke-width: 2`, round caps
 and joins — so this was a question of source, not of redrawing.
 
-New `@omniremit/ui/icons` subpath:
+New `@omniconnect/ui/icons` subpath:
 - **35 names the host already draws** export the host's own glyph, so those now render identically
   in all three apps. The reference is untouched.
 - **33 names only lucide has** are re-exported from it, pinned to **one** version in `packages/ui`.
@@ -1870,5 +1870,5 @@ classes unprefixed. Tests: `Drawer.test.tsx`, `ConfirmModal.test.tsx`, `StatusCo
   `C:\Users\udayo\.claude\plans\tingly-humming-tide.md` (the §4ab search work).
 - Graphify graph: `graphify-out/graph.json` — **5,169 nodes / 10,910 edges / 253 communities**,
   re-extracted 2026-09-08 after §4ab (was 4,209 / 8,289). Rebuild with
-  `graphify update .` from `OmniRemit/` — AST only, no LLM, no API cost.
+  `graphify update .` from `OmniConnect/` — AST only, no LLM, no API cost.
   Note it is AST-only — **no cross-service HTTP edges**, so "no path" ≠ "unrelated".

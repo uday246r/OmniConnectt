@@ -1,4 +1,4 @@
-import { ActorCell, Badge, formatAuditTimestamp } from '@omniremit/ui'
+import { ActorCell, Badge, formatAuditTimestamp } from '@omniconnect/ui'
 import { Icon } from '../../../../shared/components/Icon/Icon'
 import type { AuditLogDto } from '../../api/auditLogsApi'
 import { formatActionLabel } from '../../utils/auditLogFormatting'

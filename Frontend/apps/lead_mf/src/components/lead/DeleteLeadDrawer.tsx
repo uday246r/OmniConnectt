@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Trash2, ArrowLeft } from '@omniremit/ui/icons';
-import { Button, Drawer } from '@omniremit/ui';
+import { Trash2, ArrowLeft } from '@omniconnect/ui/icons';
+import { Button, Drawer } from '@omniconnect/ui';
 import { useLeadStore } from '../../store/useLeadStore';
 import drawerLayout from '../../shared/drawerLayout.module.css';
 import form from '../../shared/formField.module.css';

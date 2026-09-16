@@ -258,7 +258,7 @@ public class AuthAppService(
         if (user.AuthProvider != AuthProvider.Local || user.PasswordHash is null)
         {
             throw new PasswordChangeRejectedException(
-                "This account signs in with Google, so it has no OmniRemit password to change.");
+                "This account signs in with Google, so it has no OmniConnect password to change.");
         }
 
         if (!passwordHasher.Verify(user, user.PasswordHash, currentPassword))

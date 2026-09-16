@@ -16,7 +16,7 @@ import { toast } from '../../shared/stores/toastStore'
 import { LIMITS, required, maxLength, firstError, isValid, type FieldErrors } from '../../shared/validation/rules'
 import styles from './RoleFormLayer.module.css'
 import { TOPICS, invalidate } from '../../shared/stores/invalidationStore'
-import { Switch } from '@omniremit/ui'
+import { Switch } from '@omniconnect/ui'
 
 interface RoleFormLayerProps {
   roleId?: string

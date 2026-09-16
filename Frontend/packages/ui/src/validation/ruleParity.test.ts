@@ -10,7 +10,7 @@ import { validateFieldValue, type CustomPreset, type FieldDefinition } from './s
  * written in two languages and had drifted: "mailto:…" was a Website URL here and not there, "1,500"
  * failed a numeric range here and passed there, a 9-digit Indian mobile passed there and failed here.
  * Backend/AuthService.Tests/ValidationParityTests.cs runs these same rows against
- * Backend/Shared/OmniRemit.Validation, so a disagreement fails a build on whichever side changed.
+ * Backend/Shared/OmniConnect.Validation, so a disagreement fails a build on whichever side changed.
  */
 
 interface FixtureCase {

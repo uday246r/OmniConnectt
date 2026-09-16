@@ -1,7 +1,7 @@
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import { federation } from '@module-federation/vite';
-import { remoteFederationConfig } from '@omniremit/federation-config';
+import { remoteFederationConfig } from '@omniconnect/federation-config';
 
 // Lead Management Remote Micro-Frontend
 // Container Name: lead_mf (must be unique across all remotes)

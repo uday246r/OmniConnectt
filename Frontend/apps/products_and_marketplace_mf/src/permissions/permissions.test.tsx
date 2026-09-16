@@ -13,12 +13,12 @@ import { PERMISSIONS } from './permissions'
  */
 
 afterEach(() => {
-  delete window.__omniremitHost__
+  delete window.__omniconnectHost__
 })
 
 function installBridge(granted: string[], isAdministrator = false) {
   const hasCap = vi.fn((feature: string, capability: string) => granted.includes(`${feature}:${capability}`))
-  window.__omniremitHost__ = {
+  window.__omniconnectHost__ = {
     getAccessToken: () => 't',
     ensureFreshAccessToken: () => Promise.resolve('t'),
     hasCapability: hasCap,

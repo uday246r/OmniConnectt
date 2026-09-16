@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { KpiCardSection } from './KpiCardSection'
 import { useLeadStore } from '../../store/useLeadStore'
-import type { OmniRemitHostBridge } from '../../api/hostBridge'
+import type { OmniConnectHostBridge } from '../../api/hostBridge'
 
 /**
  * Which KPI cards the dashboard puts on screen.
@@ -17,7 +17,7 @@ import type { OmniRemitHostBridge } from '../../api/hostBridge'
  */
 
 function bridgeGranting(...granted: string[]) {
-  window.__omniremitHost__ = {
+  window.__omniconnectHost__ = {
     getAccessToken: () => 'token',
     ensureFreshAccessToken: () => Promise.resolve('token'),
     hasCapability: (featureKey: string, capability: string) =>
@@ -30,7 +30,7 @@ function bridgeGranting(...granted: string[]) {
       roleName: null,
       permissions: [],
     }),
-  } as OmniRemitHostBridge
+  } as OmniConnectHostBridge
 }
 
 /** Grants the dashboard cards by their capability key, which is what the manifest names them. */
@@ -39,7 +39,7 @@ function grantCards(...cards: string[]) {
 }
 
 beforeEach(() => {
-  delete window.__omniremitHost__
+  delete window.__omniconnectHost__
 
   useLeadStore.setState({
     isLoadingDashboard: false,

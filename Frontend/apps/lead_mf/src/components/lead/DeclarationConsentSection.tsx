@@ -1,5 +1,5 @@
 import React from 'react';
-import { ScrollText } from '@omniremit/ui/icons';
+import { ScrollText } from '@omniconnect/ui/icons';
 import { useLeadStore } from '../../store/useLeadStore';
 import { isFieldVisible, isFieldRequired, isFieldEditable, getFieldLabel } from '../../config/fieldControlRegistry';
 import styles from './DeclarationConsentSection.module.css';

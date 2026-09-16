@@ -13,7 +13,7 @@ import { ApiError } from '../../shared/api/httpClient'
 import { toast } from '../../shared/stores/toastStore'
 import styles from './SettingsCheckerAssignmentTab.module.css'
 import { TOPICS, invalidate, useDataRevision } from '../../shared/stores/invalidationStore'
-import { Button, Modal, SearchField, getInitials, useSuggestions, type SearchFieldSuggestion } from '@omniremit/ui'
+import { Button, Modal, SearchField, getInitials, useSuggestions, type SearchFieldSuggestion } from '@omniconnect/ui'
 function getModuleIcon(key: string, label: string) {
   const lower = (key + ' ' + label).toLowerCase()
   if (lower.includes('user')) return <Icon.Users width={14} height={14} />

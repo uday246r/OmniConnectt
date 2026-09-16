@@ -1,4 +1,4 @@
-import { Badge, type BadgeTone } from '@omniremit/ui'
+import { Badge, type BadgeTone } from '@omniconnect/ui'
 
 /**
  * A lead's pipeline status, rendered as the platform Badge.

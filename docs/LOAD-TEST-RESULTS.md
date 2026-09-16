@@ -11,7 +11,7 @@ labelled as extrapolation.
 | Machine | One Windows 11 laptop running the 4 .NET services, the 3 remotes, the host **and** the load client |
 | Database | Neon Postgres (us-east-2 pooler), shared with the team. **~285 ms round trip from this machine** |
 | Rate limiting | Left on (production settings). List endpoints are not rate limited; sign-in and page-view writes are |
-| Volume tool | `Backend/LoadTest/OmniRemit.LoadTest` — `seed`, `count`, `cleanup --run <id>` |
+| Volume tool | `Backend/LoadTest/OmniConnect.LoadTest` — `seed`, `count`, `cleanup --run <id>` |
 | Throughput | `scripts/loadtest/http-load.mjs` — concurrency ramp 10 → 50 → 100 → 200, 12–15 s per step |
 | Signed-in latency | `scripts/loadtest/browser-bench.js` — run in a signed-in host tab, 30 requests per endpoint, 6 concurrent |
 
@@ -131,7 +131,7 @@ This laptop cannot generate a million users' traffic, and the DB is 285 ms away.
 ## Re-running
 
 ```bash
-cd Backend/LoadTest/OmniRemit.LoadTest
+cd Backend/LoadTest/OmniConnect.LoadTest
 dotnet run -- seed --run myrun          # optional: --audit N --users N --leads N --applications N
 dotnet run -- count --run myrun
 node ../../../scripts/loadtest/http-load.mjs --out results.json

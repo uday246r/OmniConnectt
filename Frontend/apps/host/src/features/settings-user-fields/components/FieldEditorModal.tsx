@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
-import type { CustomPreset, FieldDefinition, ValidationRule } from '@omniremit/ui/validation'
-import { ValidationRulesEditor, describeRuleProblem } from '@omniremit/ui/validation-editor'
-import { Button, Modal } from '@omniremit/ui'
+import type { CustomPreset, FieldDefinition, ValidationRule } from '@omniconnect/ui/validation'
+import { ValidationRulesEditor, describeRuleProblem } from '@omniconnect/ui/validation-editor'
+import { Button, Modal } from '@omniconnect/ui'
 import { Icon } from '../../../shared/components/Icon/Icon'
 import styles from './FieldEditorModal.module.css'
 

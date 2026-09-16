@@ -49,7 +49,7 @@ export function actionChipClass(action: string): 'actionSuccess' | 'actionDanger
   return 'actionNeutral'
 }
 
-/** Same mapping as {@link actionChipClass}, expressed as a `Badge` tone for pages that render via `@omniremit/ui`'s `Badge` instead of the Audit Logs page's own CSS classes. */
+/** Same mapping as {@link actionChipClass}, expressed as a `Badge` tone for pages that render via `@omniconnect/ui`'s `Badge` instead of the Audit Logs page's own CSS classes. */
 export function actionBadgeTone(action: string): 'success' | 'danger' | 'warning' | 'info' | 'neutral' {
   const cls = actionChipClass(action)
   if (cls === 'actionSuccess') return 'success'

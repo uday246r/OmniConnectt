@@ -3,10 +3,10 @@ import { useCustomerStore } from '../store/customerStore';
 import { useInteractionStore } from '../store/interactionStore';
 import { useHostNavigate } from '../navigation/HostNavigation';
 import CaseDetailsModal from '../components/CaseDetailsModal';
-import { ArrowLeft, Search, Eye, MessageSquare, RefreshCw, X, ChevronLeft, ChevronRight, Clock, AlertTriangle } from '@omniremit/ui/icons';
+import { ArrowLeft, Search, Eye, MessageSquare, RefreshCw, X, ChevronLeft, ChevronRight, Clock, AlertTriangle } from '@omniconnect/ui/icons';
 import type { IndividualProfile, CorporateProfile } from '../types/api';
 import { getFriendlyErrorMessage } from '../utils/errorMessages';
-import { Button, ColumnFilter, DataTable, EMPTY_VALUE, FilterBar, PageHeader, Pagination, ResponsiveRows, RowAction, RowsPerPage, SearchField, useDebouncedValue, type ActiveFilter } from '@omniremit/ui';
+import { Button, ColumnFilter, DataTable, EMPTY_VALUE, FilterBar, PageHeader, Pagination, ResponsiveRows, RowAction, RowsPerPage, SearchField, useDebouncedValue, type ActiveFilter } from '@omniconnect/ui';
 import styles from './AllInteractions.module.css';
 import cc from '../shared/c360Common.module.css';
 

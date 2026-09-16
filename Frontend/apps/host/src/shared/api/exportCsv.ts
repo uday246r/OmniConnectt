@@ -1,4 +1,4 @@
-import { downloadCsv, type CsvDownloadResult } from '@omniremit/ui'
+import { downloadCsv, type CsvDownloadResult } from '@omniconnect/ui'
 import { forceRefreshAccessToken } from './httpClient'
 
 /**

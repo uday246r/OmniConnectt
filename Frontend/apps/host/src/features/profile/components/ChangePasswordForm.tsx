@@ -6,9 +6,9 @@ import {
   describePasswordRules,
   validatePassword,
   type PasswordPolicy,
-} from '@omniremit/ui/validation'
+} from '@omniconnect/ui/validation'
 import styles from './ChangePasswordForm.module.css'
-import { Button, Input } from '@omniremit/ui'
+import { Button, Input } from '@omniconnect/ui'
 
 export interface ChangePasswordFormProps {
   /** Called after the server confirms the change. The two callers do different things with it:

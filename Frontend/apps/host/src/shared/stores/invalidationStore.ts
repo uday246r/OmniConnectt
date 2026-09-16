@@ -6,7 +6,7 @@ import { create } from 'zustand'
  * This was previously `mutationCount` on `settingsDrawerStore`, which coupled cache invalidation to
  * the Settings drawer's UI state. Anything outside the drawer therefore had no way to publish, and
  * `ApprovalCenterPage` demonstrated the cost: its approve/reject handlers dispatched a
- * `omniremit:approval-count-invalidated` window event that had **zero listeners anywhere in the
+ * `omniconnect:approval-count-invalidated` window event that had **zero listeners anywhere in the
  * repo**, so approving a request left the bell badge, the approvals menu, the Approval Center table
  * and My Requests' "Get password" button all stale until a 60s poll or a window refocus.
  *

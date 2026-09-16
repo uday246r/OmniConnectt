@@ -13,7 +13,7 @@
  *   - 33 names only lucide has are re-exported from it, pinned to one version here.
  *
  * The host keeps using `Icon.Foo` from the main entry; nothing there changes. Remotes import named
- * icons from `@omniremit/ui/icons` and keep their existing `<Foo size={16} />` call sites — the
+ * icons from `@omniconnect/ui/icons` and keep their existing `<Foo size={16} />` call sites — the
  * shim below maps lucide's `size` onto the hand-drawn components' `width`/`height`.
  */
 import type { ReactElement, SVGProps } from 'react'

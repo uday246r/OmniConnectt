@@ -1,6 +1,6 @@
 import React from 'react';
-import { Eye, ArrowRight, Clock } from '@omniremit/ui/icons';
-import { DataTable, ResponsiveRows, getInitials } from '@omniremit/ui';
+import { Eye, ArrowRight, Clock } from '@omniconnect/ui/icons';
+import { DataTable, ResponsiveRows, getInitials } from '@omniconnect/ui';
 import card from '../../shared/dashboardCard.module.css';
 import { useLeadStore } from '../../store/useLeadStore';
 import { useHostNavigate } from '../../navigation/HostNavigation';

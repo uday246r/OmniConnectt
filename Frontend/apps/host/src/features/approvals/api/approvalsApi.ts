@@ -1,7 +1,7 @@
 import { env } from '../../../config/env'
 import { apiFetch } from '../../../shared/api/httpClient'
 import { hostDownloadCsv } from '../../../shared/api/exportCsv'
-import type { CsvDownloadResult } from '@omniremit/ui'
+import type { CsvDownloadResult } from '@omniconnect/ui'
 import type { PagedResult } from '../../settings-users/api/usersApi'
 
 const base = env.authServiceUrl

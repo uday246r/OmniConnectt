@@ -1,4 +1,4 @@
-import type { BadgeTone } from '@omniremit/ui'
+import type { BadgeTone } from '@omniconnect/ui'
 
 /*
  * System logs are written by services for engineers: event codes like "unhandled_exception" or

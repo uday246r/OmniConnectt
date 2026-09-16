@@ -1,4 +1,4 @@
-# Render Blueprint — the OmniRemit AuthService.
+# Render Blueprint — the OmniConnect AuthService.
 #
 # Create once via Render Dashboard -> New -> Blueprint, pointed at this repo. Render then reads this
 # file on every push to main and keeps the services in sync.
@@ -16,7 +16,7 @@
 services:
   # ─────────────────────────────────────────────────────────────────────────────
   - type: web
-    name: omniremit-auth
+    name: omniconnect-auth
     runtime: docker
     plan: free
     region: singapore # closest Render region to India; must match across services
@@ -34,11 +34,11 @@ services:
       - key: ASPNETCORE_ENVIRONMENT
         value: Production
       - key: Jwt__Issuer
-        value: omniremit-auth-service
+        value: omniconnect-auth-service
       - key: Jwt__Audience
-        value: omniremit-host
+        value: omniconnect-host
       - key: Auth__RefreshCookieName
-        value: omniremit_refresh
+        value: omniconnect_refresh
       # Host and API are on different registrable domains (*.vercel.app vs *.onrender.com), so the
       # request is cross-site and a Lax cookie would be withheld on refresh — login would succeed and
       # then drop the session moments later. None requires Secure, which is enforced at startup.
@@ -71,14 +71,14 @@ services:
       - key: ConnectionStrings__Redis
         fromService:
           type: redis
-          name: omniremit-redis
+          name: omniconnect-redis
           property: connectionString
 
   # ─────────────────────────────────────────────────────────────────────────────
-  # Backplane + shared cache for omniremit-auth. See the ConnectionStrings__Redis
+  # Backplane + shared cache for omniconnect-auth. See the ConnectionStrings__Redis
   # note above for exactly what it buys.
   - type: redis
-    name: omniremit-redis
+    name: omniconnect-redis
     plan: free
     region: singapore
     # Cache entries are all disposable and TTL'd; evicting the least-recently-used under pressure is

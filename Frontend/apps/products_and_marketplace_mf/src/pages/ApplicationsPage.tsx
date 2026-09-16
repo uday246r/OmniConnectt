@@ -1,4 +1,4 @@
-import { Pagination, PageHeader } from "@omniremit/ui";
+import { Pagination, PageHeader } from "@omniconnect/ui";
 import { useEffect, useState } from "react";
 import { CustomSelect } from "../components/common/CustomSelect";
 import { Icon } from "../components/common/Icon";

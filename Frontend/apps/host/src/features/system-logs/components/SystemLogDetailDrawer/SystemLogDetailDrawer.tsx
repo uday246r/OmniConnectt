@@ -8,7 +8,7 @@ import {
   DetailSections,
   Drawer,
   formatAuditTimestamp,
-} from '@omniremit/ui'
+} from '@omniconnect/ui'
 import { Icon } from '../../../../shared/components/Icon/Icon'
 import type { SystemLogDto } from '../../api/systemLogsApi'
 import {

@@ -5,7 +5,7 @@ import { EmptyState, ErrorState, LoadingSkeletonRows } from "../components/commo
 import { useAuditLogStore } from "../stores/useAuditLogStore";
 import { useDrawerStore } from "../stores/useDrawerStore";
 import { subscribeToAuditLogs } from "../services/realtime";
-import { CsvExportError, DateRangeFilterButton, EMPTY_DATE_RANGE, describeTruncation, formatAuditTimestamp, Pagination, Button, PageHeader } from "@omniremit/ui";
+import { CsvExportError, DateRangeFilterButton, EMPTY_DATE_RANGE, describeTruncation, formatAuditTimestamp, Pagination, Button, PageHeader } from "@omniconnect/ui";
 import { downloadServerCsv } from "../services/exportCsv";
 import { usePermissions } from "../permissions/PermissionContext";
 import { PERMISSIONS } from "../permissions/permissions";

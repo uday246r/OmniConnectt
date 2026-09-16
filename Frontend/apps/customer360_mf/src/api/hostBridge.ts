@@ -1,7 +1,7 @@
 /**
  * OmniConnect Host Bridge Integration for customer360_mf Remote App
  * Provides seamless auth token propagation, permission checking, and navigation hooks
- * conforming with the OmniRemit Host App remote architecture.
+ * conforming with the OmniConnect Host App remote architecture.
  */
 
 export interface HostBridgeUser {
@@ -13,7 +13,7 @@ export interface HostBridgeUser {
   permissions: string[];
 }
 
-export interface OmniRemitHostBridge {
+export interface OmniConnectHostBridge {
   getAccessToken: () => string | null;
   ensureFreshAccessToken: () => Promise<string>;
   hasCapability: (featureKey: string, capability: string) => boolean;
@@ -31,20 +31,20 @@ export interface OmniRemitHostBridge {
 
 declare global {
   interface Window {
-    __omniremitHost__?: OmniRemitHostBridge;
+    __omniconnectHost__?: OmniConnectHostBridge;
   }
 }
 
-export const getBridge = (): OmniRemitHostBridge | null => {
+export const getBridge = (): OmniConnectHostBridge | null => {
   if (typeof window === 'undefined') return null;
-  const bridge = window.__omniremitHost__;
+  const bridge = window.__omniconnectHost__;
   // import.meta.env.DEV (Vite's own flag), not process.env.NODE_ENV — `process` is never polyfilled
   // for the browser bundle in this app's vite.config, so the old check threw
   // `ReferenceError: process is not defined` the moment this ran with no bridge installed, e.g. this
   // remote loaded standalone (`vite preview`) outside the host shell.
   if (!bridge && import.meta.env.DEV) {
     console.debug(
-      '[customer360_mf] window.__omniremitHost__ is not installed — this remote is designed to run ' +
+      '[customer360_mf] window.__omniconnectHost__ is not installed — this remote is designed to run ' +
         'inside the OmniConnect host shell. API calls in standalone mode may require auth tokens.'
     );
   }

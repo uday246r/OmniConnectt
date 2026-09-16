@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ChevronDown, X, Check } from '@omniremit/ui/icons';
+import { ChevronDown, X, Check } from '@omniconnect/ui/icons';
 import { DropdownOption } from '../../types/lead';
 import styles from './SearchableDropdown.module.css';
 

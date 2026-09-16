@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { FieldEditorModal } from './FieldEditorModal'
-import type { CustomPreset, FieldDefinition } from '@omniremit/ui/validation'
+import type { CustomPreset, FieldDefinition } from '@omniconnect/ui/validation'
 
 /**
  * The "Add Field" / "Edit Field" builder — the one place a non-technical admin defines what a field

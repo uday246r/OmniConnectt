@@ -1,6 +1,6 @@
 using System.Text.RegularExpressions;
 
-namespace OmniRemit.Validation;
+namespace OmniConnect.Validation;
 
 /// <summary>
 /// The "Email address" preset: a sane email shape plus a near-miss check on common domains, so

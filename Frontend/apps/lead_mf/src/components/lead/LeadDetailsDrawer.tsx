@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Card, Drawer, getInitials } from '@omniremit/ui';
+import { Card, Drawer, getInitials } from '@omniconnect/ui';
 import styles from './LeadDetailsDrawer.module.css';
 import {
   User,
@@ -25,11 +25,11 @@ import {
   Clock,
   Shield,
   Sparkles,
-} from '@omniremit/ui/icons';
+} from '@omniconnect/ui/icons';
 import { useLeadStore } from '../../store/useLeadStore';
 import { isFieldVisible, getFieldLabel, type LeadFieldConfig } from '../../config/fieldControlRegistry';
 import { applyMaskingRule, hasRevealableValue } from '../../utils/fieldMasking';
-import { Badge } from '@omniremit/ui';
+import { Badge } from '@omniconnect/ui';
 import { LeadStatusBadge } from '../../shared/LeadStatusBadge';
 
 const formatVal = (val?: string | null): string => {

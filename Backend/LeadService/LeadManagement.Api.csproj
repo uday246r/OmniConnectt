@@ -4,7 +4,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <RepositoryUrl>https://github.com/Ashok-2004/OmniRemit</RepositoryUrl>
+    <RepositoryUrl>https://github.com/Ashok-2004/OmniConnect</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
   </PropertyGroup>
 
@@ -27,8 +27,8 @@
 
   <ItemGroup>
     <!-- The platform field-format engine, shared with every service that validates admin-configured formats. -->
-    <ProjectReference Include="../Shared/OmniRemit.Validation/OmniRemit.Validation.csproj" />
-    <Using Include="OmniRemit.Validation" />
+    <ProjectReference Include="../Shared/OmniConnect.Validation/OmniConnect.Validation.csproj" />
+    <Using Include="OmniConnect.Validation" />
   </ItemGroup>
 
 </Project>

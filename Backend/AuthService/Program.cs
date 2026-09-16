@@ -144,7 +144,7 @@ if (usingRedis)
     signalR.AddStackExchangeRedis(options =>
     {
         options.ConnectionFactory = _ => Task.FromResult<IConnectionMultiplexer>(multiplexer);
-        options.Configuration.ChannelPrefix = RedisChannel.Literal("omniremit");
+        options.Configuration.ChannelPrefix = RedisChannel.Literal("omniconnect");
     });
 }
 else
@@ -212,8 +212,8 @@ builder.Services.AddCors(options =>
 
 var jwtSection = builder.Configuration.GetSection(JwtOptions.SectionName);
 var configuredPublicKeyPem = jwtSection["SigningKeyPublic"];
-var jwtIssuer = jwtSection["Issuer"] ?? "omniremit-auth-service";
-var jwtAudience = jwtSection["Audience"] ?? "omniremit-host";
+var jwtIssuer = jwtSection["Issuer"] ?? "omniconnect-auth-service";
+var jwtAudience = jwtSection["Audience"] ?? "omniconnect-host";
 
 RSA validationRsa;
 if (!string.IsNullOrWhiteSpace(configuredPublicKeyPem))

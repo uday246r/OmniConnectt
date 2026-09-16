@@ -1,19 +1,19 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { federation } from '@module-federation/vite'
-import { hostFederationConfig } from '@omniremit/federation-config'
+import { hostFederationConfig } from '@omniconnect/federation-config'
 
 // This app is a Module Federation 2.0 *host* with zero build-time remotes. Every remote app is
 // registered at runtime (see src/shared/federation/remoteLoader.ts) from a manifest URL fetched
 // from AuthService's remote-app API — nothing about which remotes exist is known at build time.
 //
-// The shared-dependency set deliberately lives in @omniremit/federation-config, not inline here:
+// The shared-dependency set deliberately lives in @omniconnect/federation-config, not inline here:
 // the host and every remote must agree on it exactly, and a copy-pasted block drifts. See that
 // package's header for which packages belong in it and why.
 export default defineConfig({
   plugins: [
     react(),
-    federation(hostFederationConfig('omniremit_host')),
+    federation(hostFederationConfig('omniconnect_host')),
   ],
   css: {
     modules: {

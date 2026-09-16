@@ -1,6 +1,6 @@
 import { isApprovalPending } from "../services/httpClient";
 import { useEffect, useState } from "react";
-import { PageHeader } from "@omniremit/ui";
+import { PageHeader } from "@omniconnect/ui";
 import { Icon } from "../components/common/Icon";
 import { EmptyState, ErrorState, LoadingSkeletonRows } from "../components/common/EmptyState";
 import { CategoryManagementPanel } from "../components/category/CategoryManagementPanel";

@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import styles from './NotFoundPage.module.css'
-import { Button } from '@omniremit/ui'
+import { Button } from '@omniconnect/ui'
 
 export function NotFoundPage() {
   return (

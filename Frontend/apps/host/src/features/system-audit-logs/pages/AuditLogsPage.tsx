@@ -4,7 +4,7 @@ import { useSearchParams } from 'react-router-dom'
 import { useAuthStore } from '../../auth/store/authStore'
 import { queryKeys } from '../../../shared/query/queryKeys'
 import { useLiveRefetchInterval } from '../../../shared/query/invalidationBridge'
-import { ActorCell, Badge, CsvExportError, DataTable, DateRangeColumnFilter, DateRangeFilterButton, EMPTY_DATE_RANGE, EMPTY_VALUE, FilterBar, PageHeader, Pagination, ResponsiveRows, RowAction, RowsPerPage, describeDateRange, describeTruncation, formatAuditTimestamp, isDateRangeActive, readStoredPageSize, resolveDateRange, sanitizeFilterInput, filterTypeBlockedMessage, useCommittedFilter, type ActiveFilter, type CommittedFilter, type DateRangeValue } from '@omniremit/ui'
+import { ActorCell, Badge, CsvExportError, DataTable, DateRangeColumnFilter, DateRangeFilterButton, EMPTY_DATE_RANGE, EMPTY_VALUE, FilterBar, PageHeader, Pagination, ResponsiveRows, RowAction, RowsPerPage, describeDateRange, describeTruncation, formatAuditTimestamp, isDateRangeActive, readStoredPageSize, resolveDateRange, sanitizeFilterInput, filterTypeBlockedMessage, useCommittedFilter, type ActiveFilter, type CommittedFilter, type DateRangeValue } from '@omniconnect/ui'
 import { PermissionGate } from '../../../shared/components/PermissionGate/PermissionGate'
 import { ApiError } from '../../../shared/api/httpClient'
 import { useDebouncedValue } from '../../../shared/hooks/useDebouncedValue'
@@ -18,7 +18,7 @@ import styles from './AuditLogsPage.module.css'
 const FEATURE = 'host.system.audit-logs'
 const DEFAULT_PAGE_SIZE = 10
 
-/* Audit timestamps come from @omniremit/ui so the two remotes render the same shape. */
+/* Audit timestamps come from @omniconnect/ui so the two remotes render the same shape. */
 const formatTimestamp = formatAuditTimestamp
 
 const TAB_IDS = {
@@ -646,7 +646,7 @@ export function AuditLogsPage() {
         )
       ) : (
       <>
-      {/* Logs Table — chrome from @omniremit/ui so the host, Approval Center and both remotes all
+      {/* Logs Table — chrome from @omniconnect/ui so the host, Approval Center and both remotes all
           render the same table. This page's own `.tableContainer`/`.logTable` were the origin of
           that shared style; the duplicate copy in ApprovalCenterPage.module.css is now gone too. */}
       <DataTable reserveHeight footer={<Pagination page={page} pageSize={pageSize} total={total} itemLabel="event" onPageChange={setPage} />}>

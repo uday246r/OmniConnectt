@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { DetailField, DetailGrid, DetailSection, Drawer } from '@omniremit/ui';
+import { DetailField, DetailGrid, DetailSection, Drawer } from '@omniconnect/ui';
 import { LeadDiffTable } from '../../shared/LeadDiffTable';
 import {
   Shield,
@@ -18,11 +18,11 @@ import {
   Copy,
   Check,
   LayoutGrid,
-} from '@omniremit/ui/icons';
+} from '@omniconnect/ui/icons';
 import { useLeadStore } from '../../store/useLeadStore';
 import type { FieldDiff } from '../../types/lead';
 import styles from './AuditDetailsDrawer.module.css';
-import { Badge } from '@omniremit/ui';
+import { Badge } from '@omniconnect/ui';
 
 function formatTimestamp(iso?: string | null): string {
   if (!iso) return '—';

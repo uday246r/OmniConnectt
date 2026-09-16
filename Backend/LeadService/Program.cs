@@ -153,8 +153,8 @@ builder.Services.AddCors(options =>
 // RS256 JWT Token Validation
 var jwtSection = builder.Configuration.GetSection(JwtValidationOptions.SectionName);
 var configuredPublicKeyPem = jwtSection["SigningKeyPublic"];
-var jwtIssuer = jwtSection["Issuer"] ?? "omniremit-auth-service";
-var jwtAudience = jwtSection["Audience"] ?? "omniremit-host";
+var jwtIssuer = jwtSection["Issuer"] ?? "omniconnect-auth-service";
+var jwtAudience = jwtSection["Audience"] ?? "omniconnect-host";
 
 RSA validationRsa;
 if (!string.IsNullOrWhiteSpace(configuredPublicKeyPem))

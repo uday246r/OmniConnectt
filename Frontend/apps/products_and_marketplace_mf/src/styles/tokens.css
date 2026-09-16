@@ -4,7 +4,7 @@
  * This file used to define its own palette, radii, shadows and an Inter webfont import, so the remote
  * drifted from the host every time the platform theme changed and pulled a third-party font the rest
  * of the platform does not use. Every name below now resolves to the matching `--omni-*` token from
- * `@omniremit/ui/tokens.css` (imported first in App.tsx); the literal after each comma is only a
+ * `@omniconnect/ui/tokens.css` (imported first in App.tsx); the literal after each comma is only a
  * fallback for a standalone preview without that stylesheet.
  */
 :root {

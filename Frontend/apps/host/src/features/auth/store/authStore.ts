@@ -79,7 +79,7 @@ function runSessionCleanup() {
  * Logout in one tab must sign out the others; without this, tab B kept rendering an authenticated
  * UI with a live in-memory token after tab A signed out.
  */
-const AUTH_CHANNEL = 'omniremit-auth'
+const AUTH_CHANNEL = 'omniconnect-auth'
 type AuthBroadcast = { type: 'logout'; reason?: string }
 
 const authChannel: BroadcastChannel | null =
@@ -106,7 +106,7 @@ let inFlightRefresh: Promise<RefreshResponse> | null = null
 function refreshOnce(): Promise<RefreshResponse> {
   inFlightRefresh ??= (async () => {
     if (typeof navigator !== 'undefined' && 'locks' in navigator) {
-      return navigator.locks.request('omniremit-token-refresh', () => authServiceClient.refresh())
+      return navigator.locks.request('omniconnect-token-refresh', () => authServiceClient.refresh())
     }
     return authServiceClient.refresh()
   })().finally(() => {
@@ -242,7 +242,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
    * proxy will forward once every app declares its own.
    *
    * The signature is unchanged on purpose. Every caller in the host, `PermissionGate`, and
-   * `window.__omniremitHost__.hasCapability` that remotes already use, all keep working untouched,
+   * `window.__omniconnectHost__.hasCapability` that remotes already use, all keep working untouched,
    * and nothing has to learn which delivery path a given capability took.
    */
   hasCapability(featureKey, capability) {

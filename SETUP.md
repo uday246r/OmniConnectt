@@ -1,4 +1,4 @@
-# OmniRemit — Setup Guide for New Collaborators
+# OmniConnect — Setup Guide for New Collaborators
 
 Follow this top-to-bottom to get all six components running locally:
 
@@ -39,11 +39,11 @@ with anyone else on the team, and you never need anyone else's secrets to run th
 ## 2. Clone and install
 
 ```bash
-git clone https://github.com/Ashok-2004/OmniRemit.git
+git clone https://github.com/Ashok-2004/OmniConnect.git
 ```
 
 ```bash
-cd OmniRemit/Frontend && pnpm install
+cd OmniConnect/Frontend && pnpm install
 ```
 
 ```bash
@@ -453,7 +453,7 @@ STARTTLS upgrade and fails rather than silently falling back to an unencrypted s
   not), then hit **Resync permissions** on the Applications page.
 - **A registered app shows as unreachable** — the health prober could not fetch its
   `mf-manifest.json`. Confirm the remote's dev/preview server is up on its port.
-- **A remote loads but renders unstyled** — it is missing `import '@omniremit/ui/tokens.css'` in its
+- **A remote loads but renders unstyled** — it is missing `import '@omniconnect/ui/tokens.css'` in its
   `App.tsx`, before `./index.css`. See
   [docs/SHARED-UI-REFACTOR-STATUS.md](docs/SHARED-UI-REFACTOR-STATUS.md) §2, which documents this and
   the other CSS traps that typecheck and build cannot catch.

@@ -9,7 +9,7 @@ const SCOPE_ID = 'customer360-mf-scope';
 
 function scopeKeyframes() {
   return {
-    postcssPlugin: 'omniremit-scope-keyframes-c360',
+    postcssPlugin: 'omniconnect-scope-keyframes-c360',
     OnceExit(root) {
       const declared = new Set();
 
@@ -49,7 +49,7 @@ module.exports = {
        * prefix is redundant for them and actively harmful.
        *
        * Applied here as well as in lead_mf so this app is safe the moment it adopts its first
-       * `.module.css` or imports a component from @omniremit/ui.
+       * `.module.css` or imports a component from @omniconnect/ui.
        */
       /*
        * `.module.css` — CSS Modules already hash to globally-unique names, so the prefix is

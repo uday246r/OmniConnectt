@@ -1,7 +1,7 @@
 /*
  * The host's skeleton barrel.
  *
- * The four PRIMITIVES now come straight from @omniremit/ui — they were byte-compatible duplicates
+ * The four PRIMITIVES now come straight from @omniconnect/ui — they were byte-compatible duplicates
  * of the shared ones, and a shimmer that differs between the host and a remote is exactly the kind
  * of drift the shared package exists to prevent. Every existing
  * `from '…/shared/components/Skeleton'` import keeps working unchanged.
@@ -15,13 +15,13 @@ export {
   SkeletonText,
   SkeletonAvatar,
   SkeletonTable,
-} from '@omniremit/ui'
+} from '@omniconnect/ui'
 export type {
   SkeletonBlockProps,
   SkeletonTextProps,
   SkeletonAvatarProps,
   SkeletonTableProps,
-} from '@omniremit/ui'
+} from '@omniconnect/ui'
 
 // Card-level skeletons — exact shape matches for zero CLS. Host-specific.
 export { SkeletonUserCard } from './SkeletonUserCard'

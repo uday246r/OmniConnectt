@@ -6,7 +6,7 @@
  * JSX — which is how three different table header treatments coexisted here without anyone noticing.
  * Page- and component-scoped stylesheets replace both.
  *
- * The table chrome itself is NOT here: it comes from @omniremit/ui's DataTable, so this page renders
+ * The table chrome itself is NOT here: it comes from @omniconnect/ui's DataTable, so this page renders
  * the same table as the host's Audit Logs and Approval Center. Only genuinely page-specific styling
  * belongs below.
  */

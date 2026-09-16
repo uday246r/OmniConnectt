@@ -10,6 +10,6 @@
   <Project Path="ProductsService/src/ProductMarketplace.Application/ProductMarketplace.Application.csproj" />
   <Project Path="ProductsService/src/ProductMarketplace.Infrastructure/ProductMarketplace.Infrastructure.csproj" />
   <Project Path="ProductsService.Tests/ProductsService.Tests.csproj" />
-  <Project Path="Shared/OmniRemit.Validation/OmniRemit.Validation.csproj" />
-  <Project Path="LoadTest/OmniRemit.LoadTest/OmniRemit.LoadTest.csproj" />
+  <Project Path="Shared/OmniConnect.Validation/OmniConnect.Validation.csproj" />
+  <Project Path="LoadTest/OmniConnect.LoadTest/OmniConnect.LoadTest.csproj" />
 </Solution>

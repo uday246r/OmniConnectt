@@ -1,4 +1,4 @@
-import { Badge, type BadgeTone, EMPTY_VALUE } from '@omniremit/ui'
+import { Badge, type BadgeTone, EMPTY_VALUE } from '@omniconnect/ui'
 import { formatValue } from './formatValue'
 
 /**
@@ -6,7 +6,7 @@ import { formatValue } from './formatValue'
  *
  * APP-LEVEL SHARED, not global: the *mapping* below is Customer360's own domain vocabulary
  * ("Validated", "WIP", derived account statuses from CRM), so it does not belong in
- * `@omniremit/ui`. The *chrome* is entirely the shared `Badge` — this component owns no colours,
+ * `@omniconnect/ui`. The *chrome* is entirely the shared `Badge` — this component owns no colours,
  * no padding and no radius of its own, which is what keeps c360's statuses identical to the
  * host's.
  */

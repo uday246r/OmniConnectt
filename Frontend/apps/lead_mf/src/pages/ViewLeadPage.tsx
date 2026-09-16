@@ -11,8 +11,8 @@ import {
   ChevronRight,
   FolderKanban,
   X,
-} from '@omniremit/ui/icons';
-import { Button, ColumnFilter, DataTable, FilterBar, PageHeader, Pagination, ResponsiveRows, RowsPerPage, SearchField, getInitials, sanitizeFilterInput, useDebouncedValue, type ActiveFilter, type SearchFieldSuggestion } from '@omniremit/ui';
+} from '@omniconnect/ui/icons';
+import { Button, ColumnFilter, DataTable, FilterBar, PageHeader, Pagination, ResponsiveRows, RowsPerPage, SearchField, getInitials, sanitizeFilterInput, useDebouncedValue, type ActiveFilter, type SearchFieldSuggestion } from '@omniconnect/ui';
 import { useLeadStore } from '../store/useLeadStore';
 import { useHostNavigate } from '../navigation/HostNavigation';
 import styles from './ViewLeadPage.module.css';
@@ -270,7 +270,7 @@ export const ViewLeadPage: React.FC = () => {
 
   return (
     <div className={shell.page}>
-      {/* Hero banner — @omniremit/ui PageHeader. This screen previously hand-rolled the banner,
+      {/* Hero banner — @omniconnect/ui PageHeader. This screen previously hand-rolled the banner,
           its two decorative blooms and a white CTA with three JS mouse handlers, at a radius,
           padding, gradient angle and title size that had all drifted from the host's. */}
       <PageHeader

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { CustomPreset, ValidationRule } from '@omniremit/ui/validation'
+import type { CustomPreset, ValidationRule } from '@omniconnect/ui/validation'
 import type { LeadFormData } from '../types/lead'
 import type { LeadFieldConfig } from './fieldControlRegistry'
 import { composePhone, formatErrorFor, formatErrorsFor, splitStoredPhone } from './leadFormats'

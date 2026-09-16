@@ -27,7 +27,7 @@ vi.mock('../api/hostBridge', async (importOriginal) => {
 
 const { AuditLogsPage } = await import('./AuditLogsPage')
 const { useLeadStore } = await import('../store/useLeadStore')
-const { EMPTY_DATE_RANGE } = await import('@omniremit/ui')
+const { EMPTY_DATE_RANGE } = await import('@omniconnect/ui')
 
 const row = (over: Record<string, unknown> = {}) => ({
   id: crypto.randomUUID(),

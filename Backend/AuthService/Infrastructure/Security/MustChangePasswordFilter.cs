@@ -25,7 +25,7 @@ public class MustChangePasswordFilter : IAsyncAuthorizationFilter
 {
     /// <summary>Surfaced in ProblemDetails.Type so the frontend can recognise this specific refusal
     /// without string-matching a human-readable title.</summary>
-    public const string ProblemType = "urn:omniremit:password-change-required";
+    public const string ProblemType = "urn:omniconnect:password-change-required";
 
     public Task OnAuthorizationAsync(AuthorizationFilterContext context)
     {
@@ -51,7 +51,7 @@ public class MustChangePasswordFilter : IAsyncAuthorizationFilter
 
         context.Result = new ObjectResult(new ProblemDetails
         {
-            Title = "You must set your own password before using OmniRemit.",
+            Title = "You must set your own password before using OmniConnect.",
             Detail = "This account is still using a temporary password issued by an administrator.",
             Type = ProblemType,
             Status = StatusCodes.Status403Forbidden,

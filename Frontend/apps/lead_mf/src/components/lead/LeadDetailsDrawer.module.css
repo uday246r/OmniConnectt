@@ -1,7 +1,7 @@
 /*
  * Lead Details drawer — footer metadata only.
  *
- * Overlay, panel, header, body and footer chrome come from @omniremit/ui's Drawer; the split footer
+ * Overlay, panel, header, body and footer chrome come from @omniconnect/ui's Drawer; the split footer
  * layout comes from the app-level shared drawerLayout. What is left here is this drawer's own
  * "Lead ID + copy" affordance.
  */

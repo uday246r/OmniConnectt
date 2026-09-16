@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useLayoutEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { Button, sanitizeFilterInput, useDebouncedValue, useSuggestions } from '@omniremit/ui';
+import { Button, sanitizeFilterInput, useDebouncedValue, useSuggestions } from '@omniconnect/ui';
 import styles from './LeadFilterPopover.module.css';
 import {
   Layers,
@@ -12,7 +12,7 @@ import {
   Flag,
   Search,
   X,
-} from '@omniremit/ui/icons';
+} from '@omniconnect/ui/icons';
 import { useLeadStore } from '../../store/useLeadStore';
 import { isFieldVisible } from '../../config/fieldControlRegistry';
 import { formatPhone } from '../../shared/formatPhone';

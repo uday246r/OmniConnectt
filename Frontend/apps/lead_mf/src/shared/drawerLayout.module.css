@@ -1,12 +1,12 @@
 /*
  * Drawer footer layouts shared WITHIN lead_mf.
  *
- * Application-level, not global: the shared @omniremit/ui Drawer right-aligns its footer, which is
+ * Application-level, not global: the shared @omniconnect/ui Drawer right-aligns its footer, which is
  * correct for the platform default. The split "Back … Cancel + Confirm" arrangement below is a
  * two-step-wizard pattern that only lead_mf's Delete and Edit flows use, so it lives here rather
  * than becoming a variant of the shared component for two consumers.
  *
- * Promote it to @omniremit/ui only if a second application needs the same arrangement.
+ * Promote it to @omniconnect/ui only if a second application needs the same arrangement.
  */
 
 .footerSpread {

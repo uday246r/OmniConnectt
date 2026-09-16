@@ -15,7 +15,7 @@ export interface HostBridgeUser {
   permissions: string[];
 }
 
-export interface OmniRemitHostBridge {
+export interface OmniConnectHostBridge {
   getAccessToken: () => string | null;
   ensureFreshAccessToken: () => Promise<string>;
   hasCapability: (featureKey: string, capability: string) => boolean;
@@ -25,12 +25,12 @@ export interface OmniRemitHostBridge {
 
 declare global {
   interface Window {
-    __omniremitHost__?: OmniRemitHostBridge;
+    __omniconnectHost__?: OmniConnectHostBridge;
   }
 }
 
-export const getBridge = (): OmniRemitHostBridge | null =>
-  typeof window === 'undefined' ? null : (window.__omniremitHost__ ?? null);
+export const getBridge = (): OmniConnectHostBridge | null =>
+  typeof window === 'undefined' ? null : (window.__omniconnectHost__ ?? null);
 
 export const isRunningInHost = (): boolean => getBridge() !== null;
 

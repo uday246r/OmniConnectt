@@ -97,7 +97,7 @@
  * `:where()` contributes nothing to specificity, so the whole selector scores 0-0-0.
  *
  * As a plain `*` it was prefixed to `#lead-mf-scope *`, which scores 1-0-0 on the id and so beat
- * EVERY single-class rule inside this remote — including every component in @omniremit/ui. The
+ * EVERY single-class rule inside this remote — including every component in @omniconnect/ui. The
  * shared PageHeader's 28px/32px padding, Button's `0 18px`, Badge's `2px 12px` and DataTable's
  * cell padding were all being flattened to zero, which is why the page banner sat flush against
  * the edge of the card while the identical component in the host and in customer360_mf did not.

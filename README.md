@@ -1,4 +1,4 @@
-# OmniRemit
+# OmniConnect
 
 Enterprise micro-frontend platform. A central **host** application (React 19.2 + Vite + Module
 Federation 2.0) that authenticated users land in, which dynamically loads independently-deployed
@@ -11,14 +11,14 @@ installing, provisioning your own PostgreSQL databases and getting everything ru
 ## Repo layout
 
 ```
-OmniRemit/
+OmniConnect/
 ├── Frontend/                pnpm workspace
 │   ├── apps/host                shell (5173)
 │   ├── apps/lead_mf             Lead Management remote (5002)
 │   ├── apps/customer360_mf      Customer 360 remote (5003)
-│   ├── packages/ui              @omniremit/ui — shared component library
+│   ├── packages/ui              @omniconnect/ui — shared component library
 │   └── packages/federation-config
-├── Backend/                 OmniRemit.slnx — three .NET 10 services, one PostgreSQL database each
+├── Backend/                 OmniConnect.slnx — three .NET 10 services, one PostgreSQL database each
 └── docs/                    deployment, adding a remote app, performance, shared-UI handoff
 ```
 
@@ -135,7 +135,7 @@ sequences — every service unescapes that automatically (see `RsaKeyLoader`/`Pr
 See [docs/ADDING-A-REMOTE-APP.md](docs/ADDING-A-REMOTE-APP.md) for the full walkthrough. In short,
 any remote registered under Setup > Applications must:
 
-1. Build with `@module-federation/vite` (via `@omniremit/federation-config`) and publish an
+1. Build with `@module-federation/vite` (via `@omniconnect/federation-config`) and publish an
    `mf-manifest.json` — that single URL is all an admin needs to paste into Setup → Applications.
 2. Expose its root component as `./App` — the host always calls `loadRemote("<key>/App")`.
 3. Use a **globally unique Module Federation container name** (`lead_mf`, `customer360_mf`, …).
@@ -143,9 +143,9 @@ any remote registered under Setup > Applications must:
    a unique index behind that check. Note that the container name is not the same thing as the
    RemoteApp `Key`.
 4. Never import the host's global CSS. Style with its own CSS Modules, and import
-   `@omniremit/ui/tokens.css` in `App.tsx` before `./index.css` so it is also styled standalone.
+   `@omniconnect/ui/tokens.css` in `App.tsx` before `./index.css` so it is also styled standalone.
 5. Treat `react` / `react-dom` as federation-shared singletons matching the host's versions.
-6. Read auth state from `window.__omniremitHost__` (installed at host boot — see
+6. Read auth state from `window.__omniconnectHost__` (installed at host boot — see
    `Frontend/apps/host/src/shared/federation/hostBridge.ts`) instead of running its own login:
    `getAccessToken()` / `ensureFreshAccessToken()` for API calls, `hasCapability(featureKey,
    capability)` for UI gating, `getUser()` for identity. A remote is loaded with zero React props,
@@ -189,14 +189,14 @@ any remote registered under Setup > Applications must:
 - **Customer360Service** — customer profile, contacts, products and interactions (proxying an
   external CRM), field configuration and audit, with the same gating and approval-replay contract.
   Mounted at the root — **no** path base.
-- **Host frontend** — the "OmniConnect" theme (`shared/styles/theme.css` plus `@omniremit/ui`'s
+- **Host frontend** — the "OmniConnect" theme (`shared/styles/theme.css` plus `@omniconnect/ui`'s
   `tokens.css`), split-panel login, dynamic sidebar (Dashboard + registered apps + a System section),
   Module Federation runtime loader with zero build-time remotes, a topbar gear settings drawer
   surfacing exactly the Users / Roles / Applications screens the signed-in user can reach, Approval
   Center and My Requests, System → Audit Logs and System Logs (server-side filtering and paging,
   one shared date-range control and CSV export across every log screen in all three apps), global search, skeleton loading throughout, every
   route code-split, CSS Modules only (no Tailwind/CSS-in-JS), Zustand for auth, navigation and health state.
-- **`@omniremit/ui`** — the shared component library (`Frontend/packages/ui`), consumed by all three
+- **`@omniconnect/ui`** — the shared component library (`Frontend/packages/ui`), consumed by all three
   apps as a pnpm `workspace:*` dependency. **Deliberately not** a Module Federation `exposes` and not
   an MF shared singleton: the host keeps declaring zero build-time remotes and remotes stay
   independently buildable. See [docs/SHARED-UI-REFACTOR-STATUS.md](docs/SHARED-UI-REFACTOR-STATUS.md)
@@ -214,7 +214,7 @@ any remote registered under Setup > Applications must:
   now comes from each service's `.env` — but they remain in git history. **Treat all of them as
   compromised and rotate them**: the four database passwords and the internal API key.
 - There is no CI pipeline. (Tests do exist: 528 backend across three xUnit projects — AuthService
-  424, LeadService 59, Customer360Service 45 — and 366 frontend across the host 152, `@omniremit/ui`
+  424, LeadService 59, Customer360Service 45 — and 366 frontend across the host 152, `@omniconnect/ui`
   138, `lead_mf` 28 and `customer360_mf` 48.)
 - Maker-Checker concurrency is tested with deterministic fault injection and model-level schema
   assertions, not against a live Postgres: the database itself enforcing the partial unique index and
@@ -232,7 +232,7 @@ any remote registered under Setup > Applications must:
 | Document | What it covers |
 | --- | --- |
 | [SETUP.md](SETUP.md) | Local runbook — install, databases, keys, `.env`, first sign-in |
-| [docs/SHARED-UI-REFACTOR-STATUS.md](docs/SHARED-UI-REFACTOR-STATUS.md) | `@omniremit/ui`, and the CSS traps that have already caused breakage |
+| [docs/SHARED-UI-REFACTOR-STATUS.md](docs/SHARED-UI-REFACTOR-STATUS.md) | `@omniconnect/ui`, and the CSS traps that have already caused breakage |
 | [docs/ADDING-A-REMOTE-APP.md](docs/ADDING-A-REMOTE-APP.md) | Standing up a new micro-frontend without colliding with an existing one |
 | [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | Production topology, DNS, cookies and CORS |
 | [docs/PERFORMANCE-AND-INFRA.md](docs/PERFORMANCE-AND-INFRA.md) | Measured load-test baseline and the infrastructure work left |

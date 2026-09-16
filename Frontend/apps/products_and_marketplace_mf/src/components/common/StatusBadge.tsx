@@ -1,4 +1,4 @@
-import { Badge } from "@omniremit/ui";
+import { Badge } from "@omniconnect/ui";
 import { useStatusConfigStore } from "../../stores/useStatusConfigStore";
 import type { StatusEntityType, StatusTone } from "../../types/domain";
 

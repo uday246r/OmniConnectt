@@ -1,5 +1,5 @@
 import type { ReactElement, SVGProps } from "react";
-import { Icon as SharedIcon, type IconComponent } from "@omniremit/ui";
+import { Icon as SharedIcon, type IconComponent } from "@omniconnect/ui";
 
 /*
  * Every generic glyph (close, check, search, edit, trash, eye…) is drawn by the platform icon set, so

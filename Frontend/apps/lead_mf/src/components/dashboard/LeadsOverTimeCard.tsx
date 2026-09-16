@@ -11,7 +11,7 @@ import {
 import card from '../../shared/dashboardCard.module.css';
 import styles from './LeadsOverTimeCard.module.css';
 import { useLeadStore } from '../../store/useLeadStore';
-import { Select, SkeletonBlock } from '@omniremit/ui';
+import { Select, SkeletonBlock } from '@omniconnect/ui';
 
 const GRANULARITY_LABELS: Record<string, string> = {
   daily: 'Daily',

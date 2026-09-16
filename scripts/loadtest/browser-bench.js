@@ -1,12 +1,12 @@
 /*
- * Signed-in API latency benchmark, run inside a signed-in OmniRemit host tab.
+ * Signed-in API latency benchmark, run inside a signed-in OmniConnect host tab.
  *
  * Paste into the browser console on http://localhost:5173 (or run it through a browser automation
  * "evaluate" call) and await the promise:
  *
  *     await omniBench({ rounds: 20, concurrency: 6 })
  *
- * It uses the host's own session (window.__omniremitHost__.getAccessToken()), so no credential or
+ * It uses the host's own session (window.__omniconnectHost__.getAccessToken()), so no credential or
  * token is ever copied anywhere — the requests leave from the page exactly as the app's would. The
  * browser caps connections per origin (6 on HTTP/1.1), so this measures latency at realistic
  * per-user concurrency, not server throughput; scripts/loadtest/http-load.mjs covers throughput.
@@ -17,7 +17,7 @@ async function omniBench({ rounds = 20, concurrency = 6, deepPages = {} } = {}) 
   const AUTH = 'http://localhost:5155'
   const LEAD = 'http://localhost:5046/api/lead-service'
   const PRODUCTS = 'http://localhost:5266'
-  const token = window.__omniremitHost__?.getAccessToken?.()
+  const token = window.__omniconnectHost__?.getAccessToken?.()
   if (!token) throw new Error('Not signed in: open the host and sign in first.')
 
   const endpoints = [
