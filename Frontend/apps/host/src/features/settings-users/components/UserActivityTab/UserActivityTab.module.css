@@ -1,20 +1,209 @@
-.toolbar {
+/* ══════════════════════════════════════════════════════════════
+   UserActivityTab — Audit Log section in User Detail page.
+   Exact alignment with Host System Audit Logs table aesthetics:
+   - Export button on tab line
+   - Table cell styles: timeCell, actorCell, actionCell, detailsCell, entityWrap
+   - Proportional column distribution: RECORD, RESULT, APPLICATION,
+     and DETAILS shrink-wrap to eliminate empty gaps, WHAT HAPPENED
+     expands with comfortable reading space.
+   ══════════════════════════════════════════════════════════════ */
+
+.tabContent {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  animation: tabFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes tabFadeIn {
+  from { opacity: 0; transform: translateY(3px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Export button — identical to Host AuditLogsPage .exportBtn ─ */
+.exportBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 14px;
+  border-radius: var(--omni-radius-lg-minus);
+  font-size: var(--omni-font-size-xs-plus);
+  font-weight: var(--omni-font-weight-semibold);
+  cursor: pointer;
+  transition: all 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+  font-family: inherit;
+  white-space: nowrap;
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  border: none;
+  color: #ffffff;
+  box-shadow: 0 3px 10px rgba(37, 99, 235, 0.25);
+}
+
+.exportBtn:hover:not(:disabled) {
+  box-shadow: 0 5px 16px rgba(37, 99, 235, 0.38);
+  transform: translateY(-1px);
+}
+
+.exportBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.fallbackActions {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 8px;
+}
+
+/* ── Column header widths & layout balancing ─────────────────── */
+.thTime {
+  width: 170px;
+  white-space: nowrap;
+}
+
+.thActor {
+  min-width: 150px;
+  white-space: nowrap;
+}
+
+/* Forces columns to shrink-wrap their content rather than absorbing excess width.
+   Applied to ACTION, APPLICATION, RECORD, RESULT and DETAILS. */
+.thNarrow {
+  width: 1%;
+  white-space: nowrap;
+}
+
+/* WHAT HAPPENED takes up the natural remaining space */
+.thWhatHappened {
+  min-width: 200px;
+  padding: var(--omni-space-3) var(--omni-space-4);
+  font-size: var(--omni-font-size-xs-minus);
+  font-weight: var(--omni-font-weight-bold);
+  color: #475569;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.thRight {
+  text-align: right;
+  padding: var(--omni-space-3) var(--omni-space-4);
+  font-size: var(--omni-font-size-xs-minus);
+  font-weight: var(--omni-font-weight-bold);
+  color: #475569;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* ── Time cell — matches Host AuditLogsPage ──────────────────── */
+.timeCell {
+  white-space: nowrap;
+  color: var(--omni-color-text-secondary);
+  font-size: var(--omni-font-size-xs);
+  font-weight: var(--omni-font-weight-medium);
+  letter-spacing: -0.01em;
+}
+
+/* ── Actor avatar & name cell — single clean line ────────────── */
+.actorCell {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  white-space: nowrap;
+}
+
+.actorAvatar {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--omni-radius-md);
+  background: linear-gradient(135deg, #ede9fe 0%, #ddd6fe 100%);
+  color: #6d28d9;
+  font-size: var(--omni-font-size-2xs);
+  font-weight: var(--omni-font-weight-bold);
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  gap: 10px;
-  margin-bottom: 12px;
+  justify-content: center;
+  flex-shrink: 0;
+  letter-spacing: -0.02em;
+  border: 1px solid #c4b5fd;
+  box-shadow: 0 1px 3px rgba(109, 40, 217, 0.1);
 }
 
-.qualifier {
-  color: var(--omni-color-text-muted);
-  font-weight: var(--omni-font-weight-medium);
+.actorName {
+  font-weight: var(--omni-font-weight-semibold);
+  color: var(--omni-color-text-primary);
+  font-size: var(--omni-font-size-sm);
+  white-space: nowrap;
 }
 
-.details {
+/* ── Action chip — matches Host AuditLogsPage .actionCell ────── */
+.actionCell {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: inherit;
+  font-size: var(--omni-font-size-xs);
+  font-weight: var(--omni-font-weight-bold);
+  color: var(--omni-color-primary-700);
+  background: var(--omni-color-primary-50);
+  border: 1px solid var(--omni-color-primary-100);
+  border-radius: var(--omni-radius-sm);
+  padding: 3px 9px;
+  white-space: nowrap;
+}
+
+/* Per-verb color overrides from Host AuditLogsPage */
+.actionLogin   { background: var(--omni-color-primary-50);  color: var(--omni-color-primary-600);  border-color: var(--omni-color-primary-200); }
+.actionSuccess { background: var(--omni-color-success-50);  color: var(--omni-color-success-600);  border-color: var(--omni-color-success-200); }
+.actionDanger  { background: var(--omni-color-danger-50);   color: var(--omni-color-danger-600);   border-color: var(--omni-color-danger-200); }
+.actionWarning { background: var(--omni-color-warning-50);  color: var(--omni-color-warning-600);  border-color: var(--omni-color-warning-200); }
+.actionNeutral { background: var(--omni-color-surface-alt); color: var(--omni-color-text-secondary); border-color: #e2e8f0; }
+
+/* ── What happened details — matches Host AuditLogsPage ──────── */
+.detailsCell {
+  color: var(--omni-color-text-secondary);
+  font-size: var(--omni-font-size-xs-plus);
+  max-width: 420px;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  max-width: 36ch;
+  line-height: 1.45;
+}
+
+/* ── Record entity chips — matches Host AuditLogsPage ───────── */
+.entityWrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--omni-font-size-xs);
+  white-space: nowrap;
+}
+
+.entityType {
+  font-weight: var(--omni-font-weight-semibold);
+  color: #334155;
+  white-space: nowrap;
+}
+
+.entityId {
+  font-size: var(--omni-font-size-xs-plus);
+  font-weight: var(--omni-font-weight-medium);
+  color: #64748b;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  padding: 1px 7px;
+  border-radius: var(--omni-radius-xs-plus);
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mutedText {
+  color: var(--omni-color-text-muted);
+  font-size: var(--omni-font-size-xs);
 }

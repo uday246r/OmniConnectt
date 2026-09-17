@@ -91,6 +91,8 @@ export interface IndividualProfile {
 export interface CorporateProfile {
   customerId: string;
   cifNumber?: string | null;
+  salutation?: string | null;
+  segmentation?: string | null;
   organizationName?: string | null;
   businessRegDate?: string | null;
   country?: string | null;
@@ -106,6 +108,7 @@ export interface CorporateProfile {
   tin?: string | null;
   annualIncome?: string | null;
   signatoryName?: string | null;
+  signatorySalutation?: string | null;
   companyWebsite?: string | null;
   payrollIndic?: string | null;
   marketMessageOpt?: string | null;

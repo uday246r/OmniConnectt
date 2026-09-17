@@ -21,7 +21,6 @@ import {
   PageHeader,
   Pagination,
   ResponsiveRows,
-  RowAction,
   RowsPerPage,
   SearchField,
   formatDateTime,
@@ -372,22 +371,44 @@ export function UsersPage() {
     },
     {
       key: 'actions',
-      label: '',
+      label: 'Actions',
       priority: 'always',
       align: 'right',
       render: (u) => (
         <div className={styles.rowActions}>
-          <RowAction onClick={() => navigate(`/settings/users/${u.id}`)}>View</RowAction>
+          <button
+            type="button"
+            className={styles.actionView}
+            onClick={() => navigate(`/settings/users/${u.id}`)}
+            title="View user details"
+          >
+            <Icon.Eye width={12} height={12} />
+            <span>View</span>
+          </button>
           {canEdit && (
-            <RowAction onClick={() => pushLayer({ type: 'user-form', userId: u.id })}>Edit</RowAction>
+            <button
+              type="button"
+              className={`${styles.actionIconBtn} ${styles.actionEdit}`}
+              onClick={() => pushLayer({ type: 'user-form', userId: u.id })}
+              title="Edit user"
+            >
+              <Icon.Edit width={13} height={13} />
+            </button>
           )}
           {canEdit && u.awaitingPasswordSetup && (
-            <RowAction
+            <button
+              type="button"
+              className={`${styles.actionIconBtn} ${styles.actionInvite}`}
               disabled={resendingInviteFor === u.id}
               onClick={() => void handleResendInvite(u)}
+              title={resendingInviteFor === u.id ? 'Sending…' : 'Resend invite email'}
             >
-              {resendingInviteFor === u.id ? 'Sending…' : 'Resend invite'}
-            </RowAction>
+              {resendingInviteFor === u.id ? (
+                <Icon.Loader width={13} height={13} className={styles.spin} />
+              ) : (
+                <Icon.Mail width={13} height={13} />
+              )}
+            </button>
           )}
         </div>
       ),
@@ -431,7 +452,7 @@ export function UsersPage() {
         </div>
         <div className={styles.summaryCard}>
           <div className={`${styles.summaryIcon} ${styles.iconGray}`}>
-            <Icon.X width={20} height={20} />
+            <Icon.UserMinus width={20} height={20} />
           </div>
           <div className={styles.summaryContent}>
             <span className={styles.summaryLabel}>Inactive</span>

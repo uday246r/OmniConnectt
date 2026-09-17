@@ -1,125 +1,265 @@
-/* ── Capabilities Toolbar: Search, Filters, & Stats ──────── */
-.capControls {
+/* ══════════════════════════════════════════════════════════════
+   PermissionMatrixTable — Enhanced, zero-repetition permissions UI.
+   Aligned with Host App design language:
+   - Clean toolbar card with search and filters
+   - Distinct Application Cards with header bands
+   - Compact 3-column table per application
+   - Color-coded action verb chips
+   ══════════════════════════════════════════════════════════════ */
+
+.permContainer {
   display: flex;
   flex-direction: column;
   gap: 16px;
-  margin-top: 4px;
-  margin-bottom: 4px;
+  animation: tabFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-/* Stats summary row */
-.capStatsRow {
+@keyframes tabFadeIn {
+  from { opacity: 0; transform: translateY(3px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Administrator Privileges Banner ─────────────────────────── */
+.adminBanner {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 20px;
+  background: var(--omni-color-surface);
+  border: 1.5px solid #dbeafe;
+  border-left: 4.5px solid #f59e0b;
+  border-radius: var(--omni-radius-xl);
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+}
+
+.adminBannerIcon {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--omni-radius-lg);
+  background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+  color: #d97706;
+  border: 1px solid #fde68a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 1px 3px rgba(217, 119, 6, 0.15);
+}
+
+.adminBannerContent {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.adminBannerTitle {
+  font-size: var(--omni-font-size-sm);
+  font-weight: var(--omni-font-weight-bold);
+  color: var(--omni-color-text-primary);
+  letter-spacing: -0.01em;
+}
+
+.adminBannerSubtitle {
+  font-size: var(--omni-font-size-xs);
+  color: var(--omni-color-text-secondary);
+  line-height: 1.4;
+}
+
+.adminAccessBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  background: #ecfdf5;
+  color: #059669;
+  border: 1px solid #a7f3d0;
+  border-radius: var(--omni-radius-pill);
+  font-size: var(--omni-font-size-xs-minus);
+  font-weight: var(--omni-font-weight-bold);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* ── Toolbar Card (Search, Application filter, Stats) ────────── */
+.toolbarCard {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 14px;
+  gap: 12px;
   flex-wrap: wrap;
-  padding: 14px 18px;
-  background: linear-gradient(135deg, #f8faff 0%, #f0f6ff 100%);
-  border: 1px solid #dbeafe;
-  border-radius: 12px;
+  background: var(--omni-color-surface);
+  border: 1.5px solid #e8edf5;
+  border-radius: var(--omni-radius-xl);
+  padding: 10px 16px;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.03);
 }
 
-.capPillsGroup {
+.toolbarLeft {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.toolbarRight {
   display: flex;
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+  flex-shrink: 0;
 }
 
-.statChip {
+.searchWrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.searchIcon {
+  position: absolute;
+  left: 10px;
+  color: var(--omni-color-text-muted);
+  pointer-events: none;
+}
+
+.searchInput {
+  padding: 6px 28px 6px 30px;
+  background: var(--omni-color-surface-alt);
+  border: 1.5px solid #e2e8f0;
+  border-radius: var(--omni-radius-lg-minus);
+  font-size: var(--omni-font-size-xs-plus);
+  color: var(--omni-color-text-primary);
+  font-family: inherit;
+  outline: none;
+  width: 230px;
+  transition: all 0.15s ease;
+}
+
+.searchInput:focus {
+  border-color: var(--omni-color-primary-600);
+  background: var(--omni-color-surface);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.clearInputBtn {
+  position: absolute;
+  right: 8px;
+  background: none;
+  border: none;
+  color: var(--omni-color-text-muted);
+  cursor: pointer;
+  padding: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.clearInputBtn:hover { color: var(--omni-color-text-primary); }
+
+.appSelect {
+  padding: 6px 12px;
+  background: var(--omni-color-surface-alt);
+  border: 1.5px solid #e2e8f0;
+  border-radius: var(--omni-radius-lg-minus);
+  font-size: var(--omni-font-size-xs-plus);
+  font-weight: var(--omni-font-weight-medium);
+  color: var(--omni-color-text-primary);
+  font-family: inherit;
+  cursor: pointer;
+  outline: none;
+  transition: all 0.15s ease;
+}
+
+.appSelect:focus {
+  border-color: var(--omni-color-primary-600);
+  background: var(--omni-color-surface);
+}
+
+.resetFiltersBtn {
+  background: none;
+  border: 1px solid #fca5a5;
+  color: var(--omni-color-danger-600);
+  font-size: var(--omni-font-size-xs-minus);
+  font-weight: var(--omni-font-weight-bold);
+  padding: 4px 9px;
+  border-radius: var(--omni-radius-sm);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.resetFiltersBtn:hover {
+  background: var(--omni-color-danger-100);
+}
+
+.statPill {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 5px 12px;
-  background: #ffffff;
+  padding: 4px 10px;
+  background: var(--omni-color-surface-alt);
   border: 1px solid #e2e8f0;
   border-radius: var(--omni-radius-pill);
-  font-size: var(--omni-font-size-xs);
+  font-size: var(--omni-font-size-xs-minus);
+  font-weight: var(--omni-font-weight-semibold);
   color: var(--omni-color-text-secondary);
-  font-weight: var(--omni-font-weight-medium);
-  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
 }
 
-.statChipStrong {
-  color: var(--omni-color-primary-700);
-  font-weight: var(--omni-font-weight-bold);
+.rolePill {
+  background: #fffbeb;
+  border-color: #fde68a;
+  color: #b45309;
 }
 
-/* ── Permission Table ────────────────────────────────────── */
-.permTableWrap {
-  width: 100%;
-  overflow-x: auto;
-  border-radius: 14px;
-  border: 1.5px solid #e5ecf6;
-  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.04);
-  margin-top: 4px;
+/* ── Application Groups Container ────────────────────────────── */
+.appGroupsContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
-.permTable {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: var(--omni-font-size-sm);
-  table-layout: auto;
+.appCard {
+  background: var(--omni-color-surface);
+  border: 1.5px solid #e8edf5;
+  border-radius: var(--omni-radius-xl);
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.03);
+  overflow: hidden;
+  transition: border-color 0.15s ease;
 }
 
-/* Header row */
-.permTh {
+.appCard:hover {
+  border-color: #cbd5e1;
+}
+
+/* ── App Header Band — rendered ONCE per app ─────────────────── */
+.appCardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   padding: 12px 18px;
-  text-align: left;
-  font-size: 11px;
-  font-weight: var(--omni-font-weight-bold);
-  color: #475569;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  background: linear-gradient(to bottom, #f8fafc, #f1f5f9);
-  border-bottom: 1.5px solid #e5ecf6;
-  white-space: nowrap;
+  background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+  border-bottom: 1.5px solid #e2e8f0;
 }
 
-.permThCenter {
-  text-align: center;
-}
-
-/* Body rows */
-.permTr {
-  transition: background 0.12s ease;
-}
-
-.permTr:hover { background: #f8faff; }
-
-.permTr:not(:last-child) > .permTd {
-  border-bottom: 1px solid #f2f5f9;
-}
-
-.permTd {
-  padding: 14px 18px;
-  vertical-align: top;
-  color: var(--omni-color-text-primary);
-  font-size: var(--omni-font-size-sm);
-  line-height: 1.5;
-}
-
-/* Application column — icon + name + badge */
-.permTdApp {
-  white-space: nowrap;
-  min-width: 150px;
-  vertical-align: middle;
-  border-right: 1px solid #f2f5f9;
-  background: #fafbfc;
-}
-
-.permAppCell {
+.appCardHeaderLeft {
   display: flex;
   align-items: center;
   gap: 10px;
 }
 
-.permAppIcon {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  background: linear-gradient(135deg, #eff6ff, #dbeafe);
+.appCardHeaderRight {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.appIcon {
+  width: 30px;
+  height: 30px;
+  border-radius: var(--omni-radius-md);
+  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
   color: var(--omni-color-primary-600);
   border: 1px solid #bfdbfe;
   display: flex;
@@ -128,109 +268,158 @@
   flex-shrink: 0;
 }
 
-.permAppIconRemote {
-  background: linear-gradient(135deg, #f0fdf4, #dcfce7);
+.appIconRemote {
+  background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
   color: #15803d;
   border-color: #bbf7d0;
 }
 
-.permAppName {
-  font-size: var(--omni-font-size-xs);
-  font-weight: var(--omni-font-weight-bold);
-  color: var(--omni-color-text-primary);
-  white-space: nowrap;
-  margin-bottom: 3px;
+.appTitleGroup {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
-.permAppBadge {
-  display: inline-block;
+.appName {
+  font-size: var(--omni-font-size-sm);
+  font-weight: var(--omni-font-weight-bold);
+  color: var(--omni-color-text-primary);
+  letter-spacing: -0.01em;
+}
+
+.appBadge {
   font-size: 9px;
   font-weight: var(--omni-font-weight-bold);
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  padding: 1px 6px;
+  padding: 1.5px 7px;
   border-radius: var(--omni-radius-pill);
+}
+
+.appBadgeCore {
   background: #dbeafe;
   color: #1e40af;
 }
 
-/* Module column */
-.permTdModule {
-  min-width: 100px;
+.appBadgeRemote {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.appCountBadge {
+  font-size: var(--omni-font-size-xs-minus);
+  font-weight: var(--omni-font-weight-semibold);
+  color: var(--omni-color-text-muted);
+}
+
+/* ── Modules Table ───────────────────────────────────────────── */
+.moduleTableWrap {
+  overflow-x: auto;
+}
+
+.moduleTable {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.moduleTable thead {
+  background: #fafbfc;
+  border-bottom: 1px solid #edf2f7;
+}
+
+.moduleTable th {
+  padding: 10px 16px;
+  font-size: var(--omni-font-size-xs-minus);
+  font-weight: var(--omni-font-weight-bold);
+  color: #64748b;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.thModule       { width: 22%; min-width: 150px; }
+.thCapabilities { width: 46%; min-width: 250px; }
+.thDescription  { width: 32%; min-width: 200px; }
+
+.moduleRow {
+  border-bottom: 1px solid #f1f5f9;
+  transition: background 0.12s ease;
+}
+
+.moduleRow:last-child {
+  border-bottom: none;
+}
+
+.moduleRow:hover {
+  background: #f8faff;
+}
+
+.moduleRow td {
+  padding: 12px 16px;
   vertical-align: middle;
 }
 
-.permModuleLabel {
+.tdModule {
+  white-space: nowrap;
+}
+
+.moduleBadge {
   display: inline-block;
-  font-size: 11px;
+  font-size: var(--omni-font-size-xs-minus);
   font-weight: var(--omni-font-weight-bold);
-  color: #475569;
+  color: #334155;
   background: #f1f5f9;
   border: 1px solid #e2e8f0;
-  padding: 3px 10px;
+  padding: 3px 9px;
   border-radius: var(--omni-radius-pill);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  white-space: nowrap;
+  letter-spacing: 0.04em;
 }
 
-/* Permission name column */
-.permTdName {
-  min-width: 180px;
+.tdCapabilities {
   vertical-align: middle;
 }
 
-.permName {
-  display: block;
-  font-weight: var(--omni-font-weight-semibold);
-  color: var(--omni-color-text-primary);
-  cursor: default;
+.badgesWrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
 }
 
-/* Type badge column */
-.permTdType {
-  white-space: nowrap;
-  text-align: center;
+.tdDescription {
   vertical-align: middle;
 }
 
-/* Description column */
-.permTdDesc {
-  max-width: 320px;
-  vertical-align: top;
-}
-
-.permDesc {
+.moduleDescText {
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  font-size: var(--omni-font-size-xs);
-  color: #64748b;
-  line-height: 1.5;
+  font-size: var(--omni-font-size-xs-plus);
+  color: var(--omni-color-text-secondary);
+  line-height: 1.45;
+}
+
+/* ── Verb Badges ─────────────────────────────────────────────── */
+.verbBadge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 10px;
+  font-weight: var(--omni-font-weight-bold);
+  padding: 2.5px 8px;
+  border-radius: var(--omni-radius-pill);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  transition: all 0.12s ease;
   cursor: default;
 }
 
-/* Status column */
-.permTdStatus {
-  text-align: center;
-  white-space: nowrap;
-  vertical-align: middle;
-}
-
-/* Zebra-stripe alternate rows */
-.permTr:nth-child(even) { background: #fafbfd; }
-.permTr:nth-child(even):hover { background: #f0f7ff; }
-
-/* ── Verb Badges ─────────────────────────────────────────── */
-.verbBadge {
-  font-size: 10px;
-  font-weight: var(--omni-font-weight-bold);
-  padding: 2px 9px;
-  border-radius: var(--omni-radius-pill);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  white-space: nowrap;
+.verbBadge:hover {
+  transform: translateY(-0.5px);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
 .verbView     { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
@@ -245,60 +434,60 @@
 .verbKpi      { background: #ecfeff; color: #0e7490; border: 1px solid #a5f3fc; }
 .verbDefault  { background: #f8fafc; color: #475569; border: 1px solid #e2e8f0; }
 
-.capActivePill {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  background: linear-gradient(135deg, #ecfdf5, #d1fae5);
-  color: #059669;
-  border: 1px solid #a7f3d0;
-  border-radius: var(--omni-radius-pill);
-  padding: 2px 8px;
-  font-size: 10px;
-  font-weight: var(--omni-font-weight-bold);
-  flex-shrink: 0;
-  letter-spacing: 0.02em;
-}
-
-/* ── Empty States ────────────────────────────────────────── */
-.emptyCapBox {
+/* ── Empty States ────────────────────────────────────────────── */
+.emptyCard {
   padding: 40px 24px;
   text-align: center;
-  color: var(--omni-color-text-muted);
-  font-size: var(--omni-font-size-sm);
-  background: #f8fafc;
-  border-radius: 12px;
+  background: var(--omni-color-surface);
   border: 1.5px dashed #e2e8f0;
+  border-radius: var(--omni-radius-xl);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 
-.emptyCapBox span {
-  color: #64748b;
+.emptyIconWrap {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--omni-radius-circle);
+  background: #f1f5f9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #94a3b8;
+  margin-bottom: 4px;
+}
+
+.emptyTitle {
   font-size: var(--omni-font-size-sm);
-  max-width: 320px;
+  font-weight: var(--omni-font-weight-bold);
+  color: var(--omni-color-text-primary);
+}
+
+.emptyDesc {
+  font-size: var(--omni-font-size-xs-plus);
+  color: var(--omni-color-text-secondary);
+  max-width: 360px;
   line-height: 1.5;
 }
 
 .clearFilterBtn {
+  margin-top: 8px;
   display: inline-flex;
   align-items: center;
   gap: 5px;
   font-size: var(--omni-font-size-xs);
+  font-weight: var(--omni-font-weight-semibold);
   color: var(--omni-color-primary-600);
   background: var(--omni-color-primary-50);
   border: 1px solid #bfdbfe;
   border-radius: var(--omni-radius-pill);
-  font-weight: var(--omni-font-weight-semibold);
+  padding: 5px 14px;
   cursor: pointer;
-  padding: 6px 16px;
   transition: all 0.15s ease;
-  margin-top: 4px;
 }
 
 .clearFilterBtn:hover {
   background: #dbeafe;
-  border-color: #93c5fd;
 }

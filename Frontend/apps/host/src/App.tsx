@@ -15,6 +15,7 @@ import { SettingsDrawerUrlSync, useSettingsBackgroundLocation } from './layout/S
 import { RouteFallback } from './shared/components/RouteFallback/RouteFallback'
 import { LoginPage } from './pages/LoginPage/LoginPage'
 import { PageSkeleton } from './shared/components/PageSkeleton/PageSkeleton'
+import { UserDetailSkeleton } from './features/settings-users/components/UserDetailSkeleton/UserDetailSkeleton'
 import { ForbiddenPage } from './pages/ForbiddenPage/ForbiddenPage'
 import { lazyWithPreload, preloadWhenIdle } from './shared/utils/lazyWithPreload'
 
@@ -56,6 +57,12 @@ const ApprovalCenterPage = lazy(() =>
 )
 const SetPasswordPage = lazy(() =>
   import('./pages/SetPasswordPage/SetPasswordPage').then((m) => ({ default: m.SetPasswordPage })),
+)
+const ForgotPasswordPage = lazy(() =>
+  import('./pages/ForgotPasswordPage/ForgotPasswordPage').then((m) => ({ default: m.ForgotPasswordPage })),
+)
+const ResetPasswordPage = lazy(() =>
+  import('./pages/ResetPasswordPage/ResetPasswordPage').then((m) => ({ default: m.ResetPasswordPage })),
 )
 const MyRequestsPage = lazy(() =>
   import('./features/approvals/pages/MyRequestsPage').then((m) => ({ default: m.MyRequestsPage })),
@@ -360,6 +367,28 @@ function AppRoutes() {
           }
         />
 
+        {/*
+          "Forgot password?" — same public-by-necessity reasoning as /set-password above: whoever is
+          here has no working session yet, either because they never signed in or because they cannot
+          remember their password.
+        */}
+        <Route
+          path="/forgot-password"
+          element={
+            <Suspense fallback={<RouteFallback />}>
+              <ForgotPasswordPage />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/reset-password"
+          element={
+            <Suspense fallback={<RouteFallback />}>
+              <ResetPasswordPage />
+            </Suspense>
+          }
+        />
+
       <Route
         element={
           <RequireAuth>
@@ -446,7 +475,9 @@ function AppRoutes() {
                 path=":id"
                 element={
                   <RequireCapability featureKey={FEATURE_KEYS.users}>
-                    <UserDetailPage />
+                    <Suspense fallback={<UserDetailSkeleton />}>
+                      <UserDetailPage />
+                    </Suspense>
                   </RequireCapability>
                 }
               />

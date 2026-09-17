@@ -47,6 +47,8 @@ internal sealed class ApprovalHarness : IDisposable
     public RecordingCallbackHandler RemoteCallbacks { get; }
     public RecordingEmailSender Emails { get; }
     public SetPasswordInviteService Invites { get; }
+    public PasswordResetService PasswordResets { get; }
+    public RefreshTokenService RefreshTokens { get; }
 
     /// <param name="db">
     /// Pass an explicit context to point two harnesses at one database — how the two-actor tests
@@ -72,6 +74,12 @@ internal sealed class ApprovalHarness : IDisposable
             MsOptions.Create(new SmtpOptions()), MsOptions.Create(new PasswordPolicyOptions()),
             AuditLog, NullLogger<SetPasswordInviteService>.Instance);
         var invites = Invites;
+
+        RefreshTokens = new RefreshTokenService(Db, MsOptions.Create(new JwtOptions()));
+        PasswordResets = new PasswordResetService(
+            Db, Emails, hasher, RefreshTokens,
+            MsOptions.Create(new SmtpOptions()), MsOptions.Create(new PasswordPolicyOptions()),
+            AuditLog, NullLogger<PasswordResetService>.Instance);
 
         var fieldSchema = new UserFieldSchemaAppService(Db, AuditLog);
         var validationPresets = new ValidationPresetAppService(Db, AuditLog);
@@ -246,14 +254,14 @@ internal sealed class ApprovalHarness : IDisposable
     /// </summary>
     public sealed class RecordingEmailSender : AuthService.Infrastructure.Email.IEmailSender
     {
-        public List<(string To, string Subject)> Sent { get; } = [];
+        public List<(string To, string Subject, string Text)> Sent { get; } = [];
 
         public bool IsEnabled { get; set; } = true;
 
         public Task<bool> SendAsync(string toEmail, string toName, string subject, string html, string text, CancellationToken ct = default)
         {
             if (!IsEnabled) return Task.FromResult(false);
-            Sent.Add((toEmail, subject));
+            Sent.Add((toEmail, subject, text));
             return Task.FromResult(true);
         }
     }

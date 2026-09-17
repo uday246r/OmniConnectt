@@ -30,6 +30,7 @@ import cc from '../shared/c360Common.module.css';
 import { Button, ColumnFilter, DataTable, EMPTY_VALUE, FilterBar, Input, PageHeader, Pagination, ResponsiveRows, RowAction, RowsPerPage, SearchField, Select, getInitials, sanitizeFilterInput, useDebouncedValue, type ActiveFilter, type FilterInputType } from '@omniconnect/ui';
 import { StatusBadge } from '../shared/StatusBadge';
 import { formatValue, formatCurrency as formatMoney, resolveProductStatus } from '../shared/formatValue';
+import { formatCustomerName, cleanSegmentValue } from '../utils/customerProfileFormatters';
 import { useShallow } from 'zustand/react/shallow';
 
 
@@ -1127,16 +1128,23 @@ export default function Customer360() {
 
             {/* Name and Title */}
             <h3 className={styles.strong}>
-              {individualProfile.fullName}
+              {formatCustomerName(individualProfile.salutation, individualProfile.fullName)}
             </h3>
             <div className={styles.spacer10}>
               Job Title: {individualProfile.designation || '-'}
             </div>
 
             {/* Badges */}
-            <span className={styles.strong2}>
-              Customer Status: {individualProfile.flags || '-'}
-            </span>
+            <div className={styles.badgeGroup}>
+              <span className={styles.strong2}>
+                Customer Status: {individualProfile.flags || '-'}
+              </span>
+              {cleanSegmentValue(individualProfile.segmentation) && (
+                <span className={styles.segmentBadge}>
+                  {cleanSegmentValue(individualProfile.segmentation)}
+                </span>
+              )}
+            </div>
 
             {/* Divider line for visual layout */}
             <div className={styles.box5}></div>
@@ -1779,16 +1787,23 @@ export default function Customer360() {
 
             {/* Company Name */}
             <h3 className={styles.strong}>
-              {corporateProfile.organizationName}
+              {formatCustomerName(corporateProfile.salutation, corporateProfile.organizationName)}
             </h3>
             <div className={styles.spacer10}>
               BRN: {corporateProfile.brn || '-'}
             </div>
 
             {/* Badges */}
-            <span className={styles.strong2}>
-              Customer Status: {corporateProfile.lifecycleTrig || '-'}
-            </span>
+            <div className={styles.badgeGroup}>
+              <span className={styles.strong2}>
+                Customer Status: {corporateProfile.lifecycleTrig || '-'}
+              </span>
+              {cleanSegmentValue(corporateProfile.segmentation) && (
+                <span className={styles.segmentBadge}>
+                  {cleanSegmentValue(corporateProfile.segmentation)}
+                </span>
+              )}
+            </div>
 
             {/* Divider line for visual layout */}
             <div className={styles.box5}></div>
@@ -2165,7 +2180,7 @@ export default function Customer360() {
                               priority: 'always',
                               render: (row) => (
                                 <span className={styles.strong4}>
-                                  {formatValue(row.signatoryName)}
+                                  {formatValue(formatCustomerName(row.signatorySalutation || row.salutation, row.signatoryName))}
                                 </span>
                               ),
                             },

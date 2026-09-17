@@ -1,0 +1,266 @@
+/* ══════════════════════════════════════════════════════════════
+   UserDetailSkeleton — pure layout shell.
+   SkeletonBlock handles shimmer for body sections.
+   Banner ghost elements use a translucent white version that
+   reads correctly on the blue gradient background.
+   ══════════════════════════════════════════════════════════════ */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 1340px;
+  width: 100%;
+  padding-bottom: 36px;
+  animation: pageFadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes pageFadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Banner ghost shimmer — on-blue variant ───────────────────── */
+/* These divs sit on the gradient background so the standard #eaecf0
+   shimmer would look wrong. Use semi-transparent white instead. */
+@keyframes bannerSweep {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+.bannerIconTile,
+.bannerBlock,
+.bannerPill,
+.bannerBtn {
+  position: relative;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 6px;
+}
+
+.bannerIconTile {
+  width: 50px;
+  height: 50px;
+  border-radius: 12px;
+  flex-shrink: 0;
+}
+
+.bannerPill {
+  height: 20px;
+  border-radius: 9999px;
+}
+
+.bannerBtn {
+  height: 34px;
+  border-radius: 8px;
+}
+
+/* Shimmer sweep on all banner ghost elements */
+.bannerIconTile::after,
+.bannerBlock::after,
+.bannerPill::after,
+.bannerBtn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.32) 50%,
+    transparent 100%
+  );
+  animation: bannerSweep 1.6s ease-in-out infinite;
+}
+
+/* ── 1. Banner — matches PageHeader geometry exactly ─────────── */
+.banner {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+  border-radius: 20px;
+  padding: 28px 32px;
+  background: var(--omni-gradient-page-header);
+  box-shadow: var(--omni-shadow-page-header);
+}
+
+/* Decorative light blooms (same as PageHeader's ::before / ::after) */
+.banner::before,
+.banner::after {
+  content: '';
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.banner::before {
+  top: -60px;
+  right: -60px;
+  width: 240px;
+  height: 240px;
+  background: radial-gradient(circle, rgba(255,255,255,0.18) 0%, transparent 70%);
+}
+
+.banner::after {
+  bottom: -80px;
+  right: 140px;
+  width: 180px;
+  height: 180px;
+  background: radial-gradient(circle, rgba(255,255,255,0.12) 0%, transparent 70%);
+}
+
+.bannerLeft {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.bannerTitleGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.bannerTitleRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.bannerChips {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.chipDivider {
+  width: 1px;
+  height: 12px;
+  background: rgba(255, 255, 255, 0.30);
+  flex-shrink: 0;
+}
+
+.bannerActions {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  flex: 0 0 auto;
+}
+
+/* ── 2. NavBar — matches UserDetailPage's .navBar ────────────── */
+.navBar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: var(--omni-color-surface);
+  border: 1.5px solid #e8edf5;
+  border-top: 3.5px solid var(--omni-color-primary-600);
+  border-radius: var(--omni-radius-xl);
+  padding: 8px 14px 8px 20px;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+}
+
+.tabGroup {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ── 3. Detail section cards — match DetailPanel geometry ──────── */
+.sections {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.sectionCard {
+  background: var(--omni-color-surface);
+  border: 1.5px solid #e8edf5;
+  border-radius: var(--omni-radius-lg-plus);
+  padding: 16px 18px 14px;
+  margin-bottom: 12px;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.04);
+}
+
+.sectionCard:last-child {
+  margin-bottom: 0;
+}
+
+/* Push section title pill down so grid starts underneath it */
+.sectionTitleSk {
+  margin-bottom: 14px;
+}
+
+/* 2-column grid — matches DetailGrid */
+.fieldGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+/* Field card — matches DetailField geometry */
+.fieldCard {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  background: var(--omni-color-surface);
+  border: 1.5px solid #e8edf5;
+  border-radius: var(--omni-radius-lg-minus);
+  min-width: 0;
+}
+
+/* Icon tile — matches .fieldIcon in DetailPanel */
+.fieldIconBox {
+  width: 30px;
+  height: 30px;
+  border-radius: var(--omni-radius-md);
+  background: linear-gradient(135deg, #eff6ff, #dbeafe);
+  flex-shrink: 0;
+}
+
+.fieldBody {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+  flex: 1;
+}
+
+/* ── Responsive ──────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .banner {
+    padding: 20px 22px;
+  }
+
+  .fieldGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .bannerActions {
+    display: none; /* buttons wrap off-screen on small viewports */
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bannerIconTile::after,
+  .bannerBlock::after,
+  .bannerPill::after,
+  .bannerBtn::after {
+    animation: none;
+    background: rgba(255, 255, 255, 0.15);
+  }
+}

@@ -18,6 +18,7 @@ public class AuthDbContext(DbContextOptions<AuthDbContext> options) : DbContext(
     public DbSet<ApprovalRequest> ApprovalRequests => Set<ApprovalRequest>();
     public DbSet<CheckerAssignment> CheckerAssignments => Set<CheckerAssignment>();
     public DbSet<SetPasswordInvite> SetPasswordInvites => Set<SetPasswordInvite>();
+    public DbSet<PasswordResetToken> PasswordResetTokens => Set<PasswordResetToken>();
     public DbSet<FeatureNavItem> FeatureNavItems => Set<FeatureNavItem>();
     public DbSet<RemoteApp> RemoteApps => Set<RemoteApp>();
     public DbSet<NavSection> NavSections => Set<NavSection>();
@@ -273,6 +274,25 @@ public class AuthDbContext(DbContextOptions<AuthDbContext> options) : DbContext(
             entity.HasOne(i => i.User)
                 .WithMany()
                 .HasForeignKey(i => i.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // Same shape as SetPasswordInvite immediately above, and for the same reasons — the only
+        // difference worth calling out is ExpiresAt, which is minutes rather than hours away.
+        modelBuilder.Entity<PasswordResetToken>(entity =>
+        {
+            entity.HasQueryFilter(t => !t.User!.IsDeleted);
+            entity.HasIndex(t => t.TokenHash).IsUnique();
+            entity.Property(t => t.TokenHash).HasMaxLength(200);
+            entity.Property(t => t.RequestedFromIp).HasMaxLength(64);
+            entity.HasIndex(t => t.ExpiresAt);
+
+            // Finding a user's outstanding reset token happens on every fresh request.
+            entity.HasIndex(t => new { t.UserId, t.UsedAt, t.RevokedAt });
+
+            entity.HasOne(t => t.User)
+                .WithMany()
+                .HasForeignKey(t => t.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 

@@ -43,6 +43,12 @@ export interface ValidateInviteResponse {
   email: string | null
 }
 
+export interface ValidateResetTokenResponse {
+  valid: boolean
+  /** Returned only for a valid, unexpired reset link, for the same reason as ValidateInviteResponse. */
+  email: string | null
+}
+
 /** Raw calls against AuthService's /api/auth/* surface. No token/refresh orchestration here — see features/auth/store/authStore.ts for that. */
 export const authServiceClient = {
   login: (email: string, password: string) =>
@@ -69,6 +75,23 @@ export const authServiceClient = {
 
   setPassword: (token: string, newPassword: string) =>
     apiFetch<void>(`${base}/api/auth/set-password`, { method: 'POST', body: { token, newPassword } }),
+
+  /**
+   * Starts a "forgot password" reset. The server always answers with the same generic message
+   * regardless of whether the address matches an account — see AuthController — so there is nothing
+   * meaningful to branch on in the response beyond "the request was accepted".
+   */
+  forgotPassword: (email: string) =>
+    apiFetch<{ message: string }>(`${base}/api/auth/forgot-password`, { method: 'POST', body: { email } }),
+
+  /** Checks a reset link before showing the form, so an expired link says so up front. */
+  validateResetToken: (token: string) =>
+    apiFetch<ValidateResetTokenResponse>(
+      `${base}/api/auth/reset-password/validate?token=${encodeURIComponent(token)}`,
+    ),
+
+  resetPassword: (token: string, newPassword: string) =>
+    apiFetch<void>(`${base}/api/auth/reset-password`, { method: 'POST', body: { token, newPassword } }),
 
   refresh: () => apiFetch<RefreshResponse>(`${base}/api/auth/refresh`, { method: 'POST' }),
 

@@ -6,6 +6,7 @@ import styles from './CustomerHeader.module.css';
 import cc from '../shared/c360Common.module.css';
 import { Button } from '@omniconnect/ui';
 import { useShallow } from 'zustand/react/shallow';
+import { formatCustomerName, cleanSegmentValue } from '../utils/customerProfileFormatters';
 
 interface CustomerHeaderProps {
   activeTab: string;
@@ -40,7 +41,9 @@ export default function CustomerHeader({ activeTab, setActiveTab, setActiveSubTa
             <h2
               className={styles.text}
             >
-              {isIndividual ? individualProfile.fullName : corporateProfile.organizationName}
+              {isIndividual
+                ? formatCustomerName(individualProfile.salutation, individualProfile.fullName)
+                : formatCustomerName(corporateProfile.salutation, corporateProfile.organizationName)}
             </h2>
             <p className={styles.text2}>
               {isIndividual
@@ -51,11 +54,20 @@ export default function CustomerHeader({ activeTab, setActiveTab, setActiveSubTa
             {/* Badges */}
             <div className={styles.row3}>
               {isIndividual ? (
-                <span
-                  className={styles.strong}
-                >
-                  Status: {individualProfile.flags || 'Active'}
-                </span>
+                <>
+                  <span
+                    className={styles.strong}
+                  >
+                    Status: {individualProfile.flags || 'Active'}
+                  </span>
+                  {cleanSegmentValue(individualProfile.segmentation) && (
+                    <span
+                      className={styles.strong2}
+                    >
+                      {cleanSegmentValue(individualProfile.segmentation)}
+                    </span>
+                  )}
+                </>
               ) : (
                 <>
                   <span
@@ -68,6 +80,13 @@ export default function CustomerHeader({ activeTab, setActiveTab, setActiveSubTa
                   >
                     {corporateProfile.country || 'Malaysia'}
                   </span>
+                  {cleanSegmentValue(corporateProfile.segmentation) && (
+                    <span
+                      className={styles.strong}
+                    >
+                      {cleanSegmentValue(corporateProfile.segmentation)}
+                    </span>
+                  )}
                 </>
               )}
             </div>

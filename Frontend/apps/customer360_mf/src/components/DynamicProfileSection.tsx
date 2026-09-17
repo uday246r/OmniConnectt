@@ -27,6 +27,7 @@ const SECTION_ICONS: Record<string, React.ReactNode> = {
 };
 
 const FIELD_ICONS: Record<string, React.ReactNode> = {
+  salutation: <User size={14} />,
   gender: <User size={14} />, birthDate: <Calendar size={14} />, race: <User size={14} />,
   religion: <Globe size={14} />, bumiStatus: <Shield size={14} />, educationLevel: <BookOpen size={14} />,
   hnwi: <DollarSign size={14} />, pep: <AlertTriangle size={14} />, status: <User size={14} />,

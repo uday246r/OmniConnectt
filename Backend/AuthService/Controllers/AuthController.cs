@@ -17,6 +17,7 @@ public class AuthController(
     IOptions<AuthCookieOptions> cookieOptions,
     IOptions<PasswordPolicyOptions> passwordPolicyOptions,
     SetPasswordInviteService invites,
+    PasswordResetService passwordReset,
     IWebHostEnvironment env) : ControllerBase
 {
     private readonly AuthCookieOptions _cookieOptions = cookieOptions.Value;
@@ -114,6 +115,58 @@ public class AuthController(
     public async Task<IActionResult> SetPassword([FromBody] SetPasswordRequest request, CancellationToken ct)
     {
         var problem = await invites.RedeemAsync(request.Token, request.NewPassword, ct);
+        return problem is null
+            ? NoContent()
+            : BadRequest(new ProblemDetails { Title = problem, Status = 400 });
+    }
+
+    /*
+     * "Forgot password?"
+     *
+     * All three endpoints are necessarily anonymous, for the same reason the set-password ones above
+     * are: whoever is using them has, by definition, no working session. Rate limited under the same
+     * authentication policy as login for the same reason too — a 256-bit token is only impractical to
+     * brute-force if the caller cannot make unlimited attempts.
+     *
+     * ForgotPassword never reveals whether the address matched an account — see PasswordResetService
+     * for why — so its response is identical for a real account, an unknown address, a Google account,
+     * and an inactive one. The other two behave exactly like their set-password counterparts: neither
+     * distinguishes "no such token" from "expired" from "already used".
+     */
+
+    /// <summary>
+    /// Starts a password reset. Always answers the same way regardless of whether the address exists,
+    /// so this endpoint cannot be used to discover which email addresses have accounts — see
+    /// <see cref="PasswordResetService.RequestResetAsync"/> for what actually happens behind that.
+    /// </summary>
+    [HttpPost("forgot-password")]
+    [EnableRateLimiting(RateLimitPolicies.Authentication)]
+    [AllowAnonymous]
+    public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request, CancellationToken ct)
+    {
+        await passwordReset.RequestResetAsync(request.Email, ClientIp(), UserAgent(), ct);
+        return Ok(new { message = "If an account exists for that email address, a password reset link has been sent to it." });
+    }
+
+    /// <summary>Checks a link before the user types anything, so an expired link says so up front rather than after.</summary>
+    [HttpGet("reset-password/validate")]
+    [EnableRateLimiting(RateLimitPolicies.Authentication)]
+    [AllowAnonymous]
+    public async Task<ActionResult<ValidateResetTokenResponse>> ValidateResetToken([FromQuery] string token, CancellationToken ct)
+    {
+        var resetToken = await passwordReset.FindRedeemableAsync(token, ct);
+        return resetToken?.User is null
+            ? Ok(new ValidateResetTokenResponse(false, null))
+            // Echoed back only for a VALID token — the caller already demonstrably holds the link.
+            : Ok(new ValidateResetTokenResponse(true, resetToken.User.Email));
+    }
+
+    [HttpPost("reset-password")]
+    [EnableRateLimiting(RateLimitPolicies.Authentication)]
+    [AllowAnonymous]
+    public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest request, CancellationToken ct)
+    {
+        var problem = await passwordReset.RedeemAsync(request.Token, request.NewPassword, ct);
         return problem is null
             ? NoContent()
             : BadRequest(new ProblemDetails { Title = problem, Status = 400 });

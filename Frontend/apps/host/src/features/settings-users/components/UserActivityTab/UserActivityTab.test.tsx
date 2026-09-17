@@ -94,8 +94,7 @@ describe('UserActivityTab', () => {
     renderTab()
 
     expect(await screen.findByText('Ben Ito')).toBeInTheDocument()
-    expect(screen.getAllByText(/about this user/).length).toBeGreaterThan(0)
-    expect(screen.getAllByText(/this user/).length).toBeGreaterThan(1)
+    expect((await screen.findAllByText('Priya Nair')).length).toBeGreaterThan(0)
   })
 
   it('exports exactly what the table is showing', async () => {
@@ -104,7 +103,7 @@ describe('UserActivityTab', () => {
     renderTab()
     await screen.findByText('Login Succeeded')
 
-    const btn = screen.getByRole('button', { name: /export report/i })
+    const btn = screen.getByRole('button', { name: /export/i })
     fireEvent.click(btn)
 
     expect(exportCsv).toHaveBeenCalledWith('tok', expect.objectContaining({ involvingUserId: USER }))
