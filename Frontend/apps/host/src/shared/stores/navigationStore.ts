@@ -60,7 +60,10 @@ export const useNavigationStore = create<NavigationState>((set, get) => ({
   expanded: loadExpanded(),
 
   async fetch(accessToken, signal) {
-    set({ status: 'loading', error: null })
+    // Only the first load shows a loading state. Settings screens refetch the tree after registering
+    // or editing an app; flipping back to 'loading' then made RemoteAppPage swap the mounted remote
+    // for a skeleton — unmounting it and discarding whatever the user had open or half-typed.
+    if (get().sections.length === 0) set({ status: 'loading', error: null })
     try {
       const tree = await navigationApi.get(accessToken, signal)
       set({ sections: tree.sections, status: 'loaded', error: null })
@@ -86,6 +89,9 @@ export const useNavigationStore = create<NavigationState>((set, get) => ({
   },
 
   setExpanded(key, open) {
+    // The sidebar calls this on every navigation. When the row is already in the requested state it
+    // must not write storage or publish a new Set — that re-rendered every sidebar row each time.
+    if (get().expanded.has(key) === open) return
     const next = new Set(get().expanded)
     if (open) next.add(key)
     else next.delete(key)

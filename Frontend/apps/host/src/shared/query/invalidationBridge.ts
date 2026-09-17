@@ -14,7 +14,7 @@ export const TOPIC_QUERY_PREFIXES: Record<InvalidationTopic, readonly (readonly 
   applications: [['applications']],
   'checker-assignments': [['checkerAssignments']],
   approvals: [['approvals'], ['approvalSummaryBadge'], ['assignedApprovals']],
-  'audit-logs': [['auditLogs']],
+  'audit-logs': [['auditLogs'], ['securityAlerts']],
   'system-logs': [['systemLogs']],
   kpis: [['dashboard']],
 }

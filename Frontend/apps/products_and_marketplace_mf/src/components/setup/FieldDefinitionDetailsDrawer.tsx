@@ -4,9 +4,10 @@ import { Icon } from "../common/Icon";
 import { useSetupStore } from "../../stores/useSetupStore";
 import { useDrawerStore } from "../../stores/useDrawerStore";
 import { formatFieldValue } from "../../utils/fieldFormat";
+import { useShallow } from "zustand/react/shallow";
 
 export function FieldDefinitionDetailsDrawer({ productTypeId, fieldId }: { productTypeId: string; fieldId: string }) {
-  const { close } = useDrawerStore();
+  const { close } = useDrawerStore(useShallow((s) => ({ close: s.close })));
   const productTypes = useSetupStore((s) => s.productTypes);
   const productType = productTypes.find((t) => t.id === productTypeId);
   const field = productType?.fieldDefinitions.find((f) => f.id === fieldId) ?? null;

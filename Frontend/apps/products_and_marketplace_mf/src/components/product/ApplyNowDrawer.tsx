@@ -18,6 +18,7 @@ import { ACCEPT_ATTR, formatFileSize, validateFile } from "../../utils/fileValid
 import { formatFieldValue } from "../../utils/fieldFormat";
 import type { ApplicationDetail, ApplicationFieldValueInput, DocumentDefinition, FieldDefinition } from "../../types/domain";
 import { DocumentPreviewModal } from "../common/DocumentPreviewModal";
+import { useShallow } from "zustand/react/shallow";
 import "../drawer/DrawerContent.css";
 import "./ApplyNowDrawer.css";
 
@@ -131,10 +132,10 @@ function DynamicField({
 
 
 export function ApplyNowDrawer({ productId }: { productId: string }) {
-  const { selectedProduct, selectedLoading, fetchProductById, clearSelectedProduct, productTypes, fetchProductTypes } = useProductStore();
-  const { createApplication } = useApplicationStore();
-  const { close } = useDrawerStore();
-  const { items: employmentTypes, fetchAll: fetchEmploymentTypes } = useEmploymentTypeStore();
+  const { selectedProduct, selectedLoading, fetchProductById, clearSelectedProduct, productTypes, fetchProductTypes } = useProductStore(useShallow((s) => ({ selectedProduct: s.selectedProduct, selectedLoading: s.selectedLoading, fetchProductById: s.fetchProductById, clearSelectedProduct: s.clearSelectedProduct, productTypes: s.productTypes, fetchProductTypes: s.fetchProductTypes })));
+  const { createApplication } = useApplicationStore(useShallow((s) => ({ createApplication: s.createApplication })));
+  const { close } = useDrawerStore(useShallow((s) => ({ close: s.close })));
+  const { items: employmentTypes, fetchAll: fetchEmploymentTypes } = useEmploymentTypeStore(useShallow((s) => ({ items: s.items, fetchAll: s.fetchAll })));
 
   const [step, setStep] = useState(0);
   const [submitting, setSubmitting] = useState(false);

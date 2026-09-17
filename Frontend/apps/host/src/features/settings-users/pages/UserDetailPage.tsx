@@ -41,6 +41,8 @@ export function UserDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const accessToken = useAuthStore((s) => s.accessToken)
+  // A token refresh must not re-run a load (and reset what the user is editing) — only its first arrival.
+  const hasAccessToken = Boolean(accessToken)
   const isAdministrator = Boolean(useAuthStore((s) => s.user)?.isAdministrator)
   const hasCapability = useAuthStore((s) => s.hasCapability)
   const currentUserId = useAuthStore((s) => s.user?.id)
@@ -103,7 +105,7 @@ export function UserDetailPage() {
     return () => {
       cancelled = true
     }
-  }, [accessToken, id, dataRevision])
+  }, [hasAccessToken, id, dataRevision])
 
   useEffect(() => {
     if (!accessToken) return
@@ -120,7 +122,7 @@ export function UserDetailPage() {
     return () => {
       cancelled = true
     }
-  }, [accessToken])
+  }, [hasAccessToken])
 
 
   const effectivePermissions = useMemo(() => {

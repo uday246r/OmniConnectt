@@ -10,7 +10,11 @@ import { defaultSettingsSection, findSettingsSection } from '../../shared/settin
  */
 export function useSettingsBackgroundLocation(): Location {
   const location = useLocation()
-  const returnPath = useSettingsDrawerStore((s) => s.returnPath)
+  // Read only while a drawer URL is open. The shell records returnPath after every navigation, and
+  // subscribing to it unconditionally re-rendered the whole route tree — the page and any mounted
+  // remote app — a second time for each page change.
+  const onDrawerRoute = isDrawerRoute(location.pathname)
+  const returnPath = useSettingsDrawerStore((s) => (onDrawerRoute ? s.returnPath : null))
   return useMemo<Location>(() => {
     if (!isDrawerRoute(location.pathname)) return location
     const [pathname, search = ''] = (returnPath && !isDrawerRoute(returnPath) ? returnPath : '/').split('?')

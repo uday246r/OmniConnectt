@@ -3,9 +3,10 @@ import "../drawer/DrawerContent.css";
 import { Icon } from "../common/Icon";
 import { useStatusConfigStore } from "../../stores/useStatusConfigStore";
 import { useDrawerStore } from "../../stores/useDrawerStore";
+import { useShallow } from "zustand/react/shallow";
 
 export function StatusConfigDetailsDrawer({ statusConfigId }: { statusConfigId: string }) {
-  const { close } = useDrawerStore();
+  const { close } = useDrawerStore(useShallow((s) => ({ close: s.close })));
   const configs = useStatusConfigStore((s) => s.configs);
   const config = configs.find((c) => c.id === statusConfigId) ?? null;
 

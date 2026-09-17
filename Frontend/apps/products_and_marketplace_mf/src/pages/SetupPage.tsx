@@ -14,6 +14,7 @@ import { PERMISSIONS } from "../permissions/permissions";
 import { formatFieldValue } from "../utils/fieldFormat";
 import { useEmploymentTypeStore } from "../stores/useEmploymentTypeStore";
 import type { StatusEntityType, EmploymentType } from "../types/domain";
+import { useShallow } from "zustand/react/shallow";
 import "./SetupPage.css";
 
 type SetupTab = "product-types" | "documents" | "categories" | "statuses" | "employment-types";
@@ -24,8 +25,8 @@ export function SetupPage() {
   const [tab, setTab] = useState<SetupTab>("product-types");
   const { has } = usePermissions();
   const canManage = has(PERMISSIONS.SETUP_MANAGE);
-  const { fetchProductTypes, fetchDocumentDefinitions } = useSetupStore();
-  const { fetchAll: fetchEmploymentTypes } = useEmploymentTypeStore();
+  const { fetchProductTypes, fetchDocumentDefinitions } = useSetupStore(useShallow((s) => ({ fetchProductTypes: s.fetchProductTypes, fetchDocumentDefinitions: s.fetchDocumentDefinitions })));
+  const { fetchAll: fetchEmploymentTypes } = useEmploymentTypeStore(useShallow((s) => ({ fetchAll: s.fetchAll })));
 
   // Both product types, documents, and employment types are loaded up front
   useEffect(() => {
@@ -72,8 +73,8 @@ export function SetupPage() {
 }
 
 function ProductTypesSetup({ canManage }: { canManage: boolean }) {
-  const { productTypes, loading, error, selectedProductTypeId, fetchProductTypes, selectProductType, removeProductType, removeField } = useSetupStore();
-  const { open } = useDrawerStore();
+  const { productTypes, loading, error, selectedProductTypeId, fetchProductTypes, selectProductType, removeProductType, removeField } = useSetupStore(useShallow((s) => ({ productTypes: s.productTypes, loading: s.loading, error: s.error, selectedProductTypeId: s.selectedProductTypeId, fetchProductTypes: s.fetchProductTypes, selectProductType: s.selectProductType, removeProductType: s.removeProductType, removeField: s.removeField })));
+  const { open } = useDrawerStore(useShallow((s) => ({ open: s.open })));
 
   const [deleteTypeTarget, setDeleteTypeTarget] = useState<typeof productTypes[0] | null>(null);
   const [deleteTypeError, setDeleteTypeError] = useState<string | null>(null);
@@ -81,9 +82,8 @@ function ProductTypesSetup({ canManage }: { canManage: boolean }) {
   const [deleteFieldError, setDeleteFieldError] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  useEffect(() => {
-    fetchProductTypes();
-  }, [fetchProductTypes]);
+  // No fetch here: SetupPage (the only place this renders) already loads product types for every tab.
+  // Loading them again from here as well sent the request twice on each visit.
 
   const selected = productTypes.find((t) => t.id === selectedProductTypeId) ?? null;
 
@@ -344,8 +344,8 @@ function ProductTypesSetup({ canManage }: { canManage: boolean }) {
 }
 
 function DocumentsSetup({ canManage }: { canManage: boolean }) {
-  const { documentDefinitions, loading, error, fetchDocumentDefinitions, removeDocumentDefinition } = useSetupStore();
-  const { open } = useDrawerStore();
+  const { documentDefinitions, loading, error, fetchDocumentDefinitions, removeDocumentDefinition } = useSetupStore(useShallow((s) => ({ documentDefinitions: s.documentDefinitions, loading: s.loading, error: s.error, fetchDocumentDefinitions: s.fetchDocumentDefinitions, removeDocumentDefinition: s.removeDocumentDefinition })));
+  const { open } = useDrawerStore(useShallow((s) => ({ open: s.open })));
 
   const [deleteDocTarget, setDeleteDocTarget] = useState<typeof documentDefinitions[0] | null>(null);
   const [deleteDocError, setDeleteDocError] = useState<string | null>(null);
@@ -496,8 +496,8 @@ const ENTITY_TYPE_LABELS: Record<StatusEntityType, string> = {
 };
 
 function StatusesSetup({ canManage }: { canManage: boolean }) {
-  const { configs, loading, error, fetchAll, removeConfig } = useStatusConfigStore();
-  const { open } = useDrawerStore();
+  const { configs, loading, error, fetchAll, removeConfig } = useStatusConfigStore(useShallow((s) => ({ configs: s.configs, loading: s.loading, error: s.error, fetchAll: s.fetchAll, removeConfig: s.removeConfig })));
+  const { open } = useDrawerStore(useShallow((s) => ({ open: s.open })));
 
   const [deleteTarget, setDeleteTarget] = useState<typeof configs[0] | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -657,8 +657,8 @@ function StatusesSetup({ canManage }: { canManage: boolean }) {
 }
 
 function EmploymentTypesSetup({ canManage }: { canManage: boolean }) {
-  const { items, loading, error, fetchAll, updateEmploymentType, removeEmploymentType } = useEmploymentTypeStore();
-  const { open } = useDrawerStore();
+  const { items, loading, error, fetchAll, updateEmploymentType, removeEmploymentType } = useEmploymentTypeStore(useShallow((s) => ({ items: s.items, loading: s.loading, error: s.error, fetchAll: s.fetchAll, updateEmploymentType: s.updateEmploymentType, removeEmploymentType: s.removeEmploymentType })));
+  const { open } = useDrawerStore(useShallow((s) => ({ open: s.open })));
 
   const [search, setSearch] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<EmploymentType | null>(null);

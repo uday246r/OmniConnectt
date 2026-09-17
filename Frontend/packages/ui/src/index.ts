@@ -161,3 +161,6 @@ export type { AnchoredPopover, AnchoredPopoverOptions } from './hooks/useAnchore
 // ── Export ───────────────────────────────────────────────────────────────────
 export { downloadCsv, describeTruncation, CsvExportError } from './utils/downloadCsv'
 export type { CsvDownloadRequest, CsvDownloadResult } from './utils/downloadCsv'
+
+export { createRequestCache } from './utils/requestCache'
+export type { RequestCache, RequestCacheOptions, RequestCacheGetOptions } from './utils/requestCache'

@@ -4,6 +4,7 @@ import { useLeadStore } from '../../store/useLeadStore';
 import { canSeeDashboardCapability } from '../../api/hostBridge';
 import { SkeletonBlock } from '@omniconnect/ui';
 import styles from './KpiCardSection.module.css';
+import { useShallow } from 'zustand/react/shallow';
 
 const formatKpiValue = (val: number | null | undefined, isPercentage = false): string => {
   if (val === null || val === undefined) return '-';
@@ -70,7 +71,7 @@ const ICON_WRAP_STYLES: Record<string, React.CSSProperties> = {
 };
 
 export const KpiCardSection: React.FC = () => {
-  const { kpiSummary, isLoadingDashboard } = useLeadStore();
+  const { kpiSummary, isLoadingDashboard } = useLeadStore(useShallow((s) => ({ kpiSummary: s.kpiSummary, isLoadingDashboard: s.isLoadingDashboard })));
 
   /*
    * Each card is a grant of its own.

@@ -25,6 +25,8 @@ export interface ChangePasswordFormProps {
  */
 export function ChangePasswordForm({ onSuccess, onCancel, submitLabel = 'Update Password' }: ChangePasswordFormProps) {
   const accessToken = useAuthStore((s) => s.accessToken)
+  // A token refresh must not re-run a load (and reset what the user is editing) — only its first arrival.
+  const hasAccessToken = Boolean(accessToken)
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -60,7 +62,7 @@ export function ChangePasswordForm({ onSuccess, onCancel, submitLabel = 'Update 
     return () => {
       cancelled = true
     }
-  }, [accessToken])
+  }, [hasAccessToken])
 
   const rules = policy ? describePasswordRules(newPassword, policy) : []
 

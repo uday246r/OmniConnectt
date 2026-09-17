@@ -4,9 +4,10 @@ import { FileText, User, ShieldAlert, Check, Copy, Hash, Calendar, Layers, Activ
 import { Button, Badge, DetailField, DetailGrid, DetailSection, Drawer, EMPTY_VALUE } from '@omniconnect/ui';
 import { formatValue } from '../shared/formatValue';
 import styles from './ProductDetailsModal.module.css';
+import { useShallow } from 'zustand/react/shallow';
 
 export default function CaseDetailsModal() {
-  const { selectedCase, modalOpen, closeCaseModal } = useInteractionStore();
+  const { selectedCase, modalOpen, closeCaseModal } = useInteractionStore(useShallow((s) => ({ selectedCase: s.selectedCase, modalOpen: s.modalOpen, closeCaseModal: s.closeCaseModal })));
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
   /*

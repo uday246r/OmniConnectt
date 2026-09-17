@@ -2,9 +2,10 @@ import React, { useEffect } from 'react';
 import { X, CheckCircle2, AlertTriangle, AlertCircle, Info } from '@omniconnect/ui/icons';
 import { useLeadStore } from '../../store/useLeadStore';
 import styles from './ToastNotification.module.css';
+import { useShallow } from 'zustand/react/shallow';
 
 export const ToastNotification: React.FC = () => {
-  const { toast, hideToast } = useLeadStore();
+  const { toast, hideToast } = useLeadStore(useShallow((s) => ({ toast: s.toast, hideToast: s.hideToast })));
 
   useEffect(() => {
     if (toast?.show) {

@@ -12,6 +12,7 @@ import { useDrawerStore } from "../stores/useDrawerStore";
 import { usePermissions } from "../permissions/PermissionContext";
 import { PERMISSIONS } from "../permissions/permissions";
 import { ErrorState } from "../components/common/EmptyState";
+import { useShallow } from "zustand/react/shallow";
 import "./DashboardPage.css";
 
 const TREND_OPTIONS = [
@@ -29,7 +30,7 @@ export function DashboardPage() {
   const {
     summary, trend, trendDays, trendLoading, categoryBreakdown, statusDistribution, topProducts,
     recentProducts, topSearches, loading, error, fetchAll, setTrendDays,
-  } = useDashboardStore();
+  } = useDashboardStore(useShallow((s) => ({ summary: s.summary, trend: s.trend, trendDays: s.trendDays, trendLoading: s.trendLoading, categoryBreakdown: s.categoryBreakdown, statusDistribution: s.statusDistribution, topProducts: s.topProducts, recentProducts: s.recentProducts, topSearches: s.topSearches, loading: s.loading, error: s.error, fetchAll: s.fetchAll, setTrendDays: s.setTrendDays })));
   const openDrawer = useDrawerStore((s) => s.open);
   const { has } = usePermissions();
   const canCreateProduct = has(PERMISSIONS.PRODUCTS_CREATE);

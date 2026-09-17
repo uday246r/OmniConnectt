@@ -7,8 +7,7 @@ import { useMenuKeyboardNav } from '../../../../shared/hooks/useMenuKeyboardNav'
 import { Icon } from '../../../../shared/components/Icon/Icon'
 import { SkeletonBlock } from '../../../../shared/components/Skeleton'
 import { auditLogsApi } from '../../../system-audit-logs/api/auditLogsApi'
-import { TOPICS } from '../../../../shared/stores/invalidationStore'
-import { useLiveRevision } from '../../../../shared/hooks/useLiveRevision'
+import { useLiveRefetchInterval } from '../../../../shared/query/invalidationBridge'
 import styles from './SecurityAlertsMenu.module.css'
 
 const ALERT_LIMIT = 8
@@ -79,8 +78,9 @@ function formatFullTime(iso: string): string {
 export function SecurityAlertsMenu() {
   const accessToken = useAuthStore((s) => s.accessToken)
   const userId = useAuthStore((s) => s.user?.id)
-  // Push when the socket is up, a timed fallback when it is not — see useLiveRevision.
-  const dataRevision = useLiveRevision(TOPICS.auditLogs)
+  // Stable key, refreshed by the invalidation bridge on an audit event and by this interval only while
+  // the socket is down (see ApprovalsMenu for why the revision left the key).
+  const refetchInterval = useLiveRefetchInterval()
 
   const [open, setOpen] = useState(false)
   const [lastSeen, setLastSeen] = useState(0)
@@ -101,7 +101,8 @@ export function SecurityAlertsMenu() {
   }, [userId])
 
   const alertsQuery = useQuery({
-    queryKey: ['securityAlerts', ALERT_LIMIT, dataRevision],
+    queryKey: ['securityAlerts', ALERT_LIMIT],
+    refetchInterval,
     queryFn: () =>
       auditLogsApi.list(accessToken!, { page: 1, pageSize: ALERT_LIMIT, action: 'auth.login_failed' }),
     enabled: Boolean(accessToken),

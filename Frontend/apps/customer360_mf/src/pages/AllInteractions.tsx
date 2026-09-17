@@ -9,6 +9,7 @@ import { getFriendlyErrorMessage } from '../utils/errorMessages';
 import { Button, ColumnFilter, DataTable, EMPTY_VALUE, FilterBar, PageHeader, Pagination, ResponsiveRows, RowAction, RowsPerPage, SearchField, useDebouncedValue, type ActiveFilter } from '@omniconnect/ui';
 import styles from './AllInteractions.module.css';
 import cc from '../shared/c360Common.module.css';
+import { useShallow } from 'zustand/react/shallow';
 
 const getStatusBadge = (status?: string | null) => {
   const s = status?.toLowerCase() || 'new';
@@ -34,7 +35,7 @@ const CASE_STATUS_OPTIONS = [
 ];
 
 export default function AllInteractions() {
-  const { profile, customerType } = useCustomerStore();
+  const { profile, customerType } = useCustomerStore(useShallow((s) => ({ profile: s.profile, customerType: s.customerType })));
   const navigate = useHostNavigate();
   const {
     interactions,
@@ -49,7 +50,7 @@ export default function AllInteractions() {
     setPageSize,
     loadInteractions,
     openCaseModal,
-  } = useInteractionStore();
+  } = useInteractionStore(useShallow((s) => ({ interactions: s.interactions, loading: s.loading, error: s.error, errorStatus: s.errorStatus, pageNumber: s.pageNumber, pageSize: s.pageSize, totalCount: s.totalCount, totalPages: s.totalPages, setPageNumber: s.setPageNumber, setPageSize: s.setPageSize, loadInteractions: s.loadInteractions, openCaseModal: s.openCaseModal })));
 
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('');

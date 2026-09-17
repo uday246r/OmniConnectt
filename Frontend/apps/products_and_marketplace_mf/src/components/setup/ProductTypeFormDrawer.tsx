@@ -6,13 +6,14 @@ import { CustomSelect } from "../common/CustomSelect";
 import { useSetupStore } from "../../stores/useSetupStore";
 import { useDrawerStore } from "../../stores/useDrawerStore";
 import { useToastStore } from "../../stores/useToastStore";
+import { useShallow } from "zustand/react/shallow";
 
 const ICONS = ["package", "loan", "credit-card", "accounts", "investments", "insurance", "deposit", "shield", "building", "tag"] as const;
 
 export function ProductTypeFormDrawer({ productTypeId }: { productTypeId?: string }) {
   const isEdit = !!productTypeId;
-  const { close } = useDrawerStore();
-  const { productTypes, createProductType, updateProductType } = useSetupStore();
+  const { close } = useDrawerStore(useShallow((s) => ({ close: s.close })));
+  const { productTypes, createProductType, updateProductType } = useSetupStore(useShallow((s) => ({ productTypes: s.productTypes, createProductType: s.createProductType, updateProductType: s.updateProductType })));
   const existing = productTypes.find((t) => t.id === productTypeId);
 
   const [name, setName] = useState(existing?.name ?? "");

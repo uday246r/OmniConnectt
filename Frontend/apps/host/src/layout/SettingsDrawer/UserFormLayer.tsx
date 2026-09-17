@@ -50,6 +50,8 @@ type Step = 'basic' | 'permissions' | 'review'
 export function UserFormLayer({ userId }: UserFormLayerProps) {
   const isEdit = Boolean(userId)
   const accessToken = useAuthStore((s) => s.accessToken)
+  // A token refresh must not re-run a load (and reset what the user is editing) — only its first arrival.
+  const hasAccessToken = Boolean(accessToken)
   const ensureFreshAccessToken = useAuthStore((s) => s.ensureFreshAccessToken)
   const refreshSession = useAuthStore((s) => s.refreshSession)
   // Gates which roles this operator may hand out — see filteredRoles.
@@ -311,7 +313,7 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
     return () => {
       cancelled = true
     }
-  }, [accessToken, userId])
+  }, [hasAccessToken, userId])
 
   const selectedRole = useMemo(() => {
     return roles.find((r) => r.id === roleId)

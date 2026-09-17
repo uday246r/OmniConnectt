@@ -8,6 +8,7 @@ import type {
   ProductType,
   ProductTypeInput,
   SortOption,
+  StatusCount,
   TopPerformer,
 } from "../types/domain";
 
@@ -25,6 +26,11 @@ export interface ProductQuery {
 export const productApi = {
   async search(query: ProductQuery, signal?: AbortSignal): Promise<PagedResult<ProductListItem>> {
     const { data } = await httpClient.get("/products", { params: query, signal });
+    return data;
+  },
+  /** Products per status under the other filters (the status filter is ignored by the server). */
+  async statusCounts(query: Pick<ProductQuery, "search" | "categoryId" | "productTypeId">, signal?: AbortSignal): Promise<StatusCount[]> {
+    const { data } = await httpClient.get("/products/status-counts", { params: query, signal });
     return data;
   },
   async getById(id: string, trackView = false, signal?: AbortSignal): Promise<ProductDetail> {

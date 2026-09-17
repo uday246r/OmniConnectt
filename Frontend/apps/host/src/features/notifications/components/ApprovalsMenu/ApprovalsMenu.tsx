@@ -8,8 +8,7 @@ import { Icon } from '../../../../shared/components/Icon/Icon'
 import { SkeletonBlock } from '../../../../shared/components/Skeleton'
 import { approvalsApi } from '../../../approvals/api/approvalsApi'
 import styles from './ApprovalsMenu.module.css'
-import { TOPICS } from '../../../../shared/stores/invalidationStore'
-import { useLiveRevision } from '../../../../shared/hooks/useLiveRevision'
+import { useLiveRefetchInterval } from '../../../../shared/query/invalidationBridge'
 
 const ITEM_LIMIT = 8
 const DISMISSED_APPROVALS_KEY = 'omniconnect:dismissed-approvals'
@@ -52,8 +51,10 @@ function formatRelativeTime(iso: string): string {
 export function ApprovalsMenu() {
   const accessToken = useAuthStore((s) => s.accessToken)
   const userId = useAuthStore((s) => s.user?.id)
-  // Push when the socket is up, a timed fallback when it is not — see useLiveRevision.
-  const dataRevision = useLiveRevision(TOPICS.approvals)
+  // Stable keys: a pushed approvals event invalidates them through the invalidation bridge, and this
+  // interval covers only the time the socket is down. A revision number in the key used to orphan a
+  // cache entry per event and fetch twice (the old key refetched, then the new one loaded).
+  const refetchInterval = useLiveRefetchInterval()
 
   const [open, setOpen] = useState(false)
   const [dismissedIds, setDismissedIds] = useState<Set<string>>(() =>
@@ -72,17 +73,19 @@ export function ApprovalsMenu() {
   }, [userId])
 
   const listQuery = useQuery({
-    queryKey: ['assignedApprovals', ITEM_LIMIT, dataRevision],
+    queryKey: ['assignedApprovals', ITEM_LIMIT],
     queryFn: () => approvalsApi.list(accessToken!, { page: 1, pageSize: ITEM_LIMIT, assignedToMe: true, status: 'Pending' }),
     enabled: Boolean(accessToken),
     staleTime: 30_000,
+    refetchInterval,
   })
 
   const summaryQuery = useQuery({
-    queryKey: ['approvalSummaryBadge', dataRevision],
+    queryKey: ['approvalSummaryBadge'],
     queryFn: () => approvalsApi.summary(accessToken!),
     enabled: Boolean(accessToken),
     staleTime: 30_000,
+    refetchInterval,
   })
 
   const rawItems = listQuery.data?.items ?? []

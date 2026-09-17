@@ -6,6 +6,7 @@ import { useAuditLogStore } from "../../stores/useAuditLogStore";
 import { useDrawerStore } from "../../stores/useDrawerStore";
 import { auditLogApi } from "../../services/auditLogApi";
 import type { AuditLog } from "../../types/domain";
+import { useShallow } from "zustand/react/shallow";
 
 function formatAction(action: string): string {
   return action
@@ -25,8 +26,8 @@ function formatAction(action: string): string {
  * Empty fields are now omitted by the shared DetailField, and no record identifier is shown.
  */
 export function AuditLogDetailsDrawer({ auditLogId }: { auditLogId: string }) {
-  const { items } = useAuditLogStore();
-  const { close } = useDrawerStore();
+  const { items } = useAuditLogStore(useShallow((s) => ({ items: s.items })));
+  const { close } = useDrawerStore(useShallow((s) => ({ close: s.close })));
   const [entry, setEntry] = useState<AuditLog | null>(items.find((i) => i.id === auditLogId) ?? null);
   const [loading, setLoading] = useState(!entry);
   const [error, setError] = useState<string | null>(null);

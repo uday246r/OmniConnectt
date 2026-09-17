@@ -23,8 +23,6 @@ public class CategoryService : ICategoryService
 
     public async Task<List<CategoryDto>> GetAllAsync(string? status, CancellationToken ct = default)
     {
-        await SanitizeDisplayOrdersAsync(ct);
-
         // No Include of products: counts come from one grouped query, instead of loading every product
         // row in the catalogue just to count how many belong to each category.
         var query = _db.Categories.AsNoTracking().Where(c => c.ParentCategoryId == null);
@@ -32,6 +30,21 @@ public class CategoryService : ICategoryService
             query = query.Where(c => c.Status == status);
 
         var categories = await query.OrderBy(c => c.DisplayOrder).ThenBy(c => c.CreatedAt).ToListAsync(ct);
+
+        /*
+         * Repair display order only when it actually has a gap.
+         *
+         * Every read used to load and track the whole category table first, just to renumber it — an
+         * extra round trip (and sometimes a write) on each visit to the page, although every write path
+         * (create, update, reorder, delete) already keeps each sibling set numbered 1..N. The top-level
+         * rows this read just loaded show whether that still holds; only legacy data needs the repair.
+         */
+        var unfiltered = string.IsNullOrWhiteSpace(status);
+        if (unfiltered && categories.Where((c, i) => c.DisplayOrder != i + 1).Any())
+        {
+            await SanitizeDisplayOrdersAsync(ct);
+            categories = await query.OrderBy(c => c.DisplayOrder).ThenBy(c => c.CreatedAt).ToListAsync(ct);
+        }
         var rollup = await BuildProductRollupAsync(ct);
 
         return categories.Select(c => rollup.Describe(c)).ToList();

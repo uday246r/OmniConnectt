@@ -15,6 +15,7 @@ import { usePermissions } from "../permissions/PermissionContext";
 import { PERMISSIONS } from "../permissions/permissions";
 import { formatDate } from "../utils/fieldFormat";
 import type { Promotion } from "../types/domain";
+import { useShallow } from "zustand/react/shallow";
 
 export function PromotionsPage() {
   const {
@@ -34,9 +35,9 @@ export function PromotionsPage() {
     fetchPromotions,
     updateStatus,
     removePromotion,
-  } = usePromotionStore();
-  const { open } = useDrawerStore();
-  const { configs: statusConfigs, fetchAll: fetchStatusConfigs } = useStatusConfigStore();
+  } = usePromotionStore(useShallow((s) => ({ items: s.items, loading: s.loading, error: s.error, search: s.search, status: s.status, page: s.page, pageSize: s.pageSize, totalCount: s.totalCount, statusCounts: s.statusCounts, setSearch: s.setSearch, setStatus: s.setStatus, setPage: s.setPage, setPageSize: s.setPageSize, fetchPromotions: s.fetchPromotions, updateStatus: s.updateStatus, removePromotion: s.removePromotion })));
+  const { open } = useDrawerStore(useShallow((s) => ({ open: s.open })));
+  const { configs: statusConfigs, fetchAll: fetchStatusConfigs } = useStatusConfigStore(useShallow((s) => ({ configs: s.configs, fetchAll: s.fetchAll })));
   const { has } = usePermissions();
   const canCreate = has(PERMISSIONS.PROMOTIONS_CREATE);
   const canEdit = has(PERMISSIONS.PROMOTIONS_EDIT);

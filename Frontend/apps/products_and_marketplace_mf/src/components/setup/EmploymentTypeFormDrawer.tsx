@@ -5,10 +5,11 @@ import { Icon } from "../common/Icon";
 import { useEmploymentTypeStore } from "../../stores/useEmploymentTypeStore";
 import { useDrawerStore } from "../../stores/useDrawerStore";
 import { useToastStore } from "../../stores/useToastStore";
+import { useShallow } from "zustand/react/shallow";
 
 export function EmploymentTypeFormDrawer({ employmentTypeId }: { employmentTypeId?: string }) {
-  const { close } = useDrawerStore();
-  const { items, createEmploymentType, updateEmploymentType } = useEmploymentTypeStore();
+  const { close } = useDrawerStore(useShallow((s) => ({ close: s.close })));
+  const { items, createEmploymentType, updateEmploymentType } = useEmploymentTypeStore(useShallow((s) => ({ items: s.items, createEmploymentType: s.createEmploymentType, updateEmploymentType: s.updateEmploymentType })));
   const existing = employmentTypeId ? items.find((e) => e.id === employmentTypeId) : undefined;
   const isCreate = !employmentTypeId;
 

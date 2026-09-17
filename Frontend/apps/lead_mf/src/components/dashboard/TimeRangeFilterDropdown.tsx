@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { Calendar, ChevronDown, Check, RotateCcw } from '@omniconnect/ui/icons';
 import styles from './TimeRangeFilterDropdown.module.css';
 import { useLeadStore } from '../../store/useLeadStore';
+import { useShallow } from 'zustand/react/shallow';
 
 export interface TimeRangePreset {
   id: string;
@@ -29,7 +30,7 @@ export const TimeRangeFilterDropdown: React.FC = () => {
     setDashboardDatePreset,
     setDashboardDateRange,
     resetDashboardFilters,
-  } = useLeadStore();
+  } = useLeadStore(useShallow((s) => ({ dashboardDatePreset: s.dashboardDatePreset, dashboardStartDate: s.dashboardStartDate, dashboardEndDate: s.dashboardEndDate, setDashboardDatePreset: s.setDashboardDatePreset, setDashboardDateRange: s.setDashboardDateRange, resetDashboardFilters: s.resetDashboardFilters })));
 
   const [isOpen, setIsOpen] = useState(false);
   const [activePreset, setActivePreset] = useState<string>(dashboardDatePreset || 'this_month');

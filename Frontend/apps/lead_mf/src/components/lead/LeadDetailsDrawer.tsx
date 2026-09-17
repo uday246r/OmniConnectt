@@ -31,6 +31,7 @@ import { isFieldVisible, getFieldLabel, type LeadFieldConfig } from '../../confi
 import { applyMaskingRule, hasRevealableValue } from '../../utils/fieldMasking';
 import { Badge } from '@omniconnect/ui';
 import { LeadStatusBadge } from '../../shared/LeadStatusBadge';
+import { useShallow } from 'zustand/react/shallow';
 
 const formatVal = (val?: string | null): string => {
   if (!val || !val.trim() || val.trim().toLowerCase() === 'null' || val.trim().toLowerCase() === 'undefined') {
@@ -67,7 +68,7 @@ const formatConsent = (val?: string | null): string => {
   return val;
 };
 export const LeadDetailsDrawer: React.FC = () => {
-  const { selectedLead, isDetailsDrawerOpen, closeDetailsDrawer, fieldConfig } = useLeadStore();
+  const { selectedLead, isDetailsDrawerOpen, closeDetailsDrawer, fieldConfig } = useLeadStore(useShallow((s) => ({ selectedLead: s.selectedLead, isDetailsDrawerOpen: s.isDetailsDrawerOpen, closeDetailsDrawer: s.closeDetailsDrawer, fieldConfig: s.fieldConfig })));
   const [revealed, setRevealed] = useState<Record<string, boolean>>({});
   const [copiedField, setCopiedField] = useState<string | null>(null);
 

@@ -300,6 +300,9 @@ const initialKpiSummary: KpiSummary = {
   conversionRate: null,
 };
 
+/** The single in-flight or completed master-data load, shared by every caller (see fetchMasterData). */
+let masterDataLoad: Promise<void> | null = null;
+
 export const useLeadStore = create<LeadStoreState>((set, get) => ({
   // activePage and setActivePage are gone. The host owns which page is showing — it comes in as a
   // prop resolved from the URL, so /apps/lead/view-lead is now a real, refresh-safe address instead
@@ -357,6 +360,10 @@ export const useLeadStore = create<LeadStoreState>((set, get) => ({
   isLoadingMasterData: false,
 
   fetchMasterData: async () => {
+    // Idempotent: the layout, several pages and the product picker all ask for it, and StrictMode
+    // mounts each twice. One load per session serves them all.
+    if (masterDataLoad) return masterDataLoad;
+    masterDataLoad = (async () => {
     set({ isLoadingMasterData: true });
     try {
       const [products, states, referenceData, salesExecs, productsWithId] = await Promise.all([
@@ -379,10 +386,16 @@ export const useLeadStore = create<LeadStoreState>((set, get) => ({
       });
 
       get().fetchBranches();
+      // The getters return [] rather than throwing when a request fails; an empty product list means
+      // the load did not really succeed, so let the next caller try again.
+      if (products.length === 0) masterDataLoad = null;
     } catch (err) {
       console.error('Failed to load master data:', err);
       set({ isLoadingMasterData: false });
+      masterDataLoad = null;
     }
+    })();
+    return masterDataLoad;
   },
 
   fetchBranches: async (stateName, query) => {

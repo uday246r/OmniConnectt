@@ -18,6 +18,8 @@ const PAGE_SIZE = 10
 
 export function SettingsApplicationsTab() {
   const accessToken = useAuthStore((s) => s.accessToken)
+  // A token refresh must not re-run a load (and reset what the user is editing) — only its first arrival.
+  const hasAccessToken = Boolean(accessToken)
   const isAdministrator = Boolean(useAuthStore((s) => s.user)?.isAdministrator)
   const hasCapability = useAuthStore((s) => s.hasCapability)
   const pushLayer = useSettingsDrawerStore((s) => s.pushLayer)
@@ -80,7 +82,7 @@ export function SettingsApplicationsTab() {
     return () => {
       cancelled = true
     }
-  }, [accessToken, debouncedSearch, page, dataRevision])
+  }, [hasAccessToken, debouncedSearch, page, dataRevision])
 
   useEffect(() => {
     setPage(1)

@@ -5,6 +5,7 @@ import { useLeadStore } from '../../store/useLeadStore';
 import drawerLayout from '../../shared/drawerLayout.module.css';
 import form from '../../shared/formField.module.css';
 import styles from './DeleteLeadDrawer.module.css';
+import { useShallow } from 'zustand/react/shallow';
 
 /** Ties step 1's footer submit button to the reason form rendered in the Drawer body. */
 const REASON_FORM_ID = 'delete-lead-reason-form';
@@ -20,7 +21,7 @@ export const DeleteLeadDrawer: React.FC = () => {
     backToDeleteReason,
     confirmDeleteLead,
     isSubmitting,
-  } = useLeadStore();
+  } = useLeadStore(useShallow((s) => ({ isDeleteReasonOpen: s.isDeleteReasonOpen, isDeleteConfirmOpen: s.isDeleteConfirmOpen, deleteLeadTarget: s.deleteLeadTarget, deleteReason: s.deleteReason, closeDeleteWorkflow: s.closeDeleteWorkflow, proceedToDeleteConfirm: s.proceedToDeleteConfirm, backToDeleteReason: s.backToDeleteReason, confirmDeleteLead: s.confirmDeleteLead, isSubmitting: s.isSubmitting })));
 
   const [inputReason, setInputReason] = useState<string>('');
   const [error, setError] = useState<string>('');

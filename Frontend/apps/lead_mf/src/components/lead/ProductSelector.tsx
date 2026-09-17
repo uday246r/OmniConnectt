@@ -2,9 +2,10 @@ import React, { useEffect } from 'react';
 import { SearchableDropdown } from '../common/SearchableDropdown';
 import { useLeadStore } from '../../store/useLeadStore';
 import styles from './ProductSelector.module.css';
+import { useShallow } from 'zustand/react/shallow';
 
 export const ProductSelector: React.FC = () => {
-  const { formData, setProduct, errors, products, fetchMasterData, validateField } = useLeadStore();
+  const { formData, setProduct, errors, products, fetchMasterData, validateField } = useLeadStore(useShallow((s) => ({ formData: s.formData, setProduct: s.setProduct, errors: s.errors, products: s.products, fetchMasterData: s.fetchMasterData, validateField: s.validateField })));
 
   useEffect(() => {
     if (products.length === 0) {

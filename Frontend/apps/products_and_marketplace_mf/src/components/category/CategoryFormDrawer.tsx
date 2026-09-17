@@ -8,13 +8,14 @@ import { useDrawerStore } from "../../stores/useDrawerStore";
 import { useStatusConfigStore } from "../../stores/useStatusConfigStore";
 import { useToastStore } from "../../stores/useToastStore";
 import type { CategoryStatus } from "../../types/domain";
+import { useShallow } from "zustand/react/shallow";
 
 const ICONS = ["package", "loans", "credit-card", "accounts", "investments", "insurance", "deposits", "shield", "building", "tag"] as const;
 
 export function CategoryFormDrawer({ categoryId }: { categoryId?: string }) {
   const isEdit = !!categoryId;
-  const { close } = useDrawerStore();
-  const { categories, createCategory, updateCategory } = useCategoryStore();
+  const { close } = useDrawerStore(useShallow((s) => ({ close: s.close })));
+  const { categories, createCategory, updateCategory } = useCategoryStore(useShallow((s) => ({ categories: s.categories, createCategory: s.createCategory, updateCategory: s.updateCategory })));
   const statusConfigs = useStatusConfigStore((s) => s.configs);
   const statusOptions = useMemo(
     () => statusConfigs.filter((c) => c.entityType === "Category").sort((a, b) => a.sortOrder - b.sortOrder),

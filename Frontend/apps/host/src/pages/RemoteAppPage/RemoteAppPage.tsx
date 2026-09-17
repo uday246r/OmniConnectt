@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState, type ComponentType, type LazyExoticComponent } from 'react'
+import { lazy, memo, Suspense, useCallback, useEffect, useRef, useState, type ComponentType, type LazyExoticComponent } from 'react'
 import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import { registerSessionCleanup } from '../../features/auth/store/authStore'
 import { useNavigationStore } from '../../shared/stores/navigationStore'
@@ -62,6 +62,22 @@ export function RemoteAppPage() {
   const status = useNavigationStore((s) => s.status)
   const node = useNavigationStore((s) => (appKey ? s.findApp(appKey) : undefined))
 
+  /*
+   * One callback for the life of this page. It used to be a new arrow on every render, and
+   * `useNavigate()` itself changes whenever the URL does, so the remote app — which receives it as a
+   * prop — re-rendered in full on every host render and every navigation. The ref always holds the
+   * latest navigate, so the stable callback never goes stale.
+   */
+  const navigateRef = useRef(navigate)
+  useEffect(() => {
+    navigateRef.current = navigate
+  }, [navigate])
+  const remoteAppKey = node?.remote?.appKey
+  const onNavigate = useCallback(
+    (target: string) => navigateRef.current(`/apps/${remoteAppKey}/${target}`),
+    [remoteAppKey],
+  )
+
   if (status === 'idle' || status === 'loading') {
     return <LoadingFrame />
   }
@@ -90,13 +106,9 @@ export function RemoteAppPage() {
 
 
 
-  return (
-    <ActiveRemoteApp
-      node={node}
-      page={page}
-      onNavigate={(target) => navigate(`/apps/${node.remote!.appKey}/${target}`)}
-    />
-  )
+  // Keyed by app: an error screen belongs to the app that failed, and must not stay on screen (or keep
+  // its retry count) after the user moves to a different app.
+  return <ActiveRemoteApp key={node.remote.appKey} node={node} page={page} onNavigate={onNavigate} />
 }
 
 /**
@@ -105,7 +117,12 @@ export function RemoteAppPage() {
  * bumping alone wouldn't help if the cache still held the failed lazy wrapper, and evicting alone
  * wouldn't re-render without something changing.
  */
-function ActiveRemoteApp({
+/**
+ * Memoized: its props are the navigation node (stable until the tree is reloaded), the page and a
+ * stable callback, so the remote re-renders when the user moves between its pages — not whenever the
+ * host shell above it re-renders.
+ */
+const ActiveRemoteApp = memo(function ActiveRemoteApp({
   node,
   page,
   onNavigate,
@@ -132,4 +149,4 @@ function ActiveRemoteApp({
       </Suspense>
     </FederationErrorBoundary>
   )
-}
+})

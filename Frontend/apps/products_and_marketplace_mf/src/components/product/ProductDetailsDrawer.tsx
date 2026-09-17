@@ -7,10 +7,11 @@ import { RatingStars } from "../common/RatingStars";
 import { formatDate, formatFieldValue } from "../../utils/fieldFormat";
 import { useProductStore } from "../../stores/useProductStore";
 import { useDrawerStore } from "../../stores/useDrawerStore";
+import { useShallow } from "zustand/react/shallow";
 
 export function ProductDetailsDrawer({ productId }: { productId: string }) {
-  const { items, selectedProduct, selectedLoading, fetchProductById, clearSelectedProduct } = useProductStore();
-  const { close } = useDrawerStore();
+  const { items, selectedProduct, selectedLoading, fetchProductById, clearSelectedProduct } = useProductStore(useShallow((s) => ({ items: s.items, selectedProduct: s.selectedProduct, selectedLoading: s.selectedLoading, fetchProductById: s.fetchProductById, clearSelectedProduct: s.clearSelectedProduct })));
+  const { close } = useDrawerStore(useShallow((s) => ({ close: s.close })));
   const trackedRef = useRef<string | null>(null);
 
   const listItem = items.find((i) => i.id === productId);

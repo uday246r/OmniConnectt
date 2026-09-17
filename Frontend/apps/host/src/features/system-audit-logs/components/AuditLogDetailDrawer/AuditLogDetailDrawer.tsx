@@ -82,6 +82,8 @@ export interface AuditLogDetailDrawerProps {
  * "Related activity" and a way to jump to the rest of that operation.
  */
 export function AuditLogDetailDrawer({ log, accessToken, onClose, onViewRelated }: AuditLogDetailDrawerProps) {
+  // A token refresh must not re-run a load (and reset what the user is editing) — only its first arrival.
+  const hasAccessToken = Boolean(accessToken)
   const [relatedCount, setRelatedCount] = useState<number | null>(null)
 
   useEffect(() => {
@@ -99,7 +101,7 @@ export function AuditLogDetailDrawer({ log, accessToken, onClose, onViewRelated 
     return () => {
       cancelled = true
     }
-  }, [accessToken, log.correlationId])
+  }, [hasAccessToken, log.correlationId])
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -128,7 +130,7 @@ export function AuditLogDetailDrawer({ log, accessToken, onClose, onViewRelated 
     return () => {
       cancelled = true
     }
-  }, [accessToken, parsedDetails.hasPermissionChanges])
+  }, [hasAccessToken, parsedDetails.hasPermissionChanges])
 
   return (
     <div className={drawerStyles.overlayRoot}>

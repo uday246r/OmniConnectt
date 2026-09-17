@@ -4,11 +4,12 @@ import { StatusBadge } from "../common/StatusBadge";
 import { formatDate } from "../../utils/fieldFormat";
 import { usePromotionStore } from "../../stores/usePromotionStore";
 import { useDrawerStore } from "../../stores/useDrawerStore";
+import { useShallow } from "zustand/react/shallow";
 import "../drawer/DrawerContent.css";
 
 export function PromotionDetailsDrawer({ promotionId }: { promotionId: string }) {
-  const { items } = usePromotionStore();
-  const { close } = useDrawerStore();
+  const { items } = usePromotionStore(useShallow((s) => ({ items: s.items })));
+  const { close } = useDrawerStore(useShallow((s) => ({ close: s.close })));
   const promo = items.find((p) => p.id === promotionId);
 
   if (!promo) return null;

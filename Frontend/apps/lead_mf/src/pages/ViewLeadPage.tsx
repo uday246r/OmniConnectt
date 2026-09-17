@@ -26,6 +26,7 @@ import { canEditLead, canDeleteLead, canCreateLead } from '../api/hostBridge';
 import { isFieldVisible } from '../config/fieldControlRegistry';
 import { applyMaskingRule, formatFieldValue } from '../utils/fieldMasking';
 import { formatPhone } from '../shared/formatPhone';
+import { useShallow } from 'zustand/react/shallow';
 
 /** Renders '-' for genuinely empty values, else the masked/raw value per the common field config —
  * the View Leads table only ever reflects the common-field subset (see commonFieldConfig's own doc
@@ -86,7 +87,7 @@ export const ViewLeadPage: React.FC = () => {
     openDeleteWorkflow,
     commonFieldConfig,
     fetchCommonFieldConfig,
-  } = useLeadStore();
+  } = useLeadStore(useShallow((s) => ({ leads: s.leads, totalRecords: s.totalRecords, totalPages: s.totalPages, currentPage: s.currentPage, pageSize: s.pageSize, isLoadingLeads: s.isLoadingLeads, searchQuery: s.searchQuery, setSearchQuery: s.setSearchQuery, products: s.products, states: s.states, branches: s.branches, filterRules: s.filterRules, setColumnFilter: s.setColumnFilter, clearAllFilters: s.clearAllFilters, setPage: s.setPage, setPageSize: s.setPageSize, fetchLeads: s.fetchLeads, fetchMasterData: s.fetchMasterData, openDetailsDrawer: s.openDetailsDrawer, openEditWorkflow: s.openEditWorkflow, openDeleteWorkflow: s.openDeleteWorkflow, commonFieldConfig: s.commonFieldConfig, fetchCommonFieldConfig: s.fetchCommonFieldConfig })));
   const navigate = useHostNavigate();
 
   const [showFilters, setShowFilters] = useState(false);

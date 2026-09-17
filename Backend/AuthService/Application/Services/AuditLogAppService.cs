@@ -230,14 +230,25 @@ public class AuditLogAppService(AuthDbContext db, IPlatformEventPublisher events
     {
         var query = BuildFilteredQuery(filter);
 
-        var loginSuccesses = await query.CountAsync(a => a.Action == "auth.login_succeeded", ct);
-        var loginErrors = await query.CountAsync(a => a.Action == "auth.login_failed", ct);
-        var totalAuditEvents = await query.CountAsync(ct);
+        // Two statements instead of four sequential ones — each was its own round trip to the database.
+        var counts = await query
+            .GroupBy(_ => 1)
+            .Select(g => new
+            {
+                LoginSuccesses = g.Count(a => a.Action == "auth.login_succeeded"),
+                LoginErrors = g.Count(a => a.Action == "auth.login_failed"),
+                Total = g.Count(),
+            })
+            .FirstOrDefaultAsync(ct);
         var activeUsers = await query
             .Where(a => a.ActorUserId != null)
             .Select(a => a.ActorUserId)
             .Distinct()
             .CountAsync(ct);
+
+        var loginSuccesses = counts?.LoginSuccesses ?? 0;
+        var loginErrors = counts?.LoginErrors ?? 0;
+        var totalAuditEvents = counts?.Total ?? 0;
 
         return new AuditLogSummaryDto(loginSuccesses, loginErrors, totalAuditEvents, activeUsers);
     }
@@ -267,16 +278,28 @@ public class AuditLogAppService(AuthDbContext db, IPlatformEventPublisher events
             .OrderBy(g => g.Action).Take(maxOptions).ToListAsync(ct);
         var actions = actionCounts.Select(g => new AuditActionFacet(g.Action, g.Count)).ToList();
 
-        var authMethods = await DistinctNonNull(query.Select(a => a.AuthMethod), maxOptions, ct);
-        var modules = await DistinctNonNull(query.Select(a => a.Module), maxOptions, ct);
-        var pages = await DistinctNonNull(query.Select(a => a.Page), maxOptions, ct);
-        var categories = await DistinctNonNull(query.Select(a => a.ActionCategory), maxOptions, ct);
+        /*
+         * The four simple value lists in ONE statement (a UNION of the distinct values tagged by column)
+         * rather than four sequential queries — each was a round trip to the database, and this panel
+         * opens with every audit page. These columns hold small closed sets (sign-in methods, modules,
+         * pages, categories); the per-list cap is still applied.
+         */
+        var tagged = await query.Where(a => a.AuthMethod != null).Select(a => new { Facet = 0, Value = a.AuthMethod! })
+            .Union(query.Where(a => a.Module != null).Select(a => new { Facet = 1, Value = a.Module! }))
+            .Union(query.Where(a => a.Page != null).Select(a => new { Facet = 2, Value = a.Page! }))
+            .Union(query.Where(a => a.ActionCategory != null).Select(a => new { Facet = 3, Value = a.ActionCategory! }))
+            .ToListAsync(ct);
 
-        return new AuditLogFacetsDto(services, actions, authMethods, modules, pages, categories);
+        List<string> Values(int facet) => tagged
+            .Where(t => t.Facet == facet)
+            .Select(t => t.Value)
+            .Distinct(StringComparer.Ordinal)
+            .Order(StringComparer.Ordinal)
+            .Take(maxOptions)
+            .ToList();
+
+        return new AuditLogFacetsDto(services, actions, Values(0), Values(1), Values(2), Values(3));
     }
-
-    private static Task<List<string>> DistinctNonNull(IQueryable<string?> values, int take, CancellationToken ct) =>
-        values.Where(v => v != null).Select(v => v!).Distinct().OrderBy(v => v).Take(take).ToListAsync(ct);
 
     /// <summary>
     /// CSV of the current filtered result set, capped — and reporting that it capped.

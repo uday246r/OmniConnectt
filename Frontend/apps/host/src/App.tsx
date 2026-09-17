@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo } from 'react'
 import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation, useNavigate, type Location } from 'react-router-dom'
 import { AppShell } from './layout/AppShell/AppShell'
 import { RequireAuth } from './features/auth/components/RequireAuth'
@@ -174,8 +174,10 @@ function LoginRoute() {
  */
 
 function AuthenticatedShell() {
-  const user = useAuthStore((s) => s.user)
-  const accessToken = useAuthStore((s) => s.accessToken)
+  // Narrow selectors: a token refresh writes a new `user` object and token every ~14 minutes, and
+  // subscribing to those whole values re-rendered the entire shell each time for nothing visible.
+  const userName = useAuthStore((s) => s.user?.name)
+  const hasSession = useAuthStore((s) => Boolean(s.accessToken))
   const logout = useAuthStore((s) => s.logout)
   const ensureFreshAccessToken = useAuthStore((s) => s.ensureFreshAccessToken)
   const navigate = useNavigate()
@@ -207,22 +209,25 @@ function AuthenticatedShell() {
   const fetchNavigation = useNavigationStore((s) => s.fetch)
 
   useEffect(() => {
-    if (!accessToken || navStatus !== 'idle') return
+    if (!hasSession || navStatus !== 'idle') return
     void ensureFreshAccessToken()
       .then((token) => fetchNavigation(token))
       .catch(() => {
         // ensureFreshAccessToken already routes to /login via authStore on failure
       })
-  }, [accessToken, navStatus, ensureFreshAccessToken, fetchNavigation])
+  }, [hasSession, navStatus, ensureFreshAccessToken, fetchNavigation])
 
-  const healthEntries = useRemoteHealthStore((s) => s.entries)
+  // The sidebar badge needs only each app's key and health. Subscribing to the entries array
+  // re-rendered the shell on every poll, because each poll stores a new array even when nothing
+  // changed (a probe timestamp always moves). A string signature changes only when a badge would.
+  const healthSignature = useRemoteHealthStore((s) => s.entries.map((e) => `${e.key}=${e.health}`).join('|'))
   const healthStatus = useRemoteHealthStore((s) => s.status)
   const refetchHealth = useRemoteHealthStore((s) => s.refetch)
 
   useEffect(() => {
-    if (!accessToken || healthStatus !== 'idle') return
+    if (!hasSession || healthStatus !== 'idle') return
     void refetchHealth()
-  }, [accessToken, healthStatus, refetchHealth])
+  }, [hasSession, healthStatus, refetchHealth])
 
   /*
    * The cadence is adaptive, for the same reason the server's own sweep is: while everything is
@@ -237,34 +242,36 @@ function AuthenticatedShell() {
   const hasUnsettledApp = useRemoteHealthStore((s) => s.entries.some((e) => e.health !== 'Healthy'))
 
   useEffect(() => {
-    if (!accessToken) return
+    if (!hasSession) return
     const period = hasUnsettledApp ? 10_000 : 60_000
     const interval = setInterval(() => {
+      // A tab nobody is looking at does not need live badges; it catches up on the next visible tick.
+      if (document.visibilityState === 'hidden') return
       // Force an actual re-probe while something looks wrong: the plain read returns whatever the
       // background sweep last stored, which is exactly the stale value we are trying to move past.
       // When all is well, the cheap stored read is fine.
       void refetchHealth(hasUnsettledApp)
     }, period)
     return () => clearInterval(interval)
-  }, [accessToken, refetchHealth, hasUnsettledApp])
+  }, [hasSession, refetchHealth, hasUnsettledApp])
 
   // Settings visibility (the gear and its tabs) is decided from SETTINGS_SECTIONS where it is used.
   // canAccessAuditLogs / canAccessApprovals are gone: the sidebar no longer takes per-section access
   // flags from the client, because the navigation tree already applied those same permissions
   // server-side. Deciding visibility twice, in two languages, is how the two drift apart.
 
-  // Keyed by app for the sidebar's "not responding" badge.
-  const appHealth = Object.fromEntries(healthEntries.map((e) => [e.key, e.health]))
-
-  return (
-    <AppShell
-      appHealth={appHealth}
-      userName={user?.name}
-      onLogout={() => {
-        void logout().then(() => navigate('/login', { replace: true }))
-      }}
-    />
+  // Keyed by app for the sidebar's "not responding" badge; rebuilt only when a badge would change.
+  const appHealth = useMemo(
+    () => Object.fromEntries(useRemoteHealthStore.getState().entries.map((e) => [e.key, e.health])),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [healthSignature],
   )
+
+  const handleLogout = useCallback(() => {
+    void logout().then(() => navigate('/login', { replace: true }))
+  }, [logout, navigate])
+
+  return <AppShell appHealth={appHealth} userName={userName} onLogout={handleLogout} />
 }
 
 /**
@@ -290,13 +297,24 @@ function AuthenticatedPagesLayout() {
   )
 }
 
-function AppRoutes() {
-  const hydrate = useAuthStore((s) => s.hydrate)
+/**
+ * Session-wide background work, in a component of its own.
+ *
+ * These hooks used to run in AppRoutes, so the token-expiry subscription inside useSilentRefresh
+ * re-rendered AppRoutes — and with it the whole route tree, the active page and any mounted remote app
+ * — every time the token was refreshed. Rendering nothing, this component absorbs those updates.
+ */
+function SessionServices() {
   useSilentRefresh()
   // Opens the SignalR connection once authenticated and tears it down on logout, so the approval
   // tables, the notification badges and the dashboard KPIs update on a server event rather than a
   // timer. Self-disables when VITE_REALTIME_ENABLED is "false".
   usePlatformConnection()
+  return null
+}
+
+function AppRoutes() {
+  const hydrate = useAuthStore((s) => s.hydrate)
 
   useEffect(() => {
     void hydrate()
@@ -324,6 +342,7 @@ function AppRoutes() {
   return (
     <Suspense fallback={<RouteFallback />}>
       {/* Outside <Routes>, so it sees the real drawer URL rather than the page rendered behind it. */}
+      <SessionServices />
       <SettingsDrawerUrlSync />
       <Routes location={routesLocation}>
         <Route path="/login" element={<LoginRoute />} />

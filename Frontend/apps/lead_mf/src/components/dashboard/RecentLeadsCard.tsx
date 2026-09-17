@@ -6,8 +6,9 @@ import { useLeadStore } from '../../store/useLeadStore';
 import { useHostNavigate } from '../../navigation/HostNavigation';
 import styles from './RecentLeadsCard.module.css';
 import { LeadStatusBadge } from '../../shared/LeadStatusBadge';
+import { useShallow } from 'zustand/react/shallow';
 export const RecentLeadsCard: React.FC = () => {
-  const { recentLeads, isLoadingDashboard, openDetailsDrawer } = useLeadStore();
+  const { recentLeads, isLoadingDashboard, openDetailsDrawer } = useLeadStore(useShallow((s) => ({ recentLeads: s.recentLeads, isLoadingDashboard: s.isLoadingDashboard, openDetailsDrawer: s.openDetailsDrawer })));
   const navigate = useHostNavigate();
 
   const handleViewAll = (e: React.MouseEvent) => {

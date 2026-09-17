@@ -12,6 +12,7 @@ import card from '../../shared/dashboardCard.module.css';
 import styles from './LeadsOverTimeCard.module.css';
 import { useLeadStore } from '../../store/useLeadStore';
 import { Select, SkeletonBlock } from '@omniconnect/ui';
+import { useShallow } from 'zustand/react/shallow';
 
 const GRANULARITY_LABELS: Record<string, string> = {
   daily: 'Daily',
@@ -20,8 +21,7 @@ const GRANULARITY_LABELS: Record<string, string> = {
 };
 
 export const LeadsOverTimeCard: React.FC = () => {
-  const { leadsOverTime, dashboardGranularity, setDashboardGranularity, isLoadingDashboard } =
-    useLeadStore();
+  const { leadsOverTime, dashboardGranularity, setDashboardGranularity, isLoadingDashboard } = useLeadStore(useShallow((s) => ({ leadsOverTime: s.leadsOverTime, dashboardGranularity: s.dashboardGranularity, setDashboardGranularity: s.setDashboardGranularity, isLoadingDashboard: s.isLoadingDashboard })));
 
   return (
     /* widgetCard — matches host exactly */

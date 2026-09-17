@@ -7,9 +7,10 @@ import { categoryApi } from "../../services/categoryApi";
 import { useDrawerStore } from "../../stores/useDrawerStore";
 import { formatDate } from "../../utils/fieldFormat";
 import type { Category } from "../../types/domain";
+import { useShallow } from "zustand/react/shallow";
 
 export function CategoryDetailsDrawer({ categoryId }: { categoryId: string }) {
-  const { close } = useDrawerStore();
+  const { close } = useDrawerStore(useShallow((s) => ({ close: s.close })));
   const [category, setCategory] = useState<Category | null>(null);
   const [loading, setLoading] = useState(true);
 

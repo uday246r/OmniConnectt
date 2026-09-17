@@ -1,4 +1,5 @@
-import { getAccessToken, ensureFreshAccessToken, isRunningInHost } from './hostBridge';
+import { createRequestCache } from '@omniconnect/ui';
+import { getAccessToken, ensureFreshAccessToken, isRunningInHost, getCurrentUser } from './hostBridge';
 import type { LeadFieldConfig } from '../config/fieldControlRegistry';
 import type { CustomPreset } from '@omniconnect/ui/validation';
 
@@ -163,16 +164,71 @@ async function getAuthHeaders(): Promise<Record<string, string>> {
   return headers;
 }
 
+/*
+ * Every read goes through one request cache (see @omniconnect/ui createRequestCache).
+ *
+ * The layout and the page used to load the same dashboard, lead list and master data, and StrictMode
+ * mounts each effect twice, so one visit to the dashboard sent each chart request four times — and the
+ * copies queued behind the browser's six connections per origin, slowing every other call down.
+ * Identical GETs now share one request; results are reused briefly (reference data longer, it rarely
+ * changes); any write clears the cache so the next read is fresh. Responses are stored as a status +
+ * body snapshot and handed to each caller as a new Response, because a body can only be read once.
+ */
+const readCache = createRequestCache({ ttlMs: 30_000 });
+const REFERENCE_DATA_TTL_MS = 5 * 60_000;
+const REFERENCE_DATA = /\/api\/(products(\/full)?|states|branches|sales-executives|reference-data|lead-field-config\/formats)(\?|$)/;
+
+interface ResponseSnapshot {
+  status: number;
+  statusText: string;
+  headers: [string, string][];
+  body: string;
+}
+
+/** Forget every cached read — after a write, and when the signed-in user changes. */
+export function clearLeadReadCache(): void {
+  readCache.clear();
+}
+
 async function fetchWithAuth(url: string, options: RequestInit = {}): Promise<Response> {
   const authHeaders = await getAuthHeaders();
   const mergedHeaders = {
     ...authHeaders,
     ...(options.headers || {}),
   };
+  const method = (options.method ?? 'GET').toUpperCase();
 
-  return fetch(url, {
-    ...options,
-    headers: mergedHeaders,
+  if (method !== 'GET' || options.cache === 'no-store') {
+    const response = await fetch(url, { ...options, headers: mergedHeaders });
+    // A write changes what the reads would return; nothing cached before it can be trusted after it.
+    if (method !== 'GET') readCache.clear();
+    return response;
+  }
+
+  // Keyed per user, so a different sign-in in the same tab never reads the previous user's results.
+  const key = `${getCurrentUser()?.id ?? 'anonymous'} GET ${url}`;
+  const snapshot = await readCache.get<ResponseSnapshot>(
+    key,
+    async () => {
+      const response = await fetch(url, { ...options, headers: mergedHeaders });
+      return {
+        status: response.status,
+        statusText: response.statusText,
+        headers: [...response.headers.entries()],
+        body: await response.text(),
+      };
+    },
+    {
+      ttlMs: REFERENCE_DATA.test(url) ? REFERENCE_DATA_TTL_MS : undefined,
+      // Only a success is worth reusing; an error or a 401 must be retried by the next caller.
+      shouldCache: (s) => s.status >= 200 && s.status < 300,
+    },
+  );
+
+  return new Response(snapshot.status === 204 ? null : snapshot.body, {
+    status: snapshot.status,
+    statusText: snapshot.statusText,
+    headers: snapshot.headers,
   });
 }
 
@@ -385,7 +441,7 @@ export const apiClient = {
    * someone else saved in between rather than silently replacing their work.
    */
   getFieldConfigForEditing: async (productId: string): Promise<{ fields: LeadFieldConfig[]; version: string | null }> => {
-    const res = await fetchWithAuth(`${API_BASE_URL}/api/lead-field-config/${productId}`);
+    const res = await fetchWithAuth(`${API_BASE_URL}/api/lead-field-config/${productId}`, { cache: 'no-store' });
     if (!res.ok) throw new Error('Could not load field settings for this product.');
     const json: ApiResponse<LeadFieldConfig[]> = await res.json();
     return { fields: json.success ? json.data : [], version: res.headers.get('ETag') };

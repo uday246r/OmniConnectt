@@ -3,6 +3,7 @@ import { AlertCircle } from '@omniconnect/ui/icons';
 import { Button, Drawer, Select } from '@omniconnect/ui';
 import form from '../../shared/formField.module.css';
 import { useLeadStore } from '../../store/useLeadStore';
+import { useShallow } from 'zustand/react/shallow';
 
 /** Ties the footer's submit button to the form rendered in the Drawer body. */
 const FORM_ID = 'edit-reason-form';
@@ -19,7 +20,7 @@ const PREDEFINED_REASONS = [
 ];
 
 export const EditReasonDrawer: React.FC = () => {
-  const { isEditReasonOpen, closeEditReasonDrawer, proceedToEditLead, editLeadTarget } = useLeadStore();
+  const { isEditReasonOpen, closeEditReasonDrawer, proceedToEditLead, editLeadTarget } = useLeadStore(useShallow((s) => ({ isEditReasonOpen: s.isEditReasonOpen, closeEditReasonDrawer: s.closeEditReasonDrawer, proceedToEditLead: s.proceedToEditLead, editLeadTarget: s.editLeadTarget })));
 
   const [selectedReason, setSelectedReason] = useState<string>('');
   const [customReason, setCustomReason] = useState<string>('');

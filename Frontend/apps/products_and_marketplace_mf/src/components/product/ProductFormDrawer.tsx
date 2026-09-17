@@ -10,15 +10,15 @@ import { useDrawerStore } from "../../stores/useDrawerStore";
 import { useStatusConfigStore } from "../../stores/useStatusConfigStore";
 import { useToastStore } from "../../stores/useToastStore";
 import type { ProductBenefitInput, ProductEligibilityInput, ProductStatus } from "../../types/domain";
+import { useShallow } from "zustand/react/shallow";
 import "../drawer/DrawerContent.css";
 import "./ProductFormDrawer.css";
 
 export function ProductFormDrawer({ productId }: { productId?: string }) {
   const isEdit = !!productId;
-  const { close } = useDrawerStore();
-  const { categories, fetchAll: fetchCategories } = useCategoryStore();
-  const { productTypes, fetchProductTypes, selectedProduct, selectedLoading, fetchProductById, clearSelectedProduct, createProduct, updateProduct } =
-    useProductStore();
+  const { close } = useDrawerStore(useShallow((s) => ({ close: s.close })));
+  const { categories, fetchAll: fetchCategories } = useCategoryStore(useShallow((s) => ({ categories: s.categories, fetchAll: s.fetchAll })));
+  const { productTypes, fetchProductTypes, selectedProduct, selectedLoading, fetchProductById, clearSelectedProduct, createProduct, updateProduct } = useProductStore(useShallow((s) => ({ productTypes: s.productTypes, fetchProductTypes: s.fetchProductTypes, selectedProduct: s.selectedProduct, selectedLoading: s.selectedLoading, fetchProductById: s.fetchProductById, clearSelectedProduct: s.clearSelectedProduct, createProduct: s.createProduct, updateProduct: s.updateProduct })));
   const statusConfigs = useStatusConfigStore((s) => s.configs);
   const statusOptions = useMemo(
     () => statusConfigs.filter((c) => c.entityType === "Product").sort((a, b) => a.sortOrder - b.sortOrder),

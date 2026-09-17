@@ -11,6 +11,7 @@ import { StatusBadge } from '../shared/StatusBadge';
 import { formatCurrency, resolveProductStatus } from '../shared/formatValue';
 import styles from './AllProducts.module.css';
 import cc from '../shared/c360Common.module.css';
+import { useShallow } from 'zustand/react/shallow';
 
 /* The category vocabulary, lifted out of the toolbar <select> it used to live in — every other
    table in the platform puts this control in the column header. */
@@ -27,7 +28,7 @@ const PRODUCT_STATUS_OPTIONS = [
   { value: 'INACTIVE', label: 'Inactive / Closed' },
 ];
 export default function AllProducts() {
-  const { profile, customerType } = useCustomerStore();
+  const { profile, customerType } = useCustomerStore(useShallow((s) => ({ profile: s.profile, customerType: s.customerType })));
   const navigate = useHostNavigate();
   const {
     products,
@@ -42,7 +43,7 @@ export default function AllProducts() {
     setPageSize,
     loadProducts,
     openProductModal,
-  } = useProductStore();
+  } = useProductStore(useShallow((s) => ({ products: s.products, loading: s.loading, error: s.error, errorStatus: s.errorStatus, pageNumber: s.pageNumber, pageSize: s.pageSize, totalCount: s.totalCount, totalPages: s.totalPages, setPageNumber: s.setPageNumber, setPageSize: s.setPageSize, loadProducts: s.loadProducts, openProductModal: s.openProductModal })));
 
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState('');

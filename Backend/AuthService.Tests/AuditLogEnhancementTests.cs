@@ -284,6 +284,29 @@ public class AuditLogEnhancementTests : IDisposable
     }
 
     /// <summary>
+    /// The four simple facet lists now come from one UNION query tagged by column rather than four
+    /// queries. The risk that introduces is a value leaking into the wrong list — a module name showing
+    /// up among pages because the same text appears in both columns.
+    /// </summary>
+    [Fact]
+    public async Task Each_facet_list_holds_only_its_own_columns_values_sorted_and_distinct()
+    {
+        await service.WriteAsync("AuthService", Guid.NewGuid(), "A", "auth.login_succeeded", null, null, null,
+            authMethod: "Local", module: "Authentication", page: "login", actionCategory: "Auth");
+        await service.WriteAsync("AuthService", Guid.NewGuid(), "B", "auth.login_succeeded", null, null, null,
+            authMethod: "Google", module: "Authentication", page: "login", actionCategory: "Auth");
+        await service.WriteAsync("AuthService", Guid.NewGuid(), "C", "page.viewed", null, null, null,
+            module: "Users", page: "Users", actionCategory: "Navigation");
+
+        var facets = await service.FacetsAsync(new AuditLogFilter());
+
+        Assert.Equal(["Google", "Local"], facets.AuthMethods);
+        Assert.Equal(["Authentication", "Users"], facets.Modules);
+        Assert.Equal(["Users", "login"], facets.Pages);
+        Assert.Equal(["Auth", "Navigation"], facets.ActionCategories);
+    }
+
+    /// <summary>
     /// Every audit write notifies anyone watching the Audit Logs page. Pinned because the write path
     /// swallows publish failures by design, so a broken fan-out is silent at runtime.
     /// </summary>

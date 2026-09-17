@@ -6,6 +6,7 @@ import { Icon } from "../common/Icon";
 import { useStatusConfigStore } from "../../stores/useStatusConfigStore";
 import { useDrawerStore } from "../../stores/useDrawerStore";
 import type { StatusEntityType, StatusTone } from "../../types/domain";
+import { useShallow } from "zustand/react/shallow";
 
 const TONES: { value: StatusTone; label: string }[] = [
   { value: "success", label: "Green (Success)" },
@@ -18,8 +19,8 @@ const TONES: { value: StatusTone; label: string }[] = [
 const VALUE_REGEX = /^[A-Za-z][A-Za-z0-9]*$/;
 
 export function StatusConfigFormDrawer({ statusConfigId, entityType }: { statusConfigId?: string; entityType?: StatusEntityType }) {
-  const { close } = useDrawerStore();
-  const { configs, createConfig, updateConfig } = useStatusConfigStore();
+  const { close } = useDrawerStore(useShallow((s) => ({ close: s.close })));
+  const { configs, createConfig, updateConfig } = useStatusConfigStore(useShallow((s) => ({ configs: s.configs, createConfig: s.createConfig, updateConfig: s.updateConfig })));
   const existing = statusConfigId ? configs.find((c) => c.id === statusConfigId) : undefined;
   const isCreate = !statusConfigId;
   const effectiveEntityType = existing?.entityType ?? entityType;

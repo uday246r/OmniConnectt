@@ -19,9 +19,10 @@ import { StatusConfigDetailsDrawer } from "../setup/StatusConfigDetailsDrawer";
 import { EmploymentTypeFormDrawer } from "../setup/EmploymentTypeFormDrawer";
 import { EmploymentTypeDetailsDrawer } from "../setup/EmploymentTypeDetailsDrawer";
 import type { StatusEntityType } from "../../types/domain";
+import { useShallow } from "zustand/react/shallow";
 
 export function DrawerHost() {
-  const { isOpen, type, payload } = useDrawerStore();
+  const { isOpen, type, payload } = useDrawerStore(useShallow((s) => ({ isOpen: s.isOpen, type: s.type, payload: s.payload })));
   if (!isOpen || !type) return null;
 
   switch (type) {

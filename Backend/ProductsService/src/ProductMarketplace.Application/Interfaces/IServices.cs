@@ -65,6 +65,8 @@ public interface IRankingConfigService
 public interface IProductService
 {
     Task<PagedResult<ProductListItemDto>> SearchAsync(ProductQueryDto query, CancellationToken ct = default);
+    /// <summary>Products per status under the other catalogue filters (the status filter is ignored).</summary>
+    Task<IReadOnlyList<StatusCountDto>> StatusCountsAsync(ProductQueryDto query, CancellationToken ct = default);
     Task<ProductDetailDto?> GetByIdAsync(Guid id, bool trackView, CancellationToken ct = default);
     Task<ProductDetailDto> CreateAsync(ProductCreateUpdateDto dto, CancellationToken ct = default);
     Task<ProductDetailDto?> UpdateAsync(Guid id, ProductCreateUpdateDto dto, CancellationToken ct = default);

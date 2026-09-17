@@ -10,6 +10,7 @@ import { downloadServerCsv } from "../services/exportCsv";
 import { usePermissions } from "../permissions/PermissionContext";
 import { PERMISSIONS } from "../permissions/permissions";
 import { useToastStore } from "../stores/useToastStore";
+import { useShallow } from "zustand/react/shallow";
 import "./AuditLogsPage.css";
 
 function formatAction(action: string): string {
@@ -48,8 +49,8 @@ export function AuditLogsPage() {
     fetchActionOptions,
     fetchEntityTypes,
     ingestLiveEntry,
-  } = useAuditLogStore();
-  const { open } = useDrawerStore();
+  } = useAuditLogStore(useShallow((s) => ({ items: s.items, loading: s.loading, error: s.error, search: s.search, action: s.action, entityType: s.entityType, dateRange: s.dateRange, page: s.page, pageSize: s.pageSize, totalCount: s.totalCount, actionOptions: s.actionOptions, entityTypeOptions: s.entityTypeOptions, summary: s.summary, liveCount: s.liveCount, setSearch: s.setSearch, setAction: s.setAction, setEntityType: s.setEntityType, setDateRange: s.setDateRange, currentFilters: s.currentFilters, setPage: s.setPage, setPageSize: s.setPageSize, fetchAuditLogs: s.fetchAuditLogs, fetchActionOptions: s.fetchActionOptions, fetchEntityTypes: s.fetchEntityTypes, ingestLiveEntry: s.ingestLiveEntry })));
+  const { open } = useDrawerStore(useShallow((s) => ({ open: s.open })));
   const [live, setLive] = useState(false);
   const [exporting, setExporting] = useState(false);
   const canExport = usePermissions().has(PERMISSIONS.AUDIT_LOGS_EXPORT);

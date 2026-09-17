@@ -1,5 +1,6 @@
 import axios, { AxiosError, type AxiosResponse, type InternalAxiosRequestConfig } from 'axios';
-import { ensureFreshAccessToken, getAccessToken, isRunningInHost } from '../api/hostBridge';
+import { createRequestCache } from '@omniconnect/ui';
+import { ensureFreshAccessToken, getAccessToken, getCurrentUser, isRunningInHost } from '../api/hostBridge';
 import { useDrawerStore } from '../stores/useDrawerStore';
 import { useToastStore } from '../stores/useToastStore';
 
@@ -10,6 +11,61 @@ export const httpClient = axios.create({
   baseURL: API_BASE_URL,
   headers: { 'Content-Type': 'application/json' },
 });
+
+/*
+ * Every GET goes through one request cache (@omniconnect/ui createRequestCache), installed as the
+ * request adapter so no store or page has to change.
+ *
+ * Several screens asked for the same data at once — the Setup page and its default tab both loaded
+ * product types, and StrictMode mounts every effect twice — so each of those requests went out two to
+ * four times and queued behind the browser's six connections per origin. Identical GETs now share one
+ * request and a success is reused briefly; any write clears the cache so the next read is fresh. Errors
+ * reject in the underlying adapter and are therefore never cached. Each caller gets its own copy of the
+ * data, so a store that mutates what it received cannot change another caller's result.
+ */
+const readCache = createRequestCache({ ttlMs: 30_000 });
+const REFERENCE_DATA_TTL_MS = 5 * 60_000;
+const REFERENCE_DATA = /\/(categories|product-types|document-definitions|employment-types|status-configs)(\?|$)/;
+const networkAdapter = axios.getAdapter(httpClient.defaults.adapter);
+
+/** Forget every cached read — used when the signed-in user changes. */
+export function clearProductsReadCache(): void {
+  readCache.clear();
+}
+
+httpClient.defaults.adapter = async (config) => {
+  const method = (config.method ?? 'get').toLowerCase();
+  if (method !== 'get') {
+    try {
+      return await networkAdapter(config);
+    } finally {
+      // A write changes what the reads would return; nothing cached before it can be trusted after it.
+      readCache.clear();
+    }
+  }
+
+  const url = httpClient.getUri(config);
+  // Keyed per user, so a different sign-in in the same tab never reads the previous user's results.
+  const key = `${getCurrentUser()?.id ?? 'anonymous'} GET ${url}`;
+  const { signal } = config;
+  // The shared request must not carry one caller's abort signal, or cancelling one would cancel all.
+  const shared = readCache.get(key, () => networkAdapter({ ...config, signal: undefined }), {
+    ttlMs: REFERENCE_DATA.test(url) ? REFERENCE_DATA_TTL_MS : undefined,
+  });
+
+  const response = await (signal
+    ? Promise.race([
+        shared,
+        new Promise<never>((_, reject) => {
+          const abort = () => reject(new axios.CanceledError('canceled', config));
+          if (signal.aborted) abort();
+          else signal.addEventListener?.('abort', abort, { once: true });
+        }),
+      ])
+    : shared);
+
+  return { ...response, config, data: typeof structuredClone === 'function' ? structuredClone(response.data) : response.data };
+};
 
 /** What the server sends back (202) when a change is held for a checker instead of applied. */
 export interface ApprovalPending {

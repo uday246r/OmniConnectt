@@ -15,6 +15,7 @@ import { MicrofinanceFields } from './ProductSpecificFields/MicrofinanceFields';
 import { DeclarationConsentSection } from './DeclarationConsentSection';
 import { FieldDiff } from '../../types/lead';
 import styles from './EditLeadDrawer.module.css';
+import { useShallow } from 'zustand/react/shallow';
 
 export const EditLeadDrawer: React.FC = () => {
   const {
@@ -32,7 +33,7 @@ export const EditLeadDrawer: React.FC = () => {
     isSubmitting,
     products,
     fieldConfig,
-  } = useLeadStore();
+  } = useLeadStore(useShallow((s) => ({ isEditLeadOpen: s.isEditLeadOpen, editLeadTarget: s.editLeadTarget, editReason: s.editReason, editFormData: s.editFormData, editErrors: s.editErrors, setEditFieldValue: s.setEditFieldValue, validateEditForm: s.validateEditForm, submitEditLead: s.submitEditLead, closeEditLeadDrawer: s.closeEditLeadDrawer, isConfirmingEdit: s.isConfirmingEdit, setIsConfirmingEdit: s.setIsConfirmingEdit, isSubmitting: s.isSubmitting, products: s.products, fieldConfig: s.fieldConfig })));
 
   // Compute diffs between original lead target and current editFormData
   const changedFields = useMemo<FieldDiff[]>(() => {

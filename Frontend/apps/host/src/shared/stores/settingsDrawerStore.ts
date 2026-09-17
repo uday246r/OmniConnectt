@@ -84,7 +84,8 @@ export const useSettingsDrawerStore = create<SettingsDrawerState>((set, get) => 
   },
 
   setReturnPath: (path) => {
-    if (!path || isDrawerRoute(path)) return
+    // Unchanged is a no-op: no storage write, no store update, nothing re-renders.
+    if (!path || isDrawerRoute(path) || path === get().returnPath) return
     try {
       sessionStorage.setItem(STORAGE_KEY, path)
     } catch {}

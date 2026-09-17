@@ -17,6 +17,7 @@ import type {
   FieldConfigProfileType,
   ApprovalPendingDto,
 } from '../types/api';
+import { createRequestCache } from '@omniconnect/ui';
 import { getAccessToken, ensureFreshAccessToken, getCurrentUser, isRunningInHost } from '../api/hostBridge';
 
 export const API_BASE_URL: string = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5059';
@@ -56,7 +57,42 @@ export class ApiError extends Error {
  *
  * Nothing replaces it. The token already says who the caller is.
  */
+/*
+ * One request cache for every read (@omniconnect/ui createRequestCache).
+ *
+ * StrictMode mounts each effect twice and several pages asked for the same lookups and field
+ * configuration, so those requests went out in pairs. Identical GETs that overlap now share one
+ * request. Only configuration and lists are also REUSED for a short while: a customer profile lookup
+ * is audited by the server each time it is served, so those responses are never reused — a new look at
+ * a customer always reaches the server and is recorded. Any write clears the cache.
+ */
+const readCache = createRequestCache({ ttlMs: 30_000 });
+const REUSABLE = /^\/v1\/(lookups|field-config\/[\w-]+|audit)(\?|$)/;
+
+/** Forget every cached read — used when the signed-in user changes. */
+export function clearCustomer360ReadCache(): void {
+  readCache.clear();
+}
+
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  const method = (options.method ?? 'GET').toUpperCase();
+  if (method !== 'GET') {
+    try {
+      return await send<T>(endpoint, options);
+    } finally {
+      readCache.clear();
+    }
+  }
+  // Keyed per user, so a different sign-in in the same tab never reads the previous user's results.
+  const key = `${getCurrentUser()?.id ?? 'anonymous'} GET ${endpoint}`;
+  const value = await readCache.get(key, () => send<T>(endpoint, options), {
+    ttlMs: REUSABLE.test(endpoint) ? undefined : 0,
+  });
+  // Each caller gets its own copy, so a page that mutates what it received cannot change another's.
+  return typeof structuredClone === 'function' ? structuredClone(value) : value;
+}
+
+async function send<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   let token: string | null = null;
 
   if (isRunningInHost()) {

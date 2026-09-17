@@ -3,13 +3,14 @@ import card from '../../shared/dashboardCard.module.css';
 import styles from './LeadsByBranchCard.module.css';
 import { useLeadStore } from '../../store/useLeadStore';
 import { SkeletonText } from '@omniconnect/ui';
+import { useShallow } from 'zustand/react/shallow';
 
 const BRANCH_COLORS = [
   '#4f46e5', '#3b82f6', '#10b981', '#f59e0b', '#ec4899', '#0d9488',
 ];
 
 export const LeadsByBranchCard: React.FC = () => {
-  const { leadsByBranch, isLoadingDashboard } = useLeadStore();
+  const { leadsByBranch, isLoadingDashboard } = useLeadStore(useShallow((s) => ({ leadsByBranch: s.leadsByBranch, isLoadingDashboard: s.isLoadingDashboard })));
 
   const sortedBranches = [...leadsByBranch].sort((a, b) => b.count - a.count);
   const maxCount = Math.max(...sortedBranches.map((b) => b.count), 1);

@@ -1,5 +1,6 @@
 import { useToastStore, type ToastType } from "../../stores/useToastStore";
 import { Icon, type IconName } from "./Icon";
+import { useShallow } from "zustand/react/shallow";
 import "./ToastContainer.css";
 
 const ICON_MAP: Record<ToastType, IconName> = {
@@ -10,7 +11,7 @@ const ICON_MAP: Record<ToastType, IconName> = {
 };
 
 export function ToastContainer() {
-  const { toasts, dismissToast } = useToastStore();
+  const { toasts, dismissToast } = useToastStore(useShallow((s) => ({ toasts: s.toasts, dismissToast: s.dismissToast })));
 
   if (toasts.length === 0) return null;
 

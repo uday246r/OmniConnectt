@@ -39,7 +39,18 @@ export const useRemoteHealthStore = create<RemoteHealthState>((set, get) => ({
       const entries = forceProbe
         ? await remoteAppsApi.refreshHealth(accessToken)
         : await remoteAppsApi.health(accessToken)
-      set({ entries, status: 'loaded' })
+      // A poll that found nothing new keeps the existing array, so every component reading the entries
+      // is left alone instead of re-rendering once a minute over identical data.
+      const previous = get().entries
+      const unchanged =
+        previous.length === entries.length &&
+        entries.every((e, i) => {
+          const p = previous[i]
+          return p.key === e.key && p.health === e.health && p.displayName === e.displayName &&
+            p.lastCheckedAt === e.lastCheckedAt && p.error === e.error
+        })
+      if (unchanged && get().status === 'loaded') return
+      set({ entries: unchanged ? previous : entries, status: 'loaded' })
     } catch (err) {
       console.warn('Remote app health poll failed:', err)
 

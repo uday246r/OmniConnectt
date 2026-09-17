@@ -14,13 +14,14 @@ import { usePermissions } from "../../permissions/PermissionContext";
 import { PERMISSIONS } from "../../permissions/permissions";
 import { formatDate } from "../../utils/fieldFormat";
 import type { Category } from "../../types/domain";
+import { useShallow } from "zustand/react/shallow";
 import "../../pages/CategoriesPage.css";
 
 export function CategoryManagementPanel({ showAddButton = false }: { showAddButton?: boolean }) {
-  const { categories, loading, error, statusFilter, searchTerm, setStatusFilter, setSearchTerm, fetchAll, updateCategory, removeCategory } = useCategoryStore();
-  const { open } = useDrawerStore();
+  const { categories, loading, error, statusFilter, searchTerm, setStatusFilter, setSearchTerm, fetchAll, updateCategory, removeCategory } = useCategoryStore(useShallow((s) => ({ categories: s.categories, loading: s.loading, error: s.error, statusFilter: s.statusFilter, searchTerm: s.searchTerm, setStatusFilter: s.setStatusFilter, setSearchTerm: s.setSearchTerm, fetchAll: s.fetchAll, updateCategory: s.updateCategory, removeCategory: s.removeCategory })));
+  const { open } = useDrawerStore(useShallow((s) => ({ open: s.open })));
   const { has } = usePermissions();
-  const { configs: statusConfigs, fetchAll: fetchStatusConfigs } = useStatusConfigStore();
+  const { configs: statusConfigs, fetchAll: fetchStatusConfigs } = useStatusConfigStore(useShallow((s) => ({ configs: s.configs, fetchAll: s.fetchAll })));
 
   // Category statuses come from Setup (StatusConfig) exactly like every other entity's filter, so a
   // status an admin renames, adds or disables there is reflected here without a code change.

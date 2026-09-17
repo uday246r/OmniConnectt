@@ -35,6 +35,8 @@ const STEP_META: Record<TabType, { title: string; desc: string }> = {
 export function RoleFormLayer({ roleId, initialTab }: RoleFormLayerProps) {
   const isEdit = Boolean(roleId)
   const accessToken = useAuthStore((s) => s.accessToken)
+  // A token refresh must not re-run a load (and reset what the user is editing) — only its first arrival.
+  const hasAccessToken = Boolean(accessToken)
   const ensureFreshAccessToken = useAuthStore((s) => s.ensureFreshAccessToken)
   const refreshSession = useAuthStore((s) => s.refreshSession)
   const popLayer = useSettingsDrawerStore((s) => s.popLayer)
@@ -107,7 +109,7 @@ export function RoleFormLayer({ roleId, initialTab }: RoleFormLayerProps) {
     return () => {
       cancelled = true
     }
-  }, [accessToken, roleId])
+  }, [hasAccessToken, roleId])
 
   /*
    * Grid shape comes from the catalog, never from a fixed list of verbs.

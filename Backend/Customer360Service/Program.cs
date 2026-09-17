@@ -45,7 +45,7 @@ var isDbConfigured = !string.IsNullOrWhiteSpace(connectionString);
 
 builder.Services.AddDbContextPool<Customer360DbContext>(options =>
     options.UseNpgsql(
-        isDbConfigured ? connectionString : "Host=unconfigured;Database=unconfigured;Username=unconfigured;Password=unconfigured",
+        isDbConfigured ? WithWarmPool(connectionString!, builder.Configuration) : "Host=unconfigured;Database=unconfigured;Username=unconfigured;Password=unconfigured",
         npgsqlOptions => npgsqlOptions.EnableRetryOnFailure(
             maxRetryCount: 6,
             maxRetryDelay: TimeSpan.FromSeconds(20),
@@ -221,3 +221,23 @@ else
 }
 
 app.Run();
+
+/*
+ * A few database connections kept open, and kept alive.
+ *
+ * Npgsql opens connections on demand and closes idle ones after five minutes, and each new connection
+ * to the managed database costs a TLS handshake of around two seconds from a developer machine. The
+ * first page after a quiet spell therefore waited on handshakes for every request it made at once
+ * (the Lead dashboard's five charts took ~3.9 s against ~0.3 s warm). `Database:MinimumPoolSize`
+ * (default 3; 0 turns it off) keeps that many open, and a 30 s TCP keepalive stops idle ones being
+ * dropped in between. Only applied when the connection string does not already set these. Note that
+ * open connections also keep a serverless database from auto-suspending while the service runs.
+ */
+static string WithWarmPool(string connectionString, IConfiguration configuration)
+{
+    var npgsql = new Npgsql.NpgsqlConnectionStringBuilder(connectionString);
+    var minimum = configuration.GetValue<int?>("Database:MinimumPoolSize") ?? 3;
+    if (npgsql.MinPoolSize == 0 && minimum > 0) npgsql.MinPoolSize = Math.Min(minimum, npgsql.MaxPoolSize);
+    if (npgsql.KeepAlive == 0) npgsql.KeepAlive = 30;
+    return npgsql.ConnectionString;
+}

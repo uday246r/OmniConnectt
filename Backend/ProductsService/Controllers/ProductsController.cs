@@ -41,6 +41,12 @@ public class ProductsController(IProductService service, ApprovalGate gate, IAud
     public async Task<IActionResult> Search([FromQuery] ProductQueryDto query, CancellationToken ct)
         => Ok(await service.SearchAsync(query, ct));
 
+    /// <summary>Products per status for the catalogue's current filters, in one query — the status tabs' counts.</summary>
+    [HttpGet("status-counts")]
+    [RequiresCapability("products", "View")]
+    public async Task<IActionResult> StatusCounts([FromQuery] ProductQueryDto query, CancellationToken ct)
+        => Ok(await service.StatusCountsAsync(query, ct));
+
     [HttpGet("top-performers")]
     [RequiresCapability("products", "View")]
     public async Task<IActionResult> GetTopPerformers([FromQuery] string? metric, [FromQuery] int take, CancellationToken ct)

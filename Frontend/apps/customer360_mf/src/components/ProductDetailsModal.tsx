@@ -23,6 +23,7 @@ import { StatusBadge } from '../shared/StatusBadge';
 import { formatValue, formatCurrency as formatMoney, resolveProductStatus } from '../shared/formatValue';
 import { Button, Badge, DetailField, DetailGrid, DetailSection, Drawer, EMPTY_VALUE, isEmptyDetailValue } from '@omniconnect/ui';
 import styles from './ProductDetailsModal.module.css';
+import { useShallow } from 'zustand/react/shallow';
 
 // ---------------------------------------------------------------------------
 // Product type detection — mirrors the routing logic in productStore.ts
@@ -106,8 +107,8 @@ const FieldCard = ({
 };
 
 export default function ProductDetailsModal() {
-  const { selectedProductDetails, modalOpen, loadingDetails, closeProductModal } = useProductStore();
-  const { customerType, profile } = useCustomerStore();
+  const { selectedProductDetails, modalOpen, loadingDetails, closeProductModal } = useProductStore(useShallow((s) => ({ selectedProductDetails: s.selectedProductDetails, modalOpen: s.modalOpen, loadingDetails: s.loadingDetails, closeProductModal: s.closeProductModal })));
+  const { customerType, profile } = useCustomerStore(useShallow((s) => ({ customerType: s.customerType, profile: s.profile })));
   const isCorp = customerType === 'corporate';
   const profileCountry = (profile as CorporateProfile | null)?.country;
   const [copiedKey, setCopiedKey] = useState<string | null>(null);

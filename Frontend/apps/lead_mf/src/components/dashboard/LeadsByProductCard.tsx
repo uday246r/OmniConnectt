@@ -4,9 +4,10 @@ import card from '../../shared/dashboardCard.module.css';
 import styles from './LeadsByProductCard.module.css';
 import { useLeadStore } from '../../store/useLeadStore';
 import { SkeletonAvatar, SkeletonText } from '@omniconnect/ui';
+import { useShallow } from 'zustand/react/shallow';
 
 export const LeadsByProductCard: React.FC = () => {
-  const { leadsByProduct, kpiSummary, isLoadingDashboard } = useLeadStore();
+  const { leadsByProduct, kpiSummary, isLoadingDashboard } = useLeadStore(useShallow((s) => ({ leadsByProduct: s.leadsByProduct, kpiSummary: s.kpiSummary, isLoadingDashboard: s.isLoadingDashboard })));
   const totalLeads = kpiSummary.totalLeads;
 
   return (

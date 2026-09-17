@@ -15,7 +15,8 @@ import { PERMISSIONS } from "../permissions/permissions";
 import { productApi } from "../services/productApi";
 import { CsvExportError, describeTruncation, Pagination, Button, PageHeader } from "@omniconnect/ui";
 import { downloadServerCsv } from "../services/exportCsv";
-import type { ProductStatus, SortOption, TopPerformer } from "../types/domain";
+import type { SortOption, TopPerformer } from "../types/domain";
+import { useShallow } from "zustand/react/shallow";
 import "./ProductsPage.css";
 
 const SORT_TABS: { value: SortOption; label: string }[] = [
@@ -54,10 +55,10 @@ export function ProductsPage() {
     fetchProductTypes,
     updateStatus,
     removeProduct,
-  } = useProductStore();
-  const { categories, fetchAll: fetchCategories } = useCategoryStore();
-  const { open } = useDrawerStore();
-  const { configs: statusConfigs, fetchAll: fetchStatusConfigs } = useStatusConfigStore();
+  } = useProductStore(useShallow((s) => ({ items: s.items, totalCount: s.totalCount, page: s.page, pageSize: s.pageSize, search: s.search, categoryId: s.categoryId, productTypeId: s.productTypeId, status: s.status, sort: s.sort, loading: s.loading, error: s.error, productTypes: s.productTypes, setPage: s.setPage, setPageSize: s.setPageSize, setSearch: s.setSearch, setCategoryId: s.setCategoryId, setProductTypeId: s.setProductTypeId, setStatus: s.setStatus, setSort: s.setSort, resetFilters: s.resetFilters, fetchProducts: s.fetchProducts, fetchProductTypes: s.fetchProductTypes, updateStatus: s.updateStatus, removeProduct: s.removeProduct })));
+  const { categories, fetchAll: fetchCategories } = useCategoryStore(useShallow((s) => ({ categories: s.categories, fetchAll: s.fetchAll })));
+  const { open } = useDrawerStore(useShallow((s) => ({ open: s.open })));
+  const { configs: statusConfigs, fetchAll: fetchStatusConfigs } = useStatusConfigStore(useShallow((s) => ({ configs: s.configs, fetchAll: s.fetchAll })));
   const { has } = usePermissions();
 
   const [searchInput, setSearchInput] = useState(search);
@@ -105,15 +106,32 @@ export function ProductsPage() {
     setSearchInput(search);
   }, [search]);
 
+  /*
+   * Every status tab's count from one grouped query.
+   *
+   * This ran a full catalogue search per status (six of them) and did it again for every change to
+   * `items` and to the status configs — three rounds on arrival, ~18 requests. It now asks the server
+   * for all counts at once. It still follows `items`, so a save or a status change (which clears the
+   * request cache and reloads the list) refreshes the counts, but paging and sorting reuse the cached
+   * answer instead of recounting. A late response for a previous category is ignored.
+   */
   useEffect(() => {
-    Promise.all(
-      statusOptions.map((t) => productApi.search({ status: (t.value as ProductStatus) || undefined, categoryId: categoryId || undefined, pageSize: 1 }))
-    ).then((results) => {
-      const counts: Record<string, number> = {};
-      statusOptions.forEach((t, i) => (counts[t.value || "All"] = results[i].totalCount));
-      setStatusCounts(counts);
-    });
-  }, [categoryId, items, statusConfigs]);
+    let current = true;
+    productApi
+      .statusCounts({ categoryId: categoryId || undefined })
+      .then((rows) => {
+        if (!current) return;
+        const counts: Record<string, number> = { All: rows.reduce((sum, r) => sum + r.count, 0) };
+        for (const row of rows) counts[row.status] = row.count;
+        setStatusCounts(counts);
+      })
+      .catch(() => {
+        // The tabs fall back to their labels without numbers; the list itself reports its own errors.
+      });
+    return () => {
+      current = false;
+    };
+  }, [categoryId, items]);
 
   useEffect(() => {
     const handle = setTimeout(() => setSearch(searchInput), 350);
@@ -477,7 +495,7 @@ const PERFORMER_TABS: { value: "applied" | "viewed" | "rated"; label: string }[]
 ];
 
 function TopPerformersRail() {
-  const { open } = useDrawerStore();
+  const { open } = useDrawerStore(useShallow((s) => ({ open: s.open })));
   const [metric, setMetric] = useState<"applied" | "viewed" | "rated">("applied");
   const [performers, setPerformers] = useState<TopPerformer[]>([]);
   const [loading, setLoading] = useState(true);

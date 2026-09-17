@@ -3,13 +3,14 @@ import { Home } from '@omniconnect/ui/icons';
 import { useLeadStore } from '../../../store/useLeadStore';
 import { SearchableDropdown } from '../../common/SearchableDropdown';
 import { isFieldVisible, isFieldRequired, isFieldEditable, getFieldLabel } from '../../../config/fieldControlRegistry';
+import { useShallow } from 'zustand/react/shallow';
 
 interface HomeFinancingFieldsProps {
   isEdit?: boolean;
 }
 
 export const HomeFinancingFields: React.FC<HomeFinancingFieldsProps> = ({ isEdit = false }) => {
-  const store = useLeadStore();
+  const store = useLeadStore(useShallow((s) => ({ editFormData: s.editFormData, formData: s.formData, editErrors: s.editErrors, errors: s.errors, setEditFieldValue: s.setEditFieldValue, setFieldValue: s.setFieldValue, propertyTypes: s.propertyTypes, propertyStatuses: s.propertyStatuses, validateField: s.validateField, fieldConfig: s.fieldConfig })));
   const formData = isEdit ? store.editFormData : store.formData;
   const errors = isEdit ? store.editErrors : store.errors;
   const setFieldValue = isEdit ? store.setEditFieldValue : store.setFieldValue;

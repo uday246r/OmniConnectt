@@ -9,6 +9,7 @@ import { useLeadStore } from '../../store/useLeadStore';
 import { Loader2, CheckCircle2 } from '@omniconnect/ui/icons';
 import styles from './LeadFormContainer.module.css';
 import { Button } from '@omniconnect/ui';
+import { useShallow } from 'zustand/react/shallow';
 
 interface LeadFormContainerProps {
   mode?: 'page' | 'drawer';
@@ -19,7 +20,7 @@ export const LeadFormContainer: React.FC<LeadFormContainerProps> = ({
   mode = 'page',
   onSuccess,
 }) => {
-  const { formData, submitLead, isSubmitting, fieldConfig } = useLeadStore();
+  const { formData, submitLead, isSubmitting, fieldConfig } = useLeadStore(useShallow((s) => ({ formData: s.formData, submitLead: s.submitLead, isSubmitting: s.isSubmitting, fieldConfig: s.fieldConfig })));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -40,6 +40,8 @@ function toDrafts(catalog: SalutationCatalogDto): DraftEntry[] {
 export function SalutationsCard({ canEdit }: SalutationsCardProps) {
   const accessToken = useAuthStore((s) => s.accessToken)
 
+  // A token refresh must not re-run a load (and reset what the user is editing) — only its first arrival.
+  const hasAccessToken = Boolean(accessToken)
   const [entries, setEntries] = useState<DraftEntry[]>([])
   const [version, setVersion] = useState<number | undefined>(undefined)
   const [loading, setLoading] = useState(true)
@@ -66,7 +68,7 @@ export function SalutationsCard({ canEdit }: SalutationsCardProps) {
     } finally {
       setLoading(false)
     }
-  }, [accessToken])
+  }, [hasAccessToken])
 
   useEffect(() => {
     void load()

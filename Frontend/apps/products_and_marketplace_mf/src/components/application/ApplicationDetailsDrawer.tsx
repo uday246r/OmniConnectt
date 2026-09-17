@@ -13,6 +13,7 @@ import { applicationApi } from "../../services/applicationApi";
 import type { ApplicationStatus } from "../../types/domain";
 import { DocumentPreviewModal } from "../common/DocumentPreviewModal";
 import type { IconName } from "../common/Icon";
+import { useShallow } from "zustand/react/shallow";
 
 function getStatusButtonConfig(value: string, color: string): { iconName: IconName; toneClass: string } {
   switch (value) {
@@ -43,8 +44,8 @@ function getStatusButtonConfig(value: string, color: string): { iconName: IconNa
 }
 
 export function ApplicationDetailsDrawer({ applicationId }: { applicationId: string }) {
-  const { selected, selectedLoading, fetchApplicationById, clearSelected, updateStatus } = useApplicationStore();
-  const { close } = useDrawerStore();
+  const { selected, selectedLoading, fetchApplicationById, clearSelected, updateStatus } = useApplicationStore(useShallow((s) => ({ selected: s.selected, selectedLoading: s.selectedLoading, fetchApplicationById: s.fetchApplicationById, clearSelected: s.clearSelected, updateStatus: s.updateStatus })));
+  const { close } = useDrawerStore(useShallow((s) => ({ close: s.close })));
   const statusConfigs = useStatusConfigStore((s) => s.configs);
   const { has } = usePermissions();
   const [note, setNote] = useState("");

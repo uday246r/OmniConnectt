@@ -34,6 +34,8 @@ interface AppGroup extends ModuleAppGroup {
 
 export function SettingsCheckerAssignmentTab() {
   const accessToken = useAuthStore((s) => s.accessToken)
+  // A token refresh must not re-run a load (and reset what the user is editing) — only its first arrival.
+  const hasAccessToken = Boolean(accessToken)
   const isAdministrator = Boolean(useAuthStore((s) => s.user)?.isAdministrator)
   const hasCapability = useAuthStore((s) => s.hasCapability)
   const pushLayer = useSettingsDrawerStore((s) => s.pushLayer)
@@ -91,7 +93,7 @@ export function SettingsCheckerAssignmentTab() {
     return () => {
       cancelled = true
     }
-  }, [accessToken, dataRevision])
+  }, [hasAccessToken, dataRevision])
 
   // Group modules by Application (Host Platform + Remote Apps), then layer in this page's own
   // gated/checker counts — the grouping itself is shared with the assignment form's "whole

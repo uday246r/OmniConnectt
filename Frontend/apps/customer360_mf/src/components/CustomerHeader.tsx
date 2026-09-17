@@ -5,6 +5,7 @@ import type { IndividualProfile, CorporateProfile } from '../types/api';
 import styles from './CustomerHeader.module.css';
 import cc from '../shared/c360Common.module.css';
 import { Button } from '@omniconnect/ui';
+import { useShallow } from 'zustand/react/shallow';
 
 interface CustomerHeaderProps {
   activeTab: string;
@@ -14,7 +15,7 @@ interface CustomerHeaderProps {
 }
 
 export default function CustomerHeader({ activeTab, setActiveTab, setActiveSubTab }: CustomerHeaderProps) {
-  const { customerType, profile } = useCustomerStore();
+  const { customerType, profile } = useCustomerStore(useShallow((s) => ({ customerType: s.customerType, profile: s.profile })));
 
   if (!profile) return null;
 

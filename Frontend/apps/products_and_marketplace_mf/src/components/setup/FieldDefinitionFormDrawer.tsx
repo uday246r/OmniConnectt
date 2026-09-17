@@ -7,13 +7,14 @@ import { useSetupStore } from "../../stores/useSetupStore";
 import { useDrawerStore } from "../../stores/useDrawerStore";
 import { useToastStore } from "../../stores/useToastStore";
 import type { FieldDataType } from "../../types/domain";
+import { useShallow } from "zustand/react/shallow";
 
 const DATA_TYPES: FieldDataType[] = ["Text", "Number", "Currency", "Percentage", "Boolean", "Date", "Dropdown", "MultiSelect"];
 
 export function FieldDefinitionFormDrawer({ productTypeId, fieldId }: { productTypeId: string; fieldId?: string }) {
   const isEdit = !!fieldId;
-  const { close } = useDrawerStore();
-  const { productTypes, createField, updateField } = useSetupStore();
+  const { close } = useDrawerStore(useShallow((s) => ({ close: s.close })));
+  const { productTypes, createField, updateField } = useSetupStore(useShallow((s) => ({ productTypes: s.productTypes, createField: s.createField, updateField: s.updateField })));
   const productType = productTypes.find((t) => t.id === productTypeId);
   const existing = productType?.fieldDefinitions.find((f) => f.id === fieldId);
 

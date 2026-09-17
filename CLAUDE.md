@@ -187,7 +187,14 @@ assuming the fault is here.
 ### `@omniconnect/ui`
 Consumed by all three frontend apps as a pnpm `workspace:*` dependency — deliberately **not** a Module
 Federation `exposes` and not an MF shared singleton, so the host keeps zero build-time remotes and every
-remote stays independently buildable. Read `docs/SHARED-UI-REFACTOR-STATUS.md` before touching any CSS
+remote stays independently buildable. **Remote data loading:** each remote's HTTP layer (lead
+`api/apiClient.ts` `fetchWithAuth`, products `services/httpClient.ts` axios adapter, customer360
+`services/api.ts` `request`) routes every GET through `createRequestCache` from `@omniconnect/ui` —
+identical overlapping reads share one request, successes are reused briefly (reference data longer),
+any write clears the cache, and keys include the signed-in user id. Customer profile lookups in
+customer360 are de-duplicated but never reused (the server audits each lookup). Read stores with a
+selector (`useXStore(useShallow((s) => ({ … })))` or `useXStore((s) => s.x)`), never `useXStore()` —
+a whole-store subscription re-renders on every store write. Read `docs/SHARED-UI-REFACTOR-STATUS.md` before touching any CSS
 in this repo; it documents the traps that typecheck and build cannot catch (e.g. a remote rendering
 unstyled because it's missing the `tokens.css` import).
 

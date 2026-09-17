@@ -18,6 +18,8 @@ const PAGE_SIZE = 10
 
 export function SettingsRolesTab() {
   const accessToken = useAuthStore((s) => s.accessToken)
+  // A token refresh must not re-run a load (and reset what the user is editing) — only its first arrival.
+  const hasAccessToken = Boolean(accessToken)
   const isAdministrator = Boolean(useAuthStore((s) => s.user)?.isAdministrator)
   const hasCapability = useAuthStore((s) => s.hasCapability)
   // The role the signed-in user currently holds — deleting it would strip their own access, and the
@@ -78,7 +80,7 @@ export function SettingsRolesTab() {
     return () => {
       cancelled = true
     }
-  }, [accessToken, debouncedSearch, page, dataRevision])
+  }, [hasAccessToken, debouncedSearch, page, dataRevision])
 
   // A new search term invalidates the current page number.
   useEffect(() => {

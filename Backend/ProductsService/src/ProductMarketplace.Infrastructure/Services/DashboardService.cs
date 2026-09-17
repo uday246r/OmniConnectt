@@ -30,30 +30,58 @@ public class DashboardService : IDashboardService
         var cutoff = now.AddDays(-7);
 
         /*
-         * Counted by the database. Both whole tables used to be loaded into memory to count them in C#,
-         * so the dashboard's cost grew with every product and application ever created.
+         * Counted by the database, one query per table.
+         *
+         * These were ten separate COUNT queries run one after another. Each is cheap, but each is a
+         * round trip, and with the database a few hundred milliseconds away the summary took 3–6 s
+         * before the page could show a single number. Grouping every row of a table into one group and
+         * counting with a filter per figure asks for the same numbers in one statement per table
+         * (COUNT(*) FILTER (WHERE …) on Postgres).
          */
-        var products = _db.Products.AsNoTracking();
-        var applications = _db.Applications.AsNoTracking();
         string[] approvedStatuses = ["Approved", "Completed"];
 
-        var totalProductsNow = await products.CountAsync(ct);
-        var totalProductsThen = await products.CountAsync(p => p.CreatedAt <= cutoff, ct);
+        var productCounts = await _db.Products.AsNoTracking()
+            .GroupBy(_ => 1)
+            .Select(g => new
+            {
+                Total = g.Count(),
+                TotalThen = g.Count(p => p.CreatedAt <= cutoff),
+                Active = g.Count(p => p.Status == "Active"),
+                ActiveThen = g.Count(p => p.Status == "Active" && p.CreatedAt <= cutoff),
+            })
+            .FirstOrDefaultAsync(ct);
 
-        var activeNow = await products.CountAsync(p => p.Status == "Active", ct);
-        var activeThen = await products.CountAsync(p => p.Status == "Active" && p.CreatedAt <= cutoff, ct);
+        var applicationCounts = await _db.Applications.AsNoTracking()
+            .GroupBy(_ => 1)
+            .Select(g => new
+            {
+                Total = g.Count(),
+                TotalThen = g.Count(a => a.CreatedAt <= cutoff),
+                Approved = g.Count(a => approvedStatuses.Contains(a.Status)),
+                ApprovedThen = g.Count(a => approvedStatuses.Contains(a.Status) && a.CreatedAt <= cutoff),
+            })
+            .FirstOrDefaultAsync(ct);
 
-        var totalAppsNow = await applications.CountAsync(ct);
-        var totalAppsThen = await applications.CountAsync(a => a.CreatedAt <= cutoff, ct);
+        var viewCounts = await _db.ProductViewLogs.AsNoTracking()
+            .GroupBy(_ => 1)
+            .Select(g => new { Total = g.Count(), TotalThen = g.Count(v => v.ViewedAt <= cutoff) })
+            .FirstOrDefaultAsync(ct);
 
-        var approvedNow = await applications.CountAsync(a => approvedStatuses.Contains(a.Status), ct);
-        var approvedThen = await applications.CountAsync(a => approvedStatuses.Contains(a.Status) && a.CreatedAt <= cutoff, ct);
+        // An empty table has no group to count, so its figures are zero.
+        var totalProductsNow = productCounts?.Total ?? 0;
+        var totalProductsThen = productCounts?.TotalThen ?? 0;
+        var activeNow = productCounts?.Active ?? 0;
+        var activeThen = productCounts?.ActiveThen ?? 0;
+        var totalAppsNow = applicationCounts?.Total ?? 0;
+        var totalAppsThen = applicationCounts?.TotalThen ?? 0;
+        var approvedNow = applicationCounts?.Approved ?? 0;
+        var approvedThen = applicationCounts?.ApprovedThen ?? 0;
 
         var conversionNow = totalAppsNow == 0 ? 0 : Math.Round(approvedNow / (double)totalAppsNow * 100, 2);
         var conversionThen = totalAppsThen == 0 ? 0 : Math.Round(approvedThen / (double)totalAppsThen * 100, 2);
 
-        var viewsNow = await _db.ProductViewLogs.AsNoTracking().CountAsync(ct);
-        var viewsThen = await _db.ProductViewLogs.AsNoTracking().CountAsync(v => v.ViewedAt <= cutoff, ct);
+        var viewsNow = viewCounts?.Total ?? 0;
+        var viewsThen = viewCounts?.TotalThen ?? 0;
 
         return new DashboardSummaryDto
         {

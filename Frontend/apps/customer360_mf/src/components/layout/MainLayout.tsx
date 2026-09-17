@@ -5,6 +5,7 @@ import AllProducts from '../../pages/AllProducts';
 import AllInteractions from '../../pages/AllInteractions';
 import AuditLogs from '../../pages/AuditLogs';
 import FieldSettings from '../../pages/FieldSettings';
+import { useShallow } from 'zustand/react/shallow';
 
 /** The page keys this remote exposes. They match the route segments in Customer360NavigationManifest. */
 export type C360Page =
@@ -30,7 +31,7 @@ interface MainLayoutProps {
  * URL never reflected.
  */
 export const MainLayout: React.FC<MainLayoutProps> = ({ page }) => {
-  const { loadActiveProfile, setCustomerType } = useCustomerStore();
+  const { loadActiveProfile, setCustomerType } = useCustomerStore(useShallow((s) => ({ loadActiveProfile: s.loadActiveProfile, setCustomerType: s.setCustomerType })));
 
   const activePage = (page ?? 'individual') as C360Page;
 

@@ -17,6 +17,7 @@ import { useLeadStore } from '../../store/useLeadStore';
 import { isFieldVisible } from '../../config/fieldControlRegistry';
 import { formatPhone } from '../../shared/formatPhone';
 import { FilterCriterion } from '../../types/lead';
+import { useShallow } from 'zustand/react/shallow';
 
 interface LeadFilterPopoverProps {
   isOpen: boolean;
@@ -64,7 +65,7 @@ export const LeadFilterPopover: React.FC<LeadFilterPopoverProps> = ({ isOpen, on
     removeFilterRule,
     clearAllFilters,
     fetchLeads,
-  } = useLeadStore();
+  } = useLeadStore(useShallow((s) => ({ products: s.products, branches: s.branches, leads: s.leads, commonFieldConfig: s.commonFieldConfig, filterRules: s.filterRules, updateFilterRule: s.updateFilterRule, removeFilterRule: s.removeFilterRule, clearAllFilters: s.clearAllFilters, fetchLeads: s.fetchLeads })));
 
   const [activeTab, setActiveTab] = useState<FilterCriterion>('product');
   const [searchQueries, setSearchQueries] = useState<Record<string, string>>({});

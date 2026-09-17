@@ -29,13 +29,13 @@ public class ProductService : IProductService
         .Include(p => p.Promotions);
 
     /// <summary>The single definition of which products a catalogue query selects — shared by the page and the download.</summary>
-    private IQueryable<Product> Filtered(ProductQueryDto query)
+    private IQueryable<Product> Filtered(ProductQueryDto query, bool includeStatus = true)
     {
         var q = _db.Products.AsNoTracking().AsQueryable();
 
         if (query.CategoryId.HasValue) q = q.Where(p => p.CategoryId == query.CategoryId);
         if (query.ProductTypeId.HasValue) q = q.Where(p => p.ProductTypeId == query.ProductTypeId);
-        if (!string.IsNullOrWhiteSpace(query.Status))
+        if (includeStatus && !string.IsNullOrWhiteSpace(query.Status))
             q = q.Where(p => p.Status == query.Status);
         if (query.MinRating.HasValue) q = q.Where(p => p.RatingAverage >= query.MinRating.Value);
 
@@ -54,6 +54,23 @@ public class ProductService : IProductService
         }
 
         return q;
+    }
+
+    /// <summary>
+    /// How many products hold each status under the catalogue's other filters (the status filter itself
+    /// is ignored), in one grouped query.
+    /// </summary>
+    /// <remarks>
+    /// The Products page used to learn these by running a full page search per status — a count, the
+    /// ranking config and a one-row graph load, six times over — and again whenever its list changed.
+    /// </remarks>
+    public async Task<IReadOnlyList<StatusCountDto>> StatusCountsAsync(ProductQueryDto query, CancellationToken ct = default)
+    {
+        var rows = await Filtered(query, includeStatus: false)
+            .GroupBy(p => p.Status)
+            .Select(g => new { Status = g.Key, Count = g.Count() })
+            .ToListAsync(ct);
+        return rows.OrderBy(r => r.Status).Select(r => new StatusCountDto(r.Status, r.Count)).ToList();
     }
 
     private async Task<IOrderedQueryable<Product>> SortedAsync(IQueryable<Product> q, string sort, CancellationToken ct)
@@ -137,7 +154,22 @@ public class ProductService : IProductService
             .Select(p => p.Id)
             .ToListAsync(ct);
 
-        var loaded = await FullGraph().AsNoTracking().AsSplitQuery()
+        /*
+         * Only what a product card shows, in one statement.
+         *
+         * This loaded the full detail graph — field values, benefits, eligibility criteria, reviews and
+         * every promotion — as a split query of seven round trips, for at most a page of cards that use
+         * none of the reviews or eligibility rows, only the card fields, two feature tags and the current
+         * promotion. Filtered includes bring back exactly those; for one page of products the joined
+         * result stays small, so a single query beats seven sequential ones.
+         */
+        var loaded = await _db.Products.AsNoTracking()
+            .Include(p => p.Category)
+            .Include(p => p.ProductType)
+            .Include(p => p.FieldValues.Where(v => v.FieldDefinition.DisplayOnCard)).ThenInclude(v => v.FieldDefinition)
+            .Include(p => p.Benefits.OrderBy(b => b.SortOrder).Take(2))
+            .Include(p => p.Promotions.Where(x => x.Status == "Active" && x.StartDate <= now && x.EndDate >= now))
+            .AsSingleQuery()
             .Where(p => pageIds.Contains(p.Id))
             .ToListAsync(ct);
         var byId = loaded.ToDictionary(p => p.Id);

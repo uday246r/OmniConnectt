@@ -4,9 +4,10 @@ import { Icon } from "../common/Icon";
 import { useEmploymentTypeStore } from "../../stores/useEmploymentTypeStore";
 import { useDrawerStore } from "../../stores/useDrawerStore";
 import { formatDate } from "../../utils/fieldFormat";
+import { useShallow } from "zustand/react/shallow";
 
 export function EmploymentTypeDetailsDrawer({ employmentTypeId }: { employmentTypeId: string }) {
-  const { close } = useDrawerStore();
+  const { close } = useDrawerStore(useShallow((s) => ({ close: s.close })));
   const items = useEmploymentTypeStore((s) => s.items);
   const empType = items.find((e) => e.id === employmentTypeId) ?? null;
 

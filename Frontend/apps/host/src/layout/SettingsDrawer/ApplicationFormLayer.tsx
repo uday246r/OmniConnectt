@@ -73,6 +73,8 @@ function isValidHttpUrl(value: string): boolean {
 export function ApplicationFormLayer({ appId }: ApplicationFormLayerProps) {
   const isEdit = Boolean(appId)
   const accessToken = useAuthStore((s) => s.accessToken)
+  // A token refresh must not re-run a load (and reset what the user is editing) — only its first arrival.
+  const hasAccessToken = Boolean(accessToken)
   const ensureFreshAccessToken = useAuthStore((s) => s.ensureFreshAccessToken)
   const popLayer = useSettingsDrawerStore((s) => s.popLayer)
 
@@ -127,7 +129,7 @@ export function ApplicationFormLayer({ appId }: ApplicationFormLayerProps) {
     return () => {
       cancelled = true
     }
-  }, [accessToken, appId])
+  }, [hasAccessToken, appId])
 
   /*
    * The other registered apps, so the position field can say what a number actually means rather
@@ -158,7 +160,7 @@ export function ApplicationFormLayer({ appId }: ApplicationFormLayerProps) {
     return () => {
       cancelled = true
     }
-  }, [accessToken, appId])
+  }, [hasAccessToken, appId])
 
   /** The app currently sitting on the chosen position, if any. */
   const positionOccupant = useMemo(

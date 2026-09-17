@@ -6,11 +6,12 @@ import { Icon } from "../common/Icon";
 import { useSetupStore } from "../../stores/useSetupStore";
 import { useDrawerStore } from "../../stores/useDrawerStore";
 import { useToastStore } from "../../stores/useToastStore";
+import { useShallow } from "zustand/react/shallow";
 
 export function DocumentDefinitionFormDrawer({ documentId }: { documentId?: string }) {
   const isEdit = !!documentId;
-  const { close } = useDrawerStore();
-  const { documentDefinitions, productTypes, createDocumentDefinition, updateDocumentDefinition } = useSetupStore();
+  const { close } = useDrawerStore(useShallow((s) => ({ close: s.close })));
+  const { documentDefinitions, productTypes, createDocumentDefinition, updateDocumentDefinition } = useSetupStore(useShallow((s) => ({ documentDefinitions: s.documentDefinitions, productTypes: s.productTypes, createDocumentDefinition: s.createDocumentDefinition, updateDocumentDefinition: s.updateDocumentDefinition })));
   const existing = documentDefinitions.find((d) => d.id === documentId);
 
   const [name, setName] = useState(existing?.name ?? "");

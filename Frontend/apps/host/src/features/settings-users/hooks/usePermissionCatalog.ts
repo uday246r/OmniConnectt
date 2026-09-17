@@ -9,6 +9,8 @@ import { permissionsApi, type PermissionFeatureDto } from '../../../shared/api/p
  */
 export function usePermissionCatalog(): { catalog: PermissionFeatureDto[]; loading: boolean } {
   const accessToken = useAuthStore((s) => s.accessToken)
+  // A token refresh must not re-run a load (and reset what the user is editing) — only its first arrival.
+  const hasAccessToken = Boolean(accessToken)
   const [catalog, setCatalog] = useState<PermissionFeatureDto[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -30,7 +32,7 @@ export function usePermissionCatalog(): { catalog: PermissionFeatureDto[]; loadi
     return () => {
       cancelled = true
     }
-  }, [accessToken])
+  }, [hasAccessToken])
 
   return { catalog, loading }
 }

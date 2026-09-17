@@ -93,14 +93,23 @@ public class UserAppService(
     /// <summary>Headline counts for the whole directory, computed by the database.</summary>
     public async Task<UserDirectorySummaryDto> SummaryAsync(CancellationToken ct = default)
     {
-        // Three index-friendly counts rather than one grouped aggregate over a navigation, which not every
-        // provider translates. A DbContext runs one command at a time, so they are awaited in turn.
-        var users = db.Users.AsNoTracking();
-        var total = await users.CountAsync(ct);
-        var active = await users.CountAsync(u => u.Status == UserStatus.Active, ct);
-        var administrators = await users.CountAsync(u => u.Role != null && u.Role.IsAdministrator, ct);
+        // One statement: every figure the cards show, counted with a filter each. These were three
+        // sequential queries, one round trip apiece. The role flag is projected before grouping so the
+        // aggregate never has to follow a navigation property.
+        var counts = await db.Users.AsNoTracking()
+            .Select(u => new { Active = u.Status == UserStatus.Active, Administrator = u.Role != null && u.Role.IsAdministrator })
+            .GroupBy(_ => 1)
+            .Select(g => new
+            {
+                Total = g.Count(),
+                Active = g.Count(u => u.Active),
+                Administrators = g.Count(u => u.Administrator),
+            })
+            .FirstOrDefaultAsync(ct);
 
-        return new UserDirectorySummaryDto(total, active, total - active, administrators);
+        var total = counts?.Total ?? 0;
+        var active = counts?.Active ?? 0;
+        return new UserDirectorySummaryDto(total, active, total - active, counts?.Administrators ?? 0);
     }
 
     /// <summary>The roles the Role filter can offer, under the other filters applied.</summary>

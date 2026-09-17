@@ -29,7 +29,6 @@ import { useAuthStore } from '../../../auth/store/authStore'
 import { ApiError } from '../../../../shared/api/httpClient'
 import { Icon } from '../../../../shared/components/Icon/Icon'
 import { toast } from '../../../../shared/stores/toastStore'
-import { TOPICS, useDataRevision } from '../../../../shared/stores/invalidationStore'
 import { useDebouncedValue } from '../../../../shared/hooks/useDebouncedValue'
 import {
   auditLogsApi,
@@ -79,7 +78,8 @@ export function UserActivityTab({ userId, userName }: UserActivityTabProps) {
   const hasCapability = useAuthStore((s) => s.hasCapability)
   const canView = isAdministrator || hasCapability('host.system.audit-logs', 'View')
   const canExport = isAdministrator || hasCapability('host.system.audit-logs', 'Export')
-  const auditRevision = useDataRevision(TOPICS.auditLogs)
+  // No revision in the keys: an audit event invalidates ['auditLogs'] through the invalidation bridge.
+  // With it, each event orphaned a cache entry and fetched twice.
 
   const [page, setPage] = useState(1)
   const [involvement, setInvolvement] = useState<Involvement>('')
@@ -113,7 +113,7 @@ export function UserActivityTab({ userId, userName }: UserActivityTabProps) {
   }, [filters])
 
   const listQuery = useQuery({
-    queryKey: ['auditLogs', 'user', userId, filters, page, auditRevision],
+    queryKey: ['auditLogs', 'user', userId, filters, page],
     enabled: canView && Boolean(accessToken),
     placeholderData: keepPreviousData,
     queryFn: ({ signal }) =>
@@ -121,7 +121,7 @@ export function UserActivityTab({ userId, userName }: UserActivityTabProps) {
   })
 
   const facetsQuery = useQuery({
-    queryKey: ['auditLogs', 'user-facets', userId, filters, auditRevision],
+    queryKey: ['auditLogs', 'user-facets', userId, filters],
     enabled: canView && Boolean(accessToken),
     placeholderData: keepPreviousData,
     queryFn: ({ signal }) => auditLogsApi.facets(accessToken!, filters, signal),

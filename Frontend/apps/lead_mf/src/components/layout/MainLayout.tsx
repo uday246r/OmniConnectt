@@ -6,6 +6,7 @@ import { DashboardPage } from '../../pages/DashboardPage';
 import { ViewLeadPage } from '../../pages/ViewLeadPage';
 import { AuditLogsPage } from '../../pages/AuditLogsPage';
 import { FieldSettingsPage } from '../../pages/FieldSettingsPage';
+import { useShallow } from 'zustand/react/shallow';
 
 /** The page keys this remote exposes. They match the route segments declared in LeadNavigationManifest. */
 export type LeadPage = 'dashboard' | 'create-lead' | 'view-lead' | 'audit-logs' | 'field-settings';
@@ -25,28 +26,21 @@ interface MainLayoutProps {
  * than internal state the URL never saw.
  */
 export const MainLayout: React.FC<MainLayoutProps> = ({ page }) => {
-  const { fetchDashboardData, fetchMasterData, fetchLeads, products } = useLeadStore();
+  const fetchMasterData = useLeadStore((s) => s.fetchMasterData);
 
   /*
-   * App-level boot data, once per mount.
+   * Only the reference data every page's dropdowns share loads here, once; fetchMasterData is a no-op
+   * while a load is running or done.
    *
-   * `products.length` used to be a dependency of this effect, so the arrival of master data re-ran
-   * the whole thing and re-fetched the dashboard AND the leads — the second half of the
-   * skeleton → rows → skeleton → rows flicker on the Lead Directory. Splitting the master-data
-   * fetch into its own mount-only effect removes the feedback loop: the thing that changes
-   * `products` is no longer in the dependency list of the thing that reads it.
+   * The layout used to also load the dashboard charts and the lead list on every mount — for every
+   * page, including Create Lead and Audit Logs that show neither — while the Dashboard and Lead
+   * Directory pages loaded the same things again. Each page now loads what it displays and nothing
+   * else, and this component reads a single store action, so a store write no longer re-renders the
+   * whole remote.
    */
   useEffect(() => {
-    fetchDashboardData();
-    fetchLeads();
-  }, [fetchDashboardData, fetchLeads]);
-
-  useEffect(() => {
-    if (products.length === 0) {
-      fetchMasterData();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    void fetchMasterData();
+  }, [fetchMasterData]);
 
   const activePage = (page ?? 'dashboard') as LeadPage;
 

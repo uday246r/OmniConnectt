@@ -8,6 +8,7 @@ import { useLeadStore } from '../store/useLeadStore';
 import styles from './AuditLogsPage.module.css';
 import shell from '../shared/leadPage.module.css';
 import { AuditDetailsDrawer } from '../components/audit/AuditDetailsDrawer';
+import { useShallow } from 'zustand/react/shallow';
 
 export const AuditLogsPage: React.FC = () => {
   const {
@@ -33,7 +34,7 @@ export const AuditLogsPage: React.FC = () => {
     totalAuditRecords,
     setAuditPage,
     setAuditPageSize,
-  } = useLeadStore();
+  } = useLeadStore(useShallow((s) => ({ auditLogs: s.auditLogs, auditSearchQuery: s.auditSearchQuery, auditActionFilter: s.auditActionFilter, auditDateRange: s.auditDateRange, setAuditDateRange: s.setAuditDateRange, isLoadingAuditLogs: s.isLoadingAuditLogs, fetchAuditLogs: s.fetchAuditLogs, openAuditDetails: s.openAuditDetails, setAuditSearchQuery: s.setAuditSearchQuery, setAuditActionFilter: s.setAuditActionFilter, auditActorFilter: s.auditActorFilter, setAuditActorFilter: s.setAuditActorFilter, auditStatusFilter: s.auditStatusFilter, setAuditStatusFilter: s.setAuditStatusFilter, auditPage: s.auditPage, auditPageSize: s.auditPageSize, totalAuditRecords: s.totalAuditRecords, setAuditPage: s.setAuditPage, setAuditPageSize: s.setAuditPageSize })));
 
   const totalAuditPages = Math.max(1, Math.ceil(totalAuditRecords / auditPageSize));
   const auditStartIndex = totalAuditRecords > 0 ? (auditPage - 1) * auditPageSize + 1 : 0;

@@ -30,6 +30,7 @@ import cc from '../shared/c360Common.module.css';
 import { Button, ColumnFilter, DataTable, EMPTY_VALUE, FilterBar, Input, PageHeader, Pagination, ResponsiveRows, RowAction, RowsPerPage, SearchField, Select, getInitials, sanitizeFilterInput, useDebouncedValue, type ActiveFilter, type FilterInputType } from '@omniconnect/ui';
 import { StatusBadge } from '../shared/StatusBadge';
 import { formatValue, formatCurrency as formatMoney, resolveProductStatus } from '../shared/formatValue';
+import { useShallow } from 'zustand/react/shallow';
 
 
 /** One "sub-item" row skeleton — matches .left-tab-btn's real height/padding (10px 14px, 13px text). */
@@ -128,7 +129,7 @@ function ProfileWorkspaceSkeleton({ isIndividual }: { isIndividual: boolean }) {
 }
 
 export default function Customer360() {
-  const { customerType, profile, contactInfo, loading, error, errorStatus, loadActiveProfile } = useCustomerStore();
+  const { customerType, profile, contactInfo, loading, error, errorStatus, loadActiveProfile } = useCustomerStore(useShallow((s) => ({ customerType: s.customerType, profile: s.profile, contactInfo: s.contactInfo, loading: s.loading, error: s.error, errorStatus: s.errorStatus, loadActiveProfile: s.loadActiveProfile })));
   const {
     interactions,
     loading: loadingInteractions,
@@ -136,7 +137,7 @@ export default function Customer360() {
     errorStatus: interactionsErrorStatus,
     loadInteractions,
     openCaseModal
-  } = useInteractionStore();
+  } = useInteractionStore(useShallow((s) => ({ interactions: s.interactions, loading: s.loading, error: s.error, errorStatus: s.errorStatus, loadInteractions: s.loadInteractions, openCaseModal: s.openCaseModal })));
   const {
     products,
     loading: loadingProducts,
@@ -150,7 +151,7 @@ export default function Customer360() {
     totalPages,
     setPageNumber,
     setPageSize
-  } = useProductStore();
+  } = useProductStore(useShallow((s) => ({ products: s.products, loading: s.loading, error: s.error, errorStatus: s.errorStatus, loadProducts: s.loadProducts, openProductModal: s.openProductModal, pageNumber: s.pageNumber, pageSize: s.pageSize, totalCount: s.totalCount, totalPages: s.totalPages, setPageNumber: s.setPageNumber, setPageSize: s.setPageSize })));
 
   const navigate = useHostNavigate();
 

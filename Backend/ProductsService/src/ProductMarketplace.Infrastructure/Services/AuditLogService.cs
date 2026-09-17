@@ -87,10 +87,29 @@ public class AuditLogService : IAuditLogService
     {
         var q = ApplyFilters(query);
 
-        var total = await q.CountAsync(ct);
-        var success = await q.CountAsync(a => a.Success, ct);
-        var actionTypes = await q.Select(a => a.Action).Distinct().CountAsync(ct);
-        var entityTypes = await q.Select(a => a.EntityType).Distinct().CountAsync(ct);
+        // Two statements instead of four sequential ones (each is a round trip to the database): the
+        // plain counts share one grouped query, the two distinct counts share another.
+        var counts = await q
+            .GroupBy(_ => 1)
+            .Select(g => new
+            {
+                Total = g.Count(),
+                Success = g.Count(a => a.Success),
+            })
+            .FirstOrDefaultAsync(ct);
+        var distinct = await q
+            .GroupBy(_ => 1)
+            .Select(g => new
+            {
+                ActionTypes = g.Select(a => a.Action).Distinct().Count(),
+                EntityTypes = g.Select(a => a.EntityType).Distinct().Count(),
+            })
+            .FirstOrDefaultAsync(ct);
+
+        var total = counts?.Total ?? 0;
+        var success = counts?.Success ?? 0;
+        var actionTypes = distinct?.ActionTypes ?? 0;
+        var entityTypes = distinct?.EntityTypes ?? 0;
 
         return new AuditLogSummaryDto
         {

@@ -42,6 +42,8 @@ export function ProfilePage() {
   const navigate = useNavigate()
   const user = useAuthStore((s) => s.user)
   const accessToken = useAuthStore((s) => s.accessToken)
+  // A token refresh must not re-run a load (and reset what the user is editing) — only its first arrival.
+  const hasAccessToken = Boolean(accessToken)
   const fineCapabilities = useAuthStore((s) => s.fineCapabilities)
   const refreshSession = useAuthStore((s) => s.refreshSession)
   const registryApps = useRemoteHealthStore((s) => s.entries)
@@ -76,7 +78,7 @@ export function ProfilePage() {
     return () => {
       cancelled = true
     }
-  }, [accessToken])
+  }, [hasAccessToken])
 
   if (!user) return null
 

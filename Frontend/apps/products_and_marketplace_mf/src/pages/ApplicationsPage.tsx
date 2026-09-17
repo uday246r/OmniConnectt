@@ -9,6 +9,7 @@ import { useApplicationStore } from "../stores/useApplicationStore";
 import { useDrawerStore } from "../stores/useDrawerStore";
 import { useStatusConfigStore } from "../stores/useStatusConfigStore";
 import { formatDate } from "../utils/fieldFormat";
+import { useShallow } from "zustand/react/shallow";
 
 export function ApplicationsPage() {
   const {
@@ -26,9 +27,9 @@ export function ApplicationsPage() {
     setPage,
     setPageSize,
     fetchApplications,
-  } = useApplicationStore();
-  const { open } = useDrawerStore();
-  const { configs: statusConfigs, fetchAll: fetchStatusConfigs } = useStatusConfigStore();
+  } = useApplicationStore(useShallow((s) => ({ items: s.items, loading: s.loading, error: s.error, search: s.search, status: s.status, page: s.page, pageSize: s.pageSize, totalCount: s.totalCount, statusCounts: s.statusCounts, setSearch: s.setSearch, setStatus: s.setStatus, setPage: s.setPage, setPageSize: s.setPageSize, fetchApplications: s.fetchApplications })));
+  const { open } = useDrawerStore(useShallow((s) => ({ open: s.open })));
+  const { configs: statusConfigs, fetchAll: fetchStatusConfigs } = useStatusConfigStore(useShallow((s) => ({ configs: s.configs, fetchAll: s.fetchAll })));
 
   const [pageSizeOption, setPageSizeOption] = useState<string>("10");
   const [customPageSize, setCustomPageSize] = useState<number>(15);

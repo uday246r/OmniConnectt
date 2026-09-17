@@ -23,6 +23,7 @@ import { useLeadStore } from '../../store/useLeadStore';
 import type { FieldDiff } from '../../types/lead';
 import styles from './AuditDetailsDrawer.module.css';
 import { Badge } from '@omniconnect/ui';
+import { useShallow } from 'zustand/react/shallow';
 
 function formatTimestamp(iso?: string | null): string {
   if (!iso) return '—';
@@ -100,7 +101,7 @@ function getActionLabel(action?: string): string {
 }
 
 export const AuditDetailsDrawer: React.FC = () => {
-  const { isAuditDetailsOpen, selectedAuditLog, closeAuditDetails } = useLeadStore();
+  const { isAuditDetailsOpen, selectedAuditLog, closeAuditDetails } = useLeadStore(useShallow((s) => ({ isAuditDetailsOpen: s.isAuditDetailsOpen, selectedAuditLog: s.selectedAuditLog, closeAuditDetails: s.closeAuditDetails })));
 
   // Lock body scroll when drawer is open
   useEffect(() => {

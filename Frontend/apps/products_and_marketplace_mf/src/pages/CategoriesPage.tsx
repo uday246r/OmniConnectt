@@ -4,10 +4,11 @@ import { CategoryManagementPanel } from "../components/category/CategoryManageme
 import { useDrawerStore } from "../stores/useDrawerStore";
 import { usePermissions } from "../permissions/PermissionContext";
 import { PERMISSIONS } from "../permissions/permissions";
+import { useShallow } from "zustand/react/shallow";
 import "./CategoriesPage.css";
 
 export function CategoriesPage() {
-  const { open } = useDrawerStore();
+  const { open } = useDrawerStore(useShallow((s) => ({ open: s.open })));
   const { has } = usePermissions();
   const canCreate = has(PERMISSIONS.CATEGORIES_CREATE);
 

@@ -9,6 +9,7 @@ import { useStatusConfigStore } from "../../stores/useStatusConfigStore";
 import { useToastStore } from "../../stores/useToastStore";
 import { productApi } from "../../services/productApi";
 import type { ProductListItem, PromotionStatus } from "../../types/domain";
+import { useShallow } from "zustand/react/shallow";
 
 function toInputDate(value?: string) {
   if (!value) return "";
@@ -17,8 +18,8 @@ function toInputDate(value?: string) {
 
 export function PromotionFormDrawer({ promotionId }: { promotionId?: string }) {
   const isEdit = !!promotionId;
-  const { close } = useDrawerStore();
-  const { items, createPromotion, updatePromotion } = usePromotionStore();
+  const { close } = useDrawerStore(useShallow((s) => ({ close: s.close })));
+  const { items, createPromotion, updatePromotion } = usePromotionStore(useShallow((s) => ({ items: s.items, createPromotion: s.createPromotion, updatePromotion: s.updatePromotion })));
   const statusConfigs = useStatusConfigStore((s) => s.configs);
   const statusOptions = useMemo(
     () => statusConfigs.filter((c) => c.entityType === "Promotion").sort((a, b) => a.sortOrder - b.sortOrder),

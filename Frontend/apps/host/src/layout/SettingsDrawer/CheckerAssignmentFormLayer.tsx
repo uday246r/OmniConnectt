@@ -34,6 +34,8 @@ interface CheckerAssignmentFormLayerProps {
  */
 export function CheckerAssignmentFormLayer({ module: initialModule, appId: initialAppId }: CheckerAssignmentFormLayerProps) {
   const accessToken = useAuthStore((s) => s.accessToken)
+  // A token refresh must not re-run a load (and reset what the user is editing) — only its first arrival.
+  const hasAccessToken = Boolean(accessToken)
   const popLayer = useSettingsDrawerStore((s) => s.popLayer)
 
   // Scope: one module, or every module in one application at once. Opening from an app's "Assign to
@@ -129,7 +131,7 @@ export function CheckerAssignmentFormLayer({ module: initialModule, appId: initi
     return () => {
       cancelled = true
     }
-  }, [accessToken])
+  }, [hasAccessToken])
 
   const selectedModule = useMemo(() => modules.find((m) => m.key === module), [modules, module])
 

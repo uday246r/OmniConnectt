@@ -412,6 +412,8 @@ const FEATURE = 'host.system.approvals'
 
 export function ApprovalCenterPage() {
   const accessToken = useAuthStore((s) => s.accessToken)
+  // A token refresh must not re-run a load (and reset what the user is editing) — only its first arrival.
+  const hasAccessToken = Boolean(accessToken)
   const queryClient = useQueryClient()
   const refetchInterval = useLiveRefetchInterval()
   const currentUserId = useAuthStore((s) => s.user?.id)
@@ -677,7 +679,7 @@ export function ApprovalCenterPage() {
     return () => {
       cancelled = true
     }
-  }, [viewingId, accessToken])
+  }, [viewingId, hasAccessToken])
 
   const isMyDecisionToMake = Boolean(detail && currentUserId && detail.checkerId === currentUserId && detail.status === 'Pending')
 

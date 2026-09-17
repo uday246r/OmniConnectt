@@ -32,7 +32,7 @@ public static class DependencyInjection
         // concurrent load. Safe because AppDbContext takes nothing but its options.
         services.AddDbContextPool<AppDbContext>(options =>
             options.UseNpgsql(
-                configured ? connectionString : "Host=unconfigured;Database=unconfigured;Username=unconfigured;Password=unconfigured",
+                configured ? WithWarmPool(connectionString!, configuration) : "Host=unconfigured;Database=unconfigured;Username=unconfigured;Password=unconfigured",
                 npgsql =>
                 {
                     // Neon's serverless compute auto-suspends on idle; the first query after a suspend
@@ -58,4 +58,24 @@ public static class DependencyInjection
 
         return services;
     }
+
+    /*
+     * A few database connections kept open, and kept alive.
+     *
+     * Npgsql opens connections on demand and closes idle ones after five minutes, and each new connection
+     * to the managed database costs a TLS handshake of around two seconds from a developer machine, so the
+     * first page after a quiet spell waited on a handshake per request. `Database:MinimumPoolSize`
+     * (default 3; 0 turns it off) keeps that many open and a 30 s TCP keepalive stops idle ones being
+     * dropped. Only applied when the connection string does not already set these. Open connections also
+     * keep a serverless database from auto-suspending while the service runs.
+     */
+    private static string WithWarmPool(string connectionString, IConfiguration configuration)
+    {
+        var npgsql = new Npgsql.NpgsqlConnectionStringBuilder(connectionString);
+        var minimum = configuration.GetValue<int?>("Database:MinimumPoolSize") ?? 3;
+        if (npgsql.MinPoolSize == 0 && minimum > 0) npgsql.MinPoolSize = Math.Min(minimum, npgsql.MaxPoolSize);
+        if (npgsql.KeepAlive == 0) npgsql.KeepAlive = 30;
+        return npgsql.ConnectionString;
+    }
+
 }

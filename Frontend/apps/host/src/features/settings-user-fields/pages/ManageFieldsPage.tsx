@@ -14,6 +14,8 @@ import styles from './ManageFieldsPage.module.css'
 
 export function ManageFieldsPage() {
   const accessToken = useAuthStore((s) => s.accessToken)
+  // A token refresh must not re-run a load (and reset what the user is editing) — only its first arrival.
+  const hasAccessToken = Boolean(accessToken)
   const isAdministrator = Boolean(useAuthStore((s) => s.user)?.isAdministrator)
   const hasCapability = useAuthStore((s) => s.hasCapability)
   const canEdit = isAdministrator || hasCapability('host.settings.users', 'Edit')
@@ -58,7 +60,7 @@ export function ManageFieldsPage() {
     return () => {
       cancelled = true
     }
-  }, [accessToken])
+  }, [hasAccessToken])
 
   function withOrder(list: FieldDefinition[]): FieldDefinition[] {
     return list.map((f, i) => ({ ...f, order: i + 1 }))

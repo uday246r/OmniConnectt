@@ -3,13 +3,14 @@ import { useLeadStore } from '../../store/useLeadStore';
 import { SearchableDropdown } from '../common/SearchableDropdown';
 import { isFieldVisible, isFieldEditable, getFieldLabel } from '../../config/fieldControlRegistry';
 import styles from './PreferredSalesExecutiveSection.module.css';
+import { useShallow } from 'zustand/react/shallow';
 
 interface PreferredSalesExecutiveSectionProps {
   isEdit?: boolean;
 }
 
 export const PreferredSalesExecutiveSection: React.FC<PreferredSalesExecutiveSectionProps> = ({ isEdit = false }) => {
-  const store = useLeadStore();
+  const store = useLeadStore(useShallow((s) => ({ editFormData: s.editFormData, formData: s.formData, editErrors: s.editErrors, errors: s.errors, setEditFieldValue: s.setEditFieldValue, setFieldValue: s.setFieldValue, salesExecutives: s.salesExecutives, validateField: s.validateField, fieldConfig: s.fieldConfig })));
   const formData = isEdit ? store.editFormData : store.formData;
   const errors = isEdit ? store.editErrors : store.errors;
   const setFieldValue = isEdit ? store.setEditFieldValue : store.setFieldValue;

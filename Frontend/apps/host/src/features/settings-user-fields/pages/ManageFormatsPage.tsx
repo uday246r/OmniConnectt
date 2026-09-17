@@ -48,6 +48,8 @@ function summarize(preset: CustomPreset): string {
  */
 export function ManageFormatsPage() {
   const accessToken = useAuthStore((s) => s.accessToken)
+  // A token refresh must not re-run a load (and reset what the user is editing) — only its first arrival.
+  const hasAccessToken = Boolean(accessToken)
   const isAdministrator = Boolean(useAuthStore((s) => s.user)?.isAdministrator)
   const hasCapability = useAuthStore((s) => s.hasCapability)
   const canEdit = isAdministrator || hasCapability('host.settings.users', 'Edit')
@@ -87,7 +89,7 @@ export function ManageFormatsPage() {
     return () => {
       cancelled = true
     }
-  }, [accessToken])
+  }, [hasAccessToken])
 
   function handleSavePreset(preset: CustomPreset) {
     setPresets((prev) => {

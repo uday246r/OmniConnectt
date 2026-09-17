@@ -13,8 +13,7 @@ import { SkeletonStatCard, SkeletonDashboardWidget, SkeletonAuditRow, SkeletonDo
 import { Icon } from '../../shared/components/Icon/Icon'
 import styles from './DashboardPage.module.css'
 import { APP_NAME, COPYRIGHT_YEAR } from '../../shared/config/branding'
-import { TOPICS } from '../../shared/stores/invalidationStore'
-import { useLiveRevision } from '../../shared/hooks/useLiveRevision'
+import { useLiveRefetchInterval } from '../../shared/query/invalidationBridge'
 
 interface RoleDistribution {
   name: string
@@ -95,7 +94,9 @@ export function DashboardPage() {
    * KpiCoalescerService, and the Settings mutations that should still refresh these cards name it
    * explicitly in their invalidate(...) calls.
    */
-  const dataRevision = useLiveRevision(TOPICS.kpis)
+  // Stable key: a KPI event invalidates ['dashboard'] through the invalidation bridge, and this interval
+  // runs only while the socket is down. A revision in the key orphaned a cache entry per event.
+  const refetchInterval = useLiveRefetchInterval()
 
   /*
    * One cached query instead of component state.
@@ -103,15 +104,16 @@ export function DashboardPage() {
    * These figures lived in useState and were fetched by an effect on every mount, so each return to the
    * dashboard — and, before the settings routing fix, every click on the gear icon — refetched all of
    * it. The query client keeps the last answer fresh for 30 seconds and shares it across mounts; a live
-   * KPI event (dataRevision) is what asks for new numbers, not navigation.
+   * KPI event (via the invalidation bridge) is what asks for new numbers, not navigation.
    *
    * Applications and the audit tail are still row-level fetches because the page renders those rows.
    * Each is guarded on its own: a Promise.all rejects as a whole, and one failing card must not blank
    * the others or show "0 users" for a service that is actually up.
    */
   const dashboardQuery = useQuery({
-    queryKey: [...queryKeys.dashboard.stats(), dataRevision],
+    queryKey: queryKeys.dashboard.stats(),
     enabled: Boolean(accessToken),
+    refetchInterval,
     queryFn: async ({ signal }) => {
       const token = accessToken!
       const [stats, apps, logs] = await Promise.all([

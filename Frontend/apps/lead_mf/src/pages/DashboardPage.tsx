@@ -8,6 +8,7 @@ import { RecentLeadsCard } from '../components/dashboard/RecentLeadsCard';
 import { LeadDetailsDrawer } from '../components/lead/LeadDetailsDrawer';
 import styles from './DashboardPage.module.css';
 import shell from '../shared/leadPage.module.css';
+import { useShallow } from 'zustand/react/shallow';
 
 /*
  * These two cards are the only recharts consumers on the dashboard, and recharts is by a wide margin
@@ -35,7 +36,7 @@ const ChartCardFallback: React.FC = () => (
 );
 
 export const DashboardPage: React.FC = () => {
-  const { fetchDashboardData, fetchMasterData, products } = useLeadStore();
+  const { fetchDashboardData, fetchMasterData } = useLeadStore(useShallow((s) => ({ fetchDashboardData: s.fetchDashboardData, fetchMasterData: s.fetchMasterData })));
 
   // Capability keys, not component names — they match LeadCapabilityManifest exactly, which is what
   // an administrator sees in the Role editor and what the server enforces.
@@ -44,12 +45,12 @@ export const DashboardPage: React.FC = () => {
   const canSeeByBranch = canSeeDashboardCapability('chart.leads-by-branch');
   const canSeeRecentLeads = canSeeDashboardCapability('widget.recent-leads');
 
+  // Once per visit. `products.length` used to be a dependency, so master data arriving (0 → N) fetched
+  // every chart a second time. fetchMasterData is idempotent, so it needs no "already loaded" check here.
   useEffect(() => {
-    fetchDashboardData();
-    if (products.length === 0) {
-      fetchMasterData();
-    }
-  }, [fetchDashboardData, fetchMasterData, products.length]);
+    void fetchDashboardData();
+    void fetchMasterData();
+  }, [fetchDashboardData, fetchMasterData]);
 
   return (
     <div
