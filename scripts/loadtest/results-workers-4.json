@@ -1,0 +1,249 @@
+{
+  "at": "2026-09-17T18:00:28.704Z",
+  "connections": [
+    10,
+    50,
+    100,
+    200
+  ],
+  "duration": 15,
+  "signedInSkipped": null,
+  "results": [
+    {
+      "service": "auth",
+      "label": "AuthService",
+      "url": "http://localhost:5155",
+      "results": [
+        {
+          "service": "AuthService",
+          "connections": 10,
+          "req/s": 9,
+          "p50 ms": 614,
+          "p97.5 ms": 2919,
+          "p99 ms": 3723,
+          "max ms": 3724,
+          "total": 129,
+          "non-2xx": 0,
+          "timeouts": 0,
+          "errors": 0
+        },
+        {
+          "service": "AuthService",
+          "connections": 50,
+          "req/s": 55,
+          "p50 ms": 553,
+          "p97.5 ms": 3271,
+          "p99 ms": 3350,
+          "max ms": 5507,
+          "total": 828,
+          "non-2xx": 0,
+          "timeouts": 0,
+          "errors": 0
+        },
+        {
+          "service": "AuthService",
+          "connections": 100,
+          "req/s": 114,
+          "p50 ms": 552,
+          "p97.5 ms": 2483,
+          "p99 ms": 3870,
+          "max ms": 4228,
+          "total": 1706,
+          "non-2xx": 0,
+          "timeouts": 0,
+          "errors": 0
+        },
+        {
+          "service": "AuthService",
+          "connections": 200,
+          "req/s": 131,
+          "p50 ms": 1086,
+          "p97.5 ms": 6672,
+          "p99 ms": 6863,
+          "max ms": 6883,
+          "total": 1966,
+          "non-2xx": 0,
+          "timeouts": 0,
+          "errors": 0
+        }
+      ]
+    },
+    {
+      "service": "lead",
+      "label": "LeadService",
+      "url": "http://localhost:5046/api/lead-service",
+      "results": [
+        {
+          "service": "LeadService",
+          "connections": 10,
+          "req/s": 21,
+          "p50 ms": 306,
+          "p97.5 ms": 2046,
+          "p99 ms": 2394,
+          "max ms": 2599,
+          "total": 317,
+          "non-2xx": 0,
+          "timeouts": 0,
+          "errors": 0
+        },
+        {
+          "service": "LeadService",
+          "connections": 50,
+          "req/s": 159,
+          "p50 ms": 271,
+          "p97.5 ms": 686,
+          "p99 ms": 2925,
+          "max ms": 3290,
+          "total": 2381,
+          "non-2xx": 0,
+          "timeouts": 0,
+          "errors": 0
+        },
+        {
+          "service": "LeadService",
+          "connections": 100,
+          "req/s": 358,
+          "p50 ms": 271,
+          "p97.5 ms": 613,
+          "p99 ms": 825,
+          "max ms": 2496,
+          "total": 5371,
+          "non-2xx": 0,
+          "timeouts": 0,
+          "errors": 0
+        },
+        {
+          "service": "LeadService",
+          "connections": 200,
+          "req/s": 346,
+          "p50 ms": 542,
+          "p97.5 ms": 2352,
+          "p99 ms": 2476,
+          "max ms": 2938,
+          "total": 5196,
+          "non-2xx": 0,
+          "timeouts": 0,
+          "errors": 0
+        }
+      ]
+    },
+    {
+      "service": "products",
+      "label": "ProductsService",
+      "url": "http://localhost:5266",
+      "results": [
+        {
+          "service": "ProductsService",
+          "connections": 10,
+          "req/s": 13,
+          "p50 ms": 307,
+          "p97.5 ms": 2646,
+          "p99 ms": 2670,
+          "max ms": 2955,
+          "total": 189,
+          "non-2xx": 0,
+          "timeouts": 0,
+          "errors": 0
+        },
+        {
+          "service": "ProductsService",
+          "connections": 50,
+          "req/s": 100,
+          "p50 ms": 278,
+          "p97.5 ms": 2262,
+          "p99 ms": 2361,
+          "max ms": 3767,
+          "total": 1499,
+          "non-2xx": 0,
+          "timeouts": 0,
+          "errors": 0
+        },
+        {
+          "service": "ProductsService",
+          "connections": 100,
+          "req/s": 187,
+          "p50 ms": 279,
+          "p97.5 ms": 2052,
+          "p99 ms": 3776,
+          "max ms": 4685,
+          "total": 2807,
+          "non-2xx": 0,
+          "timeouts": 0,
+          "errors": 0
+        },
+        {
+          "service": "ProductsService",
+          "connections": 200,
+          "req/s": 157,
+          "p50 ms": 1065,
+          "p97.5 ms": 4028,
+          "p99 ms": 4676,
+          "max ms": 5868,
+          "total": 2352,
+          "non-2xx": 0,
+          "timeouts": 0,
+          "errors": 0
+        }
+      ]
+    },
+    {
+      "service": "c360",
+      "label": "Customer360Service",
+      "url": "http://localhost:5059",
+      "results": [
+        {
+          "service": "Customer360Service",
+          "connections": 10,
+          "req/s": 34,
+          "p50 ms": 263,
+          "p97.5 ms": 621,
+          "p99 ms": 2377,
+          "max ms": 2502,
+          "total": 507,
+          "non-2xx": 0,
+          "timeouts": 0,
+          "errors": 0
+        },
+        {
+          "service": "Customer360Service",
+          "connections": 50,
+          "req/s": 219,
+          "p50 ms": 262,
+          "p97.5 ms": 558,
+          "p99 ms": 2434,
+          "max ms": 2705,
+          "total": 3286,
+          "non-2xx": 0,
+          "timeouts": 0,
+          "errors": 0
+        },
+        {
+          "service": "Customer360Service",
+          "connections": 100,
+          "req/s": 460,
+          "p50 ms": 263,
+          "p97.5 ms": 656,
+          "p99 ms": 1193,
+          "max ms": 2445,
+          "total": 6907,
+          "non-2xx": 0,
+          "timeouts": 0,
+          "errors": 0
+        },
+        {
+          "service": "Customer360Service",
+          "connections": 200,
+          "req/s": 360,
+          "p50 ms": 525,
+          "p97.5 ms": 3894,
+          "p99 ms": 4134,
+          "max ms": 4339,
+          "total": 5399,
+          "non-2xx": 0,
+          "timeouts": 0,
+          "errors": 0
+        }
+      ]
+    }
+  ]
+}

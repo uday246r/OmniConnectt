@@ -81,7 +81,7 @@ public class AuditLogsController(AuditLogAppService auditLog, PageViewAuditServi
         [FromQuery] int pageSize = 25,
         [FromQuery] string? sortDir = null,
         CancellationToken ct = default)
-        => Ok(await auditLog.ListAsync(Math.Max(page, 1), Math.Clamp(pageSize, 1, 100), filter, sortDir, ct));
+        => Ok(await auditLog.ListAsync(Math.Max(page, 1), Math.Clamp(pageSize, 1, 2000), filter, sortDir, ct));
 
     [HttpGet("summary")]
     [RequirePermission(Feature, "View")]
