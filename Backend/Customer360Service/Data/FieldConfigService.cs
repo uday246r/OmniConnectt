@@ -151,6 +151,7 @@ namespace backend.Data
         {
             var rows = new List<(string Field, string Label, string Section, bool Sensitive)>
             {
+                ("salutation", "Salutation", "Personal Details", false),
                 ("gender", "Gender", "Personal Details", false),
                 ("birthDate", "Date of Birth", "Personal Details", false),
                 ("race", "Race", "Personal Details", false),
@@ -236,6 +237,8 @@ namespace backend.Data
                 ("annualIncome", "Annual Income", "Company Information", false),
                 ("residentType", "Resident Type", "Company Information", false),
                 ("residentAddress", "Resident Address", "Company Information", false),
+                ("salutation", "Salutation", "Company Information", false),
+                ("segmentation", "Customer Segmentation", "Company Information", false),
 
                 ("contact.padrEmail1", "Email", "Contact Information", false),
                 ("contact.contactNumber", "Phone Number", "Contact Information", true),

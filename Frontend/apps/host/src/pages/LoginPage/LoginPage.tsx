@@ -1,4 +1,5 @@
 import { useState, useId, type FormEvent } from 'react'
+import { Link } from 'react-router-dom'
 import { Icon } from '../../shared/components/Icon/Icon'
 import { BrandMark } from '../../shared/components/BrandMark/BrandMark'
 import { LoginHero } from './LoginHero'
@@ -87,9 +88,9 @@ export function LoginPage({ onSubmit, onGoogleCredential, loading, errorMessage 
                   <label htmlFor={passwordId} className={styles.fieldLabel}>
                     Password
                   </label>
-                  <a href="#" className={styles.forgotPasswordLink}>
+                  <Link to="/forgot-password" className={styles.forgotPasswordLink}>
                     Forgot password?
-                  </a>
+                  </Link>
                 </div>
                 <div className={styles.inputWrapper}>
                   <Icon.Lock width={17} height={17} className={styles.inputLeadingIcon} />

@@ -1,29 +1,79 @@
 import { useMemo, useState } from 'react'
-import { ColumnFilter, FilterBar, useDebouncedValue, type ActiveFilter, type ColumnFilterOption } from '@omniconnect/ui'
+import { useDebouncedValue } from '@omniconnect/ui'
 import { Icon } from '../../../../shared/components/Icon/Icon'
 import type { PermissionFeatureDto } from '../../../../shared/api/permissionsApi'
 import type { HealthEntryDto } from '../../../settings-applications/api/remoteAppsApi'
 import { groupPermissionsByApp } from '../../../profile/utils/formatUserPermissions'
 import styles from './PermissionMatrixTable.module.css'
 
-/** Super-admin capability grid, grouped by application so each app renders its icon/name/badge once (rowSpan) instead of per row. */
+/** Super-admin capability definitions, grouped by application with zero repetitive rows */
 const ADMIN_CAPABILITY_GROUPS = [
   {
     app: 'Host Platform',
     source: 'Host',
-    rows: [
-      { module: 'Users', name: 'User Management', verb: 'Manage', tone: 'manage', desc: 'Full authority to create, edit, deactivate, and assign roles to users.' },
-      { module: 'Roles', name: 'Role & RBAC Configuration', verb: 'Manage', tone: 'manage', desc: 'Manage system roles, assign application scopes, and fine-tune permission grants.' },
-      { module: 'Applications', name: 'Micro-Frontend Registry', verb: 'Register', tone: 'register', desc: 'Register, configure, and monitor Module Federation remote micro-frontends.' },
-      { module: 'Audit Logs', name: 'System Security Audit Trail', verb: 'View', tone: 'view', desc: 'Real-time visibility into authentication logs and administrative actions.' },
-      { module: 'Approvals', name: 'Checker & Approval Control', verb: 'Approve', tone: 'approve', desc: 'Full control over maker-checker workflows and approval queues.' },
+    modules: [
+      {
+        name: 'User Management',
+        desc: 'Full authority to create, edit, deactivate, and assign roles to platform users.',
+        actions: [
+          { verb: 'Manage', tone: 'manage' },
+          { verb: 'Create', tone: 'create' },
+          { verb: 'Edit', tone: 'edit' },
+          { verb: 'Disable', tone: 'disable' },
+          { verb: 'Delete', tone: 'delete' },
+        ],
+      },
+      {
+        name: 'Role & RBAC Configuration',
+        desc: 'Manage system roles, assign application scopes, and fine-tune permission grants.',
+        actions: [
+          { verb: 'Manage', tone: 'manage' },
+          { verb: 'Configure', tone: 'edit' },
+          { verb: 'Scopes', tone: 'approve' },
+        ],
+      },
+      {
+        name: 'Micro-Frontend Registry',
+        desc: 'Register, configure, monitor, and manage Module Federation remote applications.',
+        actions: [
+          { verb: 'Register', tone: 'register' },
+          { verb: 'Edit', tone: 'edit' },
+          { verb: 'Disable', tone: 'disable' },
+          { verb: 'Monitor', tone: 'view' },
+        ],
+      },
+      {
+        name: 'System Security Audit Trail',
+        desc: 'Real-time visibility into authentication logs, security events, and administrative actions.',
+        actions: [
+          { verb: 'View', tone: 'view' },
+          { verb: 'Export', tone: 'export' },
+          { verb: 'Audit', tone: 'manage' },
+        ],
+      },
+      {
+        name: 'Checker & Approval Control',
+        desc: 'Full control over maker-checker approval workflows, queues, and status overrides.',
+        actions: [
+          { verb: 'Approve', tone: 'approve' },
+          { verb: 'Reject', tone: 'disable' },
+          { verb: 'Override', tone: 'manage' },
+        ],
+      },
     ],
   },
   {
-    app: 'All Remotes',
+    app: 'Connected Remote Applications',
     source: 'Remote',
-    rows: [
-      { module: 'All Modules', name: 'Complete Remote Access', verb: 'Full Access', tone: 'approve', desc: 'Unrestricted access to all registered micro-frontend applications.' },
+    modules: [
+      {
+        name: 'All Micro-Frontend Services',
+        desc: 'Unrestricted access across all registered remote micro-frontend applications and features.',
+        actions: [
+          { verb: 'Full Access', tone: 'approve' },
+          { verb: 'All Modules', tone: 'manage' },
+        ],
+      },
     ],
   },
 ] as const
@@ -45,7 +95,7 @@ function getVerbClass(tone: string): string {
 }
 
 export interface PermissionMatrixTableProps {
-  /** Flat "featureKey:Capability" strings — the caller computes these (the logged-in user's own session permissions, or another user's merged role + override set). Ignored when `isAdministrator` is true. */
+  /** Flat "featureKey:Capability" strings */
   permissions: string[]
   catalog: PermissionFeatureDto[]
   registryApps: HealthEntryDto[]
@@ -54,17 +104,23 @@ export interface PermissionMatrixTableProps {
 }
 
 /**
- * The platform's "Application | Module | Permission | Type | Description | Access" table —
- * shared by the Profile page (a user's own capabilities) and the Users & Roles detail page (an
- * arbitrary user's merged role + override permissions). One implementation so both stay visually
- * and behaviorally identical.
+ * Enhanced Permission Matrix Table.
+ *
+ * Designed with zero repetition:
+ * - Applications render as clean, distinct Card Sections (never repeated per module or row)
+ * - Modules render once per row, grouping all their color-coded capabilities together
+ * - Meaningless columns like "Status: Granted" and redundant "Type" columns are removed
+ * - Super Administrators receive a polished privileges overview card with module authority breakdowns
  */
-export function PermissionMatrixTable({ permissions, catalog, registryApps, isAdministrator, roleName }: PermissionMatrixTableProps) {
+export function PermissionMatrixTable({
+  permissions,
+  catalog,
+  registryApps,
+  isAdministrator,
+  roleName,
+}: PermissionMatrixTableProps) {
   const [appFilter, setAppFilter] = useState('')
   const [permSearch, setPermSearch] = useState('')
-  // The grid re-derives every group, module and capability on each change, so running it raw on
-  // every keystroke rebuilt the whole matrix per character. 200ms is the platform's convention for
-  // filtering an already-loaded pool.
   const debouncedPermSearch = useDebouncedValue(permSearch, 200)
 
   const appGroups = useMemo(
@@ -72,7 +128,7 @@ export function PermissionMatrixTable({ permissions, catalog, registryApps, isAd
     [permissions, catalog, registryApps],
   )
 
-  const appOptions: ColumnFilterOption[] = useMemo(
+  const appOptions = useMemo(
     () => appGroups.map((g) => ({ value: g.appKey, label: g.appName })),
     [appGroups],
   )
@@ -114,142 +170,187 @@ export function PermissionMatrixTable({ permissions, catalog, registryApps, isAd
       .filter((group) => group.modules.length > 0)
   }, [appGroups, appFilter, debouncedPermSearch])
 
-  /*
-   * Recommendations for the Permission column. Sourced from the capabilities already grouped for
-   * this table and narrowed by the Application filter when one is set, so the list never offers a
-   * permission the current view could not show. Module name disambiguates same-named actions
-   * ("View" exists under half a dozen modules).
-   */
-  const permissionPool = useMemo(
-    () =>
-      appGroups
-        .filter((g) => !appFilter || g.appKey === appFilter)
-        .flatMap((g) =>
-          g.modules.flatMap((mod) =>
-            mod.capabilities.map((cap) => ({
-              value: cap.actionTitle,
-              meta: `${cap.appName} · ${cap.moduleName}`,
-            })),
-          ),
-        ),
-    [appGroups, appFilter],
-  )
-
-  const activeFilters: ActiveFilter[] = [
-    appFilter && {
-      key: 'app',
-      label: 'Application',
-      value: appGroups.find((g) => g.appKey === appFilter)?.appName ?? appFilter,
-      onRemove: () => setAppFilter(''),
-    },
-    permSearch && { key: 'permission', label: 'Permission', value: `"${permSearch}"`, onRemove: () => setPermSearch('') },
-  ].filter(Boolean) as ActiveFilter[]
-
+  // ── Administrator View ──────────────────────────────────────────
   if (isAdministrator) {
     return (
-      <div className={styles.permTableWrap}>
-        <table className={styles.permTable}>
-          <thead>
-            <tr>
-              <th className={styles.permTh}>Application</th>
-              <th className={styles.permTh}>Module</th>
-              <th className={styles.permTh}>Permission</th>
-              <th className={`${styles.permTh} ${styles.permThCenter}`}>Type</th>
-              <th className={styles.permTh}>Description</th>
-              <th className={`${styles.permTh} ${styles.permThCenter}`}>Access</th>
-            </tr>
-          </thead>
-          <tbody>
-            {ADMIN_CAPABILITY_GROUPS.map((group) =>
-              group.rows.map((row, rowIdx) => (
-                <tr key={`${group.app}-${row.module}`} className={styles.permTr}>
-                  {rowIdx === 0 && (
-                    <td className={`${styles.permTd} ${styles.permTdApp}`} rowSpan={group.rows.length}>
-                      <div className={styles.permAppCell}>
-                        <div className={styles.permAppIcon}>
-                          <Icon.ShieldCheck width={16} height={16} />
-                        </div>
-                        <div>
-                          <div className={styles.permAppName}>{group.app}</div>
-                          <span className={styles.permAppBadge}>{group.source === 'Host' ? 'Core' : 'Remote'}</span>
-                        </div>
-                      </div>
-                    </td>
-                  )}
-                  <td className={`${styles.permTd} ${styles.permTdModule}`}>
-                    <span className={styles.permModuleLabel}>{row.module}</span>
-                  </td>
-                  <td className={`${styles.permTd} ${styles.permTdName}`}>
-                    <span className={styles.permName} title={row.name}>{row.name}</span>
-                  </td>
-                  <td className={`${styles.permTd} ${styles.permTdType}`}>
-                    <span className={`${styles.verbBadge} ${getVerbClass(row.tone)}`}>{row.verb}</span>
-                  </td>
-                  <td className={`${styles.permTd} ${styles.permTdDesc}`}>
-                    <span className={styles.permDesc} title={row.desc}>{row.desc}</span>
-                  </td>
-                  <td className={`${styles.permTd} ${styles.permTdStatus}`}>
-                    <span className={styles.capActivePill}>
-                      <Icon.CheckCircle width={11} height={11} />
-                      Unrestricted
+      <div className={styles.permContainer}>
+        {/* Administrator privilege banner */}
+        <div className={styles.adminBanner}>
+          <div className={styles.adminBannerIcon}>
+            <Icon.Crown width={20} height={20} />
+          </div>
+          <div className={styles.adminBannerContent}>
+            <div className={styles.adminBannerTitle}>Super Administrator Privileges</div>
+            <div className={styles.adminBannerSubtitle}>
+              This user has complete, unrestricted administrative access across all host platform services and registered micro-frontend applications.
+            </div>
+          </div>
+          <span className={styles.adminAccessBadge}>
+            <Icon.CheckCircle width={13} height={13} />
+            Unrestricted
+          </span>
+        </div>
+
+        {/* Grouped Admin Apps */}
+        <div className={styles.appGroupsContainer}>
+          {ADMIN_CAPABILITY_GROUPS.map((group) => (
+            <div key={group.app} className={styles.appCard}>
+              <div className={styles.appCardHeader}>
+                <div className={styles.appCardHeaderLeft}>
+                  <div className={styles.appIcon}>
+                    <Icon.ShieldCheck width={16} height={16} />
+                  </div>
+                  <div className={styles.appTitleGroup}>
+                    <span className={styles.appName}>{group.app}</span>
+                    <span className={`${styles.appBadge} ${group.source === 'Host' ? styles.appBadgeCore : styles.appBadgeRemote}`}>
+                      {group.source === 'Host' ? 'Core' : 'Remote'}
                     </span>
-                  </td>
-                </tr>
-              )),
-            )}
-          </tbody>
-        </table>
+                  </div>
+                </div>
+                <div className={styles.appCardHeaderRight}>
+                  <span className={styles.appCountBadge}>
+                    {group.modules.length} {group.modules.length === 1 ? 'module' : 'modules'}
+                  </span>
+                </div>
+              </div>
+
+              <div className={styles.moduleTableWrap}>
+                <table className={styles.moduleTable}>
+                  <thead>
+                    <tr>
+                      <th className={styles.thModule}>MODULE</th>
+                      <th className={styles.thCapabilities}>AUTHORITY & ACTIONS</th>
+                      <th className={styles.thDescription}>SCOPE</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {group.modules.map((mod) => (
+                      <tr key={mod.name} className={styles.moduleRow}>
+                        <td className={styles.tdModule}>
+                          <span className={styles.moduleBadge}>{mod.name}</span>
+                        </td>
+                        <td className={styles.tdCapabilities}>
+                          <div className={styles.badgesWrap}>
+                            {mod.actions.map((act) => (
+                              <span
+                                key={act.verb}
+                                className={`${styles.verbBadge} ${getVerbClass(act.tone)}`}
+                              >
+                                {act.verb}
+                              </span>
+                            ))}
+                          </div>
+                        </td>
+                        <td className={styles.tdDescription}>
+                          <span className={styles.moduleDescText}>{mod.desc}</span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     )
   }
 
+  // ── No Permissions Assigned ─────────────────────────────────────
   if (permissions.length === 0) {
     return (
-      <div className={styles.emptyCapBox}>
-        <Icon.ShieldCheck width={24} height={24} color="#94a3b8" />
-        <span>Standard application access authorized via role. No granular permission overrides assigned.</span>
+      <div className={styles.emptyCard}>
+        <div className={styles.emptyIconWrap}>
+          <Icon.ShieldCheck width={26} height={26} />
+        </div>
+        <div className={styles.emptyTitle}>Standard Role Access</div>
+        <div className={styles.emptyDesc}>
+          Application access is authorized via the assigned role ({roleName || 'Standard User'}). No custom granular permission overrides have been assigned to this account.
+        </div>
       </div>
     )
   }
 
+  // ── Granular Permissions View ───────────────────────────────────
   return (
-    <div className={styles.capControls}>
-      {/* Stats */}
-      <div className={styles.capStatsRow}>
-        <div className={styles.capPillsGroup}>
-          <span className={styles.statChip}>
-            <Icon.ShieldCheck width={14} height={14} color="var(--omni-color-primary-600)" />
-            <span>Total:</span>
-            <span className={styles.statChipStrong}>{permissions.length}</span>
+    <div className={styles.permContainer}>
+      {/* Polished Toolbar */}
+      <div className={styles.toolbarCard}>
+        <div className={styles.toolbarLeft}>
+          <div className={styles.searchWrap}>
+            <Icon.Search width={14} height={14} className={styles.searchIcon} />
+            <input
+              type="text"
+              className={styles.searchInput}
+              placeholder="Search modules or actions…"
+              value={permSearch}
+              onChange={(e) => setPermSearch(e.target.value)}
+            />
+            {permSearch && (
+              <button
+                type="button"
+                className={styles.clearInputBtn}
+                onClick={() => setPermSearch('')}
+                aria-label="Clear search"
+              >
+                <Icon.X width={12} height={12} />
+              </button>
+            )}
+          </div>
+
+          {appOptions.length > 1 && (
+            <select
+              className={styles.appSelect}
+              value={appFilter}
+              onChange={(e) => setAppFilter(e.target.value)}
+            >
+              <option value="">All Applications ({appGroups.length})</option>
+              {appOptions.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          )}
+
+          {(permSearch || appFilter) && (
+            <button
+              type="button"
+              className={styles.resetFiltersBtn}
+              onClick={() => {
+                setPermSearch('')
+                setAppFilter('')
+              }}
+            >
+              Reset
+            </button>
+          )}
+        </div>
+
+        <div className={styles.toolbarRight}>
+          <span className={styles.statPill}>
+            <Icon.ShieldCheck width={13} height={13} />
+            <span>{permissions.length} {permissions.length === 1 ? 'Permission' : 'Permissions'}</span>
           </span>
-          <span className={styles.statChip}>
-            <Icon.Grid width={14} height={14} color="var(--omni-color-primary-600)" />
-            <span>Apps:</span>
-            <span className={styles.statChipStrong}>{appGroups.length}</span>
+          <span className={styles.statPill}>
+            <Icon.Grid width={13} height={13} />
+            <span>{appGroups.length} {appGroups.length === 1 ? 'App' : 'Apps'}</span>
           </span>
           {roleName && (
-            <span className={styles.statChip}>
-              <Icon.Crown width={14} height={14} color="#f59e0b" />
-              <span>Role:</span>
-              <span className={styles.statChipStrong}>{roleName}</span>
+            <span className={`${styles.statPill} ${styles.rolePill}`}>
+              <Icon.Crown width={13} height={13} />
+              <span>{roleName}</span>
             </span>
           )}
         </div>
       </div>
 
-      <FilterBar
-        filters={activeFilters}
-        onClearAll={() => {
-          setAppFilter('')
-          setPermSearch('')
-        }}
-      />
-
-      {/* Permission Table */}
+      {/* Filter match count or empty */}
       {filteredAppGroups.length === 0 ? (
-        <div className={styles.emptyCapBox}>
-          <Icon.Search width={22} height={22} color="#94a3b8" />
-          <span>No permissions found matching the selected filters.</span>
+        <div className={styles.emptyCard}>
+          <Icon.Search width={24} height={24} />
+          <div className={styles.emptyTitle}>No matching permissions</div>
+          <div className={styles.emptyDesc}>No permissions or modules matched your search criteria.</div>
           <button
             type="button"
             className={styles.clearFilterBtn}
@@ -259,98 +360,81 @@ export function PermissionMatrixTable({ permissions, catalog, registryApps, isAd
           </button>
         </div>
       ) : (
-        <div className={styles.permTableWrap}>
-          <table className={styles.permTable}>
-            <thead>
-              <tr>
-                <ColumnFilter
-                  label="Application"
-                  value={appFilter}
-                  onChange={setAppFilter}
-                  options={appOptions}
-                  allLabel="All Applications"
-                  searchable
-                  className={styles.permTh}
-                />
-                <th className={styles.permTh}>Module</th>
-                <ColumnFilter
-                  label="Permission"
-                  value={permSearch}
-                  onChange={setPermSearch}
-                  options={[]}
-                  freeText
-                  filterType="text"
-                  searchPlaceholder="Search permissions..."
-                  suggestFrom={permissionPool}
-                  emptyHint="No matching permission."
-                  className={styles.permTh}
-                />
-                <th className={`${styles.permTh} ${styles.permThCenter}`}>Type</th>
-                <th className={styles.permTh}>Description</th>
-                <th className={`${styles.permTh} ${styles.permThCenter}`}>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredAppGroups.map((group) =>
-                group.modules.map((module) =>
-                  module.capabilities.map((cap, capIdx) => {
-                    const isFirstInModule = capIdx === 0
-                    const totalRows = module.capabilities.length
-                    return (
-                      <tr key={cap.raw} className={styles.permTr}>
-                        {isFirstInModule && (
-                          <td
-                            className={`${styles.permTd} ${styles.permTdApp}`}
-                            rowSpan={totalRows}
-                          >
-                            <div className={styles.permAppCell}>
-                              <div className={`${styles.permAppIcon} ${group.appSource !== 'Host' ? styles.permAppIconRemote : ''}`}>
-                                {group.appSource === 'Host' ? (
-                                  <Icon.ShieldCheck width={16} height={16} />
-                                ) : group.appName.toLowerCase().includes('lead') ? (
-                                  <Icon.Users width={16} height={16} />
-                                ) : group.appName.toLowerCase().includes('customer') ? (
-                                  <Icon.Layers width={16} height={16} />
-                                ) : (
-                                  <Icon.Grid width={16} height={16} />
-                                )}
-                              </div>
-                              <div>
-                                <div className={styles.permAppName}>{group.appName}</div>
-                                <span className={styles.permAppBadge}>
-                                  {group.appSource === 'Host' ? 'Core' : 'Remote'}
-                                </span>
-                              </div>
-                            </div>
-                          </td>
-                        )}
-                        <td className={`${styles.permTd} ${styles.permTdModule}`}>
-                          <span className={styles.permModuleLabel}>{cap.moduleName}</span>
+        <div className={styles.appGroupsContainer}>
+          {filteredAppGroups.map((group) => (
+            <div key={group.appKey} className={styles.appCard}>
+              {/* App Header Band — renders exactly once per application */}
+              <div className={styles.appCardHeader}>
+                <div className={styles.appCardHeaderLeft}>
+                  <div
+                    className={`${styles.appIcon} ${group.appSource !== 'Host' ? styles.appIconRemote : ''}`}
+                  >
+                    {group.appSource === 'Host' ? (
+                      <Icon.ShieldCheck width={16} height={16} />
+                    ) : group.appName.toLowerCase().includes('lead') ? (
+                      <Icon.Users width={16} height={16} />
+                    ) : group.appName.toLowerCase().includes('customer') ? (
+                      <Icon.Layers width={16} height={16} />
+                    ) : (
+                      <Icon.Grid width={16} height={16} />
+                    )}
+                  </div>
+                  <div className={styles.appTitleGroup}>
+                    <span className={styles.appName}>{group.appName}</span>
+                    <span className={`${styles.appBadge} ${group.appSource === 'Host' ? styles.appBadgeCore : styles.appBadgeRemote}`}>
+                      {group.appSource === 'Host' ? 'Core' : 'Remote'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className={styles.appCardHeaderRight}>
+                  <span className={styles.appCountBadge}>
+                    {group.modules.length} {group.modules.length === 1 ? 'module' : 'modules'} · {group.totalCount} {group.totalCount === 1 ? 'capability' : 'capabilities'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Module Table — renders each module once with grouped capability action chips */}
+              <div className={styles.moduleTableWrap}>
+                <table className={styles.moduleTable}>
+                  <thead>
+                    <tr>
+                      <th className={styles.thModule}>MODULE</th>
+                      <th className={styles.thCapabilities}>GRANTED ACTIONS</th>
+                      <th className={styles.thDescription}>SCOPE & DESCRIPTION</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {group.modules.map((mod) => (
+                      <tr key={mod.moduleName} className={styles.moduleRow}>
+                        <td className={styles.tdModule}>
+                          <span className={styles.moduleBadge}>{mod.moduleName}</span>
                         </td>
-                        <td className={`${styles.permTd} ${styles.permTdName}`}>
-                          <span className={styles.permName} title={cap.raw}>{cap.actionTitle}</span>
+                        <td className={styles.tdCapabilities}>
+                          <div className={styles.badgesWrap}>
+                            {mod.capabilities.map((cap) => (
+                              <span
+                                key={cap.raw}
+                                className={`${styles.verbBadge} ${getVerbClass(cap.tone)}`}
+                                title={`${cap.actionTitle}: ${cap.description}`}
+                              >
+                                {cap.verb}
+                              </span>
+                            ))}
+                          </div>
                         </td>
-                        <td className={`${styles.permTd} ${styles.permTdType}`}>
-                          <span className={`${styles.verbBadge} ${getVerbClass(cap.tone)}`}>
-                            {cap.verb}
-                          </span>
-                        </td>
-                        <td className={`${styles.permTd} ${styles.permTdDesc}`}>
-                          <span className={styles.permDesc} title={cap.description}>{cap.description}</span>
-                        </td>
-                        <td className={`${styles.permTd} ${styles.permTdStatus}`}>
-                          <span className={styles.capActivePill}>
-                            <Icon.CheckCircle width={11} height={11} />
-                            Granted
+                        <td className={styles.tdDescription}>
+                          <span className={styles.moduleDescText} title={mod.capabilities.map(c => `${c.verb}: ${c.description}`).join('\n')}>
+                            {mod.capabilities[0]?.description || 'Granted application capabilities.'}
                           </span>
                         </td>
                       </tr>
-                    )
-                  })
-                )
-              )}
-            </tbody>
-          </table>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ))}
         </div>
       )}
     </div>

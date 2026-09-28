@@ -1,4 +1,4 @@
-﻿import { screen, waitFor } from '@testing-library/react'
+import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderWithQuery } from '../../../test/renderWithQuery'
@@ -93,7 +93,12 @@ describe('Users directory', () => {
     expect(lastListParams()).toMatchObject({ page: 1, pageSize: 10 })
     expect(await screen.findByText('1,250')).toBeInTheDocument()
     expect(screen.getByText('1,200')).toBeInTheDocument()
+    expect(screen.getByText('50')).toBeInTheDocument()
+    expect(screen.getByText('Inactive')).toBeInTheDocument()
     expect(screen.getByText('No Role')).toBeInTheDocument()
+    expect(screen.getByRole('columnheader', { name: 'Actions' })).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: 'View' })).toHaveLength(2)
+    expect(screen.getAllByRole('button', { name: 'Edit user' })).toHaveLength(2)
   })
 
   it('reaches pages beyond the first hundred users', async () => {
@@ -143,7 +148,7 @@ describe('resending a set-password invite', () => {
     renderPageWithToasts()
     await screen.findByText('New Hire')
 
-    expect(screen.getAllByRole('button', { name: 'Resend invite' })).toHaveLength(1)
+    expect(screen.getAllByRole('button', { name: 'Resend invite email' })).toHaveLength(1)
   })
 
   it('confirms delivery with the address it reached', async () => {
@@ -153,7 +158,7 @@ describe('resending a set-password invite', () => {
     renderPageWithToasts()
     await screen.findByText('New Hire')
 
-    await u.click(screen.getByRole('button', { name: 'Resend invite' }))
+    await u.click(screen.getByRole('button', { name: 'Resend invite email' }))
 
     expect(api.resendInvite).toHaveBeenCalledWith('token', expect.any(String))
     expect(await screen.findByText(/on its way to new\.hire@example\.com/i)).toBeInTheDocument()
@@ -166,7 +171,7 @@ describe('resending a set-password invite', () => {
     renderPageWithToasts()
     await screen.findByText('New Hire')
 
-    await u.click(screen.getByRole('button', { name: 'Resend invite' }))
+    await u.click(screen.getByRole('button', { name: 'Resend invite email' }))
 
     expect(await screen.findByText(/could not be delivered/i)).toBeInTheDocument()
     expect(screen.queryByText(/on its way/i)).not.toBeInTheDocument()
@@ -180,7 +185,7 @@ describe('resending a set-password invite', () => {
     renderPageWithToasts()
     await screen.findByText('New Hire')
 
-    await u.click(screen.getByRole('button', { name: 'Resend invite' }))
+    await u.click(screen.getByRole('button', { name: 'Resend invite email' }))
 
     expect(await screen.findByText('This user has already set their password.')).toBeInTheDocument()
   })

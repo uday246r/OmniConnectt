@@ -210,6 +210,15 @@
   text-align: center;
 }
 
+.badgeGroup {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
 .strong2 {
   font-size: var(--omni-font-size-xs-minus);
   font-weight: var(--omni-font-weight-bold);
@@ -217,7 +226,19 @@
   background-color: var(--omni-color-primary-50);
   padding: 4px 12px;
   border-radius: var(--omni-radius-xl);
-  margin-bottom: 20px;
+}
+
+.segmentBadge {
+  display: inline-flex;
+  align-items: center;
+  font-size: var(--omni-font-size-xs-minus);
+  font-weight: var(--omni-font-weight-bold);
+  color: #6d28d9;
+  background-color: #f5f3ff;
+  border: 1px solid #ddd6fe;
+  padding: 4px 12px;
+  border-radius: var(--omni-radius-xl);
+  white-space: nowrap;
 }
 
 .box5 {

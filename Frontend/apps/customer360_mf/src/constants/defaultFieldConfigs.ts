@@ -1,6 +1,7 @@
 import type { FieldConfig } from '../types/api';
 
 export const DEFAULT_INDIVIDUAL_FIELD_CONFIGS: FieldConfig[] = [
+  { id: 'ind_0', profileType: 'Individual', apiField: 'salutation', displayLabel: 'Salutation', section: 'Personal Details', displayOrder: 0, visible: true, sensitive: false, maskingRule: 'None', visibleCharCount: 0 },
   { id: 'ind_1', profileType: 'Individual', apiField: 'gender', displayLabel: 'Gender', section: 'Personal Details', displayOrder: 1, visible: true, sensitive: false, maskingRule: 'None', visibleCharCount: 0 },
   { id: 'ind_2', profileType: 'Individual', apiField: 'birthDate', displayLabel: 'Date of Birth', section: 'Personal Details', displayOrder: 2, visible: true, sensitive: false, maskingRule: 'None', visibleCharCount: 0 },
   { id: 'ind_3', profileType: 'Individual', apiField: 'race', displayLabel: 'Race', section: 'Personal Details', displayOrder: 3, visible: true, sensitive: false, maskingRule: 'None', visibleCharCount: 0 },
@@ -73,6 +74,8 @@ export const DEFAULT_CORPORATE_FIELD_CONFIGS: FieldConfig[] = [
   { id: 'corp_14', profileType: 'Corporate', apiField: 'annualIncome', displayLabel: 'Annual Income', section: 'Company Information', displayOrder: 14, visible: true, sensitive: false, maskingRule: 'None', visibleCharCount: 0 },
   { id: 'corp_15', profileType: 'Corporate', apiField: 'residentType', displayLabel: 'Resident Type', section: 'Company Information', displayOrder: 15, visible: true, sensitive: false, maskingRule: 'None', visibleCharCount: 0 },
   { id: 'corp_16', profileType: 'Corporate', apiField: 'residentAddress', displayLabel: 'Resident Address', section: 'Company Information', displayOrder: 16, visible: true, sensitive: false, maskingRule: 'None', visibleCharCount: 0 },
+  { id: 'corp_16a', profileType: 'Corporate', apiField: 'salutation', displayLabel: 'Salutation', section: 'Company Information', displayOrder: 17, visible: true, sensitive: false, maskingRule: 'None', visibleCharCount: 0 },
+  { id: 'corp_16b', profileType: 'Corporate', apiField: 'segmentation', displayLabel: 'Customer Segmentation', section: 'Company Information', displayOrder: 18, visible: true, sensitive: false, maskingRule: 'None', visibleCharCount: 0 },
 
   { id: 'corp_17', profileType: 'Corporate', apiField: 'contact.padrEmail1', displayLabel: 'Email', section: 'Contact Information', displayOrder: 17, visible: true, sensitive: false, maskingRule: 'None', visibleCharCount: 0 },
   { id: 'corp_18', profileType: 'Corporate', apiField: 'contact.contactNumber', displayLabel: 'Phone Number', section: 'Contact Information', displayOrder: 18, visible: true, sensitive: true, maskingRule: 'HideFirstShowLast', visibleCharCount: 4 },

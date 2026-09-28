@@ -18,6 +18,7 @@ import { usePermissionCatalog } from '../hooks/usePermissionCatalog'
 import { computeEffectivePermissions } from '../utils/effectivePermissions'
 import { PermissionMatrixTable } from '../components/PermissionMatrixTable/PermissionMatrixTable'
 import { UserActivityTab } from '../components/UserActivityTab/UserActivityTab'
+import { UserDetailSkeleton } from '../components/UserDetailSkeleton/UserDetailSkeleton'
 import {
   Badge,
   Button,
@@ -187,11 +188,7 @@ export function UserDetailPage() {
 
 
   if (loading && !detail) {
-    return (
-      <div className={styles.page}>
-        <div className={styles.loadingState}>Loading user…</div>
-      </div>
-    )
+    return <UserDetailSkeleton />
   }
 
   if (!detail) {
@@ -269,6 +266,7 @@ export function UserDetailPage() {
             { key: 'activity', label: 'Audit Log' },
           ]}
         />
+        <div id="user-activity-navbar-actions" className={styles.navBarActions} />
       </div>
 
       <TabPanel id="user-detail-tabs" tabId="profile" active={tab === 'profile'}>

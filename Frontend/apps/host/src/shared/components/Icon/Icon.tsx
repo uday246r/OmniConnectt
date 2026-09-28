@@ -386,5 +386,25 @@ export const Icon = {
       <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
     </svg>
   ),
+  UserMinus: (props: IconProps) => (
+    <svg {...base(props)}>
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <line x1="22" y1="11" x2="16" y2="11" />
+    </svg>
+  ),
+  MinusCircle: (props: IconProps) => (
+    <svg {...base(props)}>
+      <circle cx="12" cy="12" r="10" />
+      <line x1="8" y1="12" x2="16" y2="12" />
+    </svg>
+  ),
+  PauseCircle: (props: IconProps) => (
+    <svg {...base(props)}>
+      <circle cx="12" cy="12" r="10" />
+      <line x1="10" y1="15" x2="10" y2="9" />
+      <line x1="14" y1="15" x2="14" y2="9" />
+    </svg>
+  ),
 }
 

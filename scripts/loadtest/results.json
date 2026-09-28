@@ -1,0 +1,196 @@
+{
+  "at": "2026-09-18T12:11:57.483Z",
+  "connections": [
+    10,
+    50,
+    100
+  ],
+  "duration": 10,
+  "signedInSkipped": null,
+  "results": [
+    {
+      "service": "auth",
+      "label": "AuthService",
+      "url": "http://localhost:5155",
+      "results": [
+        {
+          "service": "AuthService",
+          "connections": 10,
+          "req/s": 14,
+          "p50 ms": 1136,
+          "p97.5 ms": 2188,
+          "p99 ms": 2211,
+          "max ms": 2440,
+          "total": 136,
+          "non-2xx": 0,
+          "timeouts": 0,
+          "errors": 0
+        },
+        {
+          "service": "AuthService",
+          "connections": 50,
+          "req/s": 70,
+          "p50 ms": 1079,
+          "p97.5 ms": 2401,
+          "p99 ms": 2453,
+          "max ms": 2490,
+          "total": 697,
+          "non-2xx": 0,
+          "timeouts": 0,
+          "errors": 0
+        },
+        {
+          "service": "AuthService",
+          "connections": 100,
+          "req/s": 115,
+          "p50 ms": 1079,
+          "p97.5 ms": 5275,
+          "p99 ms": 5461,
+          "max ms": 5538,
+          "total": 1148,
+          "non-2xx": 0,
+          "timeouts": 0,
+          "errors": 0
+        }
+      ]
+    },
+    {
+      "service": "lead",
+      "label": "LeadService",
+      "url": "http://localhost:5046/api/lead-service",
+      "results": [
+        {
+          "service": "LeadService",
+          "connections": 10,
+          "req/s": 23,
+          "p50 ms": 598,
+          "p97.5 ms": 2366,
+          "p99 ms": 2382,
+          "max ms": 2491,
+          "total": 230,
+          "non-2xx": 0,
+          "timeouts": 0,
+          "errors": 0
+        },
+        {
+          "service": "LeadService",
+          "connections": 50,
+          "req/s": 123,
+          "p50 ms": 551,
+          "p97.5 ms": 3491,
+          "p99 ms": 4024,
+          "max ms": 4166,
+          "total": 1233,
+          "non-2xx": 0,
+          "timeouts": 0,
+          "errors": 0
+        },
+        {
+          "service": "LeadService",
+          "connections": 100,
+          "req/s": 337,
+          "p50 ms": 551,
+          "p97.5 ms": 2161,
+          "p99 ms": 2302,
+          "max ms": 2451,
+          "total": 3366,
+          "non-2xx": 0,
+          "timeouts": 0,
+          "errors": 0
+        }
+      ]
+    },
+    {
+      "service": "products",
+      "label": "ProductsService",
+      "url": "http://localhost:5266",
+      "results": [
+        {
+          "service": "ProductsService",
+          "connections": 10,
+          "req/s": 9,
+          "p50 ms": 1024,
+          "p97.5 ms": 4599,
+          "p99 ms": 4706,
+          "max ms": 4706,
+          "total": 89,
+          "non-2xx": 0,
+          "timeouts": 0,
+          "errors": 0
+        },
+        {
+          "service": "ProductsService",
+          "connections": 50,
+          "req/s": 97,
+          "p50 ms": 813,
+          "p97.5 ms": 2098,
+          "p99 ms": 2146,
+          "max ms": 2462,
+          "total": 972,
+          "non-2xx": 0,
+          "timeouts": 0,
+          "errors": 0
+        },
+        {
+          "service": "ProductsService",
+          "connections": 100,
+          "req/s": 145,
+          "p50 ms": 864,
+          "p97.5 ms": 4216,
+          "p99 ms": 4278,
+          "max ms": 4911,
+          "total": 1454,
+          "non-2xx": 0,
+          "timeouts": 0,
+          "errors": 0
+        }
+      ]
+    },
+    {
+      "service": "c360",
+      "label": "Customer360Service",
+      "url": "http://localhost:5059",
+      "results": [
+        {
+          "service": "Customer360Service",
+          "connections": 10,
+          "req/s": 16,
+          "p50 ms": 300,
+          "p97.5 ms": 2703,
+          "p99 ms": 3729,
+          "max ms": 5704,
+          "total": 164,
+          "non-2xx": 0,
+          "timeouts": 0,
+          "errors": 0
+        },
+        {
+          "service": "Customer360Service",
+          "connections": 50,
+          "req/s": 46,
+          "p50 ms": 943,
+          "p97.5 ms": 6696,
+          "p99 ms": 6923,
+          "max ms": 8697,
+          "total": 459,
+          "non-2xx": 0,
+          "timeouts": 6,
+          "errors": 6
+        },
+        {
+          "service": "Customer360Service",
+          "connections": 100,
+          "req/s": 285,
+          "p50 ms": 542,
+          "p97.5 ms": 3314,
+          "p99 ms": 4269,
+          "max ms": 6736,
+          "total": 2852,
+          "non-2xx": 0,
+          "timeouts": 0,
+          "errors": 0
+        }
+      ]
+    }
+  ]
+}

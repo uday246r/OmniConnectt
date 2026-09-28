@@ -39,6 +39,14 @@ public class SmtpOptions
     /// <summary>How long a set-password invite stays valid.</summary>
     public int InviteValidHours { get; set; } = 48;
 
+    /// <summary>
+    /// How long a "forgot password" reset link stays valid, in minutes. Deliberately far shorter than
+    /// an invite: this link is issued in response to anyone typing an email address into an anonymous
+    /// form, not just the account's own owner, so a short window is what limits the damage if the
+    /// email is later found in a shared inbox or forwarded by mistake.
+    /// </summary>
+    public int ResetPasswordValidMinutes { get; set; } = 5;
+
     public string ResolvedFromAddress => string.IsNullOrWhiteSpace(FromAddress) ? Username : FromAddress;
 
     /// <summary>

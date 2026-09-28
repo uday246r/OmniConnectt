@@ -19,6 +19,23 @@ public record SetPasswordRequest(
     [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = false, ErrorMessage = "A new password is required.")]
     string NewPassword);
 
+/// <summary>
+/// Kicks off "Forgot password?". The response is identical whether or not the address matches an
+/// account — see AuthController for why — so this carries nothing back but the request itself.
+/// </summary>
+public record ForgotPasswordRequest(
+    [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = false, ErrorMessage = "Email address is required.")]
+    string Email);
+
+/// <summary>Email is populated only for a valid, unexpired reset link — same reasoning as ValidateInviteResponse.</summary>
+public record ValidateResetTokenResponse(bool Valid, string? Email);
+
+public record ResetPasswordRequest(
+    [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = false, ErrorMessage = "Token is required.")]
+    string Token,
+    [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = false, ErrorMessage = "A new password is required.")]
+    string NewPassword);
+
 public record CurrentUserDto(
     Guid Id,
     string? Salutation,

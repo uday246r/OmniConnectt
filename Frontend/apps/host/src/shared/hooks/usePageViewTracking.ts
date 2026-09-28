@@ -9,7 +9,10 @@ import { useNavigationStore } from '../stores/navigationStore'
 export const PAGE_VIEW_SETTLE_MS = 800
 
 /** Routes that are never a page someone opened: public screens, and addresses that only redirect. */
-const NEVER_A_PAGE = new Set(['/login', '/set-password', '/404', '/maintenance-preview', '/settings'])
+const NEVER_A_PAGE = new Set([
+  '/login', '/set-password', '/forgot-password', '/reset-password',
+  '/404', '/maintenance-preview', '/settings',
+])
 
 /**
  * Settings drawer tabs are pages people open; the forms stacked on top of them (a role being edited,

@@ -114,6 +114,12 @@
   border-top: 3.5px solid var(--omni-color-primary-600);
 }
 
+.navBarActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .entityQualifier {
   color: var(--omni-color-text-muted);
   font-weight: var(--omni-font-weight-medium);

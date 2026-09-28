@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import {
   Badge,
-  Button,
   ColumnFilter,
   CsvExportError,
   DataTable,
@@ -36,8 +36,8 @@ import {
   type AuditResult,
   type ListAuditLogsParams,
 } from '../../../system-audit-logs/api/auditLogsApi'
-import { actionBadgeTone, formatActionLabel } from '../../../system-audit-logs/utils/auditLogFormatting'
-import { AuditLogDetailDrawer } from '../../../system-audit-logs/components/AuditLogDetailDrawer/AuditLogDetailDrawer'
+import { actionChipClass, formatActionLabel } from '../../../system-audit-logs/utils/auditLogFormatting'
+import { AuditLogDetailDrawer, serviceTone } from '../../../system-audit-logs/components/AuditLogDetailDrawer/AuditLogDetailDrawer'
 import styles from './UserActivityTab.module.css'
 
 export const USER_ACTIVITY_PAGE_SIZE = 10
@@ -62,14 +62,12 @@ interface UserActivityTabProps {
 /**
  * A user's audit history: what they did, and what was done to them.
  *
- * It used to fetch a fixed pool of this user's most recent rows (asking for 200, which the server
- * capped at 100) and filter and page that pool in the browser. Anything older than the pool could not
- * be reached however the filters were set, and the filters' option lists described the pool rather
- * than the history. It also showed only rows where the user was the actor, so "who changed this
- * person's role?" had no answer here.
- *
- * Everything is now a server query: paging, every filter, the dropdown options (from the facets
- * endpoint, under the same filters) and the export — one parameter set for all of them.
+ * Aligned with the Host app's primary Audit Logs table:
+ * - Direct toolbar integration with the UserDetailPage navBar (Export button on tab row)
+ * - Single-line actor names with avatars — no congested line breaks or redundant "about this user" text
+ * - Balanced column widths: RECORD and RESULT shrink-wrapped to eliminate empty space, WHAT HAPPENED expands naturally
+ * - Exact table coloring, badges with dots, verb action chips, entity chips, actor avatars
+ * - Fully uppercase column headers: TIME, DONE BY, ACTION, WHAT HAPPENED, APPLICATION, RECORD, RESULT, DETAILS
  */
 export function UserActivityTab({ userId, userName }: UserActivityTabProps) {
   const navigate = useNavigate()
@@ -78,8 +76,6 @@ export function UserActivityTab({ userId, userName }: UserActivityTabProps) {
   const hasCapability = useAuthStore((s) => s.hasCapability)
   const canView = isAdministrator || hasCapability('host.system.audit-logs', 'View')
   const canExport = isAdministrator || hasCapability('host.system.audit-logs', 'Export')
-  // No revision in the keys: an audit event invalidates ['auditLogs'] through the invalidation bridge.
-  // With it, each event orphaned a cache entry and fetched twice.
 
   const [page, setPage] = useState(1)
   const [involvement, setInvolvement] = useState<Involvement>('')
@@ -92,7 +88,19 @@ export function UserActivityTab({ userId, userName }: UserActivityTabProps) {
   const [exporting, setExporting] = useState(false)
   const record = useDebouncedValue(recordSearch, 300)
 
-  // Resolved when used, never stored — a stored "Last 7 days" would freeze into one particular week.
+  // Target slot in UserDetailPage navBar where Export button lives
+  const [navTarget, setNavTarget] = useState<HTMLElement | null>(() =>
+    typeof document !== 'undefined' ? document.getElementById('user-activity-navbar-actions') : null,
+  )
+
+  useEffect(() => {
+    if (!navTarget && typeof document !== 'undefined') {
+      const el = document.getElementById('user-activity-navbar-actions')
+      if (el) setNavTarget(el)
+    }
+  }, [navTarget])
+
+  // Resolved when used, never stored
   const bounds = useMemo(() => resolveDateRange(timeRange), [timeRange])
 
   const filters: ListAuditLogsParams = useMemo(
@@ -147,7 +155,7 @@ export function UserActivityTab({ userId, userName }: UserActivityTabProps) {
   const activeFilters = [
     involvement && {
       key: 'involvement',
-      label: 'Involvement',
+      label: 'Done by',
       value: involvement === 'by' ? 'By this user' : 'About this user',
       onRemove: () => setInvolvement(''),
     },
@@ -190,18 +198,26 @@ export function UserActivityTab({ userId, userName }: UserActivityTabProps) {
   const columns: ResponsiveColumn<AuditLogDto>[] = [
     {
       key: 'time',
-      label: 'Time',
+      label: 'TIME',
       priority: 'always',
-      header: <DateRangeColumnFilter label="Time" value={timeRange} onChange={setTimeRange} />,
-      render: (l) => formatAuditTimestamp(l.occurredAt),
+      header: (
+        <DateRangeColumnFilter
+          className={styles.thTime}
+          label="TIME"
+          value={timeRange}
+          onChange={setTimeRange}
+        />
+      ),
+      render: (l) => <span className={styles.timeCell}>{formatAuditTimestamp(l.occurredAt)}</span>,
     },
     {
       key: 'actor',
-      label: 'Done by',
+      label: 'DONE BY',
       priority: 'always',
       header: (
         <ColumnFilter
-          label="Done by"
+          className={styles.thActor}
+          label="DONE BY"
           value={involvement}
           onChange={(v) => setInvolvement(v as Involvement)}
           options={INVOLVEMENT_OPTIONS}
@@ -209,41 +225,58 @@ export function UserActivityTab({ userId, userName }: UserActivityTabProps) {
           searchable
         />
       ),
-      render: (l) =>
-        l.actorUserId === userId ? (
-          <span>
-            {userName}
-            <span className={styles.qualifier}> · this user</span>
-          </span>
-        ) : (
-          <span>
-            {l.actorName || 'System'}
-            <span className={styles.qualifier}> · about this user</span>
-          </span>
-        ),
+      render: (l) => {
+        const isSelf = l.actorUserId === userId
+        const name = isSelf ? userName : (l.actorName || 'System')
+        const initial = (name || 'S').charAt(0).toUpperCase()
+        return (
+          <div className={styles.actorCell} title={name}>
+            <span className={styles.actorAvatar}>{initial}</span>
+            <span className={styles.actorName}>{name}</span>
+          </div>
+        )
+      },
     },
     {
       key: 'action',
-      label: 'Action',
+      label: 'ACTION',
       priority: 'always',
       header: (
-        <ColumnFilter label="Action" value={action} onChange={setAction} options={actionOptions} allLabel="All actions" searchable />
+        <ColumnFilter
+          className={styles.thNarrow}
+          label="ACTION"
+          value={action}
+          onChange={setAction}
+          options={actionOptions}
+          allLabel="All actions"
+          searchable
+        />
       ),
-      render: (l) => <Badge tone={actionBadgeTone(l.action)}>{formatActionLabel(l.action)}</Badge>,
+      render: (l) => (
+        <span className={`${styles.actionCell} ${styles[actionChipClass(l.action)]}`} title={l.action}>
+          {formatActionLabel(l.action)}
+        </span>
+      ),
     },
     {
       key: 'details',
-      label: 'What happened',
+      label: 'WHAT HAPPENED',
       priority: 'high',
-      render: (l) => <span className={styles.details}>{l.details || EMPTY_VALUE}</span>,
+      header: <th className={styles.thWhatHappened}>WHAT HAPPENED</th>,
+      render: (l) => (
+        <span className={styles.detailsCell} title={l.details || undefined}>
+          {l.details || EMPTY_VALUE}
+        </span>
+      ),
     },
     {
       key: 'app',
-      label: 'Application',
+      label: 'APPLICATION',
       priority: 'high',
       header: (
         <ColumnFilter
-          label="Application"
+          className={styles.thNarrow}
+          label="APPLICATION"
           value={application}
           onChange={setApplication}
           options={applicationOptions}
@@ -251,15 +284,19 @@ export function UserActivityTab({ userId, userName }: UserActivityTabProps) {
           searchable
         />
       ),
-      render: (l) => <Badge tone="neutral">{l.sourceApplication || l.serviceName}</Badge>,
+      render: (l) => {
+        const app = l.sourceApplication || l.serviceName
+        return <Badge tone={serviceTone(app)}>{app}</Badge>
+      },
     },
     {
       key: 'record',
-      label: 'Record',
+      label: 'RECORD',
       priority: 'low',
       header: (
         <ColumnFilter
-          label="Record"
+          className={styles.thNarrow}
+          label="RECORD"
           value={recordSearch}
           onChange={setRecordSearch}
           options={[]}
@@ -270,21 +307,52 @@ export function UserActivityTab({ userId, userName }: UserActivityTabProps) {
           emptyHint="No matching record on this page."
         />
       ),
-      render: (l) => l.entityLabel ?? l.entityType ?? EMPTY_VALUE,
+      render: (l) => {
+        const type = l.entityType || (l.page || l.actionCategory === 'Navigation' ? 'Page' : null)
+        const label = l.entityLabel || (l.module && l.page ? `${l.module} — ${l.page}` : l.page || l.module)
+        if (type || label) {
+          return (
+            <div className={styles.entityWrap}>
+              {type && <span className={styles.entityType}>{type}</span>}
+              {label && (
+                <span className={styles.entityId} title={label}>
+                  {label}
+                </span>
+              )}
+            </div>
+          )
+        }
+        return <span className={styles.mutedText}>{EMPTY_VALUE}</span>
+      },
     },
     {
       key: 'result',
-      label: 'Result',
+      label: 'RESULT',
       priority: 'always',
-      header: <ColumnFilter label="Result" value={result} onChange={setResult} options={RESULT_OPTIONS} allLabel="All results" searchable />,
-      render: (l) => <Badge tone={l.result === 'Success' ? 'success' : 'danger'}>{l.result}</Badge>,
+      header: (
+        <ColumnFilter
+          className={styles.thNarrow}
+          label="RESULT"
+          value={result}
+          onChange={setResult}
+          options={RESULT_OPTIONS}
+          allLabel="All results"
+          searchable
+        />
+      ),
+      render: (l) => (
+        <Badge tone={l.result === 'Success' ? 'success' : 'danger'} dot>
+          {l.result}
+        </Badge>
+      ),
     },
     {
       key: 'view',
-      label: '',
+      label: 'DETAILS',
       priority: 'always',
       align: 'right',
-      render: (l) => <RowAction onClick={() => setViewing(l)}>View</RowAction>,
+      header: <th className={`${styles.thNarrow} ${styles.thRight}`}>DETAILS</th>,
+      render: (l) => <RowAction onClick={() => setViewing(l)} title="View full details" />,
     },
   ]
 
@@ -298,16 +366,33 @@ export function UserActivityTab({ userId, userName }: UserActivityTabProps) {
     )
   }
 
+  const hasActiveFilters = activeFilters.length > 0
+
+  // The primary export button aligned with Host Audit Logs styling
+  const exportBtn = canExport ? (
+    <button
+      type="button"
+      className={styles.exportBtn}
+      onClick={() => void handleExport()}
+      disabled={exporting}
+      title="Export CSV report"
+    >
+      <Icon.Download width={14} height={14} />
+      <span>{exporting ? 'Exporting...' : 'Export'}</span>
+    </button>
+  ) : null
+
   return (
-    <>
-      <div className={styles.toolbar}>
-        {canExport && (
-          <Button variant="secondary" leadingIcon={<Icon.Download width={15} height={15} />} loading={exporting} onClick={handleExport}>
-            Export Report
-          </Button>
-        )}
-      </div>
-      <FilterBar filters={activeFilters} onClearAll={clearAll} />
+    <div className={styles.tabContent}>
+      {/* Portals the export button into the navBar tab line next to Profile | Permissions | Audit Log */}
+      {navTarget && exportBtn ? createPortal(exportBtn, navTarget) : (!navTarget && exportBtn ? <div className={styles.fallbackActions}>{exportBtn}</div> : null)}
+
+      {/* Active filter chips */}
+      {hasActiveFilters && (
+        <FilterBar filters={activeFilters} onClearAll={clearAll} />
+      )}
+
+      {/* Table */}
       <DataTable
         reserveHeight
         footer={<Pagination page={page} pageSize={USER_ACTIVITY_PAGE_SIZE} total={total} onPageChange={setPage} itemLabel="event" />}
@@ -336,6 +421,6 @@ export function UserActivityTab({ userId, userName }: UserActivityTabProps) {
           onViewRelated={(cid) => navigate(`/system/audit-logs?correlationId=${encodeURIComponent(cid)}`)}
         />
       )}
-    </>
+    </div>
   )
 }

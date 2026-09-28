@@ -1,0 +1,9 @@
+{
+  "name": "omniconnect-loadtest-autocannon",
+  "private": true,
+  "type": "module",
+  "description": "autocannon driver for scripts/loadtest/autocannon-run.mjs. Not part of the Frontend pnpm workspace.",
+  "devDependencies": {
+    "autocannon": "^7"
+  }
+}

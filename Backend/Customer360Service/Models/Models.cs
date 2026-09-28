@@ -219,6 +219,12 @@ namespace backend.Models
         [Column("cif_number")]
         public string? CifNumber { get; set; }
 
+        [Column("salutation")]
+        public string? Salutation { get; set; }
+
+        [Column("segmentation")]
+        public string? Segmentation { get; set; }
+
         [Column("organization_name")]
         public string? OrganizationName { get; set; }
 
@@ -263,6 +269,9 @@ namespace backend.Models
 
         [Column("signatory_name")]
         public string? SignatoryName { get; set; }
+
+        [Column("signatory_salutation")]
+        public string? SignatorySalutation { get; set; }
 
         [Column("company_website")]
         public string? CompanyWebsite { get; set; }
