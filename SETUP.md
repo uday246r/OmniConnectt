@@ -369,9 +369,10 @@ runtime, so enabling SSO needs no frontend rebuild and rotating the ID needs no 
      `acme.com,acme.co.uk`. **Both must be set**: an empty domain list means nobody can sign in,
      which is the safe default rather than an oversight.
 4. Restart AuthService. The button appears on the next page load — no frontend rebuild.
-5. Create a user with **Authentication Method: Google SSO** in Setup → Users. SSO never auto-creates
-   an account: an administrator still provisions the user row first, just with no password. That
-   user's email domain must be on the allowlist.
+5. Provision the user with `authProvider: "Google"`. SSO never auto-creates an account: an
+   administrator still creates the user row first, just with no password, and that user's email domain
+   must be on the allowlist. The Create User form does not offer this choice yet, so use
+   `POST /api/users` directly — see [docs/SSO-AND-EMAIL.md](docs/SSO-AND-EMAIL.md) §2.3 D and §2.6.
 
 Three rejections are reported distinctly so a failure is diagnosable: SSO not configured (503),
 domain not on the allowlist (401), and no provisioned account for that Google identity (401).
@@ -385,9 +386,10 @@ When an administrator creates a user, the new account can be emailed a **single-
 link** to choose their own password. This is preferred over emailing a temporary password: a link
 expires, dies on first use, and never leaves a working credential sitting in a mailbox.
 
-Like SSO, this is **inert until configured** — without SMTP settings no mail is attempted, account
-creation succeeds exactly as before, and the maker collects the temporary password from My Requests
-as usual. That fallback stays available even once email is on, for users who cannot receive mail.
+Like SSO, this is **inert until configured** — without SMTP settings no mail is attempted and account
+creation still succeeds, but the invite link is now the only way a local account becomes usable: the
+account cannot be signed into until mail works and an administrator clicks **Resend invite**. Full
+guide with code references: [docs/SSO-AND-EMAIL.md](docs/SSO-AND-EMAIL.md).
 
 Set these in `Backend/AuthService/.env`:
 
