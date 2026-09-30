@@ -1,0 +1,33 @@
+/*
+ * Chart colours are CSS variables resolved from the platform tokens, so the charts follow the theme and no
+ * colour is written into a component. Bars cycle through six series; a donut segment takes its status tone.
+ */
+
+.chart, .donut { display: block; width: 100%; height: auto; font-family: var(--omni-font-family); }
+.donut { max-width: 220px; margin: 0 auto; }
+
+.grid { stroke: var(--omni-color-border); stroke-width: 1; stroke-dasharray: 3 4; }
+.axis { fill: var(--omni-color-text-secondary); font-size: 11px; }
+.value { fill: var(--omni-color-text-primary); font-size: 12px; font-weight: 700; }
+.bar { transition: opacity var(--omni-transition-fast); }
+.bar:hover { opacity: 0.85; }
+
+.series0 { fill: var(--omni-color-primary-600); }
+.series1 { fill: var(--omni-color-success-600); }
+.series2 { fill: var(--omni-color-warning-500); }
+.series3 { fill: var(--omni-color-danger-500); }
+.series4 { fill: var(--omni-color-primary-300); }
+.series5 { fill: var(--omni-color-success-300); }
+
+.track { stroke: var(--omni-color-surface-sunken); }
+.centerValue { fill: var(--omni-color-text-primary); font-size: 7px; font-weight: 700; }
+.centerLabel { fill: var(--omni-color-text-secondary); font-size: 2.6px; }
+
+.tone_success { stroke: var(--omni-color-success-600); }
+.tone_warning { stroke: var(--omni-color-warning-500); }
+.tone_danger { stroke: var(--omni-color-danger-500); }
+.tone_info { stroke: var(--omni-color-primary-400); }
+.tone_primary { stroke: var(--omni-color-primary-600); }
+.tone_neutral { stroke: var(--omni-color-text-muted); }
+
+.empty { margin: 0; padding: var(--omni-space-6) 0; text-align: center; color: var(--omni-color-text-muted); font-size: var(--omni-font-size-sm); }

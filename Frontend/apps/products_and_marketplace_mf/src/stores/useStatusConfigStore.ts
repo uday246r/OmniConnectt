@@ -76,12 +76,21 @@ export interface ResolvedStatus {
 
 const UNKNOWN_TONE: StatusTone = 'neutral';
 
-/** How to draw a status, and what it means. Re-renders only when this one status changes in Setup. */
-export function useStatus(entityType: StatusEntityType, value: string): ResolvedStatus {
-  const config = useStatusConfigStore((s) => s.byKey[keyOf(entityType, value)]);
+/** How a status reads, from a lookup of Setup's rows. Pure, so a list of statuses can be resolved in one pass. */
+export function resolveStatus(byKey: Record<string, StatusConfig>, entityType: StatusEntityType, value: string): ResolvedStatus {
+  const config = byKey[keyOf(entityType, value)];
   return config
     ? { label: config.label, tone: config.color, isLive: config.isLive, known: true }
     : { label: value, tone: UNKNOWN_TONE, isLive: false, known: false };
+}
+
+/** How to draw a status, and what it means. Re-renders only when this one status changes in Setup. */
+export function useStatus(entityType: StatusEntityType, value: string): ResolvedStatus {
+  const config = useStatusConfigStore((s) => s.byKey[keyOf(entityType, value)]);
+  return useMemo(
+    () => (config ? { label: config.label, tone: config.color, isLive: config.isLive, known: true } : { label: value, tone: UNKNOWN_TONE, isLive: false, known: false }),
+    [config, value],
+  );
 }
 
 /** The statuses of one kind of record that can still be chosen, in Setup's order — for a select. */

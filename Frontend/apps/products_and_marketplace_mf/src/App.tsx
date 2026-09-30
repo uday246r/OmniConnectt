@@ -1,6 +1,7 @@
 import React, { useEffect, type ComponentType } from 'react';
 import { AuditLogsPage } from './pages/audit/AuditLogsPage';
 import { CategoriesPage } from './pages/categories/CategoriesPage';
+import { DashboardPage } from './pages/dashboard/DashboardPage';
 import { ProductsPage } from './pages/products/ProductsPage';
 import { SetupPage } from './pages/setup/SetupPage';
 import { SubCategoriesPage } from './pages/subcategories/SubCategoriesPage';
@@ -21,6 +22,7 @@ export interface ProductsAppProps {
 }
 
 const PAGES: Record<string, ComponentType> = {
+  dashboard: DashboardPage,
   products: ProductsPage,
   categories: CategoriesPage,
   'sub-categories': SubCategoriesPage,
@@ -28,7 +30,7 @@ const PAGES: Record<string, ComponentType> = {
   'audit-logs': AuditLogsPage,
 };
 
-const DEFAULT_PAGE = 'products';
+const DEFAULT_PAGE = 'dashboard';
 
 export const App: React.FC<ProductsAppProps> = ({ page }) => {
   const fetchStatuses = useStatusConfigStore((s) => s.fetchAll);
