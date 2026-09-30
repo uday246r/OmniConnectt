@@ -36,7 +36,8 @@ export const FIELD_CONTROL_REGISTRY: Record<string, FieldControlDescriptor> = {
 
 export interface LeadFieldConfig {
   id: string
-  productId: string
+  /** The Marketplace sub-category this form is configured for. */
+  catalogSubCategoryId: string
   apiField: string
   displayLabel: string
   section: string
@@ -60,6 +61,15 @@ function findField(config: LeadFieldConfig[], apiField: string): LeadFieldConfig
 export function isFieldVisible(config: LeadFieldConfig[], apiField: string): boolean {
   const field = findField(config, apiField)
   return field ? field.visible : true
+}
+
+/**
+ * True only when the field is configured AND switched on. The product-detail fields (property, business)
+ * exist for every sub-category but start hidden, so a section is shown when one of its fields is on —
+ * "present in the config" no longer means "applies to this product".
+ */
+export function hasVisibleField(config: LeadFieldConfig[], apiField: string): boolean {
+  return findField(config, apiField)?.visible === true
 }
 
 export function isFieldRequired(config: LeadFieldConfig[], apiField: string): boolean {

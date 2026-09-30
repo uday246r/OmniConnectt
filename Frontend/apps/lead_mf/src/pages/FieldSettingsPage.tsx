@@ -5,7 +5,7 @@ import { CUSTOM_PRESET_ID, findPreset, type CustomPreset, type ValidationRule } 
 import { ValidationRulesEditor, describeRuleProblem } from '@omniconnect/ui/validation-editor';
 import styles from './FieldSettingsPage.module.css';
 import shell from '../shared/leadPage.module.css';
-import { apiClient, isApprovalPending } from '../api/apiClient';
+import { apiClient, isApprovalPending, type CatalogSubCategory } from '../api/apiClient';
 import { canManageFieldSettings } from '../api/hostBridge';
 import type { LeadFieldConfig } from '../config/fieldControlRegistry';
 
@@ -37,8 +37,8 @@ export function describeFormats(rules: ValidationRule[], presets: CustomPreset[]
 
 export const FieldSettingsPage: React.FC = () => {
   const canManage = canManageFieldSettings();
-  const [products, setProducts] = useState<{ id: string; name: string }[]>([]);
-  const [selectedProductId, setSelectedProductId] = useState<string>('');
+  const [subCategories, setSubCategories] = useState<CatalogSubCategory[]>([]);
+  const [selectedSubCategoryId, setSelectedSubCategoryId] = useState<string>('');
   const [fields, setFields] = useState<LeadFieldConfig[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -54,16 +54,17 @@ export const FieldSettingsPage: React.FC = () => {
   useEffect(() => {
     (async () => {
       setFormatPresets(await apiClient.getFormatPresets());
-      const list = await apiClient.getProductsWithId();
-      setProducts(list);
-      if (list.length > 0) setSelectedProductId(list[0].id);
+      const list = await apiClient.getCatalogSubCategories();
+      setSubCategories(list);
+      if (list.length > 0) setSelectedSubCategoryId(list[0].id);
+      else setLoading(false);
     })();
   }, []);
 
   useEffect(() => {
-    if (!selectedProductId) return;
-    void loadFields(selectedProductId);
-  }, [selectedProductId]);
+    if (!selectedSubCategoryId) return;
+    void loadFields(selectedSubCategoryId);
+  }, [selectedSubCategoryId]);
 
   async function loadFields(productId: string) {
     setLoading(true);
@@ -73,7 +74,7 @@ export const FieldSettingsPage: React.FC = () => {
       setFields([...data].sort((a, b) => a.displayOrder - b.displayOrder));
       setVersion(loadedVersion);
     } catch {
-      setError('Could not load field settings for this product.');
+      setError('Could not load field settings for this product type.');
     } finally {
       setLoading(false);
     }
@@ -85,13 +86,13 @@ export const FieldSettingsPage: React.FC = () => {
   }
 
   async function handleSave() {
-    if (!selectedProductId) return;
+    if (!selectedSubCategoryId) return;
     setSaving(true);
     setError(null);
     setSavedMessage(null);
     setPendingMessage(null);
     try {
-      const res = await apiClient.updateFieldConfig(selectedProductId, fields, version);
+      const res = await apiClient.updateFieldConfig(selectedSubCategoryId, fields, version);
       if (isApprovalPending(res.data)) {
         // Nothing was actually changed yet — do NOT refetch, or the admin's unsaved edits under
         // their cursor would be silently replaced by the still-old server state.
@@ -144,9 +145,9 @@ export const FieldSettingsPage: React.FC = () => {
           which the hand-rolled button row had. */}
       <Tabs
         id="lead-field-settings-product"
-        tabs={products.map((p) => ({ key: p.id, label: p.name }))}
-        activeKey={selectedProductId ?? ''}
-        onChange={setSelectedProductId}
+        tabs={subCategories.map((s) => ({ key: s.id, label: `${s.categoryName} › ${s.name}` }))}
+        activeKey={selectedSubCategoryId ?? ''}
+        onChange={setSelectedSubCategoryId}
       />
 
       {savedMessage && (

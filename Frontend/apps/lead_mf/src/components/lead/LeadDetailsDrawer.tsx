@@ -27,7 +27,7 @@ import {
   Sparkles,
 } from '@omniconnect/ui/icons';
 import { useLeadStore } from '../../store/useLeadStore';
-import { isFieldVisible, getFieldLabel, type LeadFieldConfig } from '../../config/fieldControlRegistry';
+import { isFieldVisible, hasVisibleField, getFieldLabel, type LeadFieldConfig } from '../../config/fieldControlRegistry';
 import { applyMaskingRule, hasRevealableValue } from '../../utils/fieldMasking';
 import { Badge } from '@omniconnect/ui';
 import { LeadStatusBadge } from '../../shared/LeadStatusBadge';
@@ -103,11 +103,14 @@ export const LeadDetailsDrawer: React.FC = () => {
   const initials = getInitials(selectedLead.name);
 
   const isHomeFinancing =
-    fieldConfig.some((f) => f.apiField === 'propertyType') ||
+    hasVisibleField(fieldConfig, 'propertyType') ||
+    hasVisibleField(fieldConfig, 'propertyStatus') ||
     !!selectedLead.propertyType ||
     !!selectedLead.propertyStatus;
   const isMicrofinance =
-    fieldConfig.some((f) => f.apiField === 'dateOfIncorporation') ||
+    hasVisibleField(fieldConfig, 'dateOfIncorporation') ||
+    hasVisibleField(fieldConfig, 'companyName') ||
+    hasVisibleField(fieldConfig, 'entityType') ||
     !!selectedLead.companyName ||
     !!selectedLead.entityType ||
     !!selectedLead.dateOfIncorporation;

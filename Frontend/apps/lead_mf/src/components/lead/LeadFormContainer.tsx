@@ -1,11 +1,12 @@
 import React from 'react';
-import { ProductSelector } from './ProductSelector';
+import { ProductPicker } from './ProductPicker';
 import { CustomerInformationSection } from './CustomerInformationSection';
 import { PreferredSalesExecutiveSection } from './PreferredSalesExecutiveSection';
 import { HomeFinancingFields } from './ProductSpecificFields/HomeFinancingFields';
 import { MicrofinanceFields } from './ProductSpecificFields/MicrofinanceFields';
 import { DeclarationConsentSection } from './DeclarationConsentSection';
 import { useLeadStore } from '../../store/useLeadStore';
+import { hasVisibleField } from '../../config/fieldControlRegistry';
 import { Loader2, CheckCircle2 } from '@omniconnect/ui/icons';
 import styles from './LeadFormContainer.module.css';
 import { Button } from '@omniconnect/ui';
@@ -20,7 +21,7 @@ export const LeadFormContainer: React.FC<LeadFormContainerProps> = ({
   mode = 'page',
   onSuccess,
 }) => {
-  const { formData, submitLead, isSubmitting, fieldConfig } = useLeadStore(useShallow((s) => ({ formData: s.formData, submitLead: s.submitLead, isSubmitting: s.isSubmitting, fieldConfig: s.fieldConfig })));
+  const { formData, submitLead, isSubmitting, fieldConfig, setProduct, errors } = useLeadStore(useShallow((s) => ({ formData: s.formData, submitLead: s.submitLead, isSubmitting: s.isSubmitting, fieldConfig: s.fieldConfig, setProduct: s.setProduct, errors: s.errors })));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,19 +31,21 @@ export const LeadFormContainer: React.FC<LeadFormContainerProps> = ({
     }
   };
 
-  // Which product-specific section to show is now config-driven, not a hardcoded product-name
-  // check: a product's field config only ever contains propertyType/dateOfIncorporation rows when
-  // that product's catalog actually has them (see LeadFieldConfigService.BuildDefaultsFor), so their
-  // mere presence in the loaded config is exactly the signal that used to be `product === 'Home
-  // Financing'` / `'Micro Finance'` — the underlying rendered components are unchanged.
-  const showHomeFinancingFields = fieldConfig.some((f) => f.apiField === 'propertyType');
-  const showMicrofinanceFields = fieldConfig.some((f) => f.apiField === 'dateOfIncorporation');
+  // Which product-specific section to show is config-driven, never a product-name check: every product
+  // type's field settings contain the property and business detail fields, hidden until an administrator
+  // switches them on for that type in Field Settings (see LeadFieldConfigService.BuildDefaultsFor).
+  const showHomeFinancingFields = hasVisibleField(fieldConfig, 'propertyType') || hasVisibleField(fieldConfig, 'propertyStatus');
+  const showMicrofinanceFields = hasVisibleField(fieldConfig, 'dateOfIncorporation') || hasVisibleField(fieldConfig, 'companyName') || hasVisibleField(fieldConfig, 'entityType');
 
   const formContent = (
     <form onSubmit={handleSubmit} noValidate>
-      {/* Step 1: Product Selection */}
+      {/* Step 1: Product Selection — Category → Product, from the Marketplace's catalogue */}
       <div className={styles.stepSpacer}>
-        <ProductSelector />
+        <ProductPicker
+          productName={formData.product}
+          onSelect={setProduct}
+          error={errors.product}
+        />
       </div>
 
       {/* Display form only when a product is selected */}
@@ -75,9 +78,9 @@ export const LeadFormContainer: React.FC<LeadFormContainerProps> = ({
         >
           <div className={styles.emptyTitle}>📋</div>
           <div className={styles.emptyText}>
-            Select a Financing Product
+            Select a Product
           </div>
-          <div>Choose a product above to display the lead application form fields.</div>
+          <div>Choose a category and product above to display the lead application form fields.</div>
         </div>
       )}
     </form>

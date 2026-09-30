@@ -29,6 +29,8 @@ namespace LeadManagement.Api.Services
             string? status = null,
             string? leadSource = null);
         Task<LeadRecordDto?> GetLeadByIdAsync(string id);
+        /// <summary>The products leads have actually been taken for — what the product filter offers.</summary>
+        Task<List<string>> GetProductNamesAsync();
         Task<MutationResult<LeadRecordDto>> UpdateLeadAsync(string id, UpdateLeadDto dto, Guid? actingUserId, bool bypassApproval = false);
         /// <summary>Null once actually deleted; an ApprovalPendingDto if the delete was gated instead. Throws KeyNotFoundException if the lead doesn't exist.</summary>
         Task<ApprovalPendingDto?> DeleteLeadAsync(string id, DeleteLeadDto dto, Guid? actingUserId, bool bypassApproval = false);
@@ -466,6 +468,19 @@ namespace LeadManagement.Api.Services
                 TotalPages = totalPages
             };
         }
+
+        /// <summary>
+        /// Read from the leads themselves rather than from the catalogue: a filter has to be able to find a
+        /// lead taken for a product that has since been withdrawn or renamed, and must not offer a product
+        /// nobody has a lead for.
+        /// </summary>
+        public async Task<List<string>> GetProductNamesAsync() =>
+            await _db.Leads.AsNoTracking()
+                .Where(l => !l.IsDeleted && l.ProductName != "")
+                .Select(l => l.ProductName)
+                .Distinct()
+                .OrderBy(n => n)
+                .ToListAsync();
 
         public async Task<LeadRecordDto?> GetLeadByIdAsync(string id)
         {

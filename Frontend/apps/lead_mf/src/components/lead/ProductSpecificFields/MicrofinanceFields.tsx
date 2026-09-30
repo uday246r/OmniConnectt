@@ -23,7 +23,7 @@ export const MicrofinanceFields: React.FC<MicrofinanceFieldsProps> = ({ isEdit =
     <div className="form-section">
       <div className="form-section-title">
         <Building2 size={18} className="form-section-icon" />
-        <span>Microfinance Business Details</span>
+        <span>Business Details</span>
       </div>
 
       <div className="form-grid-1">

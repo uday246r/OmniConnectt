@@ -190,6 +190,17 @@ public class LeadCatalogTests : IDisposable
         Assert.Equal(["Home Loan – Salaried"], byCategory.Items.Select(l => l.Product));
     }
 
+    [Fact]
+    public async Task The_product_filter_offers_the_products_leads_exist_for_including_ones_since_withdrawn()
+    {
+        await CreateAsync(Application(FakeMarketplace.HomeLoanSalaried.Id, ic: "880512-14-0001"));
+        await CreateAsync(Application(FakeMarketplace.HomeLoanSalaried.Id, ic: "880512-14-0002"));
+        await CreateAsync(Application(FakeMarketplace.CashbackCard.Id));
+        marketplace.Offered.Clear();
+
+        Assert.Equal(["Cashback Card", "Home Loan – Salaried"], await leads.GetProductNamesAsync());
+    }
+
     // ── Editing ─────────────────────────────────────────────────────────────────
 
     private UpdateLeadDto Edit(Guid? productId, string employer = "Acme Sdn Bhd")

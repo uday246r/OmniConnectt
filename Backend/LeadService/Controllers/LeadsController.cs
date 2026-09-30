@@ -104,6 +104,12 @@ namespace LeadManagement.Api.Controllers
             });
         }
 
+        /// <summary>The products leads exist for — the product filter's options.</summary>
+        [HttpGet("product-names")]
+        [RequiresCapability("Lead", "View")]
+        public async Task<ActionResult<ApiResponseDto<List<string>>>> GetProductNames() =>
+            Ok(new ApiResponseDto<List<string>> { Success = true, Data = await _leadService.GetProductNamesAsync() });
+
         [HttpGet("{id}")]
         [RequiresCapability("Lead", "View")]
         public async Task<ActionResult<ApiResponseDto<LeadRecordDto>>> GetLeadById(string id)
