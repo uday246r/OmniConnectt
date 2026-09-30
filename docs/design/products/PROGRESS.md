@@ -5,8 +5,8 @@ Last updated 2026-09-30. Read [BRIEF.md](BRIEF.md) for the plan and the reasonin
 | Phase | State |
 |---|---|
 | **1 — Schema and catalog APIs** (`Backend/ProductsService`) | **Done and verified**, on local branch `products-rebuild`, not pushed. 280 unit tests pass, and 53 end-to-end checks pass against a real PostgreSQL 17 (below). |
-| 2 — Admin UI (`Frontend/apps/products_and_marketplace_mf`) | **In progress** (see "Phase 2 status" below). Categories and Audit Logs are done and verified in a browser; the other screens are not built yet, so the remote shows only those two. |
-| 3 — Dashboard and audit screens | Not started. The backend for them is done. |
+| 2 — Admin UI (`Frontend/apps/products_and_marketplace_mf`) | **Done and verified**, on the same local branch. All six screens built on `@omniconnect/ui`; 130 unit tests pass; type-check, build and lint are clean; each screen was exercised in a browser against the real API and PostgreSQL. |
+| 3 — Dashboard and audit screens | **Done** (built as part of Phase 2). |
 | 4 — Lead Management integration | Not started. Do not start until 2 and 3 are green. |
 
 ## Before running anything
@@ -116,38 +116,36 @@ the `@omniconnect/ui/tokens.css`-before-local-CSS rule and the `.test.tsx` namin
 apply.
 
 
-## Phase 2 status (frontend) — updated 2026-09-30
+## Phase 2 status (frontend) — 2026-09-30: done
 
-**Done, committed, type-checks, 45 unit tests pass, and verified in a browser against the real API:**
+**Built:** Dashboard, Products, Categories, Sub-categories, Setup (Fields, Documents, Statuses) and Audit Logs.
+`Frontend/apps/products_and_marketplace_mf/README.md` describes the structure and conventions.
 
-- The demolition of the retired screens and of every hand-rolled component the shared library replaces.
-- The data layer: types, one API module per resource, `createPagedStore` (fetch/cancel/stale-response logic,
-  tested), stores for categories, sub-categories, products, the dashboard, the category → sub-category pickers,
-  and statuses (a badge re-renders only when *its* status changes; nothing compares a status to a literal).
-- Shared components: `StatusBadge`, `CatalogIcon`, `IconPicker`, `RowMenu`, `ConfirmDialog`, `Toasts`, `KpiTile`,
-  `Field`, `TextArea`, `ListToolbar`, `useSaveAction`.
-- **Categories** (list, search, filters, sort, paging, add/edit drawer, row menu, reorder, delete with the
-  server's refusal shown in the dialog) and **Audit Logs**.
+**Verified in a browser** against the real API and a throwaway PostgreSQL 17 (a stand-in host bridge with a signed
+test token loads the built remote): the Categories list, add form with validation, row menu, and the server's
+refusal to delete a category that has sub-categories (shown in the dialog); the Products grid with live tab
+counts; the add form's category → sub-category cascade, the chosen sub-category's own attributes appearing with
+their units, the client catching a bad value, and a successful create updating the grid and counts; Setup →
+Statuses refusing to switch off the only live status; the Dashboard's tiles, bar chart and donut; Sub-categories;
+and Audit Logs listing the actions just performed. All requests on those page loads returned 200.
 
-**Not built yet** (each is registered by adding it to the `PAGES` map in `src/App.tsx`):
+**Checks:** 130 unit tests across 11 files; `tsc` reports 0 errors; the production bundle builds; `oxlint`
+reports 7 warnings and no errors (the "set loading state inside an effect" pattern the codebase already used,
+plus one pre-existing in `PermissionContext`).
 
-1. **Sub-categories** page — the Categories screen plus a Category column and a category filter; its form picks a category.
-2. **Products** page — category tabs with counts, search and sub-category/status filters, the card grid of mockup 2,
-   the add/edit drawer that renders its fields *from the chosen sub-category's field definitions*
-   (`subCategoryApi.get(id).fieldDefinitions`; validate with `@omniconnect/ui/validation`'s `validateFieldValue`
-   and show the server's `fieldErrors` from `useSaveAction`), a details drawer, status change and delete.
-3. **Dashboard** — the KPI tiles (`KpiTile`), a products-by-category bar chart, a status donut, recent products and recent
-   activity. The charts do not exist yet; write them as small SVG components coloured from CSS variables.
-4. **Setup** — tabs for Fields (per sub-category, reusing `@omniconnect/ui/validation-editor`'s
-   `ValidationRulesEditor` for a field's format rules), Documents, and Statuses (group `useStatusConfigStore().configs`
-   by `entityType`; each has label, colour, enabled, and the new **isLive** switch).
-5. Component tests for what is built (`StatusBadge`, `ListToolbar`, `ConfirmDialog`, `RowMenu`, the pages),
-   a rewrite of this app's `README.md` (it is wrong about the port and files), and a final build and lint.
+**Not verified, or not done:**
 
-**How to look at it.** The remote needs a host, so it cannot be opened on its own. For local checking, a harness
-page installs a stand-in `window.__omniconnectHost__` (a signed test token and a full grant) and loads the built
-remote: start the API against a throwaway Postgres (see "What was verified"), run `products-mf-dev`, and serve the
-harness from another port. Screenshots lag one action behind, so wait a beat before taking one.
+- **Approval (maker-checker) in the UI.** Every test token was an administrator, who bypasses it. The code path is
+  unit-tested (`ConfirmDialog`, `httpClient`, `useSaveAction`) but was not exercised against a live AuthService.
+- **Formats from Manage Formats** cannot be picked in the field editor (they live in AuthService and the app has no way
+  to read them); built-in formats work and the server still enforces any a field uses.
+- **The Setup → Fields editor and Documents were smoke-tested, not driven.** Fields/Documents create, edit and delete
+  were not exercised through the browser; the API behind them is covered by the backend's tests and end-to-end run.
+- **Real host.** The remote was loaded by a stand-in bridge, not by the actual host shell, so the sidebar, routing and
+  theme integration were not seen together. Run the platform once before shipping.
+- Row checkboxes from the mockups are not built (no bulk action to drive), and the top bar and sidebar belong to the host.
 
-**Deliberately not in the mockups' implementation:** the checkbox column in the tables (there is no bulk action
-to attach it to), and the top bar and sidebar (they belong to the host shell, not this remote).
+## Next: Phase 4 — Lead Management
+
+Do not start it until the above has been run through the real host. See BRIEF.md → Phase 4 and CODEBASE-FACTS.md Part 2. The
+highest-risk step is re-keying `LeadFieldConfig` from LeadService's private `Products.Id` to a catalogue sub-category.
