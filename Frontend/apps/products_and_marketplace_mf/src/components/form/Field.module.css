@@ -1,0 +1,25 @@
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+}
+
+.label {
+  font-size: var(--omni-font-size-sm);
+  font-weight: var(--omni-font-weight-medium);
+  color: var(--omni-color-text-primary);
+}
+
+.required { color: var(--omni-color-danger-600); }
+
+.helper {
+  font-size: var(--omni-font-size-xs);
+  color: var(--omni-color-text-muted);
+}
+
+.error {
+  font-size: var(--omni-font-size-xs);
+  color: var(--omni-color-danger-600);
+}

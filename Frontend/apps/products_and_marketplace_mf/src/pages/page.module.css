@@ -1,0 +1,104 @@
+/*
+ * What every screen in this remote shares: the page frame, the filter row, the table card and its cells.
+ * A CSS module, so nothing here can leak into the host or another remote.
+ */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--omni-space-5);
+  padding: var(--omni-space-5);
+  font-family: var(--omni-font-family);
+  color: var(--omni-color-text-primary);
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--omni-space-3);
+}
+
+.search { flex: 1 1 280px; min-width: 220px; }
+.control { flex: 0 1 200px; min-width: 150px; }
+.spacer { flex: 1 1 0; }
+
+.card {
+  background: var(--omni-color-surface);
+  border: 1px solid var(--omni-color-border);
+  border-radius: var(--omni-radius-lg);
+  box-shadow: var(--omni-shadow-sm);
+  overflow: hidden;
+}
+
+.cardBody { padding: var(--omni-space-5); }
+
+.footer { padding: var(--omni-space-3) var(--omni-space-5) var(--omni-space-4); border-top: 1px solid var(--omni-color-border); }
+
+.nameCell { display: flex; align-items: center; gap: var(--omni-space-3); min-width: 0; }
+.nameText { display: flex; flex-direction: column; min-width: 0; }
+.name { font-weight: var(--omni-font-weight-semibold); color: var(--omni-color-text-primary); }
+.sub { font-size: var(--omni-font-size-xs); color: var(--omni-color-text-muted); }
+.mono { font-family: var(--omni-font-mono); font-size: var(--omni-font-size-sm); color: var(--omni-color-text-secondary); }
+.muted { color: var(--omni-color-text-secondary); }
+.description { max-width: 340px; color: var(--omni-color-text-secondary); line-height: var(--omni-line-height-normal); }
+.numeric { text-align: center; font-weight: var(--omni-font-weight-semibold); }
+/* Visible to assistive technology only — a column header that is a button, not a word. */
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.actions { width: 1%; text-align: right; white-space: nowrap; }
+
+.error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--omni-space-3);
+  padding: var(--omni-space-3) var(--omni-space-4);
+  background: var(--omni-color-danger-50);
+  color: var(--omni-color-danger-700);
+  border: 1px solid var(--omni-color-danger-200);
+  border-radius: var(--omni-radius-lg-minus);
+  font-size: var(--omni-font-size-sm);
+}
+
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: var(--omni-space-4);
+}
+
+.liveBanner {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: var(--omni-space-2);
+  padding: 8px 14px;
+  background: var(--omni-color-primary-50);
+  color: var(--omni-color-primary-700);
+  border: 1px solid var(--omni-color-primary-200);
+  border-radius: var(--omni-radius-pill);
+  font: inherit;
+  font-size: var(--omni-font-size-sm);
+  cursor: pointer;
+}
+.liveBanner:hover { background: var(--omni-color-primary-100); }
+.liveBanner svg { width: 14px; height: 14px; }
+
+.formGrid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--omni-space-4); }
+.formGrid > .wide { grid-column: 1 / -1; }
+.formStack { display: flex; flex-direction: column; gap: var(--omni-space-4); }
+
+@media (max-width: 720px) {
+  .page { padding: var(--omni-space-3); }
+  .formGrid { grid-template-columns: 1fr; }
+  .control { flex: 1 1 100%; }
+}

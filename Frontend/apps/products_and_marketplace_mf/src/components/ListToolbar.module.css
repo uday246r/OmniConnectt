@@ -1,0 +1,13 @@
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--omni-space-3);
+}
+
+.search { flex: 1 1 280px; min-width: 220px; }
+.control { flex: 0 1 200px; min-width: 150px; }
+
+@media (max-width: 720px) {
+  .control { flex: 1 1 100%; }
+}
