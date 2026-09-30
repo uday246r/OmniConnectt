@@ -7,7 +7,7 @@ Last updated 2026-09-30. Read [BRIEF.md](BRIEF.md) for the plan and the reasonin
 | **1 — Schema and catalog APIs** (`Backend/ProductsService`) | **Done and verified**, on local branch `products-rebuild`, not pushed. 280 unit tests pass, and 53 end-to-end checks pass against a real PostgreSQL 17 (below). |
 | 2 — Admin UI (`Frontend/apps/products_and_marketplace_mf`) | **Done and verified**, on the same local branch. All six screens built on `@omniconnect/ui`; 130 unit tests pass; type-check, build and lint are clean; each screen was exercised in a browser against the real API and PostgreSQL. |
 | 3 — Dashboard and audit screens | **Done** (built as part of Phase 2). |
-| 4 — Lead Management integration | Not started. Do not start until 2 and 3 are green. |
+| 4 — Lead Management integration | **Done and verified** on the same local branch (2026-09-30): Lead Management now offers Category → Product from the Marketplace. See [Phase 4](#phase-4--lead-management-done-2026-09-30) below and [IMPLEMENTATION-REPORT.md](IMPLEMENTATION-REPORT.md). |
 
 ## Before running anything
 
@@ -139,15 +139,43 @@ plus one pre-existing in `PermissionContext`).
   unit-tested (`ConfirmDialog`, `httpClient`, `useSaveAction`) but was not exercised against a live AuthService.
 - **Formats from Manage Formats** cannot be picked in the field editor (they live in AuthService and the app has no way
   to read them); built-in formats work and the server still enforces any a field uses.
-- **Setup → Documents was not exercised at all in a browser.** Its API is covered by the backend's tests and end-to-end
-  run, and it type-checks and builds, but no one has opened it. Setup → Fields was: choosing a sub-category listed its
-  attributes, the editor opened populated (including the embedded validation editor, with no console errors), and an
-  edit to a unit saved and updated the table. Adding or deleting a field, and adding a format rule, were not driven.
-- **Real host.** The remote was loaded by a stand-in bridge, not by the actual host shell, so the sidebar, routing and
-  theme integration were not seen together. Run the platform once before shipping.
+- ~~Setup → Documents was not exercised; Fields add/delete/format rule were not driven.~~ **Done on 2026-09-30**
+  (during Phase 4): a document was added, edited and deleted; a field was added with a "Digits only" format and
+  deleted. All in the real host.
+- ~~Real host.~~ **Done on 2026-09-30**: the remote loads inside the actual host shell (sidebar, routing, theme) with the
+  real AuthService, registered through Setup → Applications.
 - Row checkboxes from the mockups are not built (no bulk action to drive), and the top bar and sidebar belong to the host.
 
-## Next: Phase 4 — Lead Management
+## Phase 4 — Lead Management (done 2026-09-30)
 
-Do not start it until the above has been run through the real host. See BRIEF.md → Phase 4 and CODEBASE-FACTS.md Part 2. The
-highest-risk step is re-keying `LeadFieldConfig` from LeadService's private `Products.Id` to a catalogue sub-category.
+**Built.** LeadService no longer has products of its own. ProductsService publishes the catalogue on
+`internal/catalog/*` (own key, `Internal:CatalogApiKey`); LeadService reads it server-to-server
+(`ProductCatalogClient`), serves `GET /api/catalog/{categories, categories/{id}/products, sub-categories}` to
+`lead_mf`, and the lead form's first step is a Category → Product picker. A lead stores the catalogue product id
+plus a snapshot (product, sub-category, category names and codes). Field Settings are keyed by sub-category and
+created on first use; the property/business detail fields exist for every sub-category, hidden until switched on.
+
+**Verified** (whole platform on a throwaway PostgreSQL 17, the *real* AuthService and the *real* host shell, torn
+down afterwards): Categories add; Setup → Documents add/edit/delete; Setup → Fields add (with a format rule) and
+delete; Lead → Create Lead: categories and products come from the Marketplace, the lead was created and its
+snapshot is in the database; Field Settings tabs per sub-category, switching Property Type on/required made the
+Property Details section appear on the Home Loan lead form; edit and move a lead to another product; product
+filter; dashboard; **switching the Loans category to inactive removed it from the picker and a lead for its product
+was refused ("no longer offered"), reactivating restored both**; **stopping ProductsService left the pickers working
+from the last list read and made lead creation answer 503**; the migration, applied to a database in the old shape
+with legacy leads, kept each lead's product name and code and cleared the old field configs; CSV exports (as an
+administrator). 107 LeadService and 289 ProductsService unit tests, 61 lead_mf tests.
+
+**Still not verified.** Maker-checker approvals end to end (every session token was an administrator; the
+approval replay of a lead create is covered by a unit test that rebuilds the stored request and re-confirms the
+product); the fine-grained export capability for a *non*-administrator; a lead user who holds only lead
+permissions; Setup → Fields' Manage Formats picker (known gap).
+
+**Deviations from the plan** — see IMPLEMENTATION-REPORT.md §7: product-specific lead questions stayed the five
+existing fields (made per-sub-category and hidden by default) instead of a generic attribute table; the catalogue
+has its own key rather than reusing the approval-replay key; the product filter reads the leads' own snapshot.
+
+**Data note.** Existing leads keep their product name and code but have no catalogue id; every old
+`LeadFieldConfig` row is deleted by the migration and recreated on first use. Pending approvals that were queued
+before this change (a lead create carrying a product *name*, a field-settings change for an old product id) cannot
+be applied and must be re-submitted.
