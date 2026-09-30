@@ -52,12 +52,50 @@ public class InternalApiKeyFilter(IOptions<InternalApiOptions> options) : IAsync
         return Task.CompletedTask;
     }
 
-    private static bool FixedTimeEquals(string provided, string expected)
+    internal static bool FixedTimeEquals(string provided, string expected)
     {
         Span<byte> providedHash = stackalloc byte[32];
         Span<byte> expectedHash = stackalloc byte[32];
         SHA256.HashData(Encoding.UTF8.GetBytes(provided), providedHash);
         SHA256.HashData(Encoding.UTF8.GetBytes(expected), expectedHash);
         return CryptographicOperations.FixedTimeEquals(providedHash, expectedHash);
+    }
+}
+
+/// <summary>
+/// Guards internal/catalog — what Lead Management reads. The same mechanism as
+/// <see cref="InternalApiKeyFilter"/> but its own secret (<c>Internal:CatalogApiKey</c>), so the key that
+/// lets a service read the catalogue cannot also apply an approved change.
+/// </summary>
+public class InternalCatalogKeyFilter(IOptions<InternalApiOptions> options) : IAsyncAuthorizationFilter
+{
+    private const string HeaderName = "X-Internal-Api-Key";
+
+    public Task OnAuthorizationAsync(AuthorizationFilterContext context)
+    {
+        var expected = options.Value.CatalogApiKey?.Trim() ?? string.Empty;
+
+        if (string.IsNullOrWhiteSpace(expected))
+        {
+            context.Result = new ObjectResult(new ProblemDetails
+            {
+                Title = "The catalogue key is not configured on this service (Internal:CatalogApiKey).",
+                Status = StatusCodes.Status503ServiceUnavailable,
+            })
+            { StatusCode = StatusCodes.Status503ServiceUnavailable };
+            return Task.CompletedTask;
+        }
+
+        var provided = context.HttpContext.Request.Headers[HeaderName].ToString().Trim();
+        if (!InternalApiKeyFilter.FixedTimeEquals(provided, expected))
+        {
+            context.Result = new UnauthorizedObjectResult(new ProblemDetails
+            {
+                Title = "Missing or invalid internal API key.",
+                Status = StatusCodes.Status401Unauthorized,
+            });
+        }
+
+        return Task.CompletedTask;
     }
 }

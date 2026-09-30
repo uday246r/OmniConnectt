@@ -59,14 +59,53 @@ public class EndpointSecurityTests
     }
 
     [Theory]
-    [InlineData(typeof(InternalApprovalsController))]
-    [InlineData(typeof(InternalCatalogController))]
-    public void The_internal_endpoints_are_guarded_by_the_internal_key(Type controller)
+    [InlineData(typeof(InternalApprovalsController), typeof(InternalApiKeyFilter))]
+    [InlineData(typeof(InternalCatalogController), typeof(InternalCatalogKeyFilter))]
+    public void The_internal_endpoints_are_guarded_by_an_internal_key(Type controller, Type expectedFilter)
     {
         var filter = controller.GetCustomAttribute<TypeFilterAttribute>();
 
         Assert.NotNull(filter);
-        Assert.Equal(typeof(InternalApiKeyFilter), filter!.ImplementationType);
+        Assert.Equal(expectedFilter, filter!.ImplementationType);
+    }
+
+    /// <summary>
+    /// Lead Management holds the catalogue key. If that were the same secret as the one AuthService uses
+    /// to replay approved changes, a service that only reads product names could apply them.
+    /// </summary>
+    [Fact]
+    public async Task The_catalogue_key_cannot_open_the_approval_replay_endpoint_and_the_reverse()
+    {
+        var options = Microsoft.Extensions.Options.Options.Create(new ProductMarketplace.Api.Options.InternalApiOptions { ApiKey = "replay-key", CatalogApiKey = "catalogue-key" });
+
+        async Task<int?> Status(Microsoft.AspNetCore.Mvc.Filters.IAsyncAuthorizationFilter filter, string key)
+        {
+            var http = new DefaultHttpContext();
+            http.Request.Headers["X-Internal-Api-Key"] = key;
+            var context = new Microsoft.AspNetCore.Mvc.Filters.AuthorizationFilterContext(
+                new Microsoft.AspNetCore.Mvc.ActionContext(http, new Microsoft.AspNetCore.Routing.RouteData(), new Microsoft.AspNetCore.Mvc.Abstractions.ActionDescriptor()), []);
+            await filter.OnAuthorizationAsync(context);
+            return (context.Result as ObjectResult)?.StatusCode;
+        }
+
+        Assert.Null(await Status(new InternalCatalogKeyFilter(options), "catalogue-key"));
+        Assert.Equal(401, await Status(new InternalCatalogKeyFilter(options), "replay-key"));
+        Assert.Null(await Status(new InternalApiKeyFilter(options), "replay-key"));
+        Assert.Equal(401, await Status(new InternalApiKeyFilter(options), "catalogue-key"));
+    }
+
+    [Fact]
+    public async Task The_catalogue_refuses_everyone_until_its_key_is_configured()
+    {
+        var options = Microsoft.Extensions.Options.Options.Create(new ProductMarketplace.Api.Options.InternalApiOptions { ApiKey = "replay-key" });
+        var http = new DefaultHttpContext();
+        http.Request.Headers["X-Internal-Api-Key"] = "";
+        var context = new Microsoft.AspNetCore.Mvc.Filters.AuthorizationFilterContext(
+            new Microsoft.AspNetCore.Mvc.ActionContext(http, new Microsoft.AspNetCore.Routing.RouteData(), new Microsoft.AspNetCore.Mvc.Abstractions.ActionDescriptor()), []);
+
+        await new InternalCatalogKeyFilter(options).OnAuthorizationAsync(context);
+
+        Assert.Equal(503, ((ObjectResult)context.Result!).StatusCode);
     }
 
     [Theory]

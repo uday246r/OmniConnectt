@@ -51,9 +51,9 @@ public class InternalApprovalsController(
         // collides with the Lead-update case in the switch below.
         if (request.EntityType == "LeadFieldConfig")
         {
-            var productId = Guid.Parse(request.EntityId!);
+            var subCategoryId = Guid.Parse(request.EntityId!);
             var fields = JsonSerializer.Deserialize<List<LeadFieldConfig>>(request.NewDataJson)!;
-            await fieldConfigService.ReplaceAsync(productId, fields, request.ActingUserId, request.ActingUserName, bypassApproval: true);
+            await fieldConfigService.ReplaceAsync(subCategoryId, fields, request.ActingUserId, request.ActingUserName, bypassApproval: true);
             return NoContent();
         }
 

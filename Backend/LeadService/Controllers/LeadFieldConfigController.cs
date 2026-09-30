@@ -27,12 +27,12 @@ namespace LeadManagement.Api.Controllers
             _service = service;
         }
 
-        [HttpGet("{productId:guid}")]
+        [HttpGet("{subCategoryId:guid}")]
         // Field Settings edits this; the lead forms and details view obey it (required, masking, formats).
         [RequiresAnyCapability("FieldSettings:View", "Lead:View", "Lead:Create", "Lead:Edit")]
-        public async Task<ActionResult<ApiResponseDto<List<LeadFieldConfig>>>> Get(Guid productId, CancellationToken ct)
+        public async Task<ActionResult<ApiResponseDto<List<LeadFieldConfig>>>> Get(Guid subCategoryId, CancellationToken ct)
         {
-            var fields = await _service.GetByProductAsync(productId, ct);
+            var fields = await _service.GetBySubCategoryAsync(subCategoryId, ct);
             // The version Field Settings saves against — a save based on anything older is refused.
             Response.Headers.ETag = $"\"{LeadFieldConfigService.Fingerprint(fields)}\"";
             return Ok(new ApiResponseDto<List<LeadFieldConfig>> { Success = true, Data = fields });
@@ -51,9 +51,9 @@ namespace LeadManagement.Api.Controllers
             return Ok(new ApiResponseDto<IReadOnlyList<OmniConnect.Validation.FormatPreset>> { Success = true, Data = await presets.GetAsync(ct) });
         }
 
-        [HttpPut("{productId:guid}")]
+        [HttpPut("{subCategoryId:guid}")]
         [RequiresCapability("FieldSettings", "Manage")]
-        public async Task<IActionResult> Replace(Guid productId, [FromBody] List<LeadFieldConfig> fields, CancellationToken ct)
+        public async Task<IActionResult> Replace(Guid subCategoryId, [FromBody] List<LeadFieldConfig> fields, CancellationToken ct)
         {
             // If-Match carries the ETag the page loaded; absent, the save is not version-checked (older callers).
             var expectedVersion = Request.Headers.IfMatch.ToString().Trim().Trim('"');
@@ -65,7 +65,7 @@ namespace LeadManagement.Api.Controllers
 
             try
             {
-                var outcome = await _service.ReplaceAsync(productId, fields, CurrentUserId(), CurrentUserName(), bypassApproval: IsSuperAdmin(), ct, expectedVersion: string.IsNullOrEmpty(expectedVersion) ? null : expectedVersion);
+                var outcome = await _service.ReplaceAsync(subCategoryId, fields, CurrentUserId(), CurrentUserName(), bypassApproval: IsSuperAdmin(), ct, expectedVersion: string.IsNullOrEmpty(expectedVersion) ? null : expectedVersion);
                 if (outcome.Pending is not null)
                 {
                     // Gated: nothing was changed. 202 Accepted — the request is understood and queued, not applied.

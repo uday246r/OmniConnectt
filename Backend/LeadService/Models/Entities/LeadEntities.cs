@@ -33,11 +33,40 @@ namespace LeadManagement.Api.Models.Entities
         [MaxLength(200)]
         public string Email { get; set; } = string.Empty;
 
-        [Required]
-        public Guid ProductId { get; set; }
+        /*
+         * The product this lead is for, by reference into the Marketplace (ProductsService) — and a
+         * snapshot of what it was called when the lead was taken.
+         *
+         * There is no foreign key: the catalogue lives in another service's database. The snapshot is what
+         * every list, export and dashboard reads, so renaming a product, moving it to another category or
+         * withdrawing it never rewrites history. CatalogProductId is null only for a lead taken before
+         * the catalogue was connected; it keeps the product name it had.
+         */
+        public Guid? CatalogProductId { get; set; }
 
-        [ForeignKey(nameof(ProductId))]
-        public Product? Product { get; set; }
+        [Required]
+        [MaxLength(200)]
+        public string ProductName { get; set; } = string.Empty;
+
+        [MaxLength(100)]
+        public string ProductCode { get; set; } = string.Empty;
+
+        /// <summary>The sub-category the product sat under: what decides which lead fields apply (LeadFieldConfig).</summary>
+        public Guid? CatalogSubCategoryId { get; set; }
+
+        [MaxLength(200)]
+        public string SubCategoryName { get; set; } = string.Empty;
+
+        [MaxLength(100)]
+        public string SubCategoryCode { get; set; } = string.Empty;
+
+        public Guid? CatalogCategoryId { get; set; }
+
+        [MaxLength(200)]
+        public string CategoryName { get; set; } = string.Empty;
+
+        [MaxLength(100)]
+        public string CategoryCode { get; set; } = string.Empty;
 
         [Required]
         public Guid StateId { get; set; }

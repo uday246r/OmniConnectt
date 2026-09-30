@@ -43,10 +43,12 @@ namespace LeadManagement.Api.Services
         private readonly SelfOptions _selfOptions;
         private readonly LeadFieldConfigService _fieldConfigService;
         private readonly ValidationPresetClient _presets;
+        private readonly ProductCatalogClient _catalog;
 
-        public LeadService(ApplicationDbContext db, IAuditLogService auditLogService, AuthServiceClient authServiceClient, IOptions<SelfOptions> selfOptions, LeadFieldConfigService fieldConfigService, ValidationPresetClient presets)
+        public LeadService(ApplicationDbContext db, IAuditLogService auditLogService, AuthServiceClient authServiceClient, IOptions<SelfOptions> selfOptions, LeadFieldConfigService fieldConfigService, ValidationPresetClient presets, ProductCatalogClient catalog)
         {
             _presets = presets;
+            _catalog = catalog;
             _db = db;
             _auditLogService = auditLogService;
             _authServiceClient = authServiceClient;
@@ -78,11 +80,45 @@ namespace LeadManagement.Api.Services
                 callbackUrl, Guid.NewGuid().ToString(), entityKey: entityKey);
         }
 
+        /// <summary>
+        /// The product a new lead is for, confirmed with the Marketplace right now — never from a cache and
+        /// never from what the browser says it is called. A product that was withdrawn (or whose category or
+        /// sub-category was switched off in Setup) since the form was opened is refused here.
+        /// </summary>
+        private async Task<CatalogProduct> ResolveProductAsync(Guid catalogProductId)
+        {
+            if (catalogProductId == Guid.Empty)
+            {
+                throw new InvalidOperationException("Product selection is required.");
+            }
+
+            return await _catalog.GetProductAsync(catalogProductId)
+                ?? throw new InvalidOperationException("That product is no longer offered. Please choose another product.");
+        }
+
+        private static void ApplyProductSnapshot(Lead lead, CatalogProduct product)
+        {
+            lead.CatalogProductId = product.Id;
+            lead.ProductName = product.Name;
+            lead.ProductCode = product.Code;
+            lead.CatalogSubCategoryId = product.SubCategoryId;
+            lead.SubCategoryName = product.SubCategoryName;
+            lead.SubCategoryCode = product.SubCategoryCode;
+            lead.CatalogCategoryId = product.CategoryId;
+            lead.CategoryName = product.CategoryName;
+            lead.CategoryCode = product.CategoryCode;
+        }
+
+        private static bool HasHomeFinancingDetails(CreateLeadDto dto) =>
+            !string.IsNullOrWhiteSpace(dto.PropertyType) || !string.IsNullOrWhiteSpace(dto.PropertyStatus);
+
+        private static bool HasMicrofinanceDetails(CreateLeadDto dto) =>
+            !string.IsNullOrWhiteSpace(dto.CompanyName) || !string.IsNullOrWhiteSpace(dto.EntityType) || !string.IsNullOrWhiteSpace(dto.DateOfIncorporation);
+
         public async Task<MutationResult<LeadRecordDto>> CreateLeadAsync(CreateLeadDto dto, Guid? actingUserId, bool bypassApproval = false)
         {
             // Resolve foreign keys
-            var product = await _db.Products.FirstOrDefaultAsync(p => p.Name.ToLower() == dto.Product.Trim().ToLower())
-                ?? throw new InvalidOperationException($"Product '{dto.Product}' is not recognized.");
+            var product = await ResolveProductAsync(dto.CatalogProductId);
 
             var state = await _db.States.FirstOrDefaultAsync(s => s.Name.ToLower() == dto.State.Trim().ToLower())
                 ?? throw new InvalidOperationException($"State '{dto.State}' is not recognized.");
@@ -103,7 +139,7 @@ namespace LeadManagement.Api.Services
             // were deliberately removed from every catalog field so this config-driven check is the
             // only thing deciding presence (format validators like [EmailAddress]/[RegularExpression]
             // stay on the DTO and still apply once a value IS present).
-            var fieldConfigs = await _fieldConfigService.GetByProductAsync(product.Id);
+            var fieldConfigs = await _fieldConfigService.GetBySubCategoryAsync(product.SubCategoryId);
             LeadFieldConfigService.EnsureRequiredFieldsPresent(fieldConfigs, dto, product.Name);
 
             // Field Settings' formats (IC number, phone, email and anything an administrator added), checked
@@ -118,9 +154,11 @@ namespace LeadManagement.Api.Services
              *
              * IC number identifies the person; product is included because the same person may
              * legitimately have separate leads for different products, and blocking that would be
-             * wrong. Lowercased and trimmed so trivial formatting differences cannot defeat the match.
+             * wrong. The product is keyed by its catalogue id, not its name, so renaming a product does
+             * not let the same person be submitted twice. Lowercased and trimmed so trivial formatting
+             * differences in the IC number cannot defeat the match.
              */
-            var createKey = $"lead:{dto.IcNumber.Trim().ToLowerInvariant()}:{product.Name.Trim().ToLowerInvariant()}";
+            var createKey = $"lead:{dto.IcNumber.Trim().ToLowerInvariant()}:{product.Id:N}";
 
             var pending = await TrySubmitForApprovalAsync(
                 "Create", null, dto.CustomerName.Trim(), null, dto, actingUserId, bypassApproval, entityKey: createKey);
@@ -141,7 +179,6 @@ namespace LeadManagement.Api.Services
                 PhoneCountryCode = string.IsNullOrWhiteSpace(dto.PhoneCountryCode) ? "+60" : dto.PhoneCountryCode.Trim(),
                 PhoneNumber = dto.PhoneNumber.Trim(),
                 Email = dto.Email.Trim(),
-                ProductId = product.Id,
                 StateId = state.Id,
                 BranchId = branch?.Id,
                 EmployerName = dto.EmployerName.Trim(),
@@ -153,12 +190,14 @@ namespace LeadManagement.Api.Services
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             };
+            ApplyProductSnapshot(lead, product);
 
             _db.Leads.Add(lead);
             await _db.SaveChangesAsync();
 
-            // Product specific details
-            if (dto.Product == "Home Financing" && (!string.IsNullOrWhiteSpace(dto.PropertyType) || !string.IsNullOrWhiteSpace(dto.PropertyStatus)))
+            // Product details the lead form collected for this sub-category (which of them apply is
+            // Field Settings' decision, so what was actually filled in is what is kept).
+            if (HasHomeFinancingDetails(dto))
             {
                 _db.LeadHomeFinancingDetails.Add(new LeadHomeFinancingDetail
                 {
@@ -167,7 +206,8 @@ namespace LeadManagement.Api.Services
                     PropertyStatus = dto.PropertyStatus
                 });
             }
-            else if (dto.Product == "Micro Finance" && (!string.IsNullOrWhiteSpace(dto.CompanyName) || !string.IsNullOrWhiteSpace(dto.EntityType)))
+
+            if (HasMicrofinanceDetails(dto))
             {
                 _db.LeadMicrofinanceDetails.Add(new LeadMicrofinanceDetail
                 {
@@ -197,6 +237,10 @@ namespace LeadManagement.Api.Services
                 Phone = $"{lead.PhoneCountryCode} {lead.PhoneNumber}".Trim(),
                 Email = lead.Email,
                 Product = product.Name,
+                CatalogProductId = lead.CatalogProductId,
+                CategoryName = lead.CategoryName,
+                SubCategoryId = lead.CatalogSubCategoryId,
+                SubCategoryName = lead.SubCategoryName,
                 State = state.Name,
                 Branch = branch?.Name ?? "Not Assigned",
                 Status = lead.Status,
@@ -238,7 +282,6 @@ namespace LeadManagement.Api.Services
             var q = _db.Leads
                 .AsNoTracking()
                 .Where(l => !l.IsDeleted)
-                .Include(l => l.Product)
                 .Include(l => l.State)
                 .Include(l => l.Branch)
                 .Include(l => l.PreferredSalesExecutive)
@@ -256,7 +299,8 @@ namespace LeadManagement.Api.Services
                     l.PhoneNumber.ToLower().Contains(s) ||
                     l.Email.ToLower().Contains(s) ||
                     (l.Branch != null && l.Branch.Name.ToLower().Contains(s)) ||
-                    (l.Product != null && l.Product.Name.ToLower().Contains(s))
+                    l.ProductName.ToLower().Contains(s) ||
+                    l.CategoryName.ToLower().Contains(s)
                 );
             }
 
@@ -265,7 +309,7 @@ namespace LeadManagement.Api.Services
                 var prods = product.Split(',').Select(p => p.Trim().ToLower()).Where(p => p.Length > 0).ToList();
                 if (prods.Count > 0)
                 {
-                    q = q.Where(l => l.Product != null && prods.Contains(l.Product.Name.ToLower()));
+                    q = q.Where(l => prods.Contains(l.ProductName.ToLower()));
                 }
             }
 
@@ -392,7 +436,11 @@ namespace LeadManagement.Api.Services
                     IcNumber = l.IcNumber,
                     Phone = $"{l.PhoneCountryCode} {l.PhoneNumber}".Trim(),
                     Email = l.Email,
-                    Product = l.Product != null ? l.Product.Name : string.Empty,
+                    Product = l.ProductName,
+                    CatalogProductId = l.CatalogProductId,
+                    CategoryName = l.CategoryName,
+                    SubCategoryId = l.CatalogSubCategoryId,
+                    SubCategoryName = l.SubCategoryName,
                     State = l.State != null ? l.State.Name : string.Empty,
                     Branch = l.Branch != null ? l.Branch.Name : "Not Assigned",
                     Status = l.Status,
@@ -426,7 +474,6 @@ namespace LeadManagement.Api.Services
             var l = await _db.Leads
                 .AsNoTracking()
                 .Where(x => !x.IsDeleted)
-                .Include(x => x.Product)
                 .Include(x => x.State)
                 .Include(x => x.Branch)
                 .Include(x => x.PreferredSalesExecutive)
@@ -444,7 +491,11 @@ namespace LeadManagement.Api.Services
                 IcNumber = l.IcNumber,
                 Phone = $"{l.PhoneCountryCode} {l.PhoneNumber}".Trim(),
                 Email = l.Email,
-                Product = l.Product?.Name ?? string.Empty,
+                Product = l.ProductName,
+                CatalogProductId = l.CatalogProductId,
+                CategoryName = l.CategoryName,
+                SubCategoryId = l.CatalogSubCategoryId,
+                SubCategoryName = l.SubCategoryName,
                 State = l.State?.Name ?? string.Empty,
                 Branch = l.Branch?.Name ?? "Not Assigned",
                 Status = l.Status,
@@ -467,7 +518,6 @@ namespace LeadManagement.Api.Services
                 throw new KeyNotFoundException($"Lead with ID '{id}' was not found.");
 
             var lead = await _db.Leads
-                .Include(l => l.Product)
                 .Include(l => l.State)
                 .Include(l => l.Branch)
                 .Include(l => l.PreferredSalesExecutive)
@@ -481,9 +531,20 @@ namespace LeadManagement.Api.Services
 
             var previousDto = await GetLeadByIdAsync(id);
 
-            // Resolve foreign keys
-            var product = await _db.Products.FirstOrDefaultAsync(p => p.Name.ToLower() == dto.Product.Trim().ToLower())
-                ?? throw new InvalidOperationException($"Product '{dto.Product}' is not recognized.");
+            /*
+             * The product. A lead keeps the product it was taken for: leaving the id out, or sending its own,
+             * changes nothing and asks nothing of the Marketplace — a lead for a product that has since been
+             * withdrawn (or that predates the catalogue) must stay editable. Only choosing a *different*
+             * product is confirmed with the Marketplace, and only a product it currently offers is accepted.
+             */
+            CatalogProduct? newProduct = null;
+            if (dto.CatalogProductId != Guid.Empty && dto.CatalogProductId != lead.CatalogProductId)
+            {
+                newProduct = await ResolveProductAsync(dto.CatalogProductId);
+            }
+
+            var subCategoryId = newProduct?.SubCategoryId ?? lead.CatalogSubCategoryId;
+            var productName = newProduct?.Name ?? lead.ProductName;
 
             var state = await _db.States.FirstOrDefaultAsync(s => s.Name.ToLower() == dto.State.Trim().ToLower())
                 ?? throw new InvalidOperationException($"State '{dto.State}' is not recognized.");
@@ -500,12 +561,13 @@ namespace LeadManagement.Api.Services
                 salesExec = await _db.SalesExecutives.FirstOrDefaultAsync(se => se.Name.ToLower() == dto.PreferredSalesExecutive.Trim().ToLower());
             }
 
-            // Field Settings' per-product Required/Editable rules — see CreateLeadAsync's comment for
+            // Field Settings' per-sub-category Required/Editable rules — see CreateLeadAsync's comment for
             // why Required is config-driven rather than a DTO attribute. Editable is checked here
             // (Update only — nothing to compare against on Create) against previousDto, the same
             // pre-mutation read-model snapshot already fetched above for the audit diff.
-            var fieldConfigs = await _fieldConfigService.GetByProductAsync(product.Id);
-            LeadFieldConfigService.EnsureRequiredFieldsPresent(fieldConfigs, dto, product.Name);
+            // A lead that predates the catalogue has no sub-category, so nothing configures its form.
+            var fieldConfigs = subCategoryId is { } sub ? await _fieldConfigService.GetBySubCategoryAsync(sub) : [];
+            LeadFieldConfigService.EnsureRequiredFieldsPresent(fieldConfigs, dto, productName);
             LeadFieldConfigService.EnsureEditableFieldsUnchanged(fieldConfigs, dto, previousDto!);
             LeadFieldConfigService.EnsureFormatsValid(fieldConfigs, dto, await _presets.GetAsync(), previousDto);
 
@@ -523,7 +585,7 @@ namespace LeadManagement.Api.Services
             lead.PhoneCountryCode = string.IsNullOrWhiteSpace(dto.PhoneCountryCode) ? "+60" : dto.PhoneCountryCode.Trim();
             lead.PhoneNumber = dto.PhoneNumber.Trim();
             lead.Email = dto.Email.Trim();
-            lead.ProductId = product.Id;
+            if (newProduct is not null) ApplyProductSnapshot(lead, newProduct);
             lead.StateId = state.Id;
             lead.BranchId = branch?.Id;
             lead.EmployerName = dto.EmployerName.Trim();
@@ -532,8 +594,9 @@ namespace LeadManagement.Api.Services
             lead.PreferredSalesExecutiveId = salesExec?.Id;
             lead.UpdatedAt = DateTime.UtcNow;
 
-            // Product specific details
-            if (dto.Product == "Home Financing")
+            // Product details: written when the form supplied them, and kept in step when a row already
+            // exists (so a value can be cleared). Which fields the form shows is Field Settings' decision.
+            if (HasHomeFinancingDetails(dto) || lead.HomeFinancingDetail != null)
             {
                 if (lead.HomeFinancingDetail == null)
                 {
@@ -543,7 +606,8 @@ namespace LeadManagement.Api.Services
                 lead.HomeFinancingDetail.PropertyType = dto.PropertyType;
                 lead.HomeFinancingDetail.PropertyStatus = dto.PropertyStatus;
             }
-            else if (dto.Product == "Micro Finance")
+
+            if (HasMicrofinanceDetails(dto) || lead.MicrofinanceDetail != null)
             {
                 if (lead.MicrofinanceDetail == null)
                 {

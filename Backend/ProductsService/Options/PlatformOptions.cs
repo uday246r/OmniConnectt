@@ -36,6 +36,13 @@ public class InternalApiOptions
     public const string SectionName = "Internal";
 
     public string ApiKey { get; set; } = string.Empty;
+
+    /// <summary>
+    /// The key Lead Management presents to read the catalogue. Deliberately not <see cref="ApiKey"/>:
+    /// that one lets AuthService replay an approved change here, and a service that only needs to read
+    /// product names must not be able to write anything.
+    /// </summary>
+    public string CatalogApiKey { get; set; } = string.Empty;
 }
 
 /// <summary>Bound from "Self". How this remote identifies itself to the platform.</summary>

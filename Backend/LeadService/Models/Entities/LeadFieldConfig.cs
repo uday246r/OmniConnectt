@@ -6,7 +6,7 @@ using System.Text.Json.Serialization;
 namespace LeadManagement.Api.Models.Entities
 {
     /// <summary>
-    /// One field's presentation/validation rule for one Product — label, visibility, whether it's
+    /// One field's presentation/validation rule for one Marketplace sub-category — label, visibility, whether it's
     /// mandatory, whether it can be edited after creation, ordering, and masking for sensitive values.
     /// This is config over the fields that already exist in code (see LeadFieldConfigService's own
     /// doc comment for the fixed catalog) — never a schema/EAV mechanism for inventing new data
@@ -20,11 +20,13 @@ namespace LeadManagement.Api.Models.Entities
         [Key]
         public Guid Id { get; set; } = Guid.NewGuid();
 
+        /// <summary>
+        /// The Marketplace sub-category this configuration is for, so every product of one type ("Home
+        /// Loan – Salaried", "Home Loan – Self employed") shares the same lead form. A reference into
+        /// another service's data, so it has no foreign key.
+        /// </summary>
         [Required]
-        public Guid ProductId { get; set; }
-
-        [ForeignKey(nameof(ProductId))]
-        public Product? Product { get; set; }
+        public Guid CatalogSubCategoryId { get; set; }
 
         /// <summary>The fixed catalog key — e.g. "customerName", "propertyType". Matched by name
         /// against CreateLeadDto/UpdateLeadDto/Lead properties in LeadFieldConfigService's own

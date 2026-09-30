@@ -57,7 +57,7 @@ namespace LeadManagement.Api.Services
             if (!string.IsNullOrWhiteSpace(filters.Product))
             {
                 var p = filters.Product.Trim().ToLower();
-                query = query.Where(l => l.Product != null && l.Product.Name.ToLower() == p);
+                query = query.Where(l => l.ProductName.ToLower() == p);
             }
 
             if (!string.IsNullOrWhiteSpace(filters.Branch))
@@ -221,14 +221,14 @@ namespace LeadManagement.Api.Services
 
         public async Task<List<ProductDistributionDto>> GetLeadsByProductAsync(DashboardFilterDto filters)
         {
-            IQueryable<Lead> query = _db.Leads.AsNoTracking().Include(l => l.Product);
+            IQueryable<Lead> query = _db.Leads.AsNoTracking();
             query = ApplyFilters(query, filters);
 
             var totalCount = await query.CountAsync();
             if (totalCount == 0) return new List<ProductDistributionDto>();
 
             var grouped = await query
-                .GroupBy(l => l.Product != null ? l.Product.Name : "Other")
+                .GroupBy(l => l.ProductName)
                 .Select(g => new
                 {
                     ProductName = g.Key,
@@ -277,7 +277,6 @@ namespace LeadManagement.Api.Services
         {
             IQueryable<Lead> query = _db.Leads
                 .AsNoTracking()
-                .Include(l => l.Product)
                 .Include(l => l.State)
                 .Include(l => l.Branch)
                 .Include(l => l.PreferredSalesExecutive);
@@ -303,7 +302,11 @@ namespace LeadManagement.Api.Services
                     IcNumber = l.IcNumber,
                     Phone = $"{l.PhoneCountryCode} {l.PhoneNumber}".Trim(),
                     Email = l.Email,
-                    Product = l.Product != null ? l.Product.Name : string.Empty,
+                    Product = l.ProductName,
+                    CatalogProductId = l.CatalogProductId,
+                    CategoryName = l.CategoryName,
+                    SubCategoryId = l.CatalogSubCategoryId,
+                    SubCategoryName = l.SubCategoryName,
                     State = l.State != null ? l.State.Name : string.Empty,
                     Branch = l.Branch != null ? l.Branch.Name : "Not Assigned",
                     Status = l.Status,

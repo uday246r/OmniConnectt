@@ -6,14 +6,15 @@ using ProductMarketplace.Application.Interfaces;
 namespace ProductMarketplace.Api.Controllers;
 
 /// <summary>
-/// The catalogue as Lead Management reads it. Guarded by the internal key, never by a user token: the
+/// The catalogue as Lead Management reads it. Guarded by its own internal key (<c>Internal:CatalogApiKey</c>,
+/// separate from the one that lets AuthService replay approvals), never by a user token: the
 /// caller is LeadService acting for a lead user, who holds lead capabilities and nothing in this service.
 /// Everything returned is limited to what the catalogue currently shows.
 /// </summary>
 [ApiController]
 [Route("internal/catalog")]
 [AllowAnonymous]
-[TypeFilter(typeof(InternalApiKeyFilter))]
+[TypeFilter(typeof(InternalCatalogKeyFilter))]
 public class InternalCatalogController(ICatalogLookupService catalog) : ControllerBase
 {
     [HttpGet("categories")]

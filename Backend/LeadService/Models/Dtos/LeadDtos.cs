@@ -9,15 +9,6 @@ namespace LeadManagement.Api.Models.Dtos
         public string? Description { get; set; }
     }
 
-    /// <summary>The real Product row (Id + Name) — unlike DropdownOptionDto's Products shape (Value=Name,
-    /// Label=Name, no id), needed by Field Settings since LeadFieldConfig is keyed by the actual
-    /// Product Guid, not by name.</summary>
-    public class ProductWithIdDto
-    {
-        public Guid Id { get; set; }
-        public string Name { get; set; } = string.Empty;
-    }
-
     public class ReferenceDataDto
     {
         public List<DropdownOptionDto> PropertyTypes { get; set; } = new();
@@ -27,11 +18,13 @@ namespace LeadManagement.Api.Models.Dtos
 
     public class CreateLeadDto
     {
-        // Product selection is a structural requirement (the field config below is KEYED by product,
-        // so there's no such thing as "no product"), not a catalog field an admin can make optional —
-        // this is the one field on this DTO that keeps a static [Required].
-        [Required(ErrorMessage = "Product selection is required.")]
-        public string Product { get; set; } = string.Empty;
+        /// <summary>
+        /// The product this lead is for: its id in the Marketplace. A structural requirement (the field
+        /// settings that follow are looked up through it), not a field an administrator can make optional,
+        /// so it is checked by the service — an all-zero id means "none chosen". On an edit, leaving it out
+        /// keeps the lead's current product.
+        /// </summary>
+        public Guid CatalogProductId { get; set; }
 
         // Every other field below is governed by LeadFieldConfig's per-product Required flag
         // (LeadFieldConfigService's required-field check, run in the service layer) instead of a
@@ -112,7 +105,14 @@ namespace LeadManagement.Api.Models.Dtos
         public string IcNumber { get; set; } = string.Empty;
         public string Phone { get; set; } = string.Empty;
         public string Email { get; set; } = string.Empty;
+        /// <summary>The product's name as it was when the lead was taken.</summary>
         public string Product { get; set; } = string.Empty;
+
+        /// <summary>Null for a lead taken before the catalogue was connected.</summary>
+        public Guid? CatalogProductId { get; set; }
+        public string CategoryName { get; set; } = string.Empty;
+        public Guid? SubCategoryId { get; set; }
+        public string SubCategoryName { get; set; } = string.Empty;
         public string State { get; set; } = string.Empty;
         public string Branch { get; set; } = string.Empty;
         public string Status { get; set; } = string.Empty;
