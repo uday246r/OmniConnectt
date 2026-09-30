@@ -4,7 +4,7 @@ Last updated 2026-09-30. Read [BRIEF.md](BRIEF.md) for the plan and the reasonin
 
 | Phase | State |
 |---|---|
-| **1 — Schema and catalog APIs** (`Backend/ProductsService`) | **Done**, on local branch `products-rebuild`, not pushed. 280 tests pass. Not yet run against a real database (see below). |
+| **1 — Schema and catalog APIs** (`Backend/ProductsService`) | **Done and verified**, on local branch `products-rebuild`, not pushed. 280 unit tests pass, and 53 end-to-end checks pass against a real PostgreSQL 17 (below). |
 | 2 — Admin UI (`Frontend/apps/products_and_marketplace_mf`) | Not started. **The remote is broken until it is** — it still calls the old API. |
 | 3 — Dashboard and audit screens | Not started. The backend for them is done. |
 | 4 — Lead Management integration | Not started. Do not start until 2 and 3 are green. |
@@ -23,17 +23,43 @@ DROP SCHEMA public CASCADE; CREATE SCHEMA public;
 That permanently deletes everything in it. The Neon databases are shared — check which one
 `Backend/ProductsService/.env` points at before running it. Nothing in this rebuild was run against one.
 
-## What was verified, and what was not
+## What was verified
 
-Verified: the class libraries and API build; all 280 tests pass; the service starts and its dependency
-graph validates; `GET /permissions` publishes the six sidebar pages in mockup order; every data endpoint
-answers 401 to an anonymous caller; `dotnet ef migrations script` produces sound SQL (11 tables, one
-`jsonb` column, the unique indexes, `RESTRICT` on the two hierarchy links, 8 bootstrap status rows).
+**Unit tests:** 280 pass. They use EF's in-memory provider, which does not enforce unique indexes, foreign
+keys or cascades, so on their own they proved logic, not the database.
 
-**Not verified: any of this against a real PostgreSQL.** The tests use EF's in-memory provider, which does
-not enforce unique indexes, foreign keys or cascades, and translates some queries more leniently than
-Npgsql. The first run against an empty Postgres is the real test of the migration, the unique-violation
-handling (`SaveOrReportDuplicateAsync`), the `ExecuteUpdate` view counter and the index-backed queries.
+**Against a real PostgreSQL 17** (a throwaway Docker container, deleted afterwards — nothing shared was
+touched): the service was started on an empty database, so both migrations were applied for real, and 53
+checks were driven through the actual HTTP API with signed tokens. All passed. They covered:
+
+- the schema: 11 tables, both migrations recorded, the 8 bootstrap statuses, `ValidationsJson` genuinely `jsonb`
+- the hierarchy and its uniqueness rules (a code across the catalogue; a name within a category)
+- **the core requirement:** a category set inactive hides its products from the customer view while the
+  admin list keeps them; *nothing beneath it is rewritten in the database*; reactivating restores each
+  product exactly as it was, so a draft stays a draft
+- server-side value validation, with every failing field reported together
+- SQL translation of the sorts and searches, the atomic view counter, and cascade delete
+- updating a product that has values (the bug the in-memory tests exposed)
+- eight simultaneous requests for one code: exactly one 201 and seven plain 400s, never a 500
+- the guard rails (deleting what still has children; the only live status; a status still in use)
+- the dashboard endpoints, the audit trail, and access control (401 anonymous, 403 for a reader)
+
+Also checked: the service starts with its dependency graph valid, and `GET /permissions` publishes the six
+sidebar pages in mockup order.
+
+**Not verified:** anything involving AuthService. Approval (maker-checker) was not exercised — the test tokens
+were administrators, who bypass it — nor the download endpoints (which ask AuthService for a fine-grained
+capability), nor loading admin-defined formats from Manage Formats. Those paths are unchanged from before the
+rebuild and their unit tests pass, but they were not run against a live AuthService.
+
+## Known follow-ups
+
+- **Log noise.** ASP.NET logs every exception its handler catches at *Error* level, including the ones this
+  service deliberately turns into a 400 (a duplicate code, deleting something that still has children). One
+  end-to-end run produced 17 "unhandled exception" lines and not one real failure. That was already true
+  before the rebuild, but at scale it would bury genuine errors and can trip alerts. The fix is to return
+  400s directly instead of throwing, or to log those at a lower level in the exception handler in `Program.cs`.
+- **The Products frontend is broken** until Phase 2, because it still calls the old API.
 
 ## Where this departs from BRIEF.md, and why
 
