@@ -12,8 +12,8 @@ namespace ProductsService.Tests;
 /// No business endpoint in Products & Marketplace answers an anonymous or unpermitted caller.
 /// </summary>
 /// <remarks>
-/// This service was integrated with no authentication at all: product changes, customer applications
-/// and uploaded identity documents were all served to anyone. The fix is a set of attributes, which is
+/// This service was integrated with no authentication at all: product changes and the catalogue's
+/// configuration were served to anyone. The fix is a set of attributes, which is
 /// exactly the kind of thing a new endpoint forgets — so this test walks every action by reflection and
 /// fails for any that lacks a token requirement and a capability, rather than relying on someone to add a
 /// test per endpoint.
@@ -67,10 +67,11 @@ public class EndpointSecurityTests
     }
 
     [Theory]
-    [InlineData("ApplicationsController", "GetDocumentFile", "applications", "View")]
-    [InlineData("ApplicationsController", "Search", "applications", "View")]
-    [InlineData("ApplicationsController", "UpdateStatus", "applications", "Manage")]
     [InlineData("ProductsController", "Delete", "products", "Delete")]
+    [InlineData("CategoriesController", "Delete", "categories", "Delete")]
+    [InlineData("SubCategoriesController", "Delete", "subcategories", "Delete")]
+    [InlineData("SubCategoriesController", "CreateField", "setup", "Manage")]
+    [InlineData("StatusConfigsController", "Create", "setup", "Manage")]
     [InlineData("AuditLogsController", "Search", "audit", "View")]
     public void Sensitive_endpoints_demand_the_specific_capability(string controller, string action, string module, string capability)
     {

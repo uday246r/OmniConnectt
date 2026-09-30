@@ -12,8 +12,8 @@ using ProductMarketplace.Infrastructure.Data;
 namespace ProductMarketplace.Infrastructure.Data.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260825041843_AddStatusConfig")]
-    partial class AddStatusConfig
+    [Migration("20260930032147_InitialCreate")]
+    partial class InitialCreate
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -24,155 +24,6 @@ namespace ProductMarketplace.Infrastructure.Data.Migrations
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
-
-            modelBuilder.Entity("ProductMarketplace.Domain.Entities.Application", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("ApplicationNumber")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("CustomerEmail")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("CustomerName")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("CustomerPhone")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<Guid>("ProductId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("ReviewNotes")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<int>("Status")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime?>("SubmittedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ApplicationNumber")
-                        .IsUnique();
-
-                    b.HasIndex("ProductId");
-
-                    b.HasIndex("Status");
-
-                    b.ToTable("Applications");
-                });
-
-            modelBuilder.Entity("ProductMarketplace.Domain.Entities.ApplicationDocument", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("ApplicationId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("DocumentName")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("DocumentType")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("FileName")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<bool>("Required")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool>("Uploaded")
-                        .HasColumnType("boolean");
-
-                    b.Property<DateTime?>("UploadedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ApplicationId");
-
-                    b.ToTable("ApplicationDocuments");
-                });
-
-            modelBuilder.Entity("ProductMarketplace.Domain.Entities.ApplicationFieldValue", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("ApplicationId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid?>("FieldDefinitionId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("FieldKey")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("FieldLabel")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("Value")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ApplicationId");
-
-                    b.HasIndex("FieldDefinitionId");
-
-                    b.ToTable("ApplicationFieldValues");
-                });
-
-            modelBuilder.Entity("ProductMarketplace.Domain.Entities.ApplicationStatusHistory", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("ApplicationId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("ChangedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Note")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<int>("Status")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ApplicationId");
-
-                    b.ToTable("ApplicationStatusHistories");
-                });
 
             modelBuilder.Entity("ProductMarketplace.Domain.Entities.AuditLog", b =>
                 {
@@ -193,6 +44,9 @@ namespace ProductMarketplace.Infrastructure.Data.Migrations
                         .IsRequired()
                         .HasMaxLength(150)
                         .HasColumnType("character varying(150)");
+
+                    b.Property<Guid?>("ActorUserId")
+                        .HasColumnType("uuid");
 
                     b.Property<string>("Description")
                         .IsRequired()
@@ -229,9 +83,13 @@ namespace ProductMarketplace.Infrastructure.Data.Migrations
 
                     b.HasIndex("Action");
 
+                    b.HasIndex("ActorUserId");
+
                     b.HasIndex("EntityType");
 
                     b.HasIndex("Timestamp");
+
+                    b.HasIndex("EntityType", "EntityId");
 
                     b.ToTable("AuditLogs");
                 });
@@ -241,6 +99,11 @@ namespace ProductMarketplace.Infrastructure.Data.Migrations
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -254,33 +117,31 @@ namespace ProductMarketplace.Infrastructure.Data.Migrations
 
                     b.Property<string>("IconKey")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(150)
                         .HasColumnType("character varying(150)");
 
-                    b.Property<Guid?>("ParentCategoryId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Slug")
+                    b.Property<string>("Status")
                         .IsRequired()
-                        .HasMaxLength(160)
-                        .HasColumnType("character varying(160)");
-
-                    b.Property<int>("Status")
-                        .HasColumnType("integer");
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
 
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ParentCategoryId");
-
-                    b.HasIndex("Slug")
+                    b.HasIndex("Code")
                         .IsUnique();
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.HasIndex("Status", "DisplayOrder");
 
                     b.ToTable("Categories");
                 });
@@ -307,21 +168,21 @@ namespace ProductMarketplace.Infrastructure.Data.Migrations
                         .HasMaxLength(150)
                         .HasColumnType("character varying(150)");
 
-                    b.Property<Guid?>("ProductTypeId")
-                        .HasColumnType("uuid");
-
                     b.Property<bool>("Required")
                         .HasColumnType("boolean");
 
                     b.Property<int>("SortOrder")
                         .HasColumnType("integer");
 
+                    b.Property<Guid?>("SubCategoryId")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ProductTypeId");
+                    b.HasIndex("SubCategoryId");
 
                     b.ToTable("DocumentDefinitions");
                 });
@@ -335,9 +196,6 @@ namespace ProductMarketplace.Infrastructure.Data.Migrations
                     b.Property<int>("DataType")
                         .HasColumnType("integer");
 
-                    b.Property<bool>("DisplayInApplication")
-                        .HasColumnType("boolean");
-
                     b.Property<bool>("DisplayOnCard")
                         .HasColumnType("boolean");
 
@@ -348,6 +206,9 @@ namespace ProductMarketplace.Infrastructure.Data.Migrations
                         .HasColumnType("boolean");
 
                     b.Property<bool>("IsPrimaryMetric")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsReadOnly")
                         .HasColumnType("boolean");
 
                     b.Property<bool>("IsSecondaryMetric")
@@ -366,9 +227,6 @@ namespace ProductMarketplace.Infrastructure.Data.Migrations
                     b.Property<string>("OptionsJson")
                         .HasColumnType("text");
 
-                    b.Property<Guid>("ProductTypeId")
-                        .HasColumnType("uuid");
-
                     b.Property<bool>("Required")
                         .HasColumnType("boolean");
 
@@ -378,15 +236,18 @@ namespace ProductMarketplace.Infrastructure.Data.Migrations
                     b.Property<bool>("Sortable")
                         .HasColumnType("boolean");
 
+                    b.Property<Guid>("SubCategoryId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("Unit")
                         .HasColumnType("text");
 
-                    b.Property<bool>("VisibleToCustomer")
-                        .HasColumnType("boolean");
+                    b.Property<string>("ValidationsJson")
+                        .HasColumnType("jsonb");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ProductTypeId", "Key")
+                    b.HasIndex("SubCategoryId", "Key")
                         .IsUnique();
 
                     b.ToTable("FieldDefinitions");
@@ -396,12 +257,6 @@ namespace ProductMarketplace.Infrastructure.Data.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<int>("ApplicationCount")
-                        .HasColumnType("integer");
-
-                    b.Property<Guid>("CategoryId")
                         .HasColumnType("uuid");
 
                     b.Property<string>("Code")
@@ -418,28 +273,25 @@ namespace ProductMarketplace.Infrastructure.Data.Migrations
 
                     b.Property<string>("IconKey")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
-                    b.Property<Guid>("ProductTypeId")
-                        .HasColumnType("uuid");
-
-                    b.Property<double>("RatingAverage")
-                        .HasColumnType("double precision");
-
-                    b.Property<int>("RatingCount")
-                        .HasColumnType("integer");
-
                     b.Property<string>("ShortDescription")
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<int>("Status")
-                        .HasColumnType("integer");
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<Guid>("SubCategoryId")
+                        .HasColumnType("uuid");
 
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -449,14 +301,14 @@ namespace ProductMarketplace.Infrastructure.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("CategoryId");
-
                     b.HasIndex("Code")
                         .IsUnique();
 
-                    b.HasIndex("ProductTypeId");
+                    b.HasIndex("CreatedAt");
 
                     b.HasIndex("Status");
+
+                    b.HasIndex("SubCategoryId", "Status", "CreatedAt", "Id");
 
                     b.ToTable("Products");
                 });
@@ -541,159 +393,12 @@ namespace ProductMarketplace.Infrastructure.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("FieldDefinitionId");
+                    b.HasIndex("FieldDefinitionId", "NumericValue");
 
                     b.HasIndex("ProductId", "FieldDefinitionId")
                         .IsUnique();
 
                     b.ToTable("ProductFieldValues");
-                });
-
-            modelBuilder.Entity("ProductMarketplace.Domain.Entities.ProductType", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Code")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.Property<string>("IconKey")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Code")
-                        .IsUnique();
-
-                    b.ToTable("ProductTypes");
-                });
-
-            modelBuilder.Entity("ProductMarketplace.Domain.Entities.ProductViewLog", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("ProductId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("ViewedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ProductId");
-
-                    b.HasIndex("ViewedAt");
-
-                    b.ToTable("ProductViewLogs");
-                });
-
-            modelBuilder.Entity("ProductMarketplace.Domain.Entities.Promotion", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("BadgeText")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Description")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTime>("EndDate")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("OfferDetail")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<int>("Priority")
-                        .HasColumnType("integer");
-
-                    b.Property<Guid>("ProductId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("StartDate")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int>("Status")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("TermsAndConditions")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("Title")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ProductId");
-
-                    b.HasIndex("Status");
-
-                    b.ToTable("Promotions");
-                });
-
-            modelBuilder.Entity("ProductMarketplace.Domain.Entities.Review", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Comment")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("CustomerEmail")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("CustomerName")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<Guid>("ProductId")
-                        .HasColumnType("uuid");
-
-                    b.Property<int>("Rating")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("Status")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ProductId");
-
-                    b.HasIndex("Status");
-
-                    b.ToTable("Reviews");
                 });
 
             modelBuilder.Entity("ProductMarketplace.Domain.Entities.SearchLog", b =>
@@ -739,6 +444,9 @@ namespace ProductMarketplace.Infrastructure.Data.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
 
+                    b.Property<bool>("IsLive")
+                        .HasColumnType("boolean");
+
                     b.Property<string>("Label")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -760,105 +468,91 @@ namespace ProductMarketplace.Infrastructure.Data.Migrations
                     b.ToTable("StatusConfigs");
                 });
 
-            modelBuilder.Entity("ProductMarketplace.Domain.Entities.Application", b =>
+            modelBuilder.Entity("ProductMarketplace.Domain.Entities.SubCategory", b =>
                 {
-                    b.HasOne("ProductMarketplace.Domain.Entities.Product", "Product")
-                        .WithMany("Applications")
-                        .HasForeignKey("ProductId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
 
-                    b.Navigation("Product");
-                });
+                    b.Property<Guid>("CategoryId")
+                        .HasColumnType("uuid");
 
-            modelBuilder.Entity("ProductMarketplace.Domain.Entities.ApplicationDocument", b =>
-                {
-                    b.HasOne("ProductMarketplace.Domain.Entities.Application", "Application")
-                        .WithMany("Documents")
-                        .HasForeignKey("ApplicationId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
 
-                    b.Navigation("Application");
-                });
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
 
-            modelBuilder.Entity("ProductMarketplace.Domain.Entities.ApplicationFieldValue", b =>
-                {
-                    b.HasOne("ProductMarketplace.Domain.Entities.Application", "Application")
-                        .WithMany("FieldValues")
-                        .HasForeignKey("ApplicationId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("text");
 
-                    b.HasOne("ProductMarketplace.Domain.Entities.FieldDefinition", "FieldDefinition")
-                        .WithMany("ApplicationValues")
-                        .HasForeignKey("FieldDefinitionId")
-                        .OnDelete(DeleteBehavior.SetNull);
+                    b.Property<int>("DisplayOrder")
+                        .HasColumnType("integer");
 
-                    b.Navigation("Application");
+                    b.Property<string>("IconKey")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
 
-                    b.Navigation("FieldDefinition");
-                });
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
 
-            modelBuilder.Entity("ProductMarketplace.Domain.Entities.ApplicationStatusHistory", b =>
-                {
-                    b.HasOne("ProductMarketplace.Domain.Entities.Application", "Application")
-                        .WithMany("StatusHistory")
-                        .HasForeignKey("ApplicationId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
 
-                    b.Navigation("Application");
-                });
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
 
-            modelBuilder.Entity("ProductMarketplace.Domain.Entities.Category", b =>
-                {
-                    b.HasOne("ProductMarketplace.Domain.Entities.Category", "ParentCategory")
-                        .WithMany("SubCategories")
-                        .HasForeignKey("ParentCategoryId")
-                        .OnDelete(DeleteBehavior.Restrict);
+                    b.HasKey("Id");
 
-                    b.Navigation("ParentCategory");
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.HasIndex("CategoryId", "DisplayOrder");
+
+                    b.HasIndex("CategoryId", "Name")
+                        .IsUnique();
+
+                    b.ToTable("SubCategories");
                 });
 
             modelBuilder.Entity("ProductMarketplace.Domain.Entities.DocumentDefinition", b =>
                 {
-                    b.HasOne("ProductMarketplace.Domain.Entities.ProductType", "ProductType")
+                    b.HasOne("ProductMarketplace.Domain.Entities.SubCategory", "SubCategory")
                         .WithMany("DocumentDefinitions")
-                        .HasForeignKey("ProductTypeId")
+                        .HasForeignKey("SubCategoryId")
                         .OnDelete(DeleteBehavior.Cascade);
 
-                    b.Navigation("ProductType");
+                    b.Navigation("SubCategory");
                 });
 
             modelBuilder.Entity("ProductMarketplace.Domain.Entities.FieldDefinition", b =>
                 {
-                    b.HasOne("ProductMarketplace.Domain.Entities.ProductType", "ProductType")
+                    b.HasOne("ProductMarketplace.Domain.Entities.SubCategory", "SubCategory")
                         .WithMany("FieldDefinitions")
-                        .HasForeignKey("ProductTypeId")
+                        .HasForeignKey("SubCategoryId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.Navigation("ProductType");
+                    b.Navigation("SubCategory");
                 });
 
             modelBuilder.Entity("ProductMarketplace.Domain.Entities.Product", b =>
                 {
-                    b.HasOne("ProductMarketplace.Domain.Entities.Category", "Category")
+                    b.HasOne("ProductMarketplace.Domain.Entities.SubCategory", "SubCategory")
                         .WithMany("Products")
-                        .HasForeignKey("CategoryId")
+                        .HasForeignKey("SubCategoryId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("ProductMarketplace.Domain.Entities.ProductType", "ProductType")
-                        .WithMany("Products")
-                        .HasForeignKey("ProductTypeId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Category");
-
-                    b.Navigation("ProductType");
+                    b.Navigation("SubCategory");
                 });
 
             modelBuilder.Entity("ProductMarketplace.Domain.Entities.ProductBenefit", b =>
@@ -902,80 +596,37 @@ namespace ProductMarketplace.Infrastructure.Data.Migrations
                     b.Navigation("Product");
                 });
 
-            modelBuilder.Entity("ProductMarketplace.Domain.Entities.ProductViewLog", b =>
+            modelBuilder.Entity("ProductMarketplace.Domain.Entities.SubCategory", b =>
                 {
-                    b.HasOne("ProductMarketplace.Domain.Entities.Product", "Product")
-                        .WithMany("ViewLogs")
-                        .HasForeignKey("ProductId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                    b.HasOne("ProductMarketplace.Domain.Entities.Category", "Category")
+                        .WithMany("SubCategories")
+                        .HasForeignKey("CategoryId")
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.Navigation("Product");
-                });
-
-            modelBuilder.Entity("ProductMarketplace.Domain.Entities.Promotion", b =>
-                {
-                    b.HasOne("ProductMarketplace.Domain.Entities.Product", "Product")
-                        .WithMany("Promotions")
-                        .HasForeignKey("ProductId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Product");
-                });
-
-            modelBuilder.Entity("ProductMarketplace.Domain.Entities.Review", b =>
-                {
-                    b.HasOne("ProductMarketplace.Domain.Entities.Product", "Product")
-                        .WithMany("Reviews")
-                        .HasForeignKey("ProductId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Product");
-                });
-
-            modelBuilder.Entity("ProductMarketplace.Domain.Entities.Application", b =>
-                {
-                    b.Navigation("Documents");
-
-                    b.Navigation("FieldValues");
-
-                    b.Navigation("StatusHistory");
+                    b.Navigation("Category");
                 });
 
             modelBuilder.Entity("ProductMarketplace.Domain.Entities.Category", b =>
                 {
-                    b.Navigation("Products");
-
                     b.Navigation("SubCategories");
                 });
 
             modelBuilder.Entity("ProductMarketplace.Domain.Entities.FieldDefinition", b =>
                 {
-                    b.Navigation("ApplicationValues");
-
                     b.Navigation("Values");
                 });
 
             modelBuilder.Entity("ProductMarketplace.Domain.Entities.Product", b =>
                 {
-                    b.Navigation("Applications");
-
                     b.Navigation("Benefits");
 
                     b.Navigation("EligibilityCriteria");
 
                     b.Navigation("FieldValues");
-
-                    b.Navigation("Promotions");
-
-                    b.Navigation("Reviews");
-
-                    b.Navigation("ViewLogs");
                 });
 
-            modelBuilder.Entity("ProductMarketplace.Domain.Entities.ProductType", b =>
+            modelBuilder.Entity("ProductMarketplace.Domain.Entities.SubCategory", b =>
                 {
                     b.Navigation("DocumentDefinitions");
 

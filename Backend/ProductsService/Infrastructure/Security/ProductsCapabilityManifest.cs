@@ -27,7 +27,7 @@ public static class ProductsCapabilityManifest
     [
         new("dashboard",
         [
-            new("View", "View dashboard", "See marketplace figures: products, applications, views and conversion.", "Api", 10),
+            new("View", "View dashboard", "See catalogue figures: products, categories, sub-categories and recent activity.", "Api", 10),
         ]),
         new("products",
         [
@@ -35,39 +35,26 @@ public static class ProductsCapabilityManifest
             new("Create", "Add products", "Add new products to the catalogue.", "Api", 20),
             new("Edit", "Edit products", "Change a product's details or status.", "Api", 30),
             new("Delete", "Delete products", "Remove products from the catalogue.", "Api", 40),
-            new("Apply", "Apply for products", "Submit an application for a product and upload its documents.", "Api", 50),
-            new("Export", "Download product list", "Download the product list as a spreadsheet file.", "Export", 60),
+            new("Export", "Download product list", "Download the product list as a spreadsheet file.", "Export", 50),
         ]),
         new("categories",
         [
             new("View", "View categories", "See product categories.", "Api", 10),
             new("Create", "Add categories", "Add new categories.", "Api", 20),
-            new("Edit", "Edit categories", "Rename, reorder or change a category.", "Api", 30),
-            new("Delete", "Delete categories", "Remove categories.", "Api", 40),
+            new("Edit", "Edit categories", "Rename, reorder or change a category, including making it inactive to hide everything beneath it.", "Api", 30),
+            new("Delete", "Delete categories", "Remove categories that have no sub-categories.", "Api", 40),
         ]),
-        new("promotions",
+        new("subcategories",
         [
-            new("View", "View promotions", "See promotional offers.", "Api", 10),
-            new("Create", "Add promotions", "Create new promotional offers.", "Api", 20),
-            new("Edit", "Edit promotions", "Change a promotion or its status.", "Api", 30),
-            new("Delete", "Delete promotions", "Remove promotions.", "Api", 40),
-        ]),
-        new("reviews",
-        [
-            new("View", "View reviews", "Read customer reviews of products.", "Api", 10),
-            new("Create", "Write reviews", "Leave a review on a product.", "Api", 20),
-            new("Moderate", "Moderate reviews", "Publish, hide or reject customer reviews.", "Api", 30),
-            new("Delete", "Delete reviews", "Remove customer reviews.", "Api", 40),
-        ]),
-        new("applications",
-        [
-            new("View", "View applications", "See customer applications and their documents.", "Api", 10),
-            new("Manage", "Decide applications", "Move an application forward, approve or reject it.", "Api", 20),
+            new("View", "View sub-categories", "See the sub-categories within each category.", "Api", 10),
+            new("Create", "Add sub-categories", "Add new sub-categories.", "Api", 20),
+            new("Edit", "Edit sub-categories", "Rename, reorder, move or change a sub-category.", "Api", 30),
+            new("Delete", "Delete sub-categories", "Remove sub-categories that have no products.", "Api", 40),
         ]),
         new("setup",
         [
-            new("View", "View setup", "See product types, fields, required documents, statuses and ranking settings.", "Api", 10),
-            new("Manage", "Change setup", "Change product types, fields, required documents, statuses and ranking settings.", "Api", 20),
+            new("View", "View setup", "See product fields, required documents and statuses.", "Api", 10),
+            new("Manage", "Change setup", "Change product fields, required documents and statuses.", "Api", 20),
         ]),
         new("audit",
         [

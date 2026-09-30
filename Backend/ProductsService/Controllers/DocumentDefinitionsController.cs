@@ -12,11 +12,11 @@ namespace ProductMarketplace.Api.Controllers;
 [Authorize]
 public class DocumentDefinitionsController(IDocumentDefinitionService service, ApprovalGate gate) : ControllerBase
 {
-    // The Apply form reads which documents a product requires.
+    // The product editor and the lead form read which documents a sub-category requires.
     [HttpGet]
-    [RequiresAnyCapability("setup:View", "products:View", "applications:View")]
-    public async Task<IActionResult> GetAll([FromQuery] Guid? productTypeId, CancellationToken ct)
-        => Ok(await service.GetAllAsync(productTypeId, ct));
+    [RequiresAnyCapability("setup:View", "products:View", "subcategories:View")]
+    public async Task<IActionResult> GetAll([FromQuery] Guid? subCategoryId, CancellationToken ct)
+        => Ok(await service.GetAllAsync(subCategoryId, ct));
 
     [HttpPost]
     [RequiresCapability("setup", "Manage")]

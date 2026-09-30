@@ -15,17 +15,10 @@ public sealed record ProductsMutation(string Operation, string Module, string Ac
 /// Every change in Products & Marketplace that goes through maker-checker, and how each is applied.
 /// </summary>
 /// <remarks>
-/// <para>
 /// Gating and replay are defined together, in one table, so a change cannot be made approvable without
 /// also being replayable — the failure that mode would produce is an approved request that silently
 /// does nothing. <see cref="ApplyAsync"/> calls the very same service method a direct request would, so an
 /// approved change is re-validated against the database as it is at approval time.
-/// </para>
-/// <para>
-/// Not gated, deliberately: a customer submitting an application or a review (these are the customer's
-/// own actions, not administrative changes), and document uploads (binary content cannot wait inside an
-/// approval request).
-/// </para>
 /// </remarks>
 public static class ProductsMutations
 {
@@ -39,19 +32,11 @@ public static class ProductsMutations
     public static readonly ProductsMutation CategoryReorder = new("category.reorder", "categories", "Update", "Category");
     public static readonly ProductsMutation CategoryDelete = new("category.delete", "categories", "Delete", "Category");
 
-    public static readonly ProductsMutation PromotionCreate = new("promotion.create", "promotions", "Create", "Promotion");
-    public static readonly ProductsMutation PromotionUpdate = new("promotion.update", "promotions", "Update", "Promotion");
-    public static readonly ProductsMutation PromotionStatus = new("promotion.status", "promotions", "Update", "Promotion");
-    public static readonly ProductsMutation PromotionDelete = new("promotion.delete", "promotions", "Delete", "Promotion");
+    public static readonly ProductsMutation SubCategoryCreate = new("sub_category.create", "subcategories", "Create", "Sub-category");
+    public static readonly ProductsMutation SubCategoryUpdate = new("sub_category.update", "subcategories", "Update", "Sub-category");
+    public static readonly ProductsMutation SubCategoryReorder = new("sub_category.reorder", "subcategories", "Update", "Sub-category");
+    public static readonly ProductsMutation SubCategoryDelete = new("sub_category.delete", "subcategories", "Delete", "Sub-category");
 
-    public static readonly ProductsMutation ReviewStatus = new("review.status", "reviews", "Update", "Review");
-    public static readonly ProductsMutation ReviewDelete = new("review.delete", "reviews", "Delete", "Review");
-
-    public static readonly ProductsMutation ApplicationStatus = new("application.status", "applications", "Update", "Application");
-
-    public static readonly ProductsMutation ProductTypeCreate = new("product_type.create", "setup", "Create", "Product type");
-    public static readonly ProductsMutation ProductTypeUpdate = new("product_type.update", "setup", "Update", "Product type");
-    public static readonly ProductsMutation ProductTypeDelete = new("product_type.delete", "setup", "Delete", "Product type");
     public static readonly ProductsMutation FieldCreate = new("field.create", "setup", "Create", "Product field");
     public static readonly ProductsMutation FieldUpdate = new("field.update", "setup", "Update", "Product field");
     public static readonly ProductsMutation FieldDelete = new("field.delete", "setup", "Delete", "Product field");
@@ -61,10 +46,6 @@ public static class ProductsMutations
     public static readonly ProductsMutation StatusConfigCreate = new("status_config.create", "setup", "Create", "Status");
     public static readonly ProductsMutation StatusConfigUpdate = new("status_config.update", "setup", "Update", "Status");
     public static readonly ProductsMutation StatusConfigDelete = new("status_config.delete", "setup", "Delete", "Status");
-    public static readonly ProductsMutation EmploymentTypeCreate = new("employment_type.create", "setup", "Create", "Employment type");
-    public static readonly ProductsMutation EmploymentTypeUpdate = new("employment_type.update", "setup", "Update", "Employment type");
-    public static readonly ProductsMutation EmploymentTypeDelete = new("employment_type.delete", "setup", "Delete", "Employment type");
-    public static readonly ProductsMutation RankingConfigUpdate = new("ranking_config.update", "setup", "Update", "Ranking settings");
 
     public static readonly IReadOnlyList<ProductsMutation> All = typeof(ProductsMutations)
         .GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)
@@ -82,7 +63,7 @@ public static class ProductsMutations
     private static Guid Id(string? entityId) =>
         Guid.TryParse(entityId, out var id) ? id : throw new InvalidOperationException("The approved change did not name the record it applies to.");
 
-    /// <summary>For changes to a child record (a field of a product type): "parentId/childId".</summary>
+    /// <summary>For changes to a child record (a field of a sub-category): "parentId/childId".</summary>
     private static (Guid Parent, Guid Child) Ids(string? entityId)
     {
         var parts = (entityId ?? string.Empty).Split('/', 2);
@@ -116,30 +97,22 @@ public static class ProductsMutations
             case "category.reorder": Found(await S<ICategoryService>().ReorderAsync(Id(entityId), Body<CategoryReorderDto>(payload).Direction, ct), "category"); break;
             case "category.delete": Found(await S<ICategoryService>().DeleteAsync(Id(entityId), ct), "category"); break;
 
-            case "promotion.create": await S<IPromotionService>().CreateAsync(Body<PromotionCreateUpdateDto>(payload), ct); break;
-            case "promotion.update": Found(await S<IPromotionService>().UpdateAsync(Id(entityId), Body<PromotionCreateUpdateDto>(payload), ct), "promotion"); break;
-            case "promotion.status": Found(await S<IPromotionService>().UpdateStatusAsync(Id(entityId), Body<PromotionStatusUpdateDto>(payload).Status, ct), "promotion"); break;
-            case "promotion.delete": Found(await S<IPromotionService>().DeleteAsync(Id(entityId), ct), "promotion"); break;
+            case "sub_category.create": await S<ISubCategoryService>().CreateAsync(Body<SubCategoryCreateUpdateDto>(payload), ct); break;
+            case "sub_category.update": Found(await S<ISubCategoryService>().UpdateAsync(Id(entityId), Body<SubCategoryCreateUpdateDto>(payload), ct), "sub-category"); break;
+            case "sub_category.reorder": Found(await S<ISubCategoryService>().ReorderAsync(Id(entityId), Body<CategoryReorderDto>(payload).Direction, ct), "sub-category"); break;
+            case "sub_category.delete": Found(await S<ISubCategoryService>().DeleteAsync(Id(entityId), ct), "sub-category"); break;
 
-            case "review.status": Found(await S<IReviewService>().UpdateStatusAsync(Id(entityId), Body<ReviewStatusUpdateDto>(payload).Status, ct), "review"); break;
-            case "review.delete": Found(await S<IReviewService>().DeleteAsync(Id(entityId), ct), "review"); break;
-
-            case "application.status": Found(await S<IApplicationService>().UpdateStatusAsync(Id(entityId), Body<ApplicationStatusUpdateDto>(payload), ct), "application"); break;
-
-            case "product_type.create": await S<IProductTypeService>().CreateAsync(Body<ProductTypeCreateUpdateDto>(payload), ct); break;
-            case "product_type.update": Found(await S<IProductTypeService>().UpdateAsync(Id(entityId), Body<ProductTypeCreateUpdateDto>(payload), ct), "product type"); break;
-            case "product_type.delete": Found(await S<IProductTypeService>().DeleteAsync(Id(entityId), ct), "product type"); break;
-            case "field.create": Found(await S<IProductTypeService>().CreateFieldAsync(Id(entityId), Body<FieldDefinitionCreateUpdateDto>(payload), ct), "product type"); break;
+            case "field.create": Found(await S<ISubCategoryService>().CreateFieldAsync(Id(entityId), Body<FieldDefinitionCreateUpdateDto>(payload), ct), "sub-category"); break;
             case "field.update":
             {
-                var (typeId, fieldId) = Ids(entityId);
-                Found(await S<IProductTypeService>().UpdateFieldAsync(typeId, fieldId, Body<FieldDefinitionCreateUpdateDto>(payload), ct), "field");
+                var (subCategoryId, fieldId) = Ids(entityId);
+                Found(await S<ISubCategoryService>().UpdateFieldAsync(subCategoryId, fieldId, Body<FieldDefinitionCreateUpdateDto>(payload), ct), "field");
                 break;
             }
             case "field.delete":
             {
-                var (typeId, fieldId) = Ids(entityId);
-                Found(await S<IProductTypeService>().DeleteFieldAsync(typeId, fieldId, ct), "field");
+                var (subCategoryId, fieldId) = Ids(entityId);
+                Found(await S<ISubCategoryService>().DeleteFieldAsync(subCategoryId, fieldId, ct), "field");
                 break;
             }
 
@@ -150,12 +123,6 @@ public static class ProductsMutations
             case "status_config.create": await S<IStatusConfigService>().CreateAsync(Body<StatusConfigCreateDto>(payload), ct); break;
             case "status_config.update": Found(await S<IStatusConfigService>().UpdateAsync(Id(entityId), Body<StatusConfigUpdateDto>(payload), ct), "status"); break;
             case "status_config.delete": Found(await S<IStatusConfigService>().DeleteAsync(Id(entityId), ct), "status"); break;
-
-            case "employment_type.create": await S<IEmploymentTypeService>().CreateAsync(Body<EmploymentTypeCreateUpdateDto>(payload), ct); break;
-            case "employment_type.update": Found(await S<IEmploymentTypeService>().UpdateAsync(Id(entityId), Body<EmploymentTypeCreateUpdateDto>(payload), ct), "employment type"); break;
-            case "employment_type.delete": Found(await S<IEmploymentTypeService>().DeleteAsync(Id(entityId), ct), "employment type"); break;
-
-            case "ranking_config.update": await S<IRankingConfigService>().UpdateConfigAsync(Body<RankingConfigUpdateDto>(payload), ct); break;
 
             default:
                 throw new InvalidOperationException($"This service does not know how to apply '{operation}'.");

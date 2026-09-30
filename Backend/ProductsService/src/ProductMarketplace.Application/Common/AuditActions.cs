@@ -18,23 +18,10 @@ public static class AuditActions
     public const string DeleteCategory = "category.delete";
     public const string ReorderCategory = "category.reorder";
 
-    public const string CreateReview = "review.create";
-    public const string ReviewStatusChange = "review.status_change";
-    public const string DeleteReview = "review.delete";
-
-    public const string CreatePromotion = "promotion.create";
-    public const string UpdatePromotion = "promotion.update";
-    public const string PromotionStatusChange = "promotion.status_change";
-    public const string DeletePromotion = "promotion.delete";
-
-    public const string CreateApplication = "application.create";
-    public const string ApplicationStatusChange = "application.status_change";
-    public const string UploadApplicationDocument = "application.document_upload";
-    public const string RemoveApplicationDocument = "application.document_remove";
-
-    public const string CreateProductType = "product_type.create";
-    public const string UpdateProductType = "product_type.update";
-    public const string DeleteProductType = "product_type.delete";
+    public const string CreateSubCategory = "sub_category.create";
+    public const string UpdateSubCategory = "sub_category.update";
+    public const string DeleteSubCategory = "sub_category.delete";
+    public const string ReorderSubCategory = "sub_category.reorder";
 
     public const string CreateField = "field.create";
     public const string UpdateField = "field.update";
@@ -47,37 +34,26 @@ public static class AuditActions
     public const string CreateStatusConfig = "status_config.create";
     public const string UpdateStatusConfig = "status_config.update";
     public const string DeleteStatusConfig = "status_config.delete";
-
-    public const string CreateEmploymentType = "employment_type.create";
-    public const string UpdateEmploymentType = "employment_type.update";
-    public const string DeleteEmploymentType = "employment_type.delete";
-
-    public const string UpdateRankingConfig = "ranking_config.update";
 }
 
 public static class AuditEntityTypes
 {
     public const string Product = "Product";
     public const string Category = "Category";
-    public const string Review = "Review";
-    public const string Promotion = "Promotion";
-    public const string Application = "Application";
+    public const string SubCategory = "SubCategory";
     public const string Search = "Search";
-    public const string ProductType = "ProductType";
     public const string FieldDefinition = "FieldDefinition";
     public const string DocumentDefinition = "DocumentDefinition";
     public const string StatusConfig = "StatusConfig";
-    public const string EmploymentType = "EmploymentType";
-    public const string RankingConfig = "RankingConfig";
 }
 
-/// <summary>Entity types that own a configurable status enum, and are therefore valid EntityType
-/// values for a StatusConfig row. Kept as one list so seeding and validation can't drift apart.</summary>
+/// <summary>Entity types that own a configurable status, and are therefore valid EntityType values for a
+/// StatusConfig row. Kept as one list so seeding and validation can't drift apart.</summary>
 public static class StatusEntityTypes
 {
     public const string Product = "Product";
+    public const string SubCategory = "SubCategory";
     public const string Category = "Category";
-    public const string Review = "Review";
-    public const string Promotion = "Promotion";
-    public const string Application = "Application";
+
+    public static readonly IReadOnlyList<string> All = [Product, SubCategory, Category];
 }

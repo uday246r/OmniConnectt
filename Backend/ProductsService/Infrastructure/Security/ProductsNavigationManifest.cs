@@ -33,20 +33,16 @@ public static class ProductsNavigationManifest
         [
             new("categories", "Categories", "Layers", 10, "View"),
         ]),
-        new("promotions", "Promotions", 40,
+        // The module key is a single word like every other module's; the page route reads better hyphenated.
+        new("subcategories", "Sub-categories", 40,
         [
-            new("promotions", "Promotions", "Star", 10, "View"),
+            new("sub-categories", "Sub-categories", "Layers", 10, "View"),
         ]),
-        new("applications", "Applications", 50,
-        [
-            new("applications", "Applications", "FileText", 10, "View"),
-        ]),
-        new("setup", "Setup", 60,
+        new("setup", "Setup", 50,
         [
             new("setup", "Setup", "Settings", 10, "View"),
         ]),
-        new("reviews", "Reviews", 65, []),
-        new("audit", "Audit Logs", 70,
+        new("audit", "Audit Logs", 60,
         [
             new("audit-logs", "Audit Logs", "ShieldCheck", 10, "View"),
         ]),

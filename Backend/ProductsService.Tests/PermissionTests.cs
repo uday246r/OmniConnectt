@@ -128,12 +128,34 @@ public class PermissionTests
         Assert.Equal("Products", products.DisplayName);
     }
 
+    /// <summary>
+    /// A module key is embedded in <c>remote.{app}.{module}:{Capability}</c> and parsed by AuthService, and
+    /// every other module in the platform is one lowercase word. The page a module opens can still be
+    /// hyphenated, as Audit Logs is.
+    /// </summary>
     [Fact]
-    public void Reviews_are_a_grantable_module_but_add_no_sidebar_row()
+    public void Sub_categories_are_a_single_word_module_with_a_hyphenated_page()
     {
-        var reviews = PermissionsController.Discover().Single(m => m.Key == "reviews");
+        var subCategories = PermissionsController.Discover().Single(m => m.Key == "subcategories");
 
-        Assert.Contains(reviews.Capabilities, c => c.Key == "Moderate");
-        Assert.Empty(reviews.Nav);
+        Assert.Equal(["Create", "Delete", "Edit", "View"], subCategories.Capabilities.Select(c => c.Key).Order());
+        Assert.Equal("sub-categories", Assert.Single(subCategories.Nav).Key);
+    }
+
+    [Fact]
+    public void The_sidebar_follows_the_catalogues_own_order_and_offers_no_retired_pages()
+    {
+        var pages = PermissionsController.Discover().OrderBy(m => m.SortOrder).SelectMany(m => m.Nav).Select(n => n.Key);
+
+        Assert.Equal(["dashboard", "products", "categories", "sub-categories", "setup", "audit-logs"], pages);
+    }
+
+    [Theory]
+    [InlineData("promotions")]
+    [InlineData("reviews")]
+    [InlineData("applications")]
+    public void The_retired_modules_are_no_longer_published(string module)
+    {
+        Assert.DoesNotContain(PermissionsController.Discover(), m => m.Key == module);
     }
 }

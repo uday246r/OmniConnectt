@@ -14,7 +14,7 @@ public class StatusConfigsController(IStatusConfigService service, ApprovalGate 
 {
     // Every list screen reads status labels and colours to draw its badges.
     [HttpGet]
-    [RequiresAnyCapability("setup:View", "products:View", "categories:View", "promotions:View", "applications:View", "reviews:View")]
+    [RequiresAnyCapability("setup:View", "products:View", "categories:View", "subcategories:View")]
     public async Task<IActionResult> GetAll([FromQuery] string? entityType, CancellationToken ct)
         => Ok(await service.GetAllAsync(entityType, ct));
 

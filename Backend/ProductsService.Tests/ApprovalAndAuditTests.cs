@@ -192,11 +192,10 @@ public class ApprovalAndAuditTests : IDisposable
         var forwarder = new RecordingForwarder();
         var maker = Guid.NewGuid();
         using var services = Services(forwarder, new FixedAuditContext(maker, "Maker Name"));
-        db.StatusConfigs.Add(new StatusConfig { EntityType = StatusEntityTypes.Category, Value = "Active", Label = "Active", Enabled = true });
-        await db.SaveChangesAsync();
+        await new Catalogue(db).SeedStatusesAsync();
 
         await ProductsMutations.ApplyAsync(services, "category.create", null,
-            JsonSerializer.SerializeToElement(new CategoryCreateUpdateDto { Name = "Home Loans", Status = "Active" }, new JsonSerializerOptions(JsonSerializerDefaults.Web)),
+            JsonSerializer.SerializeToElement(new CategoryCreateUpdateDto { Name = "Home Loans", Code = "HL", Status = "Active" }, new JsonSerializerOptions(JsonSerializerDefaults.Web)),
             CancellationToken.None);
 
         Assert.Single(await db.Categories.Where(c => c.Name == "Home Loans").ToListAsync());
@@ -211,7 +210,7 @@ public class ApprovalAndAuditTests : IDisposable
     {
         using var services = Services();
 
-        var error = await Assert.ThrowsAsync<InvalidOperationException>(() => ProductsMutations.ApplyAsync(services, "promotion.status",
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() => ProductsMutations.ApplyAsync(services, "product.status",
             Guid.NewGuid().ToString(), JsonSerializer.SerializeToElement(new { status = "Active" }), CancellationToken.None));
 
         Assert.Contains("no longer exists", error.Message);
@@ -300,25 +299,14 @@ public class ApprovalAndAuditTests : IDisposable
         services.AddSingleton(forwarder ?? new RecordingForwarder());
         services.AddSingleton<Microsoft.AspNetCore.SignalR.IHubContext<AuditLogHub>>(new RecordingHub());
         services.AddScoped<IAuditLogService, AuditLogService>();
+        services.AddScoped<ICatalogStatuses, CatalogStatuses>();
+        services.AddSingleton<IFormatPresetSource>(new NoPresets());
         services.AddScoped<ICategoryService, CategoryService>();
-        services.AddScoped<IProductTypeService, ProductTypeService>();
-        services.AddScoped<IRankingConfigService, RankingConfigService>();
+        services.AddScoped<ISubCategoryService, SubCategoryService>();
         services.AddScoped<IProductService, ProductService>();
-        services.AddScoped<IReviewService, ReviewService>();
-        services.AddScoped<IPromotionService, PromotionService>();
-        services.AddScoped<IApplicationService, ApplicationService>();
         services.AddScoped<IDocumentDefinitionService, DocumentDefinitionService>();
         services.AddScoped<IStatusConfigService, StatusConfigService>();
-        services.AddScoped<IEmploymentTypeService, EmploymentTypeService>();
-        services.AddSingleton<IFileStorageService>(new NoStorage());
         return services.BuildServiceProvider();
-    }
-
-    private sealed class NoStorage : IFileStorageService
-    {
-        public Task<string> SaveAsync(Guid applicationId, Guid documentId, string originalFileName, Stream content, CancellationToken ct = default) => Task.FromResult("x");
-        public Task<Stream?> OpenReadAsync(string storagePath, CancellationToken ct = default) => Task.FromResult<Stream?>(null);
-        public void Delete(string storagePath) { }
     }
 
     private sealed class Unreachable : HttpMessageHandler

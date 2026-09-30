@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using ProductMarketplace.Application.Common;
 using ProductMarketplace.Application.Dtos;
@@ -11,46 +12,49 @@ public class ProductService : IProductService
 {
     private readonly AppDbContext _db;
     private readonly IAuditLogService _audit;
-    private readonly IRankingConfigService _rankingConfig;
-    public ProductService(AppDbContext db, IAuditLogService audit, IRankingConfigService rankingConfig)
+    private readonly ICatalogStatuses _statuses;
+    private readonly IFormatPresetSource _presets;
+
+    public ProductService(AppDbContext db, IAuditLogService audit, ICatalogStatuses statuses, IFormatPresetSource presets)
     {
         _db = db;
         _audit = audit;
-        _rankingConfig = rankingConfig;
+        _statuses = statuses;
+        _presets = presets;
     }
 
     private IQueryable<Product> FullGraph() => _db.Products
-        .Include(p => p.Category)
-        .Include(p => p.ProductType)
+        .Include(p => p.SubCategory).ThenInclude(s => s.Category)
         .Include(p => p.FieldValues).ThenInclude(v => v.FieldDefinition)
         .Include(p => p.Benefits)
-        .Include(p => p.EligibilityCriteria)
-        .Include(p => p.Reviews)
-        .Include(p => p.Promotions);
+        .Include(p => p.EligibilityCriteria);
 
-    /// <summary>The single definition of which products a catalogue query selects — shared by the page and the download.</summary>
-    private IQueryable<Product> Filtered(ProductQueryDto query, bool includeStatus = true)
+    /// <summary>The single definition of which products a catalogue query selects — shared by the page, the counts and the download.</summary>
+    private async Task<IQueryable<Product>> FilteredAsync(ProductQueryDto query, bool includeStatus, CancellationToken ct)
     {
         var q = _db.Products.AsNoTracking().AsQueryable();
 
-        if (query.CategoryId.HasValue) q = q.Where(p => p.CategoryId == query.CategoryId);
-        if (query.ProductTypeId.HasValue) q = q.Where(p => p.ProductTypeId == query.ProductTypeId);
-        if (includeStatus && !string.IsNullOrWhiteSpace(query.Status))
-            q = q.Where(p => p.Status == query.Status);
-        if (query.MinRating.HasValue) q = q.Where(p => p.RatingAverage >= query.MinRating.Value);
+        if (query.SubCategoryId.HasValue) q = q.Where(p => p.SubCategoryId == query.SubCategoryId);
+        if (query.CategoryId.HasValue) q = q.Where(p => p.SubCategory.CategoryId == query.CategoryId);
+        if (includeStatus && !string.IsNullOrWhiteSpace(query.Status)) q = q.Where(p => p.Status == query.Status);
+        if (query.VisibleOnly) q = (await CatalogVisibility.LoadAsync(_statuses, ct)).Visible(q);
 
-        var term = query.Search?.Trim();
+        /*
+         * Name, code, blurb and where it sits — not the long description, the benefits or every field value.
+         *
+         * A substring match over all of those has to read every row's text and every product's every
+         * attribute, which no index can help, so the cost of a search grew with the whole catalogue. The
+         * columns a person actually types a name or code from are enough, and stay cheap.
+         */
+        var term = query.Search?.Trim().ToLower();
         if (!string.IsNullOrWhiteSpace(term))
         {
-            var lower = term.ToLower();
             q = q.Where(p =>
-                p.Name.ToLower().Contains(lower) ||
-                p.ShortDescription.ToLower().Contains(lower) ||
-                p.Description.ToLower().Contains(lower) ||
-                p.Category.Name.ToLower().Contains(lower) ||
-                p.ProductType.Name.ToLower().Contains(lower) ||
-                p.Benefits.Any(b => b.Title.ToLower().Contains(lower)) ||
-                p.FieldValues.Any(v => v.Value.ToLower().Contains(lower)));
+                p.Name.ToLower().Contains(term) ||
+                p.Code.ToLower().Contains(term) ||
+                p.ShortDescription.ToLower().Contains(term) ||
+                p.SubCategory.Name.ToLower().Contains(term) ||
+                p.SubCategory.Category.Name.ToLower().Contains(term));
         }
 
         return q;
@@ -60,38 +64,30 @@ public class ProductService : IProductService
     /// How many products hold each status under the catalogue's other filters (the status filter itself
     /// is ignored), in one grouped query.
     /// </summary>
-    /// <remarks>
-    /// The Products page used to learn these by running a full page search per status — a count, the
-    /// ranking config and a one-row graph load, six times over — and again whenever its list changed.
-    /// </remarks>
     public async Task<IReadOnlyList<StatusCountDto>> StatusCountsAsync(ProductQueryDto query, CancellationToken ct = default)
     {
-        var rows = await Filtered(query, includeStatus: false)
+        var rows = await (await FilteredAsync(query, includeStatus: false, ct))
             .GroupBy(p => p.Status)
             .Select(g => new { Status = g.Key, Count = g.Count() })
             .ToListAsync(ct);
         return rows.OrderBy(r => r.Status).Select(r => new StatusCountDto(r.Status, r.Count)).ToList();
     }
 
-    private async Task<IOrderedQueryable<Product>> SortedAsync(IQueryable<Product> q, string sort, CancellationToken ct)
+    private static IOrderedQueryable<Product> Sorted(IQueryable<Product> q, string sort)
     {
-        var now = DateTime.UtcNow;
-        var ranking = await _rankingConfig.GetConfigAsync(ct);
-
         IOrderedQueryable<Product> sorted = sort.ToLowerInvariant() switch
         {
-            "trending" => q.OrderByDescending(p => p.ViewCount * ranking.TrendingViewWeight + p.ApplicationCount * ranking.TrendingApplicationWeight),
-            // Products with no primary rate sort last, as decimal.MaxValue did before.
-            "lowest-rate" => q
+            "oldest" => q.OrderBy(p => p.CreatedAt),
+            "name" => q.OrderBy(p => p.Name),
+            "-name" => q.OrderByDescending(p => p.Name),
+            // Products with no primary metric sort last either way.
+            "primary-metric" => q
                 .OrderBy(p => p.FieldValues.Where(v => v.FieldDefinition.IsPrimaryMetric).Select(v => v.NumericValue).FirstOrDefault() == null)
                 .ThenBy(p => p.FieldValues.Where(v => v.FieldDefinition.IsPrimaryMetric).Select(v => v.NumericValue).FirstOrDefault()),
-            "newly-added" => q.OrderByDescending(p => p.CreatedAt),
-            "top-rated" => q.OrderByDescending(p => p.RatingAverage).ThenByDescending(p => p.RatingCount),
-            "most-applied" => q.OrderByDescending(p => p.ApplicationCount),
-            _ => q.OrderByDescending(p =>
-                p.RatingAverage * ranking.RecommendedRatingWeight
-                + p.ApplicationCount * ranking.RecommendedApplicationWeight
-                + (p.Promotions.Any(x => x.Status == "Active" && x.StartDate <= now && x.EndDate >= now) ? ranking.RecommendedPromotionWeight : 0)),
+            "-primary-metric" => q
+                .OrderBy(p => p.FieldValues.Where(v => v.FieldDefinition.IsPrimaryMetric).Select(v => v.NumericValue).FirstOrDefault() == null)
+                .ThenByDescending(p => p.FieldValues.Where(v => v.FieldDefinition.IsPrimaryMetric).Select(v => v.NumericValue).FirstOrDefault()),
+            _ => q.OrderByDescending(p => p.CreatedAt),
         };
 
         // A stable tiebreaker, so a product never appears on two pages or on none.
@@ -103,37 +99,34 @@ public class ProductService : IProductService
 
     public async Task<CsvExport> ExportCsvAsync(ProductQueryDto query, CancellationToken ct = default)
     {
-        var filtered = Filtered(query);
+        var filtered = await FilteredAsync(query, includeStatus: true, ct);
         var matched = await filtered.CountAsync(ct);
-        var rows = await (await SortedAsync(filtered, query.Sort, ct))
+        var rows = await Sorted(filtered, query.Sort)
             .Take(ExportRowLimit)
-            .Select(p => new { p.Name, p.Code, Category = p.Category.Name, Type = p.ProductType.Name, p.Status, p.RatingAverage, p.RatingCount, p.ApplicationCount, p.ViewCount, p.CreatedAt })
+            .Select(p => new { p.Name, p.Code, Category = p.SubCategory.Category.Name, SubCategory = p.SubCategory.Name, p.Status, p.ViewCount, p.CreatedAt })
             .ToListAsync(ct);
 
-        var csv = new CsvBuilder("Product", "Code", "Category", "Type", "Status", "Average rating", "Ratings", "Applications", "Views", "Added (UTC)");
+        var csv = new CsvBuilder("Product", "Code", "Category", "Sub-category", "Status", "Views", "Added (UTC)");
         foreach (var r in rows)
         {
-            csv.AppendRow(r.Name, r.Code, r.Category, r.Type, r.Status, r.RatingAverage.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture),
-                r.RatingCount.ToString(), r.ApplicationCount.ToString(), r.ViewCount.ToString(), r.CreatedAt.ToString("O"));
+            csv.AppendRow(r.Name, r.Code, r.Category, r.SubCategory, r.Status, r.ViewCount.ToString(CultureInfo.InvariantCulture), r.CreatedAt.ToString("O"));
         }
 
         return new CsvExport(csv.ToString(), rows.Count, matched, ExportRowLimit);
     }
 
     /// <summary>
-    /// Filters, counts, sorts and pages in the database, then loads the full detail for that one page only.
+    /// Filters, counts, sorts and pages in the database, then loads what a card shows for that one page only.
     /// </summary>
     /// <remarks>
-    /// This used to load every matching product with its whole graph — field values, benefits,
-    /// eligibility, every review and every promotion — into memory, sort the list in C#, and then keep
-    /// eight. The cost of a catalogue page grew with the size of the catalogue and the number of reviews,
-    /// so a large catalogue made every browse request slower and heavier until the process ran out of
-    /// memory. Each ranking is now an SQL ORDER BY over indexed counters, and only the page's ids are
-    /// ever materialised.
+    /// Only the page's ids are ever materialised by the sorted query. The second query then brings back
+    /// just what a card needs — its sub-category and category, the card fields, the benefit titles — not
+    /// the long description, the eligibility rows or every attribute, so the cost of a page is the size of
+    /// a page, not of the catalogue.
     /// </remarks>
     public async Task<PagedResult<ProductListItemDto>> SearchAsync(ProductQueryDto query, CancellationToken ct = default)
     {
-        var q = Filtered(query);
+        var q = await FilteredAsync(query, includeStatus: true, ct);
 
         var term = query.Search?.Trim();
         // Only the first page of a search counts as a search; paging through its results does not.
@@ -145,43 +138,27 @@ public class ProductService : IProductService
         }
 
         var total = await q.CountAsync(ct);
-        var now = DateTime.UtcNow;
         var page = query.Page;
         var pageSize = query.PageSize;
 
-        var pageIds = await (await SortedAsync(q, query.Sort, ct))
+        var pageIds = await Sorted(q, query.Sort)
             .Skip((page - 1) * pageSize).Take(pageSize)
             .Select(p => p.Id)
             .ToListAsync(ct);
 
-        /*
-         * Only what a product card shows, in one statement.
-         *
-         * This loaded the full detail graph — field values, benefits, eligibility criteria, reviews and
-         * every promotion — as a split query of seven round trips, for at most a page of cards that use
-         * none of the reviews or eligibility rows, only the card fields, two feature tags and the current
-         * promotion. Filtered includes bring back exactly those; for one page of products the joined
-         * result stays small, so a single query beats seven sequential ones.
-         */
         var loaded = await _db.Products.AsNoTracking()
-            .Include(p => p.Category)
-            .Include(p => p.ProductType)
+            .Include(p => p.SubCategory).ThenInclude(s => s.Category)
             .Include(p => p.FieldValues.Where(v => v.FieldDefinition.DisplayOnCard)).ThenInclude(v => v.FieldDefinition)
-            .Include(p => p.Benefits.OrderBy(b => b.SortOrder).Take(2))
-            .Include(p => p.Promotions.Where(x => x.Status == "Active" && x.StartDate <= now && x.EndDate >= now))
+            .Include(p => p.Benefits)
             .AsSingleQuery()
             .Where(p => pageIds.Contains(p.Id))
             .ToListAsync(ct);
+
+        var visibility = await CatalogVisibility.LoadAsync(_statuses, ct);
         var byId = loaded.ToDictionary(p => p.Id);
-        var items = pageIds.Where(byId.ContainsKey).Select(id => byId[id].ToListItemDto(now)).ToList();
+        var items = pageIds.Where(byId.ContainsKey).Select(id => byId[id].ToListItemDto(visibility)).ToList();
 
         return new PagedResult<ProductListItemDto> { Items = items, Page = page, PageSize = pageSize, TotalCount = total };
-    }
-
-    private static decimal? PrimaryNumeric(Product p)
-    {
-        var primary = p.FieldValues.FirstOrDefault(v => v.FieldDefinition != null && v.FieldDefinition.IsPrimaryMetric);
-        return primary?.NumericValue;
     }
 
     private async Task RecordSearchTermAsync(string term, CancellationToken ct)
@@ -203,9 +180,8 @@ public class ProductService : IProductService
     {
         if (trackView)
         {
+            // One atomic increment in the database; concurrent viewers never overwrite each other's count.
             await _db.Products.Where(p => p.Id == id).ExecuteUpdateAsync(s => s.SetProperty(p => p.ViewCount, p => p.ViewCount + 1), ct);
-            _db.ProductViewLogs.Add(new ProductViewLog { ProductId = id, ViewedAt = DateTime.UtcNow });
-            await _db.SaveChangesAsync(ct);
         }
 
         var p = await FullGraph().AsNoTracking().FirstOrDefaultAsync(p => p.Id == id, ct);
@@ -215,98 +191,84 @@ public class ProductService : IProductService
         {
             await _audit.LogAsync(AuditActions.ViewProduct, AuditEntityTypes.Product, p.Id, p.Name, $"Viewed product details for \"{p.Name}\"", ct: ct);
         }
-        return p.ToDetailDto(DateTime.UtcNow);
+        return p.ToDetailDto(await CatalogVisibility.LoadAsync(_statuses, ct));
     }
 
     public async Task<ProductDetailDto> CreateAsync(ProductCreateUpdateDto dto, CancellationToken ct = default)
     {
-        var productType = await _db.ProductTypes.Include(t => t.FieldDefinitions).FirstOrDefaultAsync(t => t.Id == dto.ProductTypeId, ct)
-            ?? throw new InvalidOperationException("Invalid product type.");
-        await StatusValidation.EnsureValidAsync(_db, StatusEntityTypes.Product, dto.Status, ct);
-
-        if (await _db.Products.AnyAsync(p => p.Code == dto.Code, ct))
-            throw new InvalidOperationException($"A product with code \"{dto.Code}\" already exists.");
+        var sub = await LoadSubCategoryAsync(dto.SubCategoryId, ct);
+        var status = await StatusValidation.EnsureValidOrDefaultAsync(_db, StatusEntityTypes.Product, dto.Status, ct);
+        var code = CatalogCodes.Normalise(dto.Code);
+        await EnsureCodeFreeAsync(code, excludingId: null, ct);
+        var values = ProductValueValidator.Accept(sub.FieldDefinitions, dto.FieldValues, await _presets.GetAsync(ct));
 
         var product = new Product
         {
-            Name = dto.Name,
-            Code = dto.Code,
-            ShortDescription = dto.ShortDescription,
-            Description = dto.Description,
-            IconKey = dto.IconKey,
-            CategoryId = dto.CategoryId,
-            ProductTypeId = dto.ProductTypeId,
-            Status = dto.Status,
+            SubCategoryId = sub.Id,
+            Name = dto.Name.Trim(),
+            Code = code,
+            ShortDescription = dto.ShortDescription.Trim(),
+            Description = dto.Description.Trim(),
+            IconKey = dto.IconKey.Trim(),
+            Status = status,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
 
-        ApplyFieldValues(product, productType, dto.FieldValues);
-        ApplyBenefits(product, dto.Benefits);
-        ApplyEligibility(product, dto.EligibilityCriteria);
+        Apply(product, values, dto);
 
         _db.Products.Add(product);
-        await _db.SaveChangesAsync(ct);
-        await _audit.LogAsync(AuditActions.CreateProduct, AuditEntityTypes.Product, product.Id, product.Name, $"Created product \"{product.Name}\"", ct: ct);
-        return (await FullGraph().FirstAsync(p => p.Id == product.Id, ct)).ToDetailDto(DateTime.UtcNow);
+        await _db.SaveOrReportDuplicateAsync($"A product with the code \"{code}\" already exists.", ct);
+        await _audit.LogAsync(AuditActions.CreateProduct, AuditEntityTypes.Product, product.Id, product.Name, $"Created product \"{product.Name}\" in \"{sub.Name}\"", ct: ct);
+        return (await GetByIdAsync(product.Id, trackView: false, ct))!;
     }
 
     public async Task<ProductDetailDto?> UpdateAsync(Guid id, ProductCreateUpdateDto dto, CancellationToken ct = default)
     {
         var product = await _db.Products
-            .Include(p => p.FieldValues).ThenInclude(v => v.FieldDefinition)
+            .Include(p => p.FieldValues)
             .Include(p => p.Benefits)
             .Include(p => p.EligibilityCriteria)
             .FirstOrDefaultAsync(p => p.Id == id, ct);
         if (product is null) return null;
 
-        var productType = await _db.ProductTypes.Include(t => t.FieldDefinitions).FirstOrDefaultAsync(t => t.Id == dto.ProductTypeId, ct)
-            ?? throw new InvalidOperationException("Invalid product type.");
-        await StatusValidation.EnsureValidAsync(_db, StatusEntityTypes.Product, dto.Status, ct);
+        var sub = await LoadSubCategoryAsync(dto.SubCategoryId, ct);
+        var status = await StatusValidation.EnsureValidOrDefaultAsync(_db, StatusEntityTypes.Product, dto.Status, ct);
+        var code = CatalogCodes.Normalise(dto.Code);
+        await EnsureCodeFreeAsync(code, excludingId: id, ct);
+        var values = ProductValueValidator.Accept(sub.FieldDefinitions, dto.FieldValues, await _presets.GetAsync(ct));
 
-        if (await _db.Products.AnyAsync(p => p.Code == dto.Code && p.Id != id, ct))
-            throw new InvalidOperationException($"A product with code \"{dto.Code}\" already exists.");
-
-        product.Name = dto.Name;
-        product.Code = dto.Code;
-        product.ShortDescription = dto.ShortDescription;
-        product.Description = dto.Description;
-        product.IconKey = dto.IconKey;
-        product.CategoryId = dto.CategoryId;
-        product.ProductTypeId = dto.ProductTypeId;
-        product.Status = dto.Status;
+        product.SubCategoryId = sub.Id;
+        product.Name = dto.Name.Trim();
+        product.Code = code;
+        product.ShortDescription = dto.ShortDescription.Trim();
+        product.Description = dto.Description.Trim();
+        product.IconKey = dto.IconKey.Trim();
+        product.Status = status;
         product.UpdatedAt = DateTime.UtcNow;
 
+        // Replaced wholesale: the form always sends the whole product, and a product moved to another
+        // sub-category must not keep values for fields that sub-category does not have.
         _db.ProductFieldValues.RemoveRange(product.FieldValues);
         _db.ProductBenefits.RemoveRange(product.Benefits);
         _db.ProductEligibilities.RemoveRange(product.EligibilityCriteria);
-        product.FieldValues.Clear();
-        product.Benefits.Clear();
-        product.EligibilityCriteria.Clear();
 
-        ApplyFieldValues(product, productType, dto.FieldValues);
-        ApplyBenefits(product, dto.Benefits);
-        ApplyEligibility(product, dto.EligibilityCriteria);
+        Apply(product, values, dto);
 
-        await _db.SaveChangesAsync(ct);
+        await _db.SaveOrReportDuplicateAsync($"A product with the code \"{code}\" already exists.", ct);
         await _audit.LogAsync(AuditActions.UpdateProduct, AuditEntityTypes.Product, product.Id, product.Name, $"Updated product \"{product.Name}\"", ct: ct);
-        return (await FullGraph().FirstAsync(p => p.Id == id, ct)).ToDetailDto(DateTime.UtcNow);
+        return await GetByIdAsync(id, trackView: false, ct);
     }
 
     public async Task<bool> DeleteAsync(Guid id, CancellationToken ct = default)
     {
-        var product = await _db.Products.AsNoTracking().FirstOrDefaultAsync(p => p.Id == id, ct);
+        var product = await _db.Products.FirstOrDefaultAsync(p => p.Id == id, ct);
         if (product is null) return false;
-        var hasApplications = await _db.Applications.AsNoTracking().AnyAsync(a => a.ProductId == id, ct);
-        if (hasApplications) throw new InvalidOperationException("Cannot delete a product that has applications submitted against it. Deactivate it instead.");
 
-        await _db.ProductViewLogs.Where(v => v.ProductId == id).ExecuteDeleteAsync(ct);
-        await _db.ProductFieldValues.Where(f => f.ProductId == id).ExecuteDeleteAsync(ct);
-        await _db.ProductBenefits.Where(b => b.ProductId == id).ExecuteDeleteAsync(ct);
-        await _db.ProductEligibilities.Where(e => e.ProductId == id).ExecuteDeleteAsync(ct);
-        await _db.Promotions.Where(pr => pr.ProductId == id).ExecuteDeleteAsync(ct);
-        await _db.Reviews.Where(r => r.ProductId == id).ExecuteDeleteAsync(ct);
-        await _db.Products.Where(p => p.Id == id).ExecuteDeleteAsync(ct);
+        // Its values, benefits and eligibility rows go with it through the foreign keys' cascade, in the
+        // database, so nothing has to be loaded to be removed.
+        _db.Products.Remove(product);
+        await _db.SaveChangesAsync(ct);
 
         await _audit.LogAsync(AuditActions.DeleteProduct, AuditEntityTypes.Product, id, product.Name, $"Deleted product \"{product.Name}\"", ct: ct);
         return true;
@@ -316,69 +278,56 @@ public class ProductService : IProductService
     {
         var product = await _db.Products.FirstOrDefaultAsync(p => p.Id == id, ct);
         if (product is null) return null;
-        await StatusValidation.EnsureValidAsync(_db, StatusEntityTypes.Product, status, ct);
+
+        var canonical = await StatusValidation.EnsureValidAsync(_db, StatusEntityTypes.Product, status, ct);
         var previousStatus = product.Status;
-        product.Status = status;
+        product.Status = canonical;
         product.UpdatedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync(ct);
+
         await _audit.LogAsync(AuditActions.ProductStatusChange, AuditEntityTypes.Product, product.Id, product.Name,
-            $"Changed status of \"{product.Name}\" from {previousStatus} to {product.Status}", previousValue: previousStatus, newValue: product.Status.ToString(), ct: ct);
-        return (await FullGraph().FirstAsync(p => p.Id == id, ct)).ToDetailDto(DateTime.UtcNow);
+            $"Changed status of \"{product.Name}\" from {previousStatus} to {product.Status}", previousValue: previousStatus, newValue: product.Status, ct: ct);
+        return await GetByIdAsync(id, trackView: false, ct);
     }
 
-    public async Task<List<TopPerformerDto>> GetTopPerformersAsync(string metric, int take, CancellationToken ct = default)
+    private async Task<SubCategory> LoadSubCategoryAsync(Guid id, CancellationToken ct) =>
+        await _db.SubCategories.AsNoTracking().Include(s => s.FieldDefinitions).FirstOrDefaultAsync(s => s.Id == id, ct)
+        ?? throw new InvalidOperationException("Choose an existing sub-category for this product.");
+
+    private async Task EnsureCodeFreeAsync(string code, Guid? excludingId, CancellationToken ct)
     {
-        var query = _db.Products.AsNoTracking().Include(p => p.Category).Where(p => p.Status == "Active");
-
-        IOrderedQueryable<Product> ordered = metric.ToLowerInvariant() switch
-        {
-            "viewed" => query.OrderByDescending(p => p.ViewCount),
-            "rated" => query.OrderByDescending(p => p.RatingAverage).ThenByDescending(p => p.RatingCount),
-            _ => query.OrderByDescending(p => p.ApplicationCount)
-        };
-
-        return await ordered.Take(take).Select(p => new TopPerformerDto
-        {
-            Id = p.Id,
-            Name = p.Name,
-            CategoryName = p.Category.Name,
-            IconKey = p.IconKey,
-            ApplicationCount = p.ApplicationCount,
-            ViewCount = p.ViewCount,
-            RatingAverage = p.RatingAverage,
-            RatingCount = p.RatingCount
-        }).ToListAsync(ct);
+        if (await _db.Products.AnyAsync(p => p.Id != excludingId && p.Code == code, ct))
+            throw new InvalidOperationException($"A product with the code \"{code}\" already exists.");
     }
 
-    private static void ApplyFieldValues(Product product, ProductType type, List<ProductFieldValueInputDto> values)
+    /// <summary>
+    /// Adds the product's attribute values, benefits and eligibility rows to the context.
+    /// </summary>
+    /// <remarks>
+    /// They are added explicitly, not to the product's collections. A child carries a Guid id from the
+    /// moment it is constructed, and EF treats an entity with a key already set — found by walking a
+    /// tracked parent's collection — as one that already exists, so it sent an UPDATE for a row that was
+    /// never inserted and the whole save failed. Adding through the set marks it as new.
+    /// </remarks>
+    private void Apply(Product product, IEnumerable<AcceptedFieldValue> values, ProductCreateUpdateDto dto)
     {
-        foreach (var input in values)
+        foreach (var v in values)
         {
-            var def = type.FieldDefinitions.FirstOrDefault(f => f.Id == input.FieldDefinitionId);
-            if (def is null) continue;
-            decimal? numeric = decimal.TryParse(input.Value, out var d) ? d : null;
-            product.FieldValues.Add(new ProductFieldValue
+            _db.ProductFieldValues.Add(new ProductFieldValue
             {
                 ProductId = product.Id,
-                FieldDefinitionId = def.Id,
-                FieldDefinition = def,
-                Value = input.Value,
-                NumericValue = numeric
+                FieldDefinitionId = v.Definition.Id,
+                Value = v.Value,
+                NumericValue = v.Numeric
             });
         }
-    }
 
-    private static void ApplyBenefits(Product product, List<ProductBenefitInputDto> benefits)
-    {
-        int order = 0;
-        foreach (var b in benefits)
-            product.Benefits.Add(new ProductBenefit { ProductId = product.Id, Title = b.Title, Description = b.Description, IconKey = b.IconKey, SortOrder = order++ });
-    }
+        var order = 0;
+        foreach (var b in dto.Benefits.Where(b => !string.IsNullOrWhiteSpace(b.Title)))
+            _db.ProductBenefits.Add(new ProductBenefit { ProductId = product.Id, Title = b.Title.Trim(), Description = b.Description.Trim(), IconKey = b.IconKey.Trim(), SortOrder = order++ });
 
-    private static void ApplyEligibility(Product product, List<ProductEligibilityInputDto> items)
-    {
-        int order = 0;
-        foreach (var e in items)
-            product.EligibilityCriteria.Add(new ProductEligibility { ProductId = product.Id, Criteria = e.Criteria, Description = e.Description, SortOrder = order++ });
+        order = 0;
+        foreach (var e in dto.EligibilityCriteria.Where(e => !string.IsNullOrWhiteSpace(e.Criteria)))
+            _db.ProductEligibilities.Add(new ProductEligibility { ProductId = product.Id, Criteria = e.Criteria.Trim(), Description = e.Description.Trim(), SortOrder = order++ });
     }
 }

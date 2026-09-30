@@ -9,10 +9,10 @@ using ProductMarketplace.Api.Infrastructure.Approvals;
 using ProductMarketplace.Api.Infrastructure.Security;
 using ProductMarketplace.Api.Options;
 using ProductMarketplace.Api.Services;
+using ProductMarketplace.Application.Common;
 using ProductMarketplace.Application.Interfaces;
 using ProductMarketplace.Infrastructure;
 using ProductMarketplace.Infrastructure.Data;
-using ProductMarketplace.Infrastructure.Data.Seed;
 using ProductMarketplace.Infrastructure.Realtime;
 
 // .env is developer-local and gitignored. It is looked for next to the project, and also under
@@ -58,6 +58,10 @@ builder.Services.AddScoped<ApprovalGate>();
 // hang the request for the default 100 seconds.
 builder.Services.AddHttpClient<AuthServiceClient>(client => client.Timeout = TimeSpan.FromSeconds(10));
 builder.Services.AddHttpClient<FineCapabilityClient>(client => client.Timeout = TimeSpan.FromSeconds(10));
+// The formats defined in Manage Formats, for product fields that use one. Bounded like the others: a slow
+// settings service must not hold up saving a product, and an unreachable one is survived (see the class).
+builder.Services.AddSingleton<ValidationPresetSource.LastKnownGood>();
+builder.Services.AddHttpClient<IFormatPresetSource, ValidationPresetSource>(client => client.Timeout = TimeSpan.FromSeconds(5));
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
@@ -147,20 +151,14 @@ else
     try
     {
         var applyMigrations = builder.Configuration.GetValue("Database:ApplyMigrationsOnStartup", true);
-        var runSeed = builder.Configuration.GetValue("Database:RunSeedOnStartup", app.Environment.IsDevelopment());
 
         using var scope = app.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        if (applyMigrations) await db.Database.MigrateAsync();
-        if (runSeed)
-        {
-            await SeedData.SeedAsync(db);
-            await SeedData.SeedDocumentDefinitionsAsync(db);
-            await SeedData.SeedAnalyticsAndAuditAsync(db);
-        }
 
-        // Status values are reference data every write is validated against, so they exist in every environment.
-        await SeedData.SeedStatusConfigsAsync(db);
+        // There is no seed step. The catalogue starts empty and is built through the app; the one thing the
+        // system cannot work without — the statuses every write is validated against — ships inside a
+        // migration, so it exists in every environment and is never re-applied over an administrator's edits.
+        if (applyMigrations) await db.Database.MigrateAsync();
     }
     catch (Exception ex)
     {
@@ -197,6 +195,22 @@ app.UseExceptionHandler(errorApp =>
             await context.Response.WriteAsync(string.IsNullOrWhiteSpace(conflict.ProblemJson)
                 ? System.Text.Json.JsonSerializer.Serialize(new { title = conflict.Message, status = 409 })
                 : conflict.ProblemJson);
+            return;
+        }
+
+        // A product's attribute values broke their sub-category's rules: say which fields, all at once.
+        if (exception is FieldValidationException fieldErrors)
+        {
+            context.Response.ContentType = "application/problem+json";
+            context.Response.StatusCode = StatusCodes.Status400BadRequest;
+            await context.Response.WriteAsJsonAsync(new
+            {
+                title = "Some fields need attention",
+                status = 400,
+                message = fieldErrors.Message,
+                errors = fieldErrors.Errors,
+                traceId
+            });
             return;
         }
 

@@ -1,3 +1,4 @@
+using OmniConnect.Validation;
 using ProductMarketplace.Application.Common;
 using ProductMarketplace.Application.Dtos;
 
@@ -5,7 +6,7 @@ namespace ProductMarketplace.Application.Interfaces;
 
 public interface ICategoryService
 {
-    Task<List<CategoryDto>> GetAllAsync(string? status, CancellationToken ct = default);
+    Task<PagedResult<CategoryDto>> SearchAsync(CategoryQueryDto query, CancellationToken ct = default);
     Task<CategoryDto?> GetByIdAsync(Guid id, CancellationToken ct = default);
     Task<CategoryDto> CreateAsync(CategoryCreateUpdateDto dto, CancellationToken ct = default);
     Task<CategoryDto?> UpdateAsync(Guid id, CategoryCreateUpdateDto dto, CancellationToken ct = default);
@@ -13,30 +14,32 @@ public interface ICategoryService
     Task<CategoryDto?> ReorderAsync(Guid id, string direction, CancellationToken ct = default);
 }
 
-public interface IProductTypeService
+public interface ISubCategoryService
 {
-    Task<List<ProductTypeDto>> GetAllAsync(CancellationToken ct = default);
-    Task<ProductTypeDto?> GetByIdAsync(Guid id, CancellationToken ct = default);
-    Task<ProductTypeDto> CreateAsync(ProductTypeCreateUpdateDto dto, CancellationToken ct = default);
-    Task<ProductTypeDto?> UpdateAsync(Guid id, ProductTypeCreateUpdateDto dto, CancellationToken ct = default);
+    Task<PagedResult<SubCategoryDto>> SearchAsync(SubCategoryQueryDto query, CancellationToken ct = default);
+    Task<SubCategoryDetailDto?> GetByIdAsync(Guid id, CancellationToken ct = default);
+    Task<SubCategoryDetailDto> CreateAsync(SubCategoryCreateUpdateDto dto, CancellationToken ct = default);
+    Task<SubCategoryDetailDto?> UpdateAsync(Guid id, SubCategoryCreateUpdateDto dto, CancellationToken ct = default);
     Task<bool> DeleteAsync(Guid id, CancellationToken ct = default);
+    Task<SubCategoryDetailDto?> ReorderAsync(Guid id, string direction, CancellationToken ct = default);
 
-    Task<ProductTypeDto?> CreateFieldAsync(Guid productTypeId, FieldDefinitionCreateUpdateDto dto, CancellationToken ct = default);
-    Task<ProductTypeDto?> UpdateFieldAsync(Guid productTypeId, Guid fieldId, FieldDefinitionCreateUpdateDto dto, CancellationToken ct = default);
-    Task<ProductTypeDto?> DeleteFieldAsync(Guid productTypeId, Guid fieldId, CancellationToken ct = default);
+    Task<SubCategoryDetailDto?> CreateFieldAsync(Guid subCategoryId, FieldDefinitionCreateUpdateDto dto, CancellationToken ct = default);
+    Task<SubCategoryDetailDto?> UpdateFieldAsync(Guid subCategoryId, Guid fieldId, FieldDefinitionCreateUpdateDto dto, CancellationToken ct = default);
+    Task<SubCategoryDetailDto?> DeleteFieldAsync(Guid subCategoryId, Guid fieldId, CancellationToken ct = default);
 }
 
 public interface IDocumentDefinitionService
 {
-    Task<List<DocumentDefinitionDto>> GetAllAsync(Guid? productTypeId, CancellationToken ct = default);
+    /// <summary>With no sub-category: the whole catalog. With one: what applies to it — scoped to it, plus the ones that apply to everything.</summary>
+    Task<List<DocumentDefinitionDto>> GetAllAsync(Guid? subCategoryId, CancellationToken ct = default);
     Task<DocumentDefinitionDto> CreateAsync(DocumentDefinitionCreateUpdateDto dto, CancellationToken ct = default);
     Task<DocumentDefinitionDto?> UpdateAsync(Guid id, DocumentDefinitionCreateUpdateDto dto, CancellationToken ct = default);
     Task<bool> DeleteAsync(Guid id, CancellationToken ct = default);
 }
 
 /// <summary>
-/// Manages the catalog of status values (and their display metadata) for each entity type. This is
-/// the source of truth for which status strings are valid on a real record - not a fixed enum - so
+/// Manages the catalog of status values (and their display metadata and meaning) for each entity type. This
+/// is the source of truth for which status strings are valid on a real record - not a fixed enum - so
 /// Create genuinely adds a new usable status, not just a label.
 /// </summary>
 public interface IStatusConfigService
@@ -47,19 +50,27 @@ public interface IStatusConfigService
     Task<bool> DeleteAsync(Guid id, CancellationToken ct = default);
 }
 
-public interface IEmploymentTypeService
+/// <summary>
+/// Answers "which statuses make a record live?" from Setup, so nothing in the catalogue compares a
+/// status to a literal like "Active".
+/// </summary>
+/// <remarks>
+/// Read once per request and reused: a request that filters products, and then reports on them, would
+/// otherwise ask the same three-row question repeatedly. It is deliberately not cached across requests —
+/// a change made in Setup takes effect on the next request on every instance, which an in-process cache
+/// cannot promise once there is more than one.
+/// </remarks>
+public interface ICatalogStatuses
 {
-    Task<List<EmploymentTypeDto>> GetAllAsync(bool? activeOnly = null, CancellationToken ct = default);
-    Task<EmploymentTypeDto?> GetByIdAsync(Guid id, CancellationToken ct = default);
-    Task<EmploymentTypeDto> CreateAsync(EmploymentTypeCreateUpdateDto dto, CancellationToken ct = default);
-    Task<EmploymentTypeDto?> UpdateAsync(Guid id, EmploymentTypeCreateUpdateDto dto, CancellationToken ct = default);
-    Task<bool> DeleteAsync(Guid id, CancellationToken ct = default);
+    /// <summary>The status values of <paramref name="entityType"/> that make a record live.</summary>
+    Task<IReadOnlyCollection<string>> LiveValuesAsync(string entityType, CancellationToken ct = default);
 }
 
-public interface IRankingConfigService
+/// <summary>The admin-defined formats (Settings → Manage Formats) a field rule may refer to.</summary>
+public interface IFormatPresetSource
 {
-    Task<RankingConfigDto> GetConfigAsync(CancellationToken ct = default);
-    Task<RankingConfigDto> UpdateConfigAsync(RankingConfigUpdateDto dto, CancellationToken ct = default);
+    /// <summary>Never throws for an unreachable source: an outage of the settings service must not stop products being saved.</summary>
+    Task<IReadOnlyList<FormatPreset>> GetAsync(CancellationToken ct = default);
 }
 
 public interface IProductService
@@ -72,64 +83,21 @@ public interface IProductService
     Task<ProductDetailDto?> UpdateAsync(Guid id, ProductCreateUpdateDto dto, CancellationToken ct = default);
     Task<bool> DeleteAsync(Guid id, CancellationToken ct = default);
     Task<ProductDetailDto?> UpdateStatusAsync(Guid id, string status, CancellationToken ct = default);
-    Task<List<TopPerformerDto>> GetTopPerformersAsync(string metric, int take, CancellationToken ct = default);
 
     /// <summary>Every product matching the catalogue filters, as CSV, capped and reporting how many matched.</summary>
     Task<CsvExport> ExportCsvAsync(ProductQueryDto query, CancellationToken ct = default);
 }
 
-public interface IReviewService
-{
-    Task<PagedResult<ReviewDto>> SearchAsync(ReviewQueryDto query, CancellationToken ct = default);
-    Task<ReviewDto?> GetByIdAsync(Guid id, CancellationToken ct = default);
-    Task<ReviewDto> CreateAsync(ReviewCreateDto dto, CancellationToken ct = default);
-    Task<ReviewDto?> UpdateStatusAsync(Guid id, string status, CancellationToken ct = default);
-    Task<bool> DeleteAsync(Guid id, CancellationToken ct = default);
-}
-
-public interface IPromotionService
-{
-    Task<PagedResult<PromotionDto>> SearchAsync(PromotionQueryDto query, CancellationToken ct = default);
-    /// <summary>How many promotions hold each status under the search and product filters (the status filter is ignored).</summary>
-    Task<IReadOnlyList<StatusCountDto>> StatusCountsAsync(PromotionQueryDto query, CancellationToken ct = default);
-    Task<PromotionDto?> GetByIdAsync(Guid id, CancellationToken ct = default);
-    Task<PromotionDto> CreateAsync(PromotionCreateUpdateDto dto, CancellationToken ct = default);
-    Task<PromotionDto?> UpdateAsync(Guid id, PromotionCreateUpdateDto dto, CancellationToken ct = default);
-    Task<PromotionDto?> UpdateStatusAsync(Guid id, string status, CancellationToken ct = default);
-    Task<bool> DeleteAsync(Guid id, CancellationToken ct = default);
-}
-
-public interface IApplicationService
-{
-    Task<PagedResult<ApplicationListItemDto>> SearchAsync(ApplicationQueryDto query, CancellationToken ct = default);
-    /// <summary>How many applications hold each status under the search and product filters (the status filter is ignored).</summary>
-    Task<IReadOnlyList<StatusCountDto>> StatusCountsAsync(ApplicationQueryDto query, CancellationToken ct = default);
-    Task<ApplicationDetailDto?> GetByIdAsync(Guid id, CancellationToken ct = default);
-    Task<ApplicationDetailDto> CreateAsync(ApplicationCreateDto dto, CancellationToken ct = default);
-    Task<ApplicationDetailDto?> UpdateStatusAsync(Guid id, ApplicationStatusUpdateDto dto, CancellationToken ct = default);
-    Task<ApplicationDocumentDto?> UploadDocumentAsync(Guid applicationId, Guid documentId, string fileName, string contentType, long length, Stream content, CancellationToken ct = default);
-    Task<(Stream Stream, string ContentType, string FileName)?> GetDocumentFileAsync(Guid applicationId, Guid documentId, CancellationToken ct = default);
-    Task<ApplicationDocumentDto?> RemoveDocumentFileAsync(Guid applicationId, Guid documentId, CancellationToken ct = default);
-}
-
-/// <summary>Abstraction over where uploaded application-document files physically live. Backed by
-/// local disk today (no cloud storage config exists anywhere in this app); swapping to blob storage
-/// later only means a new implementation, no change to callers.</summary>
-public interface IFileStorageService
-{
-    Task<string> SaveAsync(Guid applicationId, Guid documentId, string originalFileName, Stream content, CancellationToken ct = default);
-    Task<Stream?> OpenReadAsync(string storagePath, CancellationToken ct = default);
-    void Delete(string storagePath);
-}
-
 public interface IDashboardService
 {
-    Task<DashboardSummaryDto> GetSummaryAsync(CancellationToken ct = default);
-    Task<List<TrendPointDto>> GetApplicationTrendAsync(int days, CancellationToken ct = default);
-    Task<List<CategoryBreakdownDto>> GetApplicationsByCategoryAsync(CancellationToken ct = default);
+    /// <param name="comparedDays">How far back the "change" on each figure looks.</param>
+    Task<DashboardSummaryDto> GetSummaryAsync(int comparedDays, CancellationToken ct = default);
+
+    /// <summary>Products per category; or per sub-category when <paramref name="categoryId"/> names one.</summary>
+    Task<List<CatalogBreakdownDto>> GetProductBreakdownAsync(Guid? categoryId, CancellationToken ct = default);
     Task<List<StatusDistributionDto>> GetProductStatusDistributionAsync(CancellationToken ct = default);
-    Task<List<TopProductDto>> GetTopProductsAsync(int take, CancellationToken ct = default);
     Task<List<RecentProductDto>> GetRecentProductsAsync(int take, CancellationToken ct = default);
+    Task<List<RecentActivityDto>> GetRecentActivityAsync(int take, CancellationToken ct = default);
     Task<List<KeyValuePair<string, int>>> GetTopSearchesAsync(int take, CancellationToken ct = default);
 }
 
