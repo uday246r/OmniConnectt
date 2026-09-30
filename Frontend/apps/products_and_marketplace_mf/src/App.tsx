@@ -2,6 +2,7 @@ import React, { useEffect, type ComponentType } from 'react';
 import { AuditLogsPage } from './pages/audit/AuditLogsPage';
 import { CategoriesPage } from './pages/categories/CategoriesPage';
 import { ProductsPage } from './pages/products/ProductsPage';
+import { SetupPage } from './pages/setup/SetupPage';
 import { SubCategoriesPage } from './pages/subcategories/SubCategoriesPage';
 import { Toasts } from './components/Toasts';
 import { PlatformPermissionProvider } from './permissions/PermissionContext';
@@ -23,6 +24,7 @@ const PAGES: Record<string, ComponentType> = {
   products: ProductsPage,
   categories: CategoriesPage,
   'sub-categories': SubCategoriesPage,
+  setup: SetupPage,
   'audit-logs': AuditLogsPage,
 };
 
