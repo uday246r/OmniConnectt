@@ -1,41 +1,27 @@
-import { httpClient } from "./httpClient";
-import type {
-  CategoryBreakdown,
-  DashboardSummary,
-  RecentProduct,
-  StatusDistribution,
-  TopProduct,
-  TopSearch,
-  TrendPoint,
-} from "../types/domain";
+import { httpClient } from './httpClient';
+import { cleanParams } from './query';
+import type { CatalogBreakdown, DashboardSummary, RecentActivity, RecentProduct, StatusDistribution } from '../types/domain';
 
 export const dashboardApi = {
-  async summary(signal?: AbortSignal): Promise<DashboardSummary> {
-    const { data } = await httpClient.get("/dashboard/summary", { signal });
+  async summary(days?: number, signal?: AbortSignal): Promise<DashboardSummary> {
+    const { data } = await httpClient.get('/dashboard/summary', { params: cleanParams({ days }), signal });
     return data;
   },
-  async applicationTrends(days = 7, signal?: AbortSignal): Promise<TrendPoint[]> {
-    const { data } = await httpClient.get("/dashboard/application-trends", { params: { days }, signal });
+  /** Products per category; or per sub-category of `categoryId` when one is given. */
+  async productBreakdown(categoryId?: string, signal?: AbortSignal): Promise<CatalogBreakdown[]> {
+    const { data } = await httpClient.get('/dashboard/product-breakdown', { params: cleanParams({ categoryId }), signal });
     return data;
   },
-  async applicationsByCategory(signal?: AbortSignal): Promise<CategoryBreakdown[]> {
-    const { data } = await httpClient.get("/dashboard/applications-by-category", { signal });
+  async statusDistribution(signal?: AbortSignal): Promise<StatusDistribution[]> {
+    const { data } = await httpClient.get('/dashboard/product-status-distribution', { signal });
     return data;
   },
-  async productStatusDistribution(signal?: AbortSignal): Promise<StatusDistribution[]> {
-    const { data } = await httpClient.get("/dashboard/product-status-distribution", { signal });
+  async recentProducts(take?: number, signal?: AbortSignal): Promise<RecentProduct[]> {
+    const { data } = await httpClient.get('/dashboard/recent-products', { params: cleanParams({ take }), signal });
     return data;
   },
-  async topProducts(take = 5, signal?: AbortSignal): Promise<TopProduct[]> {
-    const { data } = await httpClient.get("/dashboard/top-products", { params: { take }, signal });
-    return data;
-  },
-  async recentProducts(take = 5, signal?: AbortSignal): Promise<RecentProduct[]> {
-    const { data } = await httpClient.get("/dashboard/recent-products", { params: { take }, signal });
-    return data;
-  },
-  async topSearches(take = 5, signal?: AbortSignal): Promise<TopSearch[]> {
-    const { data } = await httpClient.get("/dashboard/top-searches", { params: { take }, signal });
+  async recentActivity(take?: number, signal?: AbortSignal): Promise<RecentActivity[]> {
+    const { data } = await httpClient.get('/dashboard/recent-activity', { params: cleanParams({ take }), signal });
     return data;
   },
 };

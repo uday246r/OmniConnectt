@@ -1,24 +1,33 @@
-import { httpClient } from "./httpClient";
-import type { Category, CategoryInput } from "../types/domain";
+import { httpClient } from './httpClient';
+import { cleanParams } from './query';
+import type { Category, CategoryInput, PagedResult } from '../types/domain';
+
+export interface CategoryQuery {
+  search: string;
+  status: string;
+  sort: string;
+  page: number;
+  pageSize: number;
+}
 
 export const categoryApi = {
-  async list(status?: string, signal?: AbortSignal): Promise<Category[]> {
-    const { data } = await httpClient.get("/categories", { params: { status }, signal });
+  async list(query: CategoryQuery, signal?: AbortSignal): Promise<PagedResult<Category>> {
+    const { data } = await httpClient.get('/categories', { params: cleanParams(query), signal });
     return data;
   },
-  async getById(id: string, signal?: AbortSignal): Promise<Category> {
-    const { data } = await httpClient.get(`/categories/${id}`, { signal });
+  async get(id: string): Promise<Category> {
+    const { data } = await httpClient.get(`/categories/${id}`);
     return data;
   },
   async create(input: CategoryInput): Promise<Category> {
-    const { data } = await httpClient.post("/categories", input);
+    const { data } = await httpClient.post('/categories', input);
     return data;
   },
   async update(id: string, input: CategoryInput): Promise<Category> {
     const { data } = await httpClient.put(`/categories/${id}`, input);
     return data;
   },
-  async reorder(id: string, direction: "up" | "down"): Promise<Category> {
+  async reorder(id: string, direction: 'up' | 'down'): Promise<Category> {
     const { data } = await httpClient.post(`/categories/${id}/reorder`, { direction });
     return data;
   },

@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AxiosAdapter, InternalAxiosRequestConfig } from 'axios'
-import { ApprovalPendingError, httpClient, isApprovalPending } from './httpClient'
-import { useDrawerStore } from '../stores/useDrawerStore'
+import { ApiError, ApprovalPendingError, fieldErrorsOf, httpClient, isApprovalPending } from './httpClient'
 import { useToastStore } from '../stores/useToastStore'
 import type { OmniConnectHostBridge } from '../api/hostBridge'
 
@@ -44,7 +43,6 @@ function respondWith(...replies: Reply[]) {
 
 beforeEach(() => {
   useToastStore.setState({ toasts: [] })
-  useDrawerStore.setState({ isOpen: false, type: null, payload: null })
 })
 
 afterEach(() => {
@@ -104,9 +102,8 @@ describe('a change held for approval', () => {
     expect((error as ApprovalPendingError).pending.checkerName).toBe('Ben Ito')
   })
 
-  it('tells the user who has to approve it and closes the form', async () => {
+  it('tells the user who has to approve it', async () => {
     installBridge()
-    useDrawerStore.setState({ isOpen: true, type: 'product-form', payload: null })
     respondWith({ status: 202, data: pending })
 
     await httpClient.delete('/products/1').catch(() => undefined)
@@ -114,7 +111,6 @@ describe('a change held for approval', () => {
     const toast = useToastStore.getState().toasts.at(-1)
     expect(toast).toMatchObject({ type: 'info', title: 'Sent for approval' })
     expect(toast?.message).toContain('Ben Ito')
-    expect(useDrawerStore.getState().isOpen).toBe(false)
   })
 
   it('leaves an ordinary 202 alone', async () => {
@@ -122,5 +118,26 @@ describe('a change held for approval', () => {
     respondWith({ status: 202, data: { queued: true } })
 
     await expect(httpClient.post('/x')).resolves.toMatchObject({ data: { queued: true } })
+  })
+  it('keeps the per-field messages of a refused save, so a form can mark every field at once', async () => {
+    installBridge()
+    respondWith({ status: 400, data: { message: '2 fields need attention', errors: { rate: 'rate must be a number.', tenure: 'tenure is required.' } } })
+
+    const error = await httpClient.post('/products', {}).catch((e) => e)
+
+    expect(error).toBeInstanceOf(ApiError)
+    expect(error.message).toBe('2 fields need attention')
+    expect(fieldErrorsOf(error)).toEqual({ rate: 'rate must be a number.', tenure: 'tenure is required.' })
+  })
+
+  it('reports no field errors for a refusal that is not about fields', async () => {
+    installBridge()
+    respondWith({ status: 400, data: { message: 'A product with the code "HL_001" already exists.' } })
+
+    const error = await httpClient.post('/products', {}).catch((e) => e)
+
+    expect(error.message).toContain('already exists')
+    expect(fieldErrorsOf(error)).toBeUndefined()
+    expect(fieldErrorsOf(new Error('anything else'))).toBeUndefined()
   })
 })
