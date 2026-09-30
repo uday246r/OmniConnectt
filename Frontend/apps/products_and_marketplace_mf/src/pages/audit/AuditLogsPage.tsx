@@ -34,21 +34,22 @@ export function AuditLogsPage() {
       fetchActionOptions: state.fetchActionOptions, fetchEntityTypes: state.fetchEntityTypes, ingestLiveEntry: state.ingestLiveEntry,
     })),
   );
+  const { fetchActionOptions, fetchEntityTypes, fetchAuditLogs, ingestLiveEntry } = a;
   const canExport = usePermissions().has(PERMISSIONS.AUDIT_LOGS_EXPORT);
   const [live, setLive] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   useEffect(() => {
-    void a.fetchActionOptions();
-    void a.fetchEntityTypes();
-  }, [a.fetchActionOptions, a.fetchEntityTypes]);
+    void fetchActionOptions();
+    void fetchEntityTypes();
+  }, [fetchActionOptions, fetchEntityTypes]);
 
   useEffect(() => {
-    void a.fetchAuditLogs();
-  }, [s.search, s.action, s.entityType, s.dateRange, s.page, s.pageSize, a.fetchAuditLogs]);
+    void fetchAuditLogs();
+  }, [s.search, s.action, s.entityType, s.dateRange, s.page, s.pageSize, fetchAuditLogs]);
 
-  useEffect(() => subscribeToAuditLogs((entry) => a.ingestLiveEntry(entry), setLive), [a.ingestLiveEntry]);
+  useEffect(() => subscribeToAuditLogs((entry) => ingestLiveEntry(entry), setLive), [ingestLiveEntry]);
 
   const actionOptions = useMemo(() => s.actionOptions.map((o) => ({ value: o.value, label: o.label })), [s.actionOptions]);
   const entityOptions = useMemo(() => s.entityTypeOptions.map((e) => ({ value: e, label: e })), [s.entityTypeOptions]);
