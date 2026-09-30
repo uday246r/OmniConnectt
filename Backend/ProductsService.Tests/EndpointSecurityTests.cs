@@ -25,6 +25,7 @@ public class EndpointSecurityTests
     {
         [typeof(PermissionsController)] = "capability discovery, read by AuthService during registration",
         [typeof(InternalApprovalsController)] = "internal replay, guarded by the internal key",
+        [typeof(InternalCatalogController)] = "catalogue lookups for Lead Management, guarded by the internal key",
     };
 
     public static IEnumerable<object[]> Actions() =>
@@ -57,10 +58,12 @@ public class EndpointSecurityTests
         Assert.True(Guards(type) || Guards(method), $"{controller}.{action} is reachable by any signed-in user regardless of role.");
     }
 
-    [Fact]
-    public void The_replay_endpoint_is_guarded_by_the_internal_key()
+    [Theory]
+    [InlineData(typeof(InternalApprovalsController))]
+    [InlineData(typeof(InternalCatalogController))]
+    public void The_internal_endpoints_are_guarded_by_the_internal_key(Type controller)
     {
-        var filter = typeof(InternalApprovalsController).GetCustomAttribute<TypeFilterAttribute>();
+        var filter = controller.GetCustomAttribute<TypeFilterAttribute>();
 
         Assert.NotNull(filter);
         Assert.Equal(typeof(InternalApiKeyFilter), filter!.ImplementationType);

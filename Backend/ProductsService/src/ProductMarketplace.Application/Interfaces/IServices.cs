@@ -88,6 +88,21 @@ public interface IProductService
     Task<CsvExport> ExportCsvAsync(ProductQueryDto query, CancellationToken ct = default);
 }
 
+/// <summary>
+/// Read-only view of the catalogue for other services — today, Lead Management's product picker. Every
+/// answer is limited to what the catalogue currently shows, so a category switched off in Setup vanishes
+/// from the caller without the caller knowing anything about statuses.
+/// </summary>
+public interface ICatalogLookupService
+{
+    Task<List<CatalogCategoryLookupDto>> GetCategoriesAsync(CancellationToken ct = default);
+    Task<List<CatalogSubCategoryLookupDto>> GetSubCategoriesAsync(CancellationToken ct = default);
+    Task<List<CatalogProductLookupDto>> GetProductsAsync(Guid categoryId, CancellationToken ct = default);
+
+    /// <summary>Null when the product does not exist or is not currently shown.</summary>
+    Task<CatalogProductLookupDto?> GetProductAsync(Guid productId, CancellationToken ct = default);
+}
+
 public interface IDashboardService
 {
     /// <param name="comparedDays">How far back the "change" on each figure looks.</param>
