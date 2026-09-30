@@ -124,7 +124,7 @@ export const FieldSettingsPage: React.FC = () => {
       <PageHeader
         icon={<Settings size={24} />}
         title="Field Settings"
-        subtitle="Configure label, visibility, requirement, editability, order, and masking per financing product."
+        subtitle="Configure label, visibility, requirement, editability, order, and masking per product type."
         actions={
           <Button
             type="button"

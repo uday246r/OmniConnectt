@@ -99,6 +99,12 @@ export const ProductPicker: React.FC<ProductPickerProps> = ({ productName, onSel
 
   return (
     <div className={styles.wrap} id={id}>
+      {/* Changing a product that is already chosen can be abandoned without picking anything. */}
+      {productName && (
+        <button type="button" className={styles.back} onClick={() => setStep('summary')}>
+          <ArrowLeft size={14} /> Keep {productName}
+        </button>
+      )}
       {step === 'products' && category ? (
         <>
           <button type="button" className={styles.back} onClick={() => setStep('categories')}>

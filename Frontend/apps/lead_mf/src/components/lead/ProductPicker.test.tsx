@@ -95,6 +95,18 @@ describe('ProductPicker', () => {
     expect(await screen.findByRole('button', { name: /Credit Cards/ })).toBeInTheDocument();
   });
 
+  it('lets someone who started changing a product keep the one they had', async () => {
+    const onSelect = vi.fn();
+    const user = userEvent.setup();
+    render(<ProductPicker productName="Home Loan – Salaried" onSelect={onSelect} />);
+
+    await user.click(screen.getByRole('button', { name: 'Change product' }));
+    await user.click(await screen.findByRole('button', { name: /Keep Home Loan – Salaried/ }));
+
+    expect(screen.getByRole('button', { name: 'Change product' })).toBeInTheDocument();
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
   it('shows the validation message it is given', async () => {
     render(<ProductPicker onSelect={vi.fn()} error="Please enter the Product" />);
 

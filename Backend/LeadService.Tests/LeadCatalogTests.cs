@@ -162,6 +162,28 @@ public class LeadCatalogTests : IDisposable
         Assert.Equal(2, await db.Leads.CountAsync());
     }
 
+    /// <summary>
+    /// A gated lead is stored as JSON at submission and rebuilt when a checker approves it — with the
+    /// same call the internal approvals endpoint makes. The product must survive that trip as an id, and
+    /// be confirmed with the Marketplace again at approval time (it may have been withdrawn while the
+    /// request waited).
+    /// </summary>
+    [Fact]
+    public async Task An_approved_lead_is_rebuilt_from_its_stored_request_and_the_product_is_confirmed_again()
+    {
+        var stored = System.Text.Json.JsonSerializer.Serialize(Application(FakeMarketplace.HomeLoanSalaried.Id));
+
+        var replayed = System.Text.Json.JsonSerializer.Deserialize<CreateLeadDto>(stored)!;
+        var created = (await CreateAsync(replayed)).Applied!;
+
+        Assert.Equal(FakeMarketplace.HomeLoanSalaried.Id, created.CatalogProductId);
+        Assert.Equal("Home Loan – Salaried", created.Product);
+
+        marketplace.Offered.Remove(FakeMarketplace.HomeLoanSalaried);
+        var replayedAfterWithdrawal = System.Text.Json.JsonSerializer.Deserialize<CreateLeadDto>(stored)!;
+        await Assert.ThrowsAsync<InvalidOperationException>(() => CreateAsync(replayedAfterWithdrawal));
+    }
+
     // ── History does not move ───────────────────────────────────────────────────
 
     [Fact]
