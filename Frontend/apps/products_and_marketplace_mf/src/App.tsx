@@ -1,6 +1,8 @@
 import React, { useEffect, type ComponentType } from 'react';
 import { AuditLogsPage } from './pages/audit/AuditLogsPage';
 import { CategoriesPage } from './pages/categories/CategoriesPage';
+import { ProductsPage } from './pages/products/ProductsPage';
+import { SubCategoriesPage } from './pages/subcategories/SubCategoriesPage';
 import { Toasts } from './components/Toasts';
 import { PlatformPermissionProvider } from './permissions/PermissionContext';
 import { useStatusConfigStore } from './stores/useStatusConfigStore';
@@ -18,11 +20,13 @@ export interface ProductsAppProps {
 }
 
 const PAGES: Record<string, ComponentType> = {
+  products: ProductsPage,
   categories: CategoriesPage,
+  'sub-categories': SubCategoriesPage,
   'audit-logs': AuditLogsPage,
 };
 
-const DEFAULT_PAGE = 'categories';
+const DEFAULT_PAGE = 'products';
 
 export const App: React.FC<ProductsAppProps> = ({ page }) => {
   const fetchStatuses = useStatusConfigStore((s) => s.fetchAll);
