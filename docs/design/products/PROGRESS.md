@@ -127,7 +127,7 @@ refusal to delete a category that has sub-categories (shown in the dialog); the 
 counts; the add form's category → sub-category cascade, the chosen sub-category's own attributes appearing with
 their units, the client catching a bad value, and a successful create updating the grid and counts; Setup →
 Statuses refusing to switch off the only live status; the Dashboard's tiles, bar chart and donut; Sub-categories;
-and Audit Logs listing the actions just performed. All requests on those page loads returned 200.
+Audit Logs listing the actions just performed, and Setup → Fields (list, open editor, save an edit). All requests on those page loads returned 200.
 
 **Checks:** 130 unit tests across 11 files; `tsc` reports 0 errors; the production bundle builds; `oxlint`
 reports 7 warnings and no errors (the "set loading state inside an effect" pattern the codebase already used,
@@ -139,8 +139,10 @@ plus one pre-existing in `PermissionContext`).
   unit-tested (`ConfirmDialog`, `httpClient`, `useSaveAction`) but was not exercised against a live AuthService.
 - **Formats from Manage Formats** cannot be picked in the field editor (they live in AuthService and the app has no way
   to read them); built-in formats work and the server still enforces any a field uses.
-- **The Setup → Fields editor and Documents were smoke-tested, not driven.** Fields/Documents create, edit and delete
-  were not exercised through the browser; the API behind them is covered by the backend's tests and end-to-end run.
+- **Setup → Documents was not exercised at all in a browser.** Its API is covered by the backend's tests and end-to-end
+  run, and it type-checks and builds, but no one has opened it. Setup → Fields was: choosing a sub-category listed its
+  attributes, the editor opened populated (including the embedded validation editor, with no console errors), and an
+  edit to a unit saved and updated the table. Adding or deleting a field, and adding a format rule, were not driven.
 - **Real host.** The remote was loaded by a stand-in bridge, not by the actual host shell, so the sidebar, routing and
   theme integration were not seen together. Run the platform once before shipping.
 - Row checkboxes from the mockups are not built (no bulk action to drive), and the top bar and sidebar belong to the host.
