@@ -1,6 +1,6 @@
 # Products & Marketplace rebuild — implementation report
 
-Written 2026-09-30, on local branch `products-rebuild` (16 commits ahead of `main`, **not pushed**).
+Written 2026-09-30, on local branch `products-rebuild` (17 commits ahead of `main`, **not pushed**).
 Companion documents in this folder: [PROGRESS.md](PROGRESS.md) (state, verification log, API contract),
 [BRIEF.md](BRIEF.md) (your original request and the plan), [CODEBASE-FACTS.md](CODEBASE-FACTS.md) (what the old
 code looked like), and the four mockups.
@@ -847,6 +847,7 @@ To run the platform locally follow [SETUP.md](../../../SETUP.md), plus the three
 Branch `products-rebuild`, local only. Commits since `main` (newest first):
 
 ```
+cd32123 Docs: implementation report, Phase 4 status, catalogue notes in CLAUDE.md
 41f7b24 Lead picker: keep-current-product, copy fixes, replay test
 cdcb145 Lead form: Category → Product picker fed by the Marketplace
 f77174e Lead Management: products come from the Marketplace
