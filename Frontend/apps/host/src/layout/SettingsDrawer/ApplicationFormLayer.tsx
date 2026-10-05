@@ -10,6 +10,7 @@ import { ApiError } from '../../shared/api/httpClient'
 import { toast } from '../../shared/stores/toastStore'
 import styles from './ApplicationFormLayer.module.css'
 import { TOPICS, invalidate } from '../../shared/stores/invalidationStore'
+import { manifestUrl as manifestUrlRule } from '../../shared/validation/rules'
 
 interface ApplicationFormLayerProps {
   appId?: string
@@ -175,8 +176,9 @@ export function ApplicationFormLayer({ appId }: ApplicationFormLayerProps) {
   function validate(): boolean {
     let ok = true
 
-    if (manifestUrl && !isValidHttpUrl(manifestUrl)) {
-      setManifestUrlError('Must be a valid http:// or https:// URL.')
+    const manifestProblem = manifestUrl ? manifestUrlRule(manifestUrl, key) : undefined
+    if (manifestProblem) {
+      setManifestUrlError(manifestProblem)
       ok = false
     } else {
       setManifestUrlError(null)
@@ -544,7 +546,7 @@ export function ApplicationFormLayer({ appId }: ApplicationFormLayerProps) {
                     type="text"
                     required
                     className={styles.inputWithIcon}
-                    placeholder="https://your-app.com/mf-manifest.json"
+                    placeholder={`/modules/${key || '<key>'}/<version>/mf-manifest.json`}
                     value={manifestUrl}
                     onChange={(e) => {
                       setManifestUrl(e.target.value)

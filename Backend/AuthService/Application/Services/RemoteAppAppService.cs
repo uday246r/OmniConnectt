@@ -1,13 +1,16 @@
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using AuthService.Application.DTOs;
+using AuthService.Application.Events;
 using AuthService.Application.Exceptions;
 using AuthService.Application.Remotes;
 using AuthService.Domain.Entities;
 using AuthService.Domain.Enums;
 using AuthService.Infrastructure;
 using AuthService.Infrastructure.Remotes;
+using AuthService.Options;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace AuthService.Application.Services;
 
@@ -40,8 +43,13 @@ public partial class RemoteAppAppService(
     RemoteManifestClient manifestClient,
     ApprovalGatingService gating,
     AuditLogAppService auditLog,
-    ILogger<RemoteAppAppService> logger)
+    ILogger<RemoteAppAppService> logger,
+    IOptions<RemoteAppsOptions>? remoteAppsOptions = null,
+    IPlatformEventPublisher? events = null)
 {
+    /// <summary>Absolute manifest URLs are a development convenience; see <see cref="RemoteAppsOptions.AllowAbsoluteManifestUrls"/>.</summary>
+    private bool AllowAbsoluteManifestUrls => remoteAppsOptions?.Value.AllowAbsoluteManifestUrls ?? true;
+
     /// <summary>
     /// Identical to <see cref="CreateRemoteAppRequest.Key"/>'s annotation, and the error text below
     /// is the same sentence. The annotation runs first for a bound request; this catches a caller that
@@ -126,6 +134,11 @@ public partial class RemoteAppAppService(
             throw new ValidationAppException(KeyRuleMessage);
         }
 
+        if (key == ReleaseRecord.HostKey)
+        {
+            throw new ValidationAppException("'host' is reserved for the platform shell and cannot be an application key.");
+        }
+
         var featureKey = ToFeatureKey(key);
 
         if (await db.RemoteApps.AnyAsync(a => a.Key == key, ct))
@@ -133,8 +146,8 @@ public partial class RemoteAppAppService(
             throw new ConflictAppException($"A remote app with key '{key}' already exists.");
         }
 
-        var manifestUrl = RequireAbsoluteUrl(request.ManifestUrl, "ManifestUrl must be a valid absolute URL to an mf-manifest.json.");
-        var sourceUrl = OptionalAbsoluteUrl(request.PermissionsSourceUrl, "PermissionsSourceUrl must be a valid absolute URL.");
+        var manifestUrl = ManifestUrlPolicy.Normalize(request.ManifestUrl, key, AllowAbsoluteManifestUrls);
+        var sourceUrl = OptionalHttpUrl(request.PermissionsSourceUrl, "PermissionsSourceUrl must be an absolute http or https URL.");
         var displayName = request.DisplayName.Trim();
 
         // Probe the manifest before accepting the registration. This turns two failure modes that
@@ -233,8 +246,8 @@ public partial class RemoteAppAppService(
         var app = await db.RemoteApps.Include(a => a.Feature).FirstOrDefaultAsync(a => a.FeatureId == id, ct)
             ?? throw NotFound(id);
 
-        var manifestUrl = RequireAbsoluteUrl(request.ManifestUrl, "ManifestUrl must be a valid absolute URL to an mf-manifest.json.");
-        var newSourceUrl = OptionalAbsoluteUrl(request.PermissionsSourceUrl, "PermissionsSourceUrl must be a valid absolute URL.");
+        var manifestUrl = ManifestUrlPolicy.Normalize(request.ManifestUrl, app.Key, AllowAbsoluteManifestUrls);
+        var newSourceUrl = OptionalHttpUrl(request.PermissionsSourceUrl, "PermissionsSourceUrl must be an absolute http or https URL.");
         var displayName = request.DisplayName.Trim();
 
         var proposed = new RemoteAppSnapshotDto(
@@ -293,13 +306,25 @@ public partial class RemoteAppAppService(
         app.Feature.SortOrder = request.SidebarOrder;
         app.Feature.UpdatedAt = now;
 
+        // A new manifest URL is a new build being put in front of users, so it is held to the same
+        // checks as a release promotion: it must be readable, and it must be the same app.
+        var repointed = !string.Equals(app.ManifestUrl, manifestUrl, StringComparison.Ordinal);
+        if (repointed)
+        {
+            await RepointAsync(app, manifestUrl, ct);
+        }
+
         app.IconKey = request.IconKey?.Trim();
-        app.ManifestUrl = manifestUrl;
         app.PermissionsSourceUrl = newSourceUrl;
         app.UpdatedAt = now;
         app.UpdatedBy = actingUserId;
 
         await db.SaveChangesAsync(ct);
+
+        if (repointed)
+        {
+            await NavigationChangedAsync(ct);
+        }
 
         if (app.Status != RemoteAppStatus.Disabled)
         {
@@ -380,6 +405,12 @@ public partial class RemoteAppAppService(
         {
             // A Maintenance toggle changes what the sidebar renders, and the sidebar is cached.
             await catalog.InvalidateNavigationAsync(ct);
+        }
+
+        // Open tabs re-read the tree, so a maintenance switch takes effect without anyone reloading.
+        if (events is not null)
+        {
+            await events.PublishNavigationChangedAsync(ct);
         }
 
         await auditLog.WriteHostAsync(
@@ -578,24 +609,60 @@ public partial class RemoteAppAppService(
         app.Key, app.Feature!.DisplayName, app.IconKey, app.ManifestUrl, app.PermissionsSourceUrl,
         app.Feature.SortOrder, app.Status.ToString(), app.MaintenanceMessage);
 
-    private static string RequireAbsoluteUrl(string? value, string message)
-    {
-        if (string.IsNullOrWhiteSpace(value) || !Uri.TryCreate(value.Trim(), UriKind.Absolute, out _))
-        {
-            throw new ValidationAppException(message);
-        }
-
-        return value.Trim();
-    }
-
-    private static string? OptionalAbsoluteUrl(string? value, string message)
+    private static string? OptionalHttpUrl(string? value, string message)
     {
         if (string.IsNullOrWhiteSpace(value))
         {
             return null;
         }
 
-        return RequireAbsoluteUrl(value, message);
+        var trimmed = value.Trim();
+        return ManifestUrlPolicy.IsHttpUrl(trimmed) ? trimmed : throw new ValidationAppException(message);
+    }
+
+    /// <summary>
+    /// Points an app at a different build: probes the manifest there and refuses unless it can be read
+    /// and declares the same Module Federation container. Does not save.
+    /// </summary>
+    /// <remarks>
+    /// Both the admin form (a changed manifest URL) and a release promotion come through here, so
+    /// neither can put a dead URL or a different app in front of users. The container check is what
+    /// stops a typo'd version folder that happens to hold another remote's build from mounting that
+    /// remote under this app's name and permissions.
+    /// </remarks>
+    internal async Task<ManifestProbeResult> RepointAsync(RemoteApp app, string manifestUrl, CancellationToken ct)
+    {
+        var probe = await manifestClient.ProbeAsync(manifestUrl, ct);
+        if (probe.Health != RemoteAppHealth.Healthy || probe.ContainerName is null)
+        {
+            throw new ValidationAppException(
+                $"The build at {manifestUrl} could not be read, so users cannot be pointed at it: {probe.Error}");
+        }
+
+        if (app.ContainerName is not null && !string.Equals(app.ContainerName, probe.ContainerName, StringComparison.Ordinal))
+        {
+            throw new ConflictAppException(
+                $"The build at {manifestUrl} is the Module Federation container '{probe.ContainerName}', but "
+                + $"'{app.Key}' is '{app.ContainerName}'. That is a different app's build.");
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        app.ManifestUrl = manifestUrl;
+        app.ContainerName = probe.ContainerName;
+        app.Health = probe.Health;
+        app.LastHealthCheckAt = now;
+        app.LastHealthError = null;
+        return probe;
+    }
+
+    /// <summary>Drops the cached navigation catalog and tells open tabs to re-read their tree.</summary>
+    internal async Task NavigationChangedAsync(CancellationToken ct)
+    {
+        await catalog.InvalidateNavigationAsync(ct);
+        if (events is not null)
+        {
+            await events.PublishNavigationChangedAsync(ct);
+        }
     }
 
     /// <summary>

@@ -58,7 +58,7 @@ public record CreateRemoteAppRequest(
 
     [Required(AllowEmptyStrings = false, ErrorMessage = "Manifest URL is required.")]
     [MaxLength(2048, ErrorMessage = "Manifest URL cannot exceed 2048 characters.")]
-    [Url(ErrorMessage = "Manifest URL must be a full absolute URL, e.g. http://localhost:5001/mf-manifest.json")]
+    // Shape is checked by ManifestUrlPolicy, which needs the app key: /modules/<key>/<version>/mf-manifest.json.
     string ManifestUrl,
 
     [MaxLength(2048, ErrorMessage = "Permissions source URL cannot exceed 2048 characters.")]
@@ -82,7 +82,7 @@ public record UpdateRemoteAppRequest(
 
     [Required(AllowEmptyStrings = false, ErrorMessage = "Manifest URL is required.")]
     [MaxLength(2048, ErrorMessage = "Manifest URL cannot exceed 2048 characters.")]
-    [Url(ErrorMessage = "Manifest URL must be a full absolute URL.")]
+    // Shape is checked by ManifestUrlPolicy, which needs the app key: /modules/<key>/<version>/mf-manifest.json.
     string ManifestUrl,
 
     [MaxLength(2048, ErrorMessage = "Permissions source URL cannot exceed 2048 characters.")]

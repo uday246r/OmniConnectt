@@ -28,27 +28,37 @@ public static class RemoteAppSeeder
     /// <c>ModuleRegistryDbSeeder</c> declared them. Keyed by app key.
     /// </summary>
     /// <remarks>
-    /// Localhost URLs, because these are the defaults a developer gets on a fresh machine — the same
-    /// values the old seeder used. A deployed environment overwrites them through Setup →
-    /// Applications, and this seeder never touches a row that already has one.
+    /// Localhost URLs, because these are the defaults a developer gets on a fresh machine. A deployed
+    /// environment supplies its own through <c>RemoteApps:BuiltIn:&lt;key&gt;</c> (inside docker compose
+    /// they are service names, e.g. <c>http://lead:8080/api/lead-service/permissions</c>), and this seeder
+    /// never touches a row that already has one.
     /// </remarks>
-    private static readonly Dictionary<string, string> BuiltInPermissionsSources = new(StringComparer.Ordinal)
+    private static readonly Dictionary<string, string> DefaultPermissionsSources = new(StringComparer.Ordinal)
     {
         ["customer360"] = "http://localhost:5059/permissions",
         ["lead"] = "http://localhost:5046/api/lead-service/permissions",
+        ["products"] = "http://localhost:5266/permissions",
     };
 
-    public static async Task SeedAsync(AuthDbContext db, ILogger logger, CancellationToken ct = default)
+    public static async Task SeedAsync(
+        AuthDbContext db, ILogger logger, CancellationToken ct = default,
+        IReadOnlyDictionary<string, string>? configuredSources = null)
     {
-        await RestoreBuiltInPermissionsSourcesAsync(db, logger, ct);
+        var sources = new Dictionary<string, string>(DefaultPermissionsSources, StringComparer.Ordinal);
+        foreach (var (key, url) in configuredSources ?? new Dictionary<string, string>())
+        {
+            if (!string.IsNullOrWhiteSpace(url)) sources[key.ToLowerInvariant()] = url.Trim();
+        }
+
+        await RestoreBuiltInPermissionsSourcesAsync(db, logger, sources, ct);
         await ReportAppsNeedingAttentionAsync(db, logger, ct);
         await ReportUnreplayableApprovalsAsync(db, logger, ct);
     }
 
     private static async Task RestoreBuiltInPermissionsSourcesAsync(
-        AuthDbContext db, ILogger logger, CancellationToken ct)
+        AuthDbContext db, ILogger logger, IReadOnlyDictionary<string, string> sources, CancellationToken ct)
     {
-        var keys = BuiltInPermissionsSources.Keys.ToList();
+        var keys = sources.Keys.ToList();
 
         var apps = await db.RemoteApps
             .Where(a => keys.Contains(a.Key) && a.PermissionsSourceUrl == null)
@@ -61,7 +71,7 @@ public static class RemoteAppSeeder
 
         foreach (var app in apps)
         {
-            app.PermissionsSourceUrl = BuiltInPermissionsSources[app.Key];
+            app.PermissionsSourceUrl = sources[app.Key];
             app.UpdatedAt = DateTimeOffset.UtcNow;
 
             logger.LogInformation(

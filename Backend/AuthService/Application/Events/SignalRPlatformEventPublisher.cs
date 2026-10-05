@@ -64,6 +64,20 @@ public class SignalRPlatformEventPublisher(
         }
     }
 
+    public async Task PublishNavigationChangedAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            // Every connection is an authenticated user (the hub requires it), and the payload names no
+            // app: a tab learns what changed only by re-reading its own scoped tree.
+            await hubContext.Clients.All.SendAsync("platformEvent", new PlatformEvent("navigation", "changed"), ct);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to publish the navigation-changed event");
+        }
+    }
+
     public async Task PublishBadgeAsync(Guid userId, int pendingCount, CancellationToken ct = default)
     {
         try

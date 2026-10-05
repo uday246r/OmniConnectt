@@ -133,6 +133,32 @@ export function absoluteUrl(value: string | null | undefined, label: string): st
 }
 
 /**
+ * A remote app's manifest URL — the browser twin of AuthService's ManifestUrlPolicy, so the form
+ * answers the way the server will.
+ *
+ * The normal shape is a path on the platform's own origin, under the app's own folder and a version:
+ * `/modules/lead/4.7.3/mf-manifest.json`. An absolute http(s) URL is let through here because only
+ * the server knows whether this environment allows one (development does, production does not), and
+ * it says so in its own words if not.
+ */
+export function manifestUrl(value: string | null | undefined, appKey: string): string | undefined {
+  const url = (value ?? '').trim()
+  if (url === '') return 'Manifest URL is required.'
+
+  if (url.startsWith('/')) {
+    const match = /^\/modules\/([a-z][a-z0-9-]{1,49})\/[A-Za-z0-9][A-Za-z0-9._+-]{0,63}\/mf-manifest\.json$/.exec(url)
+    const folder = appKey.trim() || '<key>'
+    if (!match) return `Must look like /modules/${folder}/<version>/mf-manifest.json.`
+    if (appKey.trim() && match[1] !== appKey.trim()) {
+      return `Must be under /modules/${appKey.trim()}/ — an app can only be served from its own folder.`
+    }
+    return undefined
+  }
+
+  return absoluteUrl(url, 'Manifest URL')
+}
+
+/**
  * Application key. This is not cosmetic strictness: the key becomes the Module Federation container
  * name AND the root of every permission feature key for the app — `remote.<key>` and
  * `remote.<key>.<module>:<capability>`. A key containing a dot would produce feature keys

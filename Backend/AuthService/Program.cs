@@ -171,6 +171,11 @@ builder.Services.AddHttpClient<RemoteManifestClient>(c => c.Timeout = probeTimeo
 builder.Services.AddHttpClient<RemoteCapabilityDiscoveryClient>(c => c.Timeout = TimeSpan.FromSeconds(10));
 
 builder.Services.AddScoped<RemoteAppAppService>();
+builder.Services.AddScoped<ReleaseAppService>();
+builder.Services.Configure<RemoteAppsOptions>(builder.Configuration.GetSection(RemoteAppsOptions.SectionName));
+// Absolute manifest URLs are a development convenience; anywhere else every remote is served from the
+// platform's own origin unless an operator explicitly says otherwise.
+builder.Services.PostConfigure<RemoteAppsOptions>(o => o.AllowAbsoluteManifestUrls ??= builder.Environment.IsDevelopment());
 
 // Singleton so the background sweep and the on-demand refresh endpoint share one set of
 // consecutive-failure counters — two tallies would disagree about whether an app is really down.
@@ -440,7 +445,8 @@ else
         // Runs after AuthDbSeeder because it reads the permission features that seeder creates.
         // Restores what the ModuleRegistry absorption migration could not carry across, and reports
         // anything left needing an administrator's attention.
-        await RemoteAppSeeder.SeedAsync(db, app.Logger);
+        await RemoteAppSeeder.SeedAsync(db, app.Logger,
+            configuredSources: scope.ServiceProvider.GetRequiredService<Microsoft.Extensions.Options.IOptions<RemoteAppsOptions>>().Value.BuiltIn);
     }
     catch (Exception ex)
     {

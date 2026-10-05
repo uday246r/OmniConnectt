@@ -21,6 +21,7 @@ public class AuthDbContext(DbContextOptions<AuthDbContext> options) : DbContext(
     public DbSet<PasswordResetToken> PasswordResetTokens => Set<PasswordResetToken>();
     public DbSet<FeatureNavItem> FeatureNavItems => Set<FeatureNavItem>();
     public DbSet<RemoteApp> RemoteApps => Set<RemoteApp>();
+    public DbSet<ReleaseRecord> ReleaseRecords => Set<ReleaseRecord>();
     public DbSet<NavSection> NavSections => Set<NavSection>();
     public DbSet<HostNavItem> HostNavItems => Set<HostNavItem>();
     public DbSet<UserFieldSchema> UserFieldSchemas => Set<UserFieldSchema>();
@@ -201,6 +202,30 @@ public class AuthDbContext(DbContextOptions<AuthDbContext> options) : DbContext(
             // it means, and these two enums are read by hand during an incident more than by any code.
             entity.Property(a => a.Status).HasConversion<string>().HasMaxLength(20);
             entity.Property(a => a.Health).HasConversion<string>().HasMaxLength(20);
+        });
+
+        modelBuilder.Entity<ReleaseRecord>(entity =>
+        {
+            entity.HasKey(r => r.Id);
+
+            // A version is published once. Republishing it — even with identical content — would make
+            // "what was live at 14:02" unanswerable, so the pair is unique.
+            entity.HasIndex(r => new { r.Key, r.Version }).IsUnique();
+
+            // At most one live build per app, enforced by the database rather than by care.
+            entity.HasIndex(r => r.Key).IsUnique().HasFilter("\"Status\" = 'Live'").HasDatabaseName("IX_ReleaseRecords_Key_Live");
+
+            entity.Property(r => r.Key).HasMaxLength(100);
+            entity.Property(r => r.Version).HasMaxLength(64);
+            entity.Property(r => r.ManifestUrl).HasMaxLength(2048);
+            entity.Property(r => r.ContainerName).HasMaxLength(200);
+            entity.Property(r => r.RequiredHostBridge).HasMaxLength(100);
+            entity.Property(r => r.BridgeVersion).HasMaxLength(32);
+            entity.Property(r => r.Checksum).HasMaxLength(128);
+            entity.Property(r => r.ReleaseId).HasMaxLength(100);
+            entity.Property(r => r.PromotedBy).HasMaxLength(200);
+            // Text, like RemoteApp.Status: read by hand during an incident more than by any code.
+            entity.Property(r => r.Status).HasConversion<string>().HasMaxLength(20);
         });
 
         modelBuilder.Entity<NavSection>(entity =>
