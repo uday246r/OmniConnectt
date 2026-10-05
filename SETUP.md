@@ -208,9 +208,14 @@ without them.
 cp Frontend/apps/host/.env.example Frontend/apps/host/.env
 ```
 
-No changes needed — `VITE_AUTH_SERVICE_URL` already points at the default backend port. It is
-**required**: the host throws at startup with a clear message rather than letting a blank base URL
-produce confusing network errors later.
+**Leave `VITE_AUTH_SERVICE_URL` empty** (or delete the line). Empty means "the host's own origin": the
+host dev server on :5173 proxies `/api`, `/hubs`, every `/api/<service>` prefix and every
+`/modules/<key>/…` to the local servers (`apps/host/dev-proxy.ts`), exactly as nginx does in production.
+Your browser then only ever talks to `http://localhost:5173`, and the refresh cookie is first-party.
+Set it to `http://localhost:5155` only if you deliberately want the old cross-origin setup.
+
+If a backend runs on a non-default port, point the proxy at it instead, e.g.
+`OMNI_DEV_AUTH_URL=http://127.0.0.1:5165 pnpm dev:host` (see the variables in `dev-proxy.ts`).
 
 ### `Frontend/apps/lead_mf/.env` and `Frontend/apps/customer360_mf/.env`
 
@@ -222,9 +227,12 @@ cp Frontend/apps/lead_mf/.env.example Frontend/apps/lead_mf/.env
 cp Frontend/apps/customer360_mf/.env.example Frontend/apps/customer360_mf/.env
 ```
 
-No changes needed. Note the asymmetry, which is not a typo: lead_mf's `VITE_API_BASE_URL` includes
-the `/api/lead-service` path base, customer360_mf's does not — Customer360Service mounts its
-controllers at the root.
+Keep `VITE_PREVIEW_PORT`; **leave `VITE_API_BASE_URL` empty**. Each remote then calls its service under
+its same-origin prefix (`/api/lead-service`, `/api/customer360-service`, `/api/products-service/api`),
+which the host dev server proxies. Do the same for `Frontend/apps/products_and_marketplace_mf/.env`.
+
+Release builds ignore these files' URLs entirely (`pnpm release` forces same-origin, and refuses
+local `.env` files in CI).
 
 ## 6. Run everything
 
@@ -273,7 +281,8 @@ Or run all three frontends at once with `pnpm dev:all` from `Frontend/`.
 Note what the remotes' `dev` script actually does: `concurrently "vite build --watch" "vite preview"`.
 Unlike the host, a remote is **built and served from `dist/`**, not from a dev server — that is what
 publishes `mf-manifest.json`. So a remote takes a few seconds longer to come up on first start, and
-the host cannot load it until `http://localhost:5002/mf-manifest.json` returns 200.
+the host cannot load it until `http://localhost:5173/modules/lead/dev/mf-manifest.json` (proxied to the
+lead build server on :5002) returns 200. The remote servers listen on 127.0.0.1 only.
 
 Each backend **applies its database migrations automatically on first startup** — no `dotnet ef`
 commands required. Watch the AuthService terminal for a one-time line like:
@@ -320,7 +329,7 @@ A remote's server being up is not enough — it appears only once an administrat
 |---|---|
 | Key | `lead` |
 | Display name | `Lead Management` |
-| Manifest URL | `http://localhost:5002/mf-manifest.json` |
+| Manifest URL | `/modules/lead/dev/mf-manifest.json` |
 | Permissions source URL | `http://localhost:5046/api/lead-service/permissions` |
 
 ### Customer 360
@@ -329,8 +338,27 @@ A remote's server being up is not enough — it appears only once an administrat
 |---|---|
 | Key | `customer360` |
 | Display name | `Customer 360` |
-| Manifest URL | `http://localhost:5003/mf-manifest.json` |
+| Manifest URL | `/modules/customer360/dev/mf-manifest.json` |
 | Permissions source URL | `http://localhost:5059/permissions` |
+
+### Products & Marketplace
+
+| Field | Value |
+|---|---|
+| Key | `products` |
+| Display name | `Products & Marketplace` |
+| Manifest URL | `/modules/products/dev/mf-manifest.json` |
+| Permissions source URL | `http://localhost:5266/permissions` |
+
+The lead form's products come from this app's catalogue, through LeadService. Set the same secret as
+`Internal__CatalogApiKey` in `Backend/ProductsService/.env` and `ProductsService__InternalApiKey` in
+`Backend/LeadService/.env` (with `ProductsService__BaseUrl=http://localhost:5266`); without it the lead
+form says the catalogue could not be loaded.
+
+A relative manifest URL is fetched by AuthService through `RemoteApps:InternalBaseUrl`
+(`http://127.0.0.1:5173` in `appsettings.Development.json`), so the host dev server must be running for
+registration to succeed. Absolute URLs (`http://127.0.0.1:5002/mf-manifest.json`) are still accepted in
+Development.
 
 The **Permissions source URL** is what makes the permission system dynamic: AuthService fetches it
 on save (and on **Resync permissions**, from the same page) to learn that service's current

@@ -20,12 +20,20 @@ Frontend/apps/customer360_mf     Customer 360 remote (5003)
 Frontend/apps/products_and_marketplace_mf  Products & Marketplace remote, app key "products" (5004)
 Frontend/packages/ui             @omniconnect/ui — shared component library, workspace:* dep, NOT a Module Federation share
                                    (subpaths: /validation field-format engine, /validation-editor rule editor)
+Frontend/packages/host-bridge    @omniconnect/host-bridge — the versioned host↔remote contract (HOST_BRIDGE_VERSION),
+                                   SemVer checker, typed test fake (/testing); workspace:* dep of host and remotes
+Frontend/scripts/release         pnpm release — builds every app into one versioned release artifact
 Backend/AuthService               users/roles/permissions/JWT/maker-checker/audit hub, remote-app
                                    registry, capability discovery, health probing, sidebar (5155)
 Backend/LeadService                 leads CRUD; path base /api/lead-service (5046)
-Backend/Customer360Service           customer profile/CRM proxy; no path base (5059)
-Backend/ProductsService              products marketplace; clean architecture (src/ProductMarketplace.*) (5266)
+Backend/Customer360Service           customer profile/CRM proxy; path base /api/customer360-service (5059)
+Backend/ProductsService              products marketplace; clean architecture (src/ProductMarketplace.*);
+                                       path base /api/products-service (5266)
 Backend/Shared/OmniConnect.Validation  the server field-format engine, referenced by AuthService and LeadService
+Backend/Shared/OmniConnect.Hosting     every service's proxy edge (forwarded headers, Hosting:PathBase),
+                                       --healthcheck and --migrate-only modes
+deploy/                              production: nginx (only public port), compose, release scripts —
+                                       docs/RUNBOOK-RELEASE.md
 ```
 
 Each service has its **own** internal API key (`Internal__Services__<Service>__ApiKey` in AuthService's
@@ -96,7 +104,11 @@ cleanup re-counts to prove 0 remain — the Neon databases are shared), `scripts
 pnpm install
 pnpm dev:host / pnpm dev:lead / pnpm dev:customer360 / pnpm dev:all
 pnpm -C apps/host build   # or packages/ui, apps/lead_mf, apps/customer360_mf
+pnpm release              # one release artifact (Frontend/release/<id>.tar.gz) — see docs/RUNBOOK-RELEASE.md
 ```
+In development the browser only talks to the host dev server (:5173): `apps/host/dev-proxy.ts` proxies
+`/api`, `/hubs`, each `/api/<service>` prefix and `/modules/<key>/<version>/` to the local servers, like
+nginx in production. API base URLs default to same-origin paths; leave the `VITE_*_URL` vars empty.
 
 ### Frontend tests (vitest, per-package — `apps/host`, `apps/lead_mf`, `apps/customer360_mf`, `packages/ui`)
 ```bash
@@ -201,7 +213,23 @@ globally-unique MF container name, never imports the host's global CSS (imports
 `@omniconnect/ui/tokens.css` before its own `index.css` instead), treats `react`/`react-dom` as shared
 singletons, reads auth state from `window.__omniconnectHost__` (`getAccessToken()`,
 `hasCapability(featureKey, capability)`, `getUser()`) instead of running its own login, and declares
-its capability set dynamically via `GET /permissions`.
+its capability set dynamically via `GET /permissions`. It also builds with `base: './'`, declares its
+`version` and `omniconnect.requiredHostBridge` in package.json (written into the manifest; the build fails
+without them), and imports the bridge types from `@omniconnect/host-bridge` rather than copying them.
+
+### Production release model (read docs/adr/0001-release-by-pointer.md before changing it)
+Every build lives in an immutable folder (`/host/<v>/`, `/modules/<key>/<v>/`) on one origin behind
+nginx. A remote goes live when its `RemoteApp.ManifestUrl` moves to the new folder — via
+`/internal/releases` (ReleaseAgent key only; `ReleaseAppService`) or the Applications form, both through
+`RemoteAppAppService.RepointAsync` (probe + same container) — with history in `ReleaseRecords`, a
+SignalR "navigation" broadcast, and host-bridge compatibility checked (`SemVerRange` ↔ host-bridge
+`semver.ts`, parity table `packages/host-bridge/src/__fixtures__/semver-parity.json`). Manifest URLs
+are `/modules/<own key>/<version>/mf-manifest.json` (`ManifestUrlPolicy`); absolute URLs only in
+Development. A tab already running a remote keeps that build and is offered a reload. Maintenance
+bypass is the capability `host.settings.applications:MaintenanceBypass`; non-holders get
+`manifestUrl: null`. Services run with `Database:ApplyMigrationsOnStartup=false` in production; the
+deploy runs `<service> --migrate-only` once. A transaction in AuthService must run inside
+`CreateExecutionStrategy()` (retrying Npgsql strategy) — a bare `BeginTransaction` 500s on Postgres.
 
 ### Product catalogue → Lead Management
 Lead Management owns **no product data**. Products are `Category → SubCategory → Product` in ProductsService, and a
@@ -256,6 +284,7 @@ backplane. Do not reintroduce a direct `IMemoryCache` dependency in an app servi
 a two-replica deploy serve stale sidebars.
 
 ## Known stale docs
-`docs/DEPLOYMENT.md` and `docs/PERFORMANCE-AND-INFRA.md` carry banners marking which
-parts predate the SQL Server→Postgres migration, and both still describe the retired ModuleRegistry
-service. Don't treat either as current without checking against the actual code first.
+`docs/PERFORMANCE-AND-INFRA.md` carries a banner marking which parts predate the SQL Server→Postgres
+migration, and still describes the retired ModuleRegistry service. Don't treat it as current without
+checking against the actual code first. `render.yaml` and `apps/*/vercel.json` describe the retired
+Vercel/Render topology; `docs/DEPLOYMENT.md` and `docs/RUNBOOK-RELEASE.md` are current.

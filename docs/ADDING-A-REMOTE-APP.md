@@ -23,7 +23,8 @@ in **Setup → Applications**.
 |---|---|---|
 | App **key** (`lead`, `products`) | Setup → Applications, and the backend's `Self__AppKey` | Registration refuses it. Every permission is `remote.<key>.<module>:<Capability>`, so the backend's key must match. |
 | Module Federation **container name** (`lead_mf`) | `vite.config.ts` → `remoteFederationConfig(name, …)` | Refused at registration (AuthService reads the built manifest). |
-| **Port** | the app's `.env` → `VITE_PREVIEW_PORT`; the service's `launchSettings.json` | Startup failure, or a manifest on a port the registry does not know. |
+| **Dev port** | the app's `.env` → `VITE_PREVIEW_PORT`, and the host's `apps/host/dev-proxy.ts` (`DEV_REMOTES`) | Startup failure, or the host dev server proxies `/modules/<key>/` to the wrong app. Production has no per-app port. |
+| **Path base** | the service's `Hosting__PathBase` default (`/api/<key>-service`) and nginx's `location` | Two services answering under one prefix. |
 | **CSS scope id** (`#lead-mf-scope`) | `postcss.config.cjs` → `SCOPE_ID`, and the root element in `App.tsx` | Styles leak between apps. |
 | **Internal service key** | `Internal__Services__<ServiceName>__ApiKey` in AuthService's `.env` | Each service has its own; see *Service keys*. |
 
@@ -33,9 +34,16 @@ in **Setup → Applications**.
 
 Copy `Frontend/apps/lead_mf` to `Frontend/apps/<app>_mf`, then:
 
-- **`package.json`** — a unique `name`; keep `@omniconnect/ui` and `@omniconnect/federation-config` as
-  `workspace:*`. Keep the `test` / `build` scripts; `build` must type-check the app's real tsconfig.
-- **`vite.config.ts`** — `federation(remoteFederationConfig('<app>_mf', './src/App.tsx', ['zustand']))`.
+- **`package.json`** — a unique `name`, a SemVer `version` (it names the folder the build is published
+  under, `/modules/<key>/<version>/` — bump it with every change), and
+  `"omniconnect": { "requiredHostBridge": "^1.0.0" }`, the range of host-bridge contract versions the app
+  was written against. The build fails without either. Keep `@omniconnect/ui`,
+  `@omniconnect/federation-config` and `@omniconnect/host-bridge` as `workspace:*`. Keep the `test` /
+  `build` scripts; `build` must type-check the app's real tsconfig.
+- **`vite.config.ts`** — `base: './'` (the build must work from any versioned folder), content-hashed
+  `assetFileNames`, servers bound to `127.0.0.1` — copy `lead_mf`'s config.
+  `federation(remoteFederationConfig('<app>_mf', './src/App.tsx', ['zustand']))` writes the version and
+  `requiredHostBridge` into `mf-manifest.json`.
   List every shared package you actually import (`zustand`, `react-router-dom`, `@tanstack/react-query`).
   An unlisted one gets its own second copy — a second router with an empty context is the classic
   failure. Listing one you did not install fails the build.
@@ -47,7 +55,10 @@ Copy `Frontend/apps/lead_mf` to `Frontend/apps/<app>_mf`, then:
   `docs/SHARED-UI-REFACTOR-STATUS.md` first.
 - **Drawers** — one close control (the header X), no footer "Close" button, and no database ids,
   GUIDs, raw JSON or action keys shown to people. Show names and plain-language descriptions.
-- **Identity** — never run a login. `src/api/hostBridge.ts` reads `window.__omniconnectHost__`:
+- **API base URL** — default to the same-origin path, e.g. `'/api/<key>-service'`; `VITE_API_BASE_URL`
+  overrides it only for a backend on another origin. Never default to a `localhost` URL.
+- **Identity** — never run a login. Import the contract types from `@omniconnect/host-bridge` (never copy
+  them) and use them in `src/api/hostBridge.ts`, which reads `window.__omniconnectHost__`:
   `getAccessToken()`, `ensureFreshAccessToken()`, `hasCapability(featureKey, capability)`, `getUser()`.
   Send `Authorization: Bearer <token>` on every call, refresh once on a 401, and send nothing that
   names the user (no `X-Actor-*` headers — the server reads the actor from the token).
@@ -62,7 +73,13 @@ Copy `Frontend/apps/lead_mf` to `Frontend/apps/<app>_mf`, then:
 - **Field formats** — to validate against Settings → Manage Formats, use `validateFieldValue` from
   `@omniconnect/ui/validation` and `ValidationRulesEditor` from `@omniconnect/ui/validation-editor`.
 
-Every remote default-exports a React component from `./src/App.tsx`; the host always loads `<key>/App`.
+Every remote default-exports a React component from `./src/App.tsx`; the host always loads `<key>/App`
+and passes `RemoteAppProps` (`page`, `subPath` for deep links like `/apps/<key>/<page>/123`,
+`onNavigate`). Test fakes of the bridge come from `@omniconnect/host-bridge/testing`.
+
+Add the app to `Frontend/release.config.json` (key, dir, display name) so `pnpm release` builds it, to
+`DEV_REMOTES` in `apps/host/dev-proxy.ts`, and a `location` block to `deploy/nginx/conf.d` for its
+backend (before `/api/`).
 
 Add a launch entry in `.claude/launch.json` with `"runtimeArgs": ["-C", "Frontend", "--filter", "<app>-mf", "dev"]`.
 `-C Frontend` is required — the workspace root is `Frontend/`.
@@ -153,10 +170,12 @@ unreachable database does not crash the process.
 |---|---|
 | Key | the app key (lowercase, unique, equal to `Self__AppKey`) |
 | Display name | shown in the sidebar and on audit rows |
-| Manifest URL | `http://localhost:<frontend port>/mf-manifest.json` |
-| Permissions source URL | `http://localhost:<backend port>/<path base>/permissions` |
+| Manifest URL | Development: `/modules/<key>/dev/mf-manifest.json` (through the host dev server's proxy). Production: done by the release — the first deploy of an app registers it. |
+| Permissions source URL | `http://localhost:<backend port>/<path base>/permissions` (production: the compose service name, e.g. `http://<svc>:8080/...`) |
 
-Registration fetches the manifest and the permissions. Grant capabilities per role under **Roles →
+Registration fetches the manifest (through `RemoteApps:InternalBaseUrl`) and the permissions. In
+production, a new version goes live through `deploy.sh` / `promote.sh`, never by editing the URL — see
+[RUNBOOK-RELEASE.md](RUNBOOK-RELEASE.md). Grant capabilities per role under **Roles →
 Application Access**; assign checkers under **Checker Assignment**.
 
 ---
