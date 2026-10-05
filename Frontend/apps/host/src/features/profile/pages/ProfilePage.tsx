@@ -80,6 +80,17 @@ export function ProfilePage() {
     }
   }, [hasAccessToken])
 
+  // Combine user.permissions and fineCapabilities. Above the early return on purpose: a hook after
+  // `if (!user) return null` runs on some renders and not others, which React rejects the moment the
+  // user signs in or out while this page is mounted.
+  const allEffectivePermissions = useMemo(() => {
+    const set = new Set<string>(user?.permissions || [])
+    for (const cap of fineCapabilities || []) {
+      set.add(cap)
+    }
+    return Array.from(set)
+  }, [user?.permissions, fineCapabilities])
+
   if (!user) return null
 
   const isGoogle = user.authProvider === 'Google'
@@ -149,15 +160,6 @@ export function ProfilePage() {
       setSavingProfile(false)
     }
   }
-
-  // Combine user.permissions and fineCapabilities
-  const allEffectivePermissions = useMemo(() => {
-    const set = new Set<string>(user?.permissions || [])
-    for (const cap of fineCapabilities || []) {
-      set.add(cap)
-    }
-    return Array.from(set)
-  }, [user?.permissions, fineCapabilities])
 
   return (
     <div className={styles.page}>
