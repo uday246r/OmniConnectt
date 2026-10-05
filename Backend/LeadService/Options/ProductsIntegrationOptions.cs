@@ -8,8 +8,9 @@ public class ProductsIntegrationOptions
     public string BaseUrl { get; set; } = string.Empty;
 
     /// <summary>
-    /// The shared key ProductsService expects in X-Internal-Api-Key on its internal endpoints — the same
-    /// value as that service's <c>Internal__ApiKey</c>.
+    /// The shared key ProductsService expects in X-Internal-Api-Key on its <c>internal/catalog</c>
+    /// endpoints — the same value as that service's <c>Internal__CatalogApiKey</c>. It is deliberately NOT
+    /// <c>Internal__ApiKey</c>: that one authorises AuthService replaying approvals, a write.
     /// </summary>
     public string InternalApiKey { get; set; } = string.Empty;
 }
