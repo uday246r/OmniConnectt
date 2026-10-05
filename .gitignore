@@ -68,3 +68,6 @@ yarn-error.log*
 # --- Scratch & Diagnostics ---
 graphify-out/
 scratch/
+
+# Assembled frontend releases (Frontend/scripts/release/build.mjs) — artifacts, never source
+Frontend/release/

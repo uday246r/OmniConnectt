@@ -1,0 +1,9 @@
+{
+  "$comment": "What a release contains. Read by scripts/release/build.mjs. 'key' is the platform's app key (the /modules/<key>/ folder and the RemoteApp key); 'dir' is the workspace app; displayName/iconKey/sidebarOrder are used only when an app is installed for the first time.",
+  "host": { "dir": "apps/host" },
+  "remotes": [
+    { "key": "lead", "dir": "apps/lead_mf", "displayName": "Lead Management", "iconKey": "Users", "sidebarOrder": 10 },
+    { "key": "customer360", "dir": "apps/customer360_mf", "displayName": "Customer 360", "iconKey": "User", "sidebarOrder": 20 },
+    { "key": "products", "dir": "apps/products_and_marketplace_mf", "displayName": "Products & Marketplace", "iconKey": "Package", "sidebarOrder": 30 }
+  ]
+}

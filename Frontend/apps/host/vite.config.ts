@@ -12,6 +12,9 @@ import { devProxy } from './dev-proxy.ts'
 // the host and every remote must agree on it exactly, and a copy-pasted block drifts. See that
 // package's header for which packages belong in it and why.
 export default defineConfig({
+  // A release publishes each host build to its own immutable folder, /host/<version>/, and serves only
+  // index.html at the origin root (scripts/release/build.mjs sets this). Development stays at '/'.
+  base: process.env.OMNI_HOST_BASE || '/',
   plugins: [
     react(),
     federation(hostFederationConfig('omniconnect_host')),

@@ -21,6 +21,7 @@
     "build:all": "pnpm -r build",
     "lint": "pnpm -r lint",
     "typecheck": "pnpm -r typecheck",
-    "test": "pnpm -r test"
+    "test": "pnpm -r test",
+    "release": "node scripts/release/build.mjs"
   }
 }
