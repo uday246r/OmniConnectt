@@ -3,16 +3,19 @@ using DotNetEnv;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
-using Microsoft.AspNetCore.HttpOverrides;
 using LeadManagement.Api.Data;
 using LeadManagement.Api.Infrastructure;
 using LeadManagement.Api.Infrastructure.Security;
 using LeadManagement.Api.Middleware;
 using LeadManagement.Api.Options;
 using LeadManagement.Api.Services;
+using OmniConnect.Hosting;
 
 // Load Backend/LeadService/.env before configuration is read
 var currentDir = Directory.GetCurrentDirectory();
+// Container HEALTHCHECK mode (`--healthcheck <url>`): probe and exit before anything else boots.
+ContainerHealthProbe.RunIfRequested(args);
+
 var candidateEnvFiles = new[]
 {
     Path.Combine(currentDir, "Backend", "LeadService", ".env"),
@@ -202,20 +205,10 @@ var app = builder.Build();
  * wrote recorded as the actor's origin. An audit trail whose source IP is the infrastructure's is
  * not merely unhelpful, it is wrong in a way that looks right.
  *
- * KnownNetworks/KnownProxies are cleared because the platform assigns the proxy address dynamically,
- * which is safe only while this container is reachable solely through that proxy — the same
- * reasoning, and the same caveat, as AuthService and Customer360Service already carry.
+ * Which senders are believed, and the /api/lead-service prefix this service is published under, are
+ * configured in one place for every service — see OmniConnect.Hosting.PlatformEdge.
  */
-var forwardedHeaders = new ForwardedHeadersOptions
-{
-    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto,
-};
-forwardedHeaders.KnownNetworks.Clear();
-forwardedHeaders.KnownProxies.Clear();
-app.UseForwardedHeaders(forwardedHeaders);
-
-// Service path base for remote integration
-app.UsePathBase("/api/lead-service");
+app.UsePlatformEdge(defaultPathBase: "/api/lead-service");
 
 // Exception handling sits outside Authentication and CORS
 app.UseMiddleware<ExceptionMiddleware>();
@@ -262,7 +255,13 @@ else
         // (Migrations/20260818182525_InitialCreate.cs, verified column-for-column identical to the
         // schema EnsureCreatedAsync had already produced before switching), so MigrateAsync is a
         // no-op here and a real migration path from now on.
-        await dbContext.Database.MigrateAsync();
+        //
+        // Off where a deployment applies migrations as its own single-writer step (an EF migration
+        // bundle run before the service starts), so N replicas never race to migrate one database.
+        if (app.Configuration.GetValue("Database:ApplyMigrationsOnStartup", true))
+        {
+            await dbContext.Database.MigrateAsync();
+        }
         app.Logger.LogInformation("Database initialized successfully.");
     }
     catch (Exception ex)

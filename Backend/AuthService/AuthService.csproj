@@ -38,6 +38,7 @@
   <ItemGroup>
     <!-- The platform field-format engine, shared with every service that validates admin-configured formats. -->
     <ProjectReference Include="../Shared/OmniConnect.Validation/OmniConnect.Validation.csproj" />
+    <ProjectReference Include="../Shared/OmniConnect.Hosting/OmniConnect.Hosting.csproj" />
     <Using Include="OmniConnect.Validation" />
   </ItemGroup>
 

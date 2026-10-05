@@ -1,13 +1,14 @@
-# Build context is this directory (Backend/) for all three service Dockerfiles.
+# Build context is this directory (Backend/) for every service Dockerfile.
 
 # SECURITY — never let local secrets into an image. Every service calls Env.TraversePath().Load()
 # at startup, which walks UP the directory tree looking for a .env. If one were copied into the
 # image it would be found and loaded, silently overriding the platform's environment variables with
 # development credentials — a local database connection string and the dev JWT signing key baked
 # into a production container.
-.env
-.env.*
-!.env.example
+# The **/ prefix matters: a bare `.env` matches only Backend/.env, not AuthService/.env.
+**/.env
+**/.env.*
+!**/.env.example
 
 # Build output — stale local artifacts would be copied over the ones restored inside the image,
 # and they are large enough to slow every build.

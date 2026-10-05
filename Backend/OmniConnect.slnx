@@ -11,5 +11,6 @@
   <Project Path="ProductsService/src/ProductMarketplace.Infrastructure/ProductMarketplace.Infrastructure.csproj" />
   <Project Path="ProductsService.Tests/ProductsService.Tests.csproj" />
   <Project Path="Shared/OmniConnect.Validation/OmniConnect.Validation.csproj" />
+  <Project Path="Shared/OmniConnect.Hosting/OmniConnect.Hosting.csproj" />
   <Project Path="LoadTest/OmniConnect.LoadTest/OmniConnect.LoadTest.csproj" />
 </Solution>

@@ -1,7 +1,7 @@
 using System.Security.Cryptography;
 using DotNetEnv;
+using OmniConnect.Hosting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using ProductMarketplace.Api.Infrastructure;
@@ -14,6 +14,9 @@ using ProductMarketplace.Application.Interfaces;
 using ProductMarketplace.Infrastructure;
 using ProductMarketplace.Infrastructure.Data;
 using ProductMarketplace.Infrastructure.Realtime;
+
+// Container HEALTHCHECK mode (`--healthcheck <url>`): probe and exit before anything else boots.
+ContainerHealthProbe.RunIfRequested(args);
 
 // .env is developer-local and gitignored. It is looked for next to the project, and also under
 // Backend/ProductsService when the process is started from the repository root (the launch.json
@@ -135,10 +138,10 @@ builder.Services.AddAuthorization();
 
 var app = builder.Build();
 
-var forwarded = new ForwardedHeadersOptions { ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto };
-forwarded.KnownIPNetworks.Clear();
-forwarded.KnownProxies.Clear();
-app.UseForwardedHeaders(forwarded);
+// First middleware: which proxy senders are believed, and the /api/products-service prefix this
+// service is published under on the platform's single origin — see OmniConnect.Hosting.PlatformEdge.
+// The unprefixed paths keep working for callers that address the service directly.
+app.UsePlatformEdge(defaultPathBase: "/api/products-service");
 
 if (string.IsNullOrWhiteSpace(builder.Configuration.GetConnectionString("DefaultConnection")))
 {

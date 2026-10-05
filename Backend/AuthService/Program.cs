@@ -14,12 +14,15 @@ using AuthService.Infrastructure.Seed;
 using AuthService.Options;
 using DotNetEnv;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using OmniConnect.Hosting;
 using StackExchange.Redis;
+
+// Container HEALTHCHECK mode (`--healthcheck <url>`): probe and exit before anything else boots.
+ContainerHealthProbe.RunIfRequested(args);
 
 foreach (var path in new[] {
     Path.Combine(AppContext.BaseDirectory, ".env"),
@@ -372,7 +375,7 @@ var app = builder.Build();
 /*
  * MUST be the first middleware: everything downstream reads the values it rewrites.
  *
- * In production this service runs behind a TLS-terminating reverse proxy (Render), which forwards
+ * In production this service runs behind a TLS-terminating reverse proxy (nginx), which forwards
  * plain HTTP and puts the original scheme and client IP in X-Forwarded-Proto / X-Forwarded-For.
  * Without this, three things break, none of them obviously:
  *
@@ -386,19 +389,11 @@ var app = builder.Build();
  *   3. Audit entries record that same proxy address as the source IP of every action, which for a
  *      compliance audit trail is worse than recording nothing at all.
  *
- * KnownNetworks/KnownProxies are cleared because the proxy's address is assigned dynamically by the
- * platform and is not knowable ahead of time. That is safe HERE, and only here, because the
- * container accepts traffic solely from that proxy — it is not publicly routable. Do not copy this
- * clearing into a service that is directly reachable from the internet: it would let a caller spoof
- * both its own IP and the request scheme.
+ * Which senders are believed, and the path prefix, are configured in one place for every service —
+ * see OmniConnect.Hosting.PlatformEdge. AuthService is published at the origin's root (its refresh
+ * cookie is scoped to /api/auth), so its default path base is empty.
  */
-var forwardedHeaders = new ForwardedHeadersOptions
-{
-    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto,
-};
-forwardedHeaders.KnownNetworks.Clear();
-forwardedHeaders.KnownProxies.Clear();
-app.UseForwardedHeaders(forwardedHeaders);
+app.UsePlatformEdge(defaultPathBase: "");
 
 if (app.Environment.IsDevelopment())
 {
@@ -434,7 +429,12 @@ else
     {
         using var scope = app.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AuthDbContext>();
-        await db.Database.MigrateAsync();
+        // Off where a deployment applies migrations as its own single-writer step (an EF migration
+        // bundle run before the service starts), so N replicas never race to migrate one database.
+        if (app.Configuration.GetValue("Database:ApplyMigrationsOnStartup", true))
+        {
+            await db.Database.MigrateAsync();
+        }
         await AuthDbSeeder.SeedAsync(db, app.Logger);
 
         // Runs after AuthDbSeeder because it reads the permission features that seeder creates.

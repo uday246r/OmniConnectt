@@ -3,7 +3,6 @@ using System.Security.Cryptography;
 using System.Text;
 using DotNetEnv;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using backend.Data;
@@ -11,6 +10,10 @@ using backend.Controllers;
 using backend.Infrastructure;
 using backend.Middleware;
 using backend.Options;
+using OmniConnect.Hosting;
+
+// Container HEALTHCHECK mode (`--healthcheck <url>`): probe and exit before anything else boots.
+ContainerHealthProbe.RunIfRequested(args);
 
 foreach (var path in new[] {
     Path.Combine(AppContext.BaseDirectory, ".env"),
@@ -111,6 +114,8 @@ builder.Services.AddCors(options =>
     });
 });
 
+builder.Services.AddHealthChecks().AddDbContextCheck<Customer360DbContext>("database");
+
 // ---------------------------------------------------------------------------
 // Authentication — RS256 JWT Token Validation (OmniConnect Platform Standard)
 // ---------------------------------------------------------------------------
@@ -158,17 +163,11 @@ builder.Services.AddAuthorization();
 // ---------------------------------------------------------------------------
 var app = builder.Build();
 
-// First middleware, matching AuthService/LeadService: behind a TLS-terminating
-// proxy the real scheme and client IP arrive only as X-Forwarded-* headers. KnownNetworks/KnownProxies
-// are cleared because the platform assigns the proxy address dynamically; safe only because this
-// container is reachable solely via that proxy.
-var forwardedHeaders = new ForwardedHeadersOptions
-{
-    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto,
-};
-forwardedHeaders.KnownNetworks.Clear();
-forwardedHeaders.KnownProxies.Clear();
-app.UseForwardedHeaders(forwardedHeaders);
+// First middleware, matching every other service: behind a TLS-terminating proxy the real scheme and
+// client IP arrive only as X-Forwarded-* headers, and on the platform's single origin this service is
+// published under /api/customer360-service. Both are configured in one place — see
+// OmniConnect.Hosting.PlatformEdge. The unprefixed paths keep working for direct callers.
+app.UsePlatformEdge(defaultPathBase: "/api/customer360-service");
 
 // Before CORS/auth, matching EmployeeService — otherwise anything thrown by the auth handler bypasses
 // it entirely and comes back as a bare 500 with no CORS headers, which the browser reports as an
@@ -179,6 +178,10 @@ app.UseCors("AllowFrontend");
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
+// Readiness opens a database connection; liveness has no dependencies, so a slow database restarts
+// nothing — the CRM-proxy endpoints keep working without it.
+app.MapHealthChecks("/health");
+app.MapHealthChecks("/health/live", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions { Predicate = _ => false });
 
 if (!isDbConfigured)
 {
@@ -196,7 +199,12 @@ else
     {
         using var scope = app.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<Customer360DbContext>();
-        await db.Database.MigrateAsync();
+        // Off where a deployment applies migrations as its own single-writer step (an EF migration
+        // bundle run before the service starts), so N replicas never race to migrate one database.
+        if (app.Configuration.GetValue("Database:ApplyMigrationsOnStartup", true))
+        {
+            await db.Database.MigrateAsync();
+        }
         // Seeds default field-visibility/masking rows on first boot only (idempotent — a populated
         // table is left untouched), so an admin's edits are never overwritten by a redeploy.
         await scope.ServiceProvider.GetRequiredService<FieldConfigService>().EnsureSeededAsync();

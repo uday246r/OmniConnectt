@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    How every OmniConnect service sits behind the platform's reverse proxy: which proxies it believes
+    about the caller's IP and scheme, the path prefix it is published under, and the container health
+    probe. One implementation instead of four copies, because the four copies had already drifted (one
+    service cleared KnownProxies but not KnownNetworks) and this is security-relevant code.
+
+    Target framework, nullable and implicit usings come from Backend/Directory.Build.props.
+  -->
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+</Project>
