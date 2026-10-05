@@ -13,5 +13,10 @@ export default defineConfig({
     globals: true,
     setupFiles: ['./src/test/setup.ts'],
     include: ['src/**/*.test.{ts,tsx}'],
+    // Several suites re-import the API module graph per test (vi.resetModules) to get a fresh request
+    // cache. That takes well under a second alone, but `pnpm -r test` runs every package at once and the
+    // first import then crossed the 5s default — a timeout that also leaked its pending requests into the
+    // next test's call count. A budget sized for a loaded CI runner, not a correctness change.
+    testTimeout: 20_000,
   },
 })

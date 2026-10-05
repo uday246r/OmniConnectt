@@ -13,5 +13,9 @@ export default defineConfig({
     globals: true,
     setupFiles: ['./src/test/setup.ts'],
     include: ['src/**/*.test.{ts,tsx}'],
+    // `pnpm -r test` runs every package at once; suites that re-import a module graph per test
+    // (vi.resetModules) crossed the 5s default under that load and failed by timeout alone. Sized for
+    // a loaded CI runner — see customer360_mf/vitest.config.ts.
+    testTimeout: 20_000,
   },
 })
