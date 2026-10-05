@@ -159,6 +159,51 @@ public class NavigationTreeBuilderTests
     }
 
     [Fact]
+    public void A_caller_who_cannot_bypass_maintenance_is_not_told_where_the_app_lives()
+    {
+        var tree = NavigationTreeBuilder.Build(
+            Catalog(appStatus: "Maintenance"), Perms("remote.lead.lead:View"), isAdministrator: false);
+
+        Assert.Null(App(tree)!.Remote!.ManifestUrl);
+    }
+
+    [Fact]
+    public void A_caller_holding_the_bypass_capability_can_open_an_app_in_maintenance()
+    {
+        var tree = NavigationTreeBuilder.Build(
+            Catalog(appStatus: "Maintenance", maintenanceMessage: "Back at 09:00."),
+            Perms("remote.lead.lead:View", NavigationTreeBuilder.MaintenanceBypassPermission), isAdministrator: false);
+
+        var app = App(tree)!;
+
+        Assert.Equal("maintenance-bypass", app.State);
+        Assert.NotNull(app.Remote!.ManifestUrl);
+        // The notice still travels, so an operator never mistakes the app for being back.
+        Assert.Equal("Back at 09:00.", app.MaintenanceMessage);
+        Assert.All(app.Children, c => Assert.Equal("maintenance-bypass", c.State));
+    }
+
+    [Fact]
+    public void An_administrator_bypasses_maintenance_without_a_grant()
+    {
+        var tree = NavigationTreeBuilder.Build(Catalog(appStatus: "Maintenance"), Perms(), isAdministrator: true);
+
+        Assert.Equal("maintenance-bypass", App(tree)!.State);
+    }
+
+    [Fact]
+    public void Bypass_on_one_capability_name_is_not_inferred_from_another()
+    {
+        // Holding every other Applications capability is not maintenance access.
+        var tree = NavigationTreeBuilder.Build(
+            Catalog(appStatus: "Maintenance"),
+            Perms("remote.lead.lead:View", "host.settings.applications:Edit", "host.settings.applications:Disable"),
+            isAdministrator: false);
+
+        Assert.Equal("maintenance", App(tree)!.State);
+    }
+
+    [Fact]
     public void An_app_with_no_render_metadata_is_omitted()
     {
         // Half-synced: the permission features arrived but the registry never pushed the manifest, so

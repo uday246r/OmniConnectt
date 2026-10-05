@@ -51,9 +51,14 @@ function unreachableBadge(node: NavNodeDto, health: SidebarProps['health']) {
 }
 
 function StateBadge({ node }: { node: NavNodeDto }) {
-  if (node.state === 'maintenance') {
+  // An operator who may open an app in maintenance still sees that it is in maintenance.
+  if (node.state === 'maintenance' || node.state === 'maintenance-bypass') {
+    const title = node.maintenanceMessage ?? 'Under maintenance'
     return (
-      <span className={navItemStyles.navItemBadge} title={node.maintenanceMessage ?? 'Under maintenance'}>
+      <span
+        className={navItemStyles.navItemBadge}
+        title={node.state === 'maintenance-bypass' ? `${title} (you have maintenance access)` : title}
+      >
         <Icon.AlertTriangle width={13} height={13} />
       </span>
     )

@@ -10,6 +10,10 @@ public static class NavigationTreeBuilder
 {
     private const string StateVisible = "visible";
     private const string StateMaintenance = "maintenance";
+    private const string StateMaintenanceBypass = "maintenance-bypass";
+
+    /// <summary>Opening an app that is in maintenance. Administrators hold it implicitly.</summary>
+    public const string MaintenanceBypassPermission = "host.settings.applications:MaintenanceBypass";
     private const string RemotePrefix = "remote.";
 
     /// <summary>
@@ -106,7 +110,9 @@ public static class NavigationTreeBuilder
         string? maintenanceMessage = null;
         if (string.Equals(render.Status, "Maintenance", StringComparison.OrdinalIgnoreCase))
         {
-            state = StateMaintenance;
+            state = isAdministrator || permissions.Contains(MaintenanceBypassPermission)
+                ? StateMaintenanceBypass
+                : StateMaintenance;
             maintenanceMessage = render.MaintenanceMessage;
         }
 
@@ -137,7 +143,7 @@ public static class NavigationTreeBuilder
                     row.SortOrder,
                     Kind: "submodule",
                     state,
-                    state == StateMaintenance ? maintenanceMessage : null,
+                    state == StateVisible ? null : maintenanceMessage,
                     Remote: null,
                     Children: []));
             }
@@ -164,7 +170,11 @@ public static class NavigationTreeBuilder
             maintenanceMessage,
             // DefaultRoutePath is the first surviving child, so /apps/lead never lands on a blank
             // frame when the remote's own first page is one the caller cannot see.
-            new RemoteMountDto(appKey, render.ManifestUrl, render.ContainerName, children.FirstOrDefault()?.RoutePath),
+            new RemoteMountDto(
+                appKey,
+                state == StateMaintenance ? null : render.ManifestUrl,
+                render.ContainerName,
+                children.FirstOrDefault()?.RoutePath),
             children);
     }
 

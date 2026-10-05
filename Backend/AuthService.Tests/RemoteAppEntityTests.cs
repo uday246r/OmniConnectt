@@ -188,7 +188,8 @@ public class RemoteAppEntityTests : IDisposable
         var navigation = new NavigationAppService(db, NewCache());
         var response = await navigation.GetAsync(
             new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "remote.lead:View" },
-            isAdministrator: true);
+            // An ordinary user: an administrator bypasses maintenance and is shown "maintenance-bypass".
+            isAdministrator: false);
 
         var node = response.Sections.Single(s => s.Key == "apps").Items.Single();
 

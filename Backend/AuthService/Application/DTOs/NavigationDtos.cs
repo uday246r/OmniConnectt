@@ -37,7 +37,8 @@ public record NavNodeDto(
     /// <summary>"host" | "remote-app" | "submodule".</summary>
     string Kind,
     /// <summary>
-    /// "visible" | "maintenance". There is deliberately no "forbidden" or "hidden": a row the caller
+    /// "visible" | "maintenance" | "maintenance-bypass" (in maintenance, and this caller may open it
+    /// anyway). There is deliberately no "forbidden" or "hidden": a row the caller
     /// must not see is absent from the array entirely, because emitting it would ship the whole
     /// product's module list to every browser.
     /// </summary>
@@ -50,7 +51,11 @@ public record NavNodeDto(
 
 public record RemoteMountDto(
     string AppKey,
-    string ManifestUrl,
+    /// <summary>
+    /// Null while the app is in maintenance for a caller who may not bypass it: there is nothing for
+    /// them to load, so the server does not tell them where the build lives.
+    /// </summary>
+    string? ManifestUrl,
     string? ContainerName,
     /// <summary>Where /apps/{key} should land — the first row the caller can actually see.</summary>
     string? DefaultRoutePath);

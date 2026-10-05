@@ -44,7 +44,10 @@ public static class AuthDbSeeder
     // Deliberately just View/Edit and a feature of its own, not a Settings > Users capability: whoever
     // shapes the user form is not necessarily who should decide how long a credential lives.
     private static readonly string[] PasswordPolicyCapabilities = ["View", "Edit"];
-    private static readonly string[] ApplicationsCapabilities = ["View", "Register", "Edit", "Delete", "Disable"];
+    // MaintenanceBypass: open an app while it is in maintenance, to verify a fix before users get it
+    // back. A capability an administrator grants to an operator role — never inferred from a role name —
+    // and checked by the server, which simply does not send a non-holder where the app lives.
+    private static readonly string[] ApplicationsCapabilities = ["View", "Register", "Edit", "Delete", "Disable", "MaintenanceBypass"];
     private static readonly string[] AuditLogsCapabilities = ["View", "Export"];
     private static readonly string[] SystemLogsCapabilities = ["View", "Export"];
 
