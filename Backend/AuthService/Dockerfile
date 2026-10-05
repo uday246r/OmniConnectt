@@ -39,4 +39,6 @@ HEALTHCHECK --interval=30s --timeout=8s --start-period=40s --retries=3   CMD ["d
 # Honour a platform-injected $PORT (Render sets it) and fall back to 8080, the port every OmniConnect
 # container listens on. `exec` so dotnet becomes PID 1 and receives SIGTERM directly — without it the
 # shell swallows the signal and the platform kills the container instead of letting it drain requests.
-CMD ["sh", "-c", "exec dotnet AuthService.dll --urls http://+:${PORT:-8080}"]
+# ENTRYPOINT, not CMD, so extra arguments are appended rather than replacing the command — the
+# deployment runs `docker compose run --rm auth --migrate-only` exactly as it does for every service.
+ENTRYPOINT ["sh", "-c", "exec dotnet AuthService.dll --urls http://+:${PORT:-8080} \"$@\"", "--"]

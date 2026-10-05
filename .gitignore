@@ -71,3 +71,8 @@ scratch/
 
 # Assembled frontend releases (Frontend/scripts/release/build.mjs) — artifacts, never source
 Frontend/release/
+
+# Deployment secrets and certificates — only the *.example files are tracked
+deploy/.env
+deploy/env/*.env
+deploy/certs/

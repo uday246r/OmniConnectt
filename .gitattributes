@@ -8,3 +8,9 @@
 # `text=auto` stores every file git detects as text with LF in the repository,
 # while still checking it out with the platform's native endings.
 * text=auto
+# Executed or parsed on Linux: must stay LF whatever the checkout platform. A CRLF shell script fails
+# with "$'\r': command not found"; a CRLF nginx include can fail to parse.
+*.sh            text eol=lf
+deploy/**       text eol=lf
+Dockerfile      text eol=lf
+*.Dockerfile    text eol=lf

@@ -377,6 +377,16 @@ builder.Services.AddProblemDetails();
 
 var app = builder.Build();
 
+// Deployment step (OmniConnect.Hosting.MigrationMode): apply migrations as the single writer and exit.
+// An exception here ends the process non-zero, which is what stops the deploy.
+if (MigrationMode.IsRequested(args))
+{
+    using var migrationScope = app.Services.CreateScope();
+    await migrationScope.ServiceProvider.GetRequiredService<AuthDbContext>().Database.MigrateAsync();
+    app.Logger.LogInformation("Migrations applied (--migrate-only); exiting.");
+    return;
+}
+
 /*
  * MUST be the first middleware: everything downstream reads the values it rewrites.
  *

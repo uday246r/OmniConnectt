@@ -145,8 +145,10 @@ const RELEASE_ENV = {
 
 const commit = git('rev-parse', '--short=12', 'HEAD') ?? 'nogit'
 const dirty = git('status', '--porcelain') ? '-dirty' : ''
-const today = new Date().toISOString().slice(0, 10).replaceAll('-', '.')
-const releaseId = `${today}-${commit}${dirty}`
+// Date and time, then commit: sortable, and unique even for two releases cut from one commit (a
+// remote-only release rebuilt on top of the previous one).
+const stamp = new Date().toISOString().replace(/[-:]/g, '').replace('T', '.').slice(0, 15)
+const releaseId = `${stamp}-${commit}${dirty}`
 if (dirty && isCi) throw new Error('Refusing to build a release from a working tree with uncommitted changes.')
 
 const releaseDir = path.join(outRoot, releaseId)

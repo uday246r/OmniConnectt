@@ -1,0 +1,142 @@
+# OmniConnect production stack — one host, one public port.
+#
+#   docker compose --env-file .env up -d          (deploy/scripts/deploy.sh does this for you)
+#
+# Only `web` (nginx) publishes a port. The four services are reachable solely on the private `omni`
+# network, which is also why they may believe nginx's X-Forwarded-For (ForwardedHeaders__KnownNetworks).
+# Frontend builds are NOT in any image: they live on the host under RELEASE_ROOT, are added by each
+# deploy and never overwritten, and nginx serves them read-only. Shipping a remote therefore restarts
+# nothing. See docs/RUNBOOK-RELEASE.md.
+
+name: omniconnect
+
+x-service: &service
+  restart: unless-stopped
+  networks: [omni]
+  security_opt: ["no-new-privileges:true"]
+  cap_drop: [ALL]
+  logging:
+    driver: json-file
+    options: { max-size: "20m", max-file: "5" }
+
+x-service-env: &service-env
+  ASPNETCORE_ENVIRONMENT: Production
+  # Migrations run once per deploy as a single writer (`<service> --migrate-only`), never on startup.
+  Database__ApplyMigrationsOnStartup: "false"
+  ForwardedHeaders__KnownNetworks: ${PROXY_SUBNET:-172.30.0.0/24}
+  # EF Core logs every SQL statement at Information; in production that is noise, volume, and parameter
+  # shapes nobody should be reading. Failures are still logged (Warning and above).
+  Logging__LogLevel__Default: Information
+  Logging__LogLevel__Microsoft.AspNetCore: Warning
+  Logging__LogLevel__Microsoft.EntityFrameworkCore: Warning
+  # No Cors__AllowedOrigins: the browser only ever calls the platform's own origin, so no cross-origin
+  # caller is allowed at all. Do not add one to the env files.
+
+services:
+  web:
+    <<: *service
+    image: nginxinc/nginx-unprivileged:1.27-alpine
+    # nginx-unprivileged runs as uid 101 and binds 8080, so it needs no capabilities.
+    ports:
+      - "${PUBLIC_PORT:-80}:8080"
+      # - "${PUBLIC_HTTPS_PORT:-443}:8443"     # with nginx/optional/tls.conf.example
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./nginx/snippets:/etc/nginx/snippets:ro
+      - ${RELEASE_ROOT:-/srv/omniconnect}:/srv/omniconnect:ro
+      # - ./certs:/etc/nginx/certs:ro
+    networks:
+      omni:
+        aliases: [web-internal]
+    depends_on:
+      auth: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  auth:
+    <<: *service
+    image: ${IMAGE_REGISTRY:-omniconnect}/auth:${AUTH_TAG:-local}
+    build: { context: ../Backend, dockerfile: AuthService/Dockerfile }
+    env_file: [env/auth.env]
+    environment:
+      <<: *service-env
+      # Remote manifests are fetched through nginx's internal listener, i.e. exactly what browsers get.
+      RemoteApps__InternalBaseUrl: http://web-internal:8081
+      RemoteApps__AllowAbsoluteManifestUrls: "false"
+      RemoteApps__BuiltIn__lead: http://lead:8080/api/lead-service/permissions
+      RemoteApps__BuiltIn__customer360: http://c360:8080/permissions
+      RemoteApps__BuiltIn__products: http://products:8080/permissions
+      Internal__Services__LeadService__CallbackBaseUrl: http://lead:8080/api/lead-service
+      Internal__Services__Customer360Service__CallbackBaseUrl: http://c360:8080
+      Internal__Services__ProductsService__CallbackBaseUrl: http://products:8080
+
+  lead:
+    <<: *service
+    image: ${IMAGE_REGISTRY:-omniconnect}/lead:${LEAD_TAG:-local}
+    build: { context: ../Backend, dockerfile: LeadService/Dockerfile }
+    env_file: [env/lead.env]
+    environment:
+      <<: *service-env
+      AuthService__BaseUrl: http://auth:8080
+      ProductsService__BaseUrl: http://products:8080
+      Self__PublicBaseUrl: http://lead:8080/api/lead-service
+    depends_on:
+      auth: { condition: service_healthy }
+
+  c360:
+    <<: *service
+    image: ${IMAGE_REGISTRY:-omniconnect}/customer360:${C360_TAG:-local}
+    build: { context: ../Backend, dockerfile: Customer360Service/Dockerfile }
+    env_file: [env/customer360.env]
+    environment:
+      <<: *service-env
+      AuthService__BaseUrl: http://auth:8080
+      Self__PublicBaseUrl: http://c360:8080
+    depends_on:
+      auth: { condition: service_healthy }
+
+  products:
+    <<: *service
+    image: ${IMAGE_REGISTRY:-omniconnect}/products:${PRODUCTS_TAG:-local}
+    build: { context: ../Backend, dockerfile: ProductsService/Dockerfile }
+    env_file: [env/products.env]
+    environment:
+      <<: *service-env
+      AuthService__BaseUrl: http://auth:8080
+      Self__PublicBaseUrl: http://products:8080
+    depends_on:
+      auth: { condition: service_healthy }
+
+  # ── Tools (never started by `up`) ─────────────────────────────────────────
+
+  # The release pipeline's client for AuthService's /internal/releases API, inside the private network.
+  release-agent:
+    image: curlimages/curl:8.11.1
+    profiles: [tools]
+    networks: [omni]
+    environment:
+      RELEASE_AGENT_KEY: ${RELEASE_AGENT_KEY:-}
+
+  # A throwaway PostgreSQL for verifying a release on a workstation. Production uses a managed database.
+  db:
+    image: postgres:17-alpine
+    profiles: [localdb]
+    networks: [omni]
+    environment:
+      POSTGRES_PASSWORD: ${LOCAL_DB_PASSWORD:-omniconnect-local}
+    volumes:
+      - ./localdb/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 5s
+      retries: 10
+
+networks:
+  omni:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: ${PROXY_SUBNET:-172.30.0.0/24}

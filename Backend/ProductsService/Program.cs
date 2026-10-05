@@ -138,6 +138,16 @@ builder.Services.AddAuthorization();
 
 var app = builder.Build();
 
+// Deployment step (OmniConnect.Hosting.MigrationMode): apply migrations as the single writer and exit.
+// An exception here ends the process non-zero, which is what stops the deploy.
+if (MigrationMode.IsRequested(args))
+{
+    using var migrationScope = app.Services.CreateScope();
+    await migrationScope.ServiceProvider.GetRequiredService<AppDbContext>().Database.MigrateAsync();
+    app.Logger.LogInformation("Migrations applied (--migrate-only); exiting.");
+    return;
+}
+
 // First middleware: which proxy senders are believed, and the /api/products-service prefix this
 // service is published under on the platform's single origin — see OmniConnect.Hosting.PlatformEdge.
 // The unprefixed paths keep working for callers that address the service directly.

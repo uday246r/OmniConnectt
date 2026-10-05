@@ -232,29 +232,44 @@ public class ReleaseAppService(
     }
 
     /// <summary>
-    /// Old live → superseded, then new → live, as two statements: the database allows one live row per
-    /// key, and a single batch could apply the second update first.
+    /// Old live → superseded, then new → live, as two statements in one transaction: the database
+    /// allows one live row per key, and a single batch could apply the second update first.
     /// </summary>
+    /// <remarks>
+    /// Inside the execution strategy, not a bare BeginTransaction: the platform's Npgsql connection
+    /// retries transient failures, and a retrying strategy refuses a transaction it cannot replay as a
+    /// whole — which is what failed the first rehearsal of a real deploy.
+    /// </remarks>
     private async Task SwapLiveAsync(ReleaseRecord? current, ReleaseRecord next, string actor, CancellationToken ct)
     {
-        var relational = db.Database.IsRelational();
-        await using var tx = relational ? await db.Database.BeginTransactionAsync(ct) : null;
+        var promotedAt = DateTimeOffset.UtcNow;
 
-        if (current is not null)
+        async Task SwapAsync()
         {
-            current.Status = ReleaseStatus.Superseded;
+            if (current is not null)
+            {
+                current.Status = ReleaseStatus.Superseded;
+                await db.SaveChangesAsync(ct);
+            }
+
+            next.Status = ReleaseStatus.Live;
+            next.PromotedAt = promotedAt;
+            next.PromotedBy = actor;
             await db.SaveChangesAsync(ct);
         }
 
-        next.Status = ReleaseStatus.Live;
-        next.PromotedAt = DateTimeOffset.UtcNow;
-        next.PromotedBy = actor;
-        await db.SaveChangesAsync(ct);
-
-        if (tx is not null)
+        if (!db.Database.IsRelational())
         {
-            await tx.CommitAsync(ct);
+            await SwapAsync();
+            return;
         }
+
+        await db.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
+        {
+            await using var tx = await db.Database.BeginTransactionAsync(ct);
+            await SwapAsync();
+            await tx.CommitAsync(ct);
+        });
     }
 
     private async Task RegisterFirstBuildAsync(ReleaseRecord record, RegisterReleaseRequest request, CancellationToken ct)

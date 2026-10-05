@@ -163,6 +163,16 @@ builder.Services.AddAuthorization();
 // ---------------------------------------------------------------------------
 var app = builder.Build();
 
+// Deployment step (OmniConnect.Hosting.MigrationMode): apply migrations as the single writer and exit.
+// An exception here ends the process non-zero, which is what stops the deploy.
+if (MigrationMode.IsRequested(args))
+{
+    using var migrationScope = app.Services.CreateScope();
+    await migrationScope.ServiceProvider.GetRequiredService<Customer360DbContext>().Database.MigrateAsync();
+    app.Logger.LogInformation("Migrations applied (--migrate-only); exiting.");
+    return;
+}
+
 // First middleware, matching every other service: behind a TLS-terminating proxy the real scheme and
 // client IP arrive only as X-Forwarded-* headers, and on the platform's single origin this service is
 // published under /api/customer360-service. Both are configured in one place — see

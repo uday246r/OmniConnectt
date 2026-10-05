@@ -1,0 +1,40 @@
+# Workstation rehearsal of a production deploy (docs/RUNBOOK-RELEASE.md, "Rehearse a release").
+#
+# Layered on compose.yml: the release folders live on a Linux-native named volume instead of a host
+# path, so the deploy scripts — run from the `deployer` container below — get real symlinks and atomic
+# renames even on Windows or macOS, and a throwaway PostgreSQL stands in for the managed database.
+#
+#   COMPOSE_EXTRA_FILE=compose.verify.yml (set in deploy/.env for the rehearsal)
+
+services:
+  web:
+    volumes:
+      - releases:/srv/omniconnect:ro
+
+  auth:
+    depends_on: { db: { condition: service_healthy } }
+  lead:
+    depends_on: { db: { condition: service_healthy } }
+  c360:
+    depends_on: { db: { condition: service_healthy } }
+  products:
+    depends_on: { db: { condition: service_healthy } }
+
+  db:
+    profiles: !reset []
+
+  # Runs deploy/scripts/*.sh with bash, jq and the docker CLI, against the host's Docker.
+  deployer:
+    profiles: [tools]
+    build:
+      context: .
+      dockerfile_inline: |
+        FROM docker:27-cli
+        RUN apk add --no-cache bash jq curl coreutils tar findutils util-linux
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - releases:/srv/omniconnect
+    extra_hosts: ["host.docker.internal:host-gateway"]
+
+volumes:
+  releases:
