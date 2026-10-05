@@ -3,7 +3,10 @@ import { getAccessToken, ensureFreshAccessToken, isRunningInHost, getCurrentUser
 import type { LeadFieldConfig } from '../config/fieldControlRegistry';
 import type { CustomPreset } from '@omniconnect/ui/validation';
 
-export const API_BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL || 'http://localhost:5046/api/lead-service';
+// Same origin by default: the platform publishes LeadService under /api/lead-service on the host's own
+// domain (nginx in production, the host's dev-server proxy in development), so one build works in every
+// environment. VITE_API_BASE_URL overrides it only for a backend reached on another origin.
+export const API_BASE_URL: string = (import.meta as any).env?.VITE_API_BASE_URL || '/api/lead-service';
 
 export interface ApiResponse<T> {
   success: boolean;

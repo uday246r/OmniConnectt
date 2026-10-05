@@ -20,7 +20,10 @@ import type {
 import { createRequestCache } from '@omniconnect/ui';
 import { getAccessToken, ensureFreshAccessToken, getCurrentUser, isRunningInHost } from '../api/hostBridge';
 
-export const API_BASE_URL: string = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5059';
+// Same origin by default: the platform publishes Customer360Service under /api/customer360-service on
+// the host's own domain (nginx in production, the host's dev-server proxy in development), so one build
+// works in every environment. VITE_API_BASE_URL overrides it only for a backend on another origin.
+export const API_BASE_URL: string = import.meta.env.VITE_API_BASE_URL || '/api/customer360-service';
 
 // ---------------------------------------------------------------------------
 // Response envelopes

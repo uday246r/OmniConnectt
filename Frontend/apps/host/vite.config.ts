@@ -2,6 +2,7 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { federation } from '@module-federation/vite'
 import { hostFederationConfig } from '@omniconnect/federation-config'
+import { devProxy } from './dev-proxy.ts'
 
 // This app is a Module Federation 2.0 *host* with zero build-time remotes. Every remote app is
 // registered at runtime (see src/shared/federation/remoteLoader.ts) from a manifest URL fetched
@@ -23,11 +24,16 @@ export default defineConfig({
     },
   },
   server: {
+    // IPv4 loopback: the browser's http://localhost:5173 still reaches it, and AuthService's manifest
+    // prober (RemoteApps:InternalBaseUrl) gets a deterministic address instead of a ::1/127.0.0.1 race.
+    host: '127.0.0.1',
     port: 5173,
-    // Fail loudly if 5173 is taken instead of silently rebinding to another port — a silent
-    // fallback breaks CORS (AuthService only allows http://localhost:5173) in a way
-    // that's confusing to diagnose from the browser alone.
+    // Fail loudly if 5173 is taken instead of silently rebinding to another port: every link, the
+    // Google sign-in origin and AuthService's CORS list name exactly this one.
     strictPort: true,
+    // The only URL a developer's browser uses. Backends and remote build servers sit behind it, the
+    // same way they sit behind nginx in production — see dev-proxy.ts.
+    proxy: devProxy(),
   },
   build: {
     target: 'esnext',

@@ -3,7 +3,10 @@ import { createRequestCache } from '@omniconnect/ui';
 import { ensureFreshAccessToken, getAccessToken, getCurrentUser, isRunningInHost } from '../api/hostBridge';
 import { useToastStore } from '../stores/useToastStore';
 
-export const API_BASE_URL: string = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5266/api';
+// Same origin by default: the platform publishes ProductsService under /api/products-service on the
+// host's own domain (nginx in production, the host's dev-server proxy in development), so one build works
+// in every environment. VITE_API_BASE_URL overrides it only for a backend reached on another origin.
+export const API_BASE_URL: string = import.meta.env.VITE_API_BASE_URL || '/api/products-service/api';
 export const API_ORIGIN = API_BASE_URL.replace(/\/api\/?$/, '');
 
 export const httpClient = axios.create({

@@ -16,37 +16,41 @@ export default defineConfig(({ mode }) => {
       federation(remoteFederationConfig('customer360_mf', './src/App.tsx', ['zustand'])),
     ],
 
+    // Relative, not '/': the built remote is published under a versioned folder
+    // (/modules/<key>/<version>/), and Module Federation resolves every chunk and stylesheet from the
+    // manifest's own directory. An absolute base would point a remote's assets at the host's /assets.
+    base: './',
+
     build: {
       target: 'esnext',
       cssCodeSplit: false,
       rollupOptions: {
         output: {
-          assetFileNames: 'assets/[name].[ext]',
+          // Content-hashed so a published version's files can be cached forever (immutable). The
+          // stylesheet is found through mf-manifest.json, never by a fixed name.
+          assetFileNames: 'assets/[name]-[hash][extname]',
         },
       },
     },
 
     server: {
-      // `true`, not the string '0.0.0.0': the string binds the IPv4 wildcard ONLY. AuthService's
-      // background health prober is a .NET HttpClient resolving "localhost", which on this platform
-      // sometimes tries ::1 first — with no IPv6 listener that attempt is refused, and if the IPv4
-      // fallback doesn't complete inside the prober's 5s timeout the app flaps to "Unreachable" even
-      // though it's actually up (observed live: 4 consecutive Healthy probes, then one Unreachable).
-      // `true` listens on both address families, removing the race entirely.
-      host: true,
+      // Loopback only: this server is an implementation detail behind the host dev server's
+      // /modules/<key>/ proxy, never an entry point — nothing off this machine can reach it.
+      // 127.0.0.1 rather than 'localhost', which can resolve to ::1 alone and refuse an IPv4 caller.
+      host: '127.0.0.1',
       port,
       strictPort: true,
       cors: true,
     },
 
     preview: {
-      // `true`, not the string '0.0.0.0': the string binds the IPv4 wildcard ONLY. AuthService's
-      // background health prober is a .NET HttpClient resolving "localhost", which on this platform
-      // sometimes tries ::1 first — with no IPv6 listener that attempt is refused, and if the IPv4
-      // fallback doesn't complete inside the prober's 5s timeout the app flaps to "Unreachable" even
-      // though it's actually up (observed live: 4 consecutive Healthy probes, then one Unreachable).
-      // `true` listens on both address families, removing the race entirely.
-      host: true,
+      // The build is rewritten in place on every save (vite build --watch), under the same
+      // unversioned URL, so nothing it serves may be cached.
+      headers: { 'Cache-Control': 'no-store' },
+      // Loopback only: this server is an implementation detail behind the host dev server's
+      // /modules/<key>/ proxy, never an entry point — nothing off this machine can reach it.
+      // 127.0.0.1 rather than 'localhost', which can resolve to ::1 alone and refuse an IPv4 caller.
+      host: '127.0.0.1',
       port,
       strictPort: true,
       cors: true,
