@@ -113,28 +113,6 @@
         "dev"
       ],
       "port": 5004
-    },
-    {
-      "name": "product-marketplace-service-dev",
-      "runtimeExecutable": "dotnet",
-      "runtimeArgs": [
-        "run",
-        "--project",
-        "Backend/ProductMarketPlaceBackend"
-      ],
-      "port": 5099
-    },
-    {
-      "name": "product-marketplace-mf-dev",
-      "runtimeExecutable": "pnpm",
-      "runtimeArgs": [
-        "-C",
-        "Frontend",
-        "--filter",
-        "product-marketplace-mf",
-        "dev"
-      ],
-      "port": 5005
     }
   ]
 }
