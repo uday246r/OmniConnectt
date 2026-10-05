@@ -352,4 +352,49 @@ public class UserSchemaValidatorTests
 
         Assert.Empty(errors);
     }
+
+    [Fact]
+    public void A_dropdown_field_with_valid_option_passes_validation()
+    {
+        var fields = new[]
+        {
+            new FieldDefinitionDto("country", "Country", false, "dropdown", true, 4, [], Options: ["India", "United States", "Germany"]),
+        };
+        var values = new Dictionary<string, string?> { ["country"] = "india" };
+
+        var errors = validator.Validate(fields, values);
+
+        Assert.Empty(errors);
+    }
+
+    [Fact]
+    public void A_dropdown_field_with_invalid_option_fails_validation()
+    {
+        var fields = new[]
+        {
+            new FieldDefinitionDto("country", "Country", false, "dropdown", true, 4, [], Options: ["India", "United States", "Germany"]),
+        };
+        var values = new Dictionary<string, string?> { ["country"] = "Atlantis" };
+
+        var errors = validator.Validate(fields, values);
+
+        var error = Assert.Single(errors);
+        Assert.Equal("country", error.FieldKey);
+        Assert.Equal("Please select a valid option for Country.", error.Message);
+    }
+
+    [Fact]
+    public void An_optional_dropdown_field_left_empty_passes_validation()
+    {
+        var fields = new[]
+        {
+            new FieldDefinitionDto("country", "Country", false, "dropdown", false, 4, [], Options: ["India", "United States"]),
+        };
+        var values = new Dictionary<string, string?> { ["country"] = "" };
+
+        var errors = validator.Validate(fields, values);
+
+        Assert.Empty(errors);
+    }
 }
+

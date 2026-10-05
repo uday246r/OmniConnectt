@@ -25,7 +25,7 @@ import {
   type DateRangeValue,
   type ResponsiveColumn,
 } from '@omniconnect/ui'
-import { useAuthStore } from '../../../auth/store/authStore'
+import { useAuthStore, isSuperAdminOrAdmin } from '../../../auth/store/authStore'
 import { ApiError } from '../../../../shared/api/httpClient'
 import { Icon } from '../../../../shared/components/Icon/Icon'
 import { toast } from '../../../../shared/stores/toastStore'
@@ -72,7 +72,7 @@ interface UserActivityTabProps {
 export function UserActivityTab({ userId, userName }: UserActivityTabProps) {
   const navigate = useNavigate()
   const accessToken = useAuthStore((s) => s.accessToken)
-  const isAdministrator = Boolean(useAuthStore((s) => s.user?.isAdministrator))
+  const isAdministrator = useAuthStore((s) => isSuperAdminOrAdmin(s.user))
   const hasCapability = useAuthStore((s) => s.hasCapability)
   const canView = isAdministrator || hasCapability('host.system.audit-logs', 'View')
   const canExport = isAdministrator || hasCapability('host.system.audit-logs', 'Export')

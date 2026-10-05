@@ -264,6 +264,33 @@
   letter-spacing: -0.01em;
 }
 
+.formCardHeaderRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.addFieldBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  border-radius: var(--omni-radius-md, 6px);
+  padding: 4px 9px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #2563eb;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.addFieldBtn:hover {
+  background: #eff6ff;
+  border-color: #93c5fd;
+}
+
 .fieldsGrid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -311,6 +338,74 @@
   align-items: center;
   gap: 8px;
   width: 100%;
+}
+
+.phoneInputWrap {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: 36px;
+  background: var(--omni-color-surface, #ffffff);
+  border: 1.5px solid #cbd5e1;
+  border-radius: var(--omni-radius-md, 8px);
+  padding: 0 10px;
+  box-sizing: border-box;
+  transition: all 0.15s ease;
+}
+
+.phoneInputWrap:focus-within {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.phoneInputInvalid {
+  border-color: #ef4444 !important;
+}
+
+.phoneInputInvalid:focus-within {
+  border-color: #ef4444 !important;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.12) !important;
+}
+
+.phoneInputWrap :global(.PhoneInputCountry) {
+  display: flex;
+  align-items: center;
+  margin-right: 8px;
+  cursor: pointer;
+}
+
+.phoneInputWrap :global(.PhoneInputCountrySelect) {
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  font-family: inherit;
+  font-size: 13px;
+  color: #0f172a;
+}
+
+.phoneInputWrap :global(.PhoneInputCountryIcon) {
+  width: 22px;
+  height: 16px;
+  border-radius: 2px;
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.phoneInputWrap :global(.PhoneInputCountrySelectArrow) {
+  margin-left: 5px;
+  color: #64748b;
+  opacity: 0.8;
+}
+
+.phoneInputWrap :global(.PhoneInputInput) {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 13.5px;
+  font-family: inherit;
+  color: #0f172a;
+  height: 100%;
 }
 
 .countryPickerWrap {

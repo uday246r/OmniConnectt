@@ -159,6 +159,30 @@ bumps `Version`) with a matching frontend page under **Settings → Manage Field
 - **`SalutationCatalog`** — the Mr./Ms./Dr./... list offered on Create/Edit User and shown on a
   profile. Same "fixed dropdown, admin-editable value list" shape as Role, not a `UserFieldSchema`
   field.
+- **`FieldSectionCatalog`** (Manage Fields → **Sections** tab) — the headings that group fields on the
+  Create/Edit User form and the user detail page. A field's `Section` is a section **key**, never its
+  label, so renaming a section can't orphan fields; `personal-details` is the undeletable default
+  (where an unresolvable field lands). Field `Order` is **per section**, renumbered 1..n by the server
+  (`UserFieldSchemaAppService.Arrange`, mirrored by `utils/sections.ts` on the client — keep the two in
+  step). Reads are forgiving (a legacy label, a blank, or a deleted section all resolve to a real
+  section); saves are strict (an unknown section is refused). Deleting a section that still holds
+  fields must name a destination in the same request (`ReassignFieldsTo`) so the delete and the move
+  commit together. `UserFormLayer` renders purely from this catalog — nothing about section names or
+  order is hardcoded there any more.
+
+### Password policy (its own page and permission — **not** part of the user-schema system)
+`Settings → Manage Password Policy`, gated by `host.settings.password-policy` (View/Edit), deliberately
+separate from `host.settings.users`. One JSONB row (`PasswordPolicyCatalog`): global expiry days
+(`0` = never), per-role expiry days (a role's value *replaces* the global one; absent = inherit; `0` is
+not allowed per role), complexity rules, and reminder settings (email/in-app + lead days).
+`PasswordPolicyOptions` (appsettings) is only the **seed**: enforced until an admin first saves, the DB
+row after that. Expiry is enforced at **login and at token refresh** (`AuthAppService`), by setting the
+same `MustChangePassword` flag a temporary password uses — so `MustChangePasswordFilter` and the
+frontend `RequirePasswordChange` gate cover both, told apart by `passwordExpiry.isExpired` on the user
+DTO. SSO accounts and un-accepted invites never expire. `PasswordExpiryReminderService` (under
+`IDistributedLock`) emails one warning per threshold per password; the in-app banner is driven by the
+server-resolved `passwordExpiry.showReminder`. The rollout migration starts the expiry clock at
+deployment for existing accounts so switching this on doesn't expire everyone created >N days ago.
 
 `Backend/Shared/OmniConnect.Validation` (`FieldRuleEngine`, used by AuthService's `UserSchemaValidator` and by
 LeadService for lead fields) and `schemaValidation.ts` (`packages/ui`) are two implementations of the

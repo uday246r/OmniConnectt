@@ -6,6 +6,19 @@ const base = env.authServiceUrl
 
 export type AuthProvider = 'Local' | 'Google'
 
+/**
+ * Where the signed-in user's password stands. `isExpired` distinguishes an expired password from an
+ * administrator-issued temporary one (both set `mustChangePassword`); `showReminder` is already resolved
+ * against the administrator's channel choice and the warning window, so the client obeys one boolean.
+ * Dates/days are null when the password does not expire.
+ */
+export interface PasswordExpiryDto {
+  expiresAt: string | null
+  daysRemaining: number | null
+  isExpired: boolean
+  showReminder: boolean
+}
+
 export interface CurrentUserDto {
   id: string
   salutation: string | null
@@ -20,6 +33,7 @@ export interface CurrentUserDto {
   authProvider: AuthProvider
   isActive: boolean
   lastLoginAt: string | null
+  passwordExpiry?: PasswordExpiryDto | null
 }
 
 export interface LoginResponse {

@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { useAuthStore } from '../../../features/auth/store/authStore'
+import { useAuthStore, isSuperAdminOrAdmin } from '../../../features/auth/store/authStore'
 
 export interface PermissionGateProps {
   featureKey: string
@@ -17,6 +17,6 @@ export interface PermissionGateProps {
  * already compute their own capability consts are left as-is, not forced onto this component.
  */
 export function PermissionGate({ featureKey, capability, children, fallback = null }: PermissionGateProps) {
-  const allowed = useAuthStore((s) => Boolean(s.user?.isAdministrator) || s.hasCapability(featureKey, capability))
+  const allowed = useAuthStore((s) => isSuperAdminOrAdmin(s.user) || s.hasCapability(featureKey, capability))
   return allowed ? <>{children}</> : <>{fallback}</>
 }

@@ -69,16 +69,17 @@ internal sealed class ApprovalHarness : IDisposable
         var hasher = new PasswordHasher();
 
         Emails = new RecordingEmailSender();
+        var passwordPolicy = new PasswordPolicyAppService(Db, AuditLog, MsOptions.Create(new PasswordPolicyOptions()));
         Invites = new SetPasswordInviteService(
             Db, Emails, hasher,
-            MsOptions.Create(new SmtpOptions()), MsOptions.Create(new PasswordPolicyOptions()),
+            MsOptions.Create(new SmtpOptions()), passwordPolicy,
             AuditLog, NullLogger<SetPasswordInviteService>.Instance);
         var invites = Invites;
 
         RefreshTokens = new RefreshTokenService(Db, MsOptions.Create(new JwtOptions()));
         PasswordResets = new PasswordResetService(
             Db, Emails, hasher, RefreshTokens,
-            MsOptions.Create(new SmtpOptions()), MsOptions.Create(new PasswordPolicyOptions()),
+            MsOptions.Create(new SmtpOptions()), passwordPolicy,
             AuditLog, NullLogger<PasswordResetService>.Instance);
 
         var fieldSchema = new UserFieldSchemaAppService(Db, AuditLog);
@@ -87,7 +88,7 @@ internal sealed class ApprovalHarness : IDisposable
 
         Users = new UserAppService(
             Db, hasher, AuditLog, accessor, Gating, invites, fine,
-            fieldSchema, new UserSchemaValidator(), validationPresets, salutations);
+            fieldSchema, new UserSchemaValidator(), validationPresets, salutations, passwordPolicy);
 
         Roles = new RoleAppService(Db, AuditLog, accessor, Gating, fine);
 

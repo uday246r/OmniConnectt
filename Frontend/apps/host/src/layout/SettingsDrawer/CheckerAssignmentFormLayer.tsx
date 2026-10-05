@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, useMemo, useRef, type FormEvent } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../features/auth/store/authStore'
 import { usersApi } from '../../features/settings-users/api/usersApi'
 import { rolesApi } from '../../features/settings-roles/api/rolesApi'
@@ -33,10 +34,16 @@ interface CheckerAssignmentFormLayerProps {
  * (UserFormLayer, RoleFormLayer, ApplicationFormLayer) so it reads as the same system.
  */
 export function CheckerAssignmentFormLayer({ module: initialModule, appId: initialAppId }: CheckerAssignmentFormLayerProps) {
+  const navigate = useNavigate()
   const accessToken = useAuthStore((s) => s.accessToken)
   // A token refresh must not re-run a load (and reset what the user is editing) — only its first arrival.
   const hasAccessToken = Boolean(accessToken)
-  const popLayer = useSettingsDrawerStore((s) => s.popLayer)
+
+  const finish = () => {
+    const { returnPath, close } = useSettingsDrawerStore.getState()
+    close()
+    navigate(returnPath.startsWith('/settings/checker-assignment') ? returnPath : '/settings/checker-assignment')
+  }
 
   // Scope: one module, or every module in one application at once. Opening from an app's "Assign to
   // Whole App" button starts in 'app' scope with that app pre-picked; every other entry point starts
@@ -210,7 +217,7 @@ export function CheckerAssignmentFormLayer({ module: initialModule, appId: initi
         }
       }
       invalidate(TOPICS.checkerAssignments)
-      popLayer()
+      finish()
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Could not assign this checker.')
     } finally {
@@ -230,7 +237,7 @@ export function CheckerAssignmentFormLayer({ module: initialModule, appId: initi
             <p className={styles.subtitle}>Map a module — or a whole application — to an eligible approver</p>
           </div>
         </div>
-        <button type="button" className={styles.closeBtn} onClick={popLayer} aria-label="Close">
+        <button type="button" className={styles.closeBtn} onClick={finish} aria-label="Close">
           <Icon.X width={16} height={16} />
         </button>
       </div>
@@ -537,7 +544,7 @@ export function CheckerAssignmentFormLayer({ module: initialModule, appId: initi
         </div>
 
         <div className={styles.bottomBar}>
-          <button type="button" className={styles.cancelBtn} onClick={popLayer}>
+          <button type="button" className={styles.cancelBtn} onClick={finish}>
             Cancel
           </button>
           <button

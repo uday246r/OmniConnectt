@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useAuthStore } from '../../features/auth/store/authStore'
+import { useAuthStore, isSuperAdminOrAdmin } from '../../features/auth/store/authStore'
 import {
   usersApi,
   type CreateUserResponse,
@@ -18,10 +18,25 @@ import { Icon } from '../../shared/components/Icon/Icon'
 import { SkeletonBlock } from '../../shared/components/Skeleton'
 import { resolveIcon } from '../../shared/components/Icon/resolveIcon'
 import { toast } from '../../shared/stores/toastStore'
-import { validateFields, type FieldDefinition } from '@omniconnect/ui/validation'
-import { isValid } from '../../shared/validation/rules'
+import { validateFields, type FieldDefinition, type CustomPreset } from '@omniconnect/ui/validation'
+import { isValid, email as validateEmail } from '../../shared/validation/rules'
 import { userSchemaApi } from '../../features/settings-user-fields/api/userSchemaApi'
 import { salutationsApi } from '../../features/settings-user-fields/api/salutationsApi'
+import { customPresetsApi } from '../../features/settings-user-fields/api/customPresetsApi'
+import { fieldTemplatesApi } from '../../features/settings-user-fields/api/fieldTemplatesApi'
+import { FieldEditorModal } from '../../features/settings-user-fields/components/FieldEditorModal'
+import { getTemplateById, setCatalogTemplates, type FieldTemplate } from '../../features/settings-user-fields/constants/fieldTemplates'
+import { fieldSectionsApi, type FieldSection } from '../../features/settings-user-fields/api/fieldSectionsApi'
+import {
+  FALLBACK_SECTIONS,
+  SYSTEM_SECTION_KEY,
+  arrangeFields,
+  groupFieldsBySection,
+} from '../../features/settings-user-fields/utils/sections'
+import 'react-phone-number-input/style.css'
+import PhoneInput, { isValidPhoneNumber } from 'react-phone-number-input'
+import { Country, State, City } from 'country-state-city'
+import { getCountryIsoCode, validatePostalCode } from '../../shared/validation/postalCodeValidator'
 import {
   groupsFromCatalog,
   columnsForRows,
@@ -31,7 +46,22 @@ import {
 import { CapabilityPicker } from '../../shared/permissions/CapabilityPicker'
 import styles from './UserFormLayer.module.css'
 import { TOPICS, invalidate } from '../../shared/stores/invalidationStore'
-import { Select, Switch } from '@omniconnect/ui'
+import { Combobox, Select, Switch } from '@omniconnect/ui'
+
+function hydrateField(field: FieldDefinition): FieldDefinition {
+  if (field.dataType === 'dropdown' && (!field.options || field.options.length === 0)) {
+    if (field.template === 'contact-country' || field.key === 'country') {
+      return { ...field, options: Country.getAllCountries().map((c) => c.name) }
+    }
+    if (field.template) {
+      const tmpl = getTemplateById(field.template)
+      if (tmpl?.options && tmpl.options.length > 0) {
+        return { ...field, options: [...tmpl.options] }
+      }
+    }
+  }
+  return field
+}
 
 /*
  * Name/Email/Phone are no longer hardcoded here — they're the "core" entries of the admin-configurable
@@ -55,7 +85,9 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
   const ensureFreshAccessToken = useAuthStore((s) => s.ensureFreshAccessToken)
   const refreshSession = useAuthStore((s) => s.refreshSession)
   // Gates which roles this operator may hand out — see filteredRoles.
-  const isAdministrator = Boolean(useAuthStore((s) => s.user)?.isAdministrator)
+  const isAdministrator = useAuthStore((s) => isSuperAdminOrAdmin(s.user))
+  const hasCapability = useAuthStore((s) => s.hasCapability)
+  const canManageFields = isAdministrator || hasCapability('host.settings.users', 'Edit')
   const navigate = useNavigate()
 
   /*
@@ -90,6 +122,10 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
   // per FieldDefinition key, core (name/email/phoneNumber) and custom alike.
   const [fields, setFields] = useState<FieldDefinition[]>([])
   const [fieldValues, setFieldValues] = useState<Record<string, string>>({})
+  const [customPresets, setCustomPresets] = useState<CustomPreset[]>([])
+  const [fieldModalOpen, setFieldModalOpen] = useState(false)
+  const [fieldModalInitialSection, setFieldModalInitialSection] = useState<string>(SYSTEM_SECTION_KEY)
+  const [sections, setSections] = useState<FieldSection[]>(FALLBACK_SECTIONS)
   const [salutationOptions, setSalutationOptions] = useState<string[]>([])
   const [salutation, setSalutation] = useState('')
   const [roleId, setRoleId] = useState<string>('')
@@ -244,18 +280,28 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
 
     async function loadData() {
       try {
-        const [rolesRes, catalogRes, schemaRes, salutationsRes] = await Promise.all([
+        const [rolesRes, catalogRes, schemaRes, sectionsRes, salutationsRes, presetsRes, templatesRes] = await Promise.all([
           rolesApi.list(accessToken!, { pageSize: 100 }),
           permissionsApi.catalog(accessToken!),
           userSchemaApi.get(accessToken!),
+          // Not soft-failed like presets/templates: the inline "Add Field" saves the whole schema, and
+          // saving it against a fallback catalog would flatten every field into one section.
+          fieldSectionsApi.get(accessToken!),
           salutationsApi.get(accessToken!),
+          customPresetsApi.get(accessToken!).catch(() => ({ presets: [] })),
+          fieldTemplatesApi.get(accessToken!).catch(() => null),
         ])
 
         if (cancelled) return
+        if (templatesRes) {
+          setCatalogTemplates(templatesRes.templates as unknown as FieldTemplate[])
+        }
         setRoles(rolesRes.items)
         setCatalog(catalogRes)
         setSalutationOptions(salutationsRes.salutations)
-        const sortedFields = [...schemaRes.fields].sort((a, b) => a.order - b.order)
+        setCustomPresets(presetsRes.presets ?? [])
+        const sortedFields = arrangeFields(schemaRes.fields.map(hydrateField), sectionsRes.sections)
+        setSections(sectionsRes.sections)
         setFields(sortedFields)
         // Every field starts blank; a userId load below overwrites core + custom values on top.
         setFieldValues(Object.fromEntries(sortedFields.map((f) => [f.key, ''])))
@@ -414,29 +460,525 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
   const grantsList = useMemo(() => computedOverrides.filter((o) => o.effect === 'Grant'), [computedOverrides])
   const revokesList = useMemo(() => computedOverrides.filter((o) => o.effect === 'Revoke'), [computedOverrides])
 
+  // Cascading Address Fields (Country -> State -> City via country-state-city)
+  const countryField = useMemo(
+    () =>
+      fields.find(
+        (f) =>
+          f.template === 'contact-country' ||
+          f.key.toLowerCase() === 'country' ||
+          f.key.toLowerCase().includes('country') ||
+          f.label.trim().toLowerCase() === 'country' ||
+          f.label.toLowerCase().includes('country'),
+      ),
+    [fields],
+  )
+  const stateField = useMemo(
+    () => fields.find((f) => f.template === 'contact-state' || f.key === 'stateProvince'),
+    [fields],
+  )
+  const cityField = useMemo(
+    () => fields.find((f) => f.template === 'contact-city' || f.key === 'city'),
+    [fields],
+  )
+
+  const selectedCountryName = countryField ? (fieldValues[countryField.key] ?? '') : ''
+  const selectedCountryIso = useMemo(() => getCountryIsoCode(selectedCountryName), [selectedCountryName])
+
+  const availableStates = useMemo(() => {
+    if (!selectedCountryIso) return []
+    return State.getStatesOfCountry(selectedCountryIso)
+  }, [selectedCountryIso])
+
+  const selectedStateName = stateField ? (fieldValues[stateField.key] ?? '') : ''
+  const selectedStateIso = useMemo(() => {
+    if (!selectedStateName || availableStates.length === 0) return undefined
+    const match = availableStates.find(
+      (s) =>
+        s.name.toLowerCase() === selectedStateName.toLowerCase() ||
+        s.isoCode.toLowerCase() === selectedStateName.toLowerCase(),
+    )
+    return match?.isoCode
+  }, [selectedStateName, availableStates])
+
+  const availableCities = useMemo(() => {
+    if (!selectedCountryIso) return []
+    if (selectedStateIso) {
+      return City.getCitiesOfState(selectedCountryIso, selectedStateIso)
+    }
+    if (availableStates.length === 0) {
+      return City.getCitiesOfCountry(selectedCountryIso) ?? []
+    }
+    return []
+  }, [selectedCountryIso, selectedStateIso, availableStates])
+
+  const handleCountryChange = (countryKey: string, newCountry: string) => {
+    setFieldValues((prev) => {
+      const next = { ...prev, [countryKey]: newCountry }
+      if (stateField && prev[stateField.key]) {
+        next[stateField.key] = ''
+      }
+      if (cityField && prev[cityField.key]) {
+        next[cityField.key] = ''
+      }
+      return next
+    })
+    setTouched((t) => ({ ...t, [countryKey]: true }))
+  }
+
+  const handleStateChange = (stateKey: string, newState: string) => {
+    setFieldValues((prev) => {
+      const next = { ...prev, [stateKey]: newState }
+      if (cityField && prev[cityField.key]) {
+        next[cityField.key] = ''
+      }
+      return next
+    })
+    setTouched((t) => ({ ...t, [stateKey]: true }))
+  }
+
   /**
    * Per-field validation mirroring the server's annotations on CreateUserRequest.
-   *
-   * Replaces a single check that only asked whether name and email were non-empty and reported one
-   * combined sentence above the form. The deleted routed form had no validation at all, which is why
-   * it accepted "989898989sssss" as a phone number and "ashok246@gmail.comsssssssss" as an email.
-   *
-   * The server validates independently; these exist so a problem is attached to the field that caused
-   * it while the cursor is still in it.
+   * Includes phone validation (via react-phone-number-input isValidPhoneNumber)
+   * and postal code validation (via postal-codes-js).
    */
-  const fieldErrors = validateFields(fields, fieldValues)
+  const fieldErrors = useMemo(() => {
+    const errors = validateFields(fields, fieldValues, customPresets)
+
+    // Check email format
+    const emailField = fields.find((f) => f.dataType === 'email' || f.key === 'email')
+    if (emailField) {
+      const emailVal = (fieldValues[emailField.key] ?? '').trim()
+      if (emailVal) {
+        const emailErr = validateEmail(emailVal)
+        if (emailErr) {
+          errors[emailField.key] = emailErr
+        }
+      }
+    }
+
+    // Check phone number format using react-phone-number-input's isValidPhoneNumber
+    const phoneField = fields.find((f) => f.template === 'contact-phone' || f.key === 'phoneNumber')
+    if (phoneField) {
+      const phoneVal = (fieldValues[phoneField.key] ?? '').trim()
+      if (phoneVal && !isValidPhoneNumber(phoneVal)) {
+        errors[phoneField.key] = 'Enter a valid international phone number (e.g. +91 98765 43210).'
+      }
+    }
+
+    // Check postal code using country-aware postcode-validator
+    const postalFields = fields.filter((f) => {
+      if (f.template === 'contact-postal-code') return true
+      const k = f.key.toLowerCase()
+      if (
+        k.includes('postal') ||
+        k.includes('zip') ||
+        k.includes('postcode') ||
+        k.includes('post_code') ||
+        k.includes('pincode') ||
+        k.includes('pin_code')
+      )
+        return true
+      const l = f.label.toLowerCase()
+      if (
+        l.includes('postal') ||
+        l.includes('zip') ||
+        l.includes('postcode') ||
+        l.includes('post code') ||
+        l.includes('pincode') ||
+        l.includes('pin code')
+      )
+        return true
+      return false
+    })
+    for (const pField of postalFields) {
+      const postalVal = (fieldValues[pField.key] ?? '').trim()
+      if (postalVal) {
+        const countryVal = countryField ? (fieldValues[countryField.key] ?? '').trim() : undefined
+        const res = validatePostalCode(postalVal, countryVal)
+        if (!res.valid) {
+          errors[pField.key] = res.error || (countryVal ? `Invalid postal code for ${countryVal}.` : 'Invalid postal code.')
+        }
+      }
+    }
+
+    return errors
+  }, [fields, fieldValues, customPresets, countryField])
 
   // A role governs what the account can actually do, so leaving it unset ("No Role") is no longer an
   // acceptable end state — it's still selectable from the dropdown (an admin may genuinely be deciding),
   // but the wizard can't move past this step until something other than "No Role" is chosen.
   const roleError = roleId ? undefined : 'Assign a role before continuing.'
 
-  // Shown once a field is visited or a submit attempted, so the form does not greet the user in red.
+  // Shows validation errors live while typing, or once a field is visited or a submit attempted.
   const [touched, setTouched] = useState<Record<string, boolean>>({})
   const [submitAttempted, setSubmitAttempted] = useState(false)
-  const showError = (fieldKey: string) =>
-    touched[fieldKey] || submitAttempted ? fieldErrors[fieldKey] : undefined
+  const showError = (fieldKey: string) => {
+    const val = fieldValues[fieldKey]
+    const hasValue = val !== undefined && val !== null && String(val).trim() !== ''
+    return hasValue || touched[fieldKey] || submitAttempted ? fieldErrors[fieldKey] : undefined
+  }
   const showRoleError = (touched.role || submitAttempted) && roleError
+
+  // Sections come from the admin-managed catalog; nothing about them is hardcoded here. A field whose
+  // section is missing or was deleted resolves to the default section (see utils/sections), so every
+  // field is always rendered somewhere.
+  const canAddInline = canManageFields && !isEdit
+  const sectionGroups = useMemo(
+    // Empty sections are shown only to someone who can add to them — everyone else sees no empty heading.
+    () => groupFieldsBySection(fields, sections, { skipEmpty: false }).filter(
+      (g) => g.fields.length > 0 || g.section.key === SYSTEM_SECTION_KEY || canAddInline,
+    ),
+    [fields, sections, canAddInline],
+  )
+
+  const handleAddFieldToSection = (secName: string) => {
+    setFieldModalInitialSection(secName)
+    setFieldModalOpen(true)
+  }
+
+  const renderField = (field: FieldDefinition) => {
+    const isPhone = field.template === 'contact-phone' || field.key === 'phoneNumber'
+    const isCountry = field.template === 'contact-country' || field.key === 'country'
+    const isState = field.template === 'contact-state' || field.key === 'stateProvince'
+    const isCity = field.template === 'contact-city' || field.key === 'city'
+    const isPostal =
+      field.template === 'contact-postal-code' ||
+      field.key === 'postalCode' ||
+      field.key.toLowerCase().includes('postal') ||
+      field.key.toLowerCase().includes('zip') ||
+      field.key.toLowerCase().includes('postcode') ||
+      field.key.toLowerCase().includes('pincode') ||
+      field.label.toLowerCase().includes('postal') ||
+      field.label.toLowerCase().includes('zip') ||
+      field.label.toLowerCase().includes('postcode') ||
+      field.label.toLowerCase().includes('post code') ||
+      field.label.toLowerCase().includes('pincode') ||
+      field.label.toLowerCase().includes('pin code')
+    const isAddress = field.template === 'contact-address' || field.key === 'address'
+    const isDropdown = field.dataType === 'dropdown' && field.options && field.options.length > 0
+
+    const fieldIcon =
+      field.key === 'name' ? (
+        <Icon.Users width={16} height={16} className={styles.fieldLeftIcon} />
+      ) : field.key === 'email' ? (
+        <Icon.FileText width={16} height={16} className={styles.fieldLeftIcon} />
+      ) : null
+
+    if (isPhone) {
+      return (
+        <div key={field.key} className={styles.inputGroup}>
+          <label className={styles.label} htmlFor={`user-field-${field.key}`}>
+            {field.label} {field.required && <span className={styles.req}>*</span>}
+          </label>
+          <div className={`${styles.phoneInputWrap} ${showError(field.key) ? styles.phoneInputInvalid : ''}`}>
+            <PhoneInput
+              id={`user-field-${field.key}`}
+              international
+              withCountryCallingCode
+              defaultCountry={(selectedCountryIso as any) || 'IN'}
+              value={fieldValues[field.key] ?? ''}
+              onChange={(val) => {
+                setFieldValues((prev) => ({ ...prev, [field.key]: val ?? '' }))
+                setTouched((t) => ({ ...t, [field.key]: true }))
+              }}
+              onBlur={() => setTouched((t) => ({ ...t, [field.key]: true }))}
+              placeholder="Enter phone number"
+              aria-invalid={Boolean(showError(field.key))}
+              aria-describedby={showError(field.key) ? `user-field-${field.key}-error` : undefined}
+            />
+          </div>
+          {showError(field.key) && (
+            <span id={`user-field-${field.key}-error`} className={styles.fieldError} role="alert">
+              {showError(field.key)}
+            </span>
+          )}
+        </div>
+      )
+    }
+
+    if (isCountry) {
+      const rawOptions =
+        field.options && field.options.length > 0
+          ? field.options
+          : Country.getAllCountries().map((c) => c.name)
+      const currentVal = fieldValues[field.key] ?? ''
+      const countryOptions = rawOptions.map((opt) => {
+        const c = Country.getAllCountries().find((x) => x.name.toLowerCase() === opt.toLowerCase())
+        return {
+          value: opt,
+          label: opt,
+          keywords: c ? `${c.isoCode} +${c.phonecode} ${opt}` : opt,
+        }
+      })
+      if (currentVal && !countryOptions.some((o) => o.value === currentVal)) {
+        countryOptions.unshift({ value: currentVal, label: currentVal, keywords: currentVal })
+      }
+
+      return (
+        <div key={field.key} className={styles.inputGroup}>
+          <label className={styles.label} htmlFor={`user-field-${field.key}`}>
+            {field.label} {field.required && <span className={styles.req}>*</span>}
+          </label>
+          <Combobox
+            id={`user-field-${field.key}`}
+            aria-label={field.label}
+            options={countryOptions}
+            value={currentVal}
+            onChange={(val) => handleCountryChange(field.key, val)}
+            onBlur={() => setTouched((t) => ({ ...t, [field.key]: true }))}
+            placeholder="Select or search Country (e.g. India, +91)…"
+            clearLabel="None"
+            emptyMessage="No country found"
+            invalid={Boolean(showError(field.key))}
+            aria-describedby={showError(field.key) ? `user-field-${field.key}-error` : undefined}
+          />
+          {showError(field.key) && (
+            <span id={`user-field-${field.key}-error`} className={styles.fieldError} role="alert">
+              {showError(field.key)}
+            </span>
+          )}
+        </div>
+      )
+    }
+
+    if (isState) {
+      const currentVal = fieldValues[field.key] ?? ''
+      if (availableStates.length > 0) {
+        const stateOptions = availableStates.map((s) => ({
+          value: s.name,
+          label: s.name,
+          keywords: `${s.isoCode} ${s.name}`,
+        }))
+        if (currentVal && !stateOptions.some((o) => o.value === currentVal)) {
+          stateOptions.unshift({ value: currentVal, label: currentVal, keywords: currentVal })
+        }
+
+        return (
+          <div key={field.key} className={styles.inputGroup}>
+            <label className={styles.label} htmlFor={`user-field-${field.key}`}>
+              {field.label} {field.required && <span className={styles.req}>*</span>}
+            </label>
+            <Combobox
+              id={`user-field-${field.key}`}
+              aria-label={field.label}
+              options={stateOptions}
+              value={currentVal}
+              onChange={(val) => handleStateChange(field.key, val)}
+              onBlur={() => setTouched((t) => ({ ...t, [field.key]: true }))}
+              placeholder={
+                selectedCountryName ? `Select or search ${field.label}…` : 'Select Country first…'
+              }
+              clearLabel="None"
+              emptyMessage="No state found"
+              invalid={Boolean(showError(field.key))}
+              aria-describedby={showError(field.key) ? `user-field-${field.key}-error` : undefined}
+            />
+            {showError(field.key) && (
+              <span id={`user-field-${field.key}-error`} className={styles.fieldError} role="alert">
+                {showError(field.key)}
+              </span>
+            )}
+          </div>
+        )
+      }
+
+      return (
+        <div key={field.key} className={styles.inputGroup}>
+          <label className={styles.label} htmlFor={`user-field-${field.key}`}>
+            {field.label} {field.required && <span className={styles.req}>*</span>}
+          </label>
+          <input
+            id={`user-field-${field.key}`}
+            aria-label={field.label}
+            type="text"
+            className={`${styles.input} ${showError(field.key) ? styles.inputInvalid : ''}`}
+            placeholder={
+              selectedCountryName ? `Enter ${field.label} in ${selectedCountryName}` : `Enter ${field.label}`
+            }
+            value={currentVal}
+            aria-invalid={Boolean(showError(field.key))}
+            aria-describedby={showError(field.key) ? `user-field-${field.key}-error` : undefined}
+            onChange={(e) => {
+              handleStateChange(field.key, e.target.value)
+            }}
+            onBlur={() => setTouched((t) => ({ ...t, [field.key]: true }))}
+          />
+          {showError(field.key) && (
+            <span id={`user-field-${field.key}-error`} className={styles.fieldError} role="alert">
+              {showError(field.key)}
+            </span>
+          )}
+        </div>
+      )
+    }
+
+    if (isCity) {
+      const currentVal = fieldValues[field.key] ?? ''
+      if (availableCities.length > 0) {
+        const cityOptions = availableCities.map((c) => ({
+          value: c.name,
+          label: c.name,
+        }))
+        if (currentVal && !cityOptions.some((o) => o.value === currentVal)) {
+          cityOptions.unshift({ value: currentVal, label: currentVal })
+        }
+
+        return (
+          <div key={field.key} className={styles.inputGroup}>
+            <label className={styles.label} htmlFor={`user-field-${field.key}`}>
+              {field.label} {field.required && <span className={styles.req}>*</span>}
+            </label>
+            <Combobox
+              id={`user-field-${field.key}`}
+              aria-label={field.label}
+              options={cityOptions}
+              value={currentVal}
+              onChange={(val) => {
+                setFieldValues((prev) => ({ ...prev, [field.key]: val }))
+                setTouched((t) => ({ ...t, [field.key]: true }))
+              }}
+              onBlur={() => setTouched((t) => ({ ...t, [field.key]: true }))}
+              placeholder={
+                selectedStateName
+                  ? `Select or search ${field.label}…`
+                  : selectedCountryName
+                  ? `Select State first or search ${field.label}…`
+                  : 'Select Country first…'
+              }
+              clearLabel="None"
+              emptyMessage="No city found"
+              invalid={Boolean(showError(field.key))}
+              aria-describedby={showError(field.key) ? `user-field-${field.key}-error` : undefined}
+            />
+            {showError(field.key) && (
+              <span id={`user-field-${field.key}-error`} className={styles.fieldError} role="alert">
+                {showError(field.key)}
+              </span>
+            )}
+          </div>
+        )
+      }
+
+      return (
+        <div key={field.key} className={styles.inputGroup}>
+          <label className={styles.label} htmlFor={`user-field-${field.key}`}>
+            {field.label} {field.required && <span className={styles.req}>*</span>}
+          </label>
+          <input
+            id={`user-field-${field.key}`}
+            aria-label={field.label}
+            type="text"
+            className={`${styles.input} ${showError(field.key) ? styles.inputInvalid : ''}`}
+            placeholder={
+              selectedStateName
+                ? `Enter ${field.label} in ${selectedStateName}`
+                : selectedCountryName
+                ? `Enter ${field.label} in ${selectedCountryName}`
+                : `Enter ${field.label}`
+            }
+            value={currentVal}
+            aria-invalid={Boolean(showError(field.key))}
+            aria-describedby={showError(field.key) ? `user-field-${field.key}-error` : undefined}
+            onChange={(e) => {
+              setFieldValues((prev) => ({ ...prev, [field.key]: e.target.value }))
+              setTouched((t) => ({ ...t, [field.key]: true }))
+            }}
+            onBlur={() => setTouched((t) => ({ ...t, [field.key]: true }))}
+          />
+          {showError(field.key) && (
+            <span id={`user-field-${field.key}-error`} className={styles.fieldError} role="alert">
+              {showError(field.key)}
+            </span>
+          )}
+        </div>
+      )
+    }
+
+    if (isDropdown) {
+      const rawOptions = field.options ?? []
+      const currentVal = fieldValues[field.key] ?? ''
+      const optionsList =
+        currentVal && !rawOptions.includes(currentVal) ? [currentVal, ...rawOptions] : rawOptions
+      const comboboxOptions = optionsList.map((opt) => ({ value: opt, label: opt }))
+
+      return (
+        <div key={field.key} className={styles.inputGroup}>
+          <label className={styles.label} htmlFor={`user-field-${field.key}`}>
+            {field.label} {field.required && <span className={styles.req}>*</span>}
+          </label>
+          <Combobox
+            id={`user-field-${field.key}`}
+            aria-label={field.label}
+            options={comboboxOptions}
+            value={currentVal}
+            onChange={(val) => {
+              setFieldValues((prev) => ({ ...prev, [field.key]: val }))
+              setTouched((t) => ({ ...t, [field.key]: true }))
+            }}
+            onBlur={() => setTouched((t) => ({ ...t, [field.key]: true }))}
+            placeholder={`Select or search ${field.label}…`}
+            clearLabel="None"
+            emptyMessage={`No ${field.label.toLowerCase()} found`}
+            invalid={Boolean(showError(field.key))}
+            aria-describedby={showError(field.key) ? `user-field-${field.key}-error` : undefined}
+          />
+          {showError(field.key) && (
+            <span id={`user-field-${field.key}-error`} className={styles.fieldError} role="alert">
+              {showError(field.key)}
+            </span>
+          )}
+        </div>
+      )
+    }
+
+    const placeholder = isPostal
+      ? selectedCountryName
+        ? `Enter Postal / ZIP code (${selectedCountryName})`
+        : 'Enter Postal / ZIP code'
+      : isAddress
+      ? 'e.g. 123 Main Street, Suite 400'
+      : `Enter ${field.label}`
+
+    const input = (
+      <input
+        id={`user-field-${field.key}`}
+        aria-label={field.label}
+        type={field.dataType === 'email' ? 'email' : 'text'}
+        className={`${fieldIcon ? styles.inputWithIcon : styles.input} ${showError(field.key) ? styles.inputInvalid : ''}`}
+        placeholder={placeholder}
+        value={fieldValues[field.key] ?? ''}
+        aria-invalid={Boolean(showError(field.key))}
+        aria-describedby={showError(field.key) ? `user-field-${field.key}-error` : undefined}
+        onChange={(e) => {
+          setFieldValues((prev) => ({ ...prev, [field.key]: e.target.value }))
+          setTouched((t) => ({ ...t, [field.key]: true }))
+        }}
+        onBlur={() => setTouched((t) => ({ ...t, [field.key]: true }))}
+      />
+    )
+
+    return (
+      <div key={field.key} className={styles.inputGroup}>
+        <label className={styles.label} htmlFor={`user-field-${field.key}`}>
+          {field.label} {field.required && <span className={styles.req}>*</span>}
+        </label>
+        {fieldIcon ? (
+          <div className={styles.inputIconWrap}>
+            {input}
+            {fieldIcon}
+          </div>
+        ) : (
+          input
+        )}
+        {showError(field.key) && (
+          <span id={`user-field-${field.key}-error`} className={styles.fieldError} role="alert">
+            {showError(field.key)}
+          </span>
+        )}
+      </div>
+    )
+  }
 
   const handleNextFromBasic = (e: FormEvent) => {
     e.preventDefault()
@@ -556,6 +1098,21 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
       setError(err?.message || 'Could not save user.')
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function handleCreateFieldFromForm(newField: FieldDefinition) {
+    if (!accessToken) return
+    try {
+      const updatedFields = arrangeFields([...fields, hydrateField({ ...newField, order: Number.MAX_SAFE_INTEGER })], sections)
+      const res = await userSchemaApi.update(accessToken, { fields: updatedFields })
+      const sorted = arrangeFields(res.fields.map(hydrateField), sections)
+      setFields(sorted)
+      setFieldValues((prev) => ({ ...prev, [newField.key]: '' }))
+      setFieldModalOpen(false)
+      toast.success(`Field "${newField.label}" added to user fields.`)
+    } catch (err: any) {
+      toast.error(err?.message || 'Could not add field.')
     }
   }
 
@@ -803,81 +1360,47 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
             {/* STEP 1: Basic Info */}
             {currentStep === 'basic' && (
               <form id="basic-form" onSubmit={handleNextFromBasic} className={styles.formSection}>
-                <div className={styles.formCard}>
-                  <h4 className={styles.formCardTitle}>Personal Information</h4>
-                  {/*
-                   * Rendered entirely from the admin-configurable UserFieldSchema (Settings > Manage
-                   * Fields) — Name/Email/Phone are its fixed "core" entries, and any custom field an
-                   * admin adds (Aadhar Number, etc.) appears here the same way, in the order they chose.
-                   * This replaced three hand-built inputs (including a country-code phone picker), so a
-                   * plain text field is what every field gets now, core or custom alike.
-                   */}
-                  <div className={styles.fieldsGrid}>
-                    {/* Salutation — like Role, a fixed dropdown backed by an admin-editable value list
-                        (Settings > Manage Fields > Salutations), not part of UserFieldSchema itself. */}
-                    <div className={styles.inputGroup}>
-                      <label className={styles.label} htmlFor="user-form-salutation">Salutation</label>
-                      <Select
-                        id="user-form-salutation"
-                        value={salutation}
-                        onChange={(e) => setSalutation(e.target.value)}
-                        placeholder="None"
-                        clearLabel="None"
-                        // A title since removed from the list stays selectable for the person who already has it.
-                        options={(salutation && !salutationOptions.includes(salutation) ? [...salutationOptions, salutation] : salutationOptions).map((s) => ({ value: s, label: s }))}
-                      />
+                {/* One card per section, in the order the admin arranged them in Manage Fields. */}
+                {sectionGroups.map(({ section, fields: sectionFields }) => (
+                  <div key={section.key} className={styles.formCard}>
+                    <div className={styles.formCardHeaderRow}>
+                      <h4 className={styles.formCardTitle}>{section.label}</h4>
+                      {canAddInline && (
+                        <button
+                          type="button"
+                          className={styles.addFieldBtn}
+                          onClick={() => handleAddFieldToSection(section.key)}
+                          title={`Add a custom field to ${section.label}`}
+                          aria-label={`Add field to ${section.label}`}
+                        >
+                          <Icon.Plus width={12} height={12} />
+                          <span>Add Field</span>
+                        </button>
+                      )}
                     </div>
-
-                    {fields.map((field) => {
-                      // Only the three core fields have a fixed, recognisable icon. A custom field
-                      // (Aadhar Number, etc.) has no obvious icon to guess at, and reserving the icon's
-                      // gutter space anyway just leaves an empty dent and an oddly-indented placeholder
-                      // — so those get a plain input with no left padding instead.
-                      const fieldIcon =
-                        field.key === 'name' ? (
-                          <Icon.Users width={16} height={16} className={styles.fieldLeftIcon} />
-                        ) : field.key === 'email' ? (
-                          <Icon.FileText width={16} height={16} className={styles.fieldLeftIcon} />
-                        ) : field.key === 'phoneNumber' ? (
-                          <Icon.Activity width={16} height={16} className={styles.fieldLeftIcon} />
-                        ) : null
-
-                      const input = (
-                        <input
-                          type={field.dataType === 'email' ? 'email' : 'text'}
-                          className={`${fieldIcon ? styles.inputWithIcon : styles.input} ${showError(field.key) ? styles.inputInvalid : ''}`}
-                          placeholder={field.key === 'phoneNumber' ? 'e.g. +91 98765 43210' : `Enter ${field.label}`}
-                          value={fieldValues[field.key] ?? ''}
-                          aria-invalid={Boolean(showError(field.key))}
-                          aria-describedby={showError(field.key) ? `user-field-${field.key}-error` : undefined}
-                          onChange={(e) => setFieldValues((prev) => ({ ...prev, [field.key]: e.target.value }))}
-                          onBlur={() => setTouched((t) => ({ ...t, [field.key]: true }))}
-                        />
-                      )
-
-                      return (
-                        <div key={field.key} className={styles.inputGroup}>
-                          <label className={styles.label}>
-                            {field.label} {field.required && <span className={styles.req}>*</span>}
-                          </label>
-                          {fieldIcon ? (
-                            <div className={styles.inputIconWrap}>
-                              {input}
-                              {fieldIcon}
-                            </div>
-                          ) : (
-                            input
-                          )}
-                          {showError(field.key) && (
-                            <span id={`user-field-${field.key}-error`} className={styles.fieldError} role="alert">
-                              {showError(field.key)}
-                            </span>
-                          )}
+                    <div className={styles.fieldsGrid}>
+                      {section.key === SYSTEM_SECTION_KEY && (
+                        <div className={styles.inputGroup}>
+                          <label className={styles.label} htmlFor="user-form-salutation">Salutation</label>
+                          <Select
+                            id="user-form-salutation"
+                            value={salutation}
+                            onChange={(e) => setSalutation(e.target.value)}
+                            placeholder="None"
+                            clearLabel="None"
+                            options={(salutation && !salutationOptions.includes(salutation) ? [...salutationOptions, salutation] : salutationOptions).map((v) => ({ value: v, label: v }))}
+                          />
                         </div>
-                      )
-                    })}
+                      )}
+                      {sectionFields.map(renderField)}
+                    </div>
+                    {sectionFields.length === 0 && section.key !== SYSTEM_SECTION_KEY && (
+                      <p className={styles.sectionHint}>
+                        No fields in this section yet. Click &quot;Add Field&quot; to add one.
+                      </p>
+                    )}
                   </div>
-                </div>
+                ))}
 
                 <div className={styles.formCard}>
                   <h4 className={styles.formCardTitle}>Assigned Role</h4>
@@ -1519,6 +2042,19 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
       )}
 
       <PendingApprovalDialog conflict={approvalConflict} onClose={() => setApprovalConflict(null)} />
+
+      {canManageFields && !isEdit && (
+        <FieldEditorModal
+          open={fieldModalOpen}
+          field={null}
+          existingKeys={fields.map((f) => f.key)}
+          customPresets={customPresets}
+          sections={sections}
+          initialSection={fieldModalInitialSection}
+          onSave={handleCreateFieldFromForm}
+          onClose={() => setFieldModalOpen(false)}
+        />
+      )}
     </div>
   )
 }

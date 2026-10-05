@@ -1,5 +1,7 @@
 import { useEffect } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
+import { useAuthStore, isSuperAdminOrAdmin } from '../../features/auth/store/authStore'
+import { visibleSettingsGroups } from '../../shared/settings/settingsSections'
 import { classNames } from '../../shared/utils/classNames'
 import { SkeletonBlock } from '../../shared/components/Skeleton'
 import { Icon } from '../../shared/components/Icon/Icon'
@@ -171,8 +173,15 @@ export function Sidebar({ health, mobileOpen }: SidebarProps) {
   const status = useNavigationStore((s) => s.status)
   const sections = useNavigationStore((s) => s.sections)
   const error = useNavigationStore((s) => s.error)
+  const expanded = useNavigationStore((s) => s.expanded)
+  const toggleExpanded = useNavigationStore((s) => s.toggleExpanded)
   const setExpanded = useNavigationStore((s) => s.setExpanded)
   const location = useLocation()
+
+  const isAdministrator = useAuthStore((s) => isSuperAdminOrAdmin(s.user))
+  const hasCapability = useAuthStore((s) => s.hasCapability)
+  const can = (featureKey: string, capability = 'View') => isAdministrator || hasCapability(featureKey, capability)
+  const settingsGroups = visibleSettingsGroups(can)
 
   // Open the group containing the current route, so a refresh onto /apps/lead/view-lead shows that
   // row highlighted inside an expanded parent rather than collapsed and apparently absent.
@@ -183,6 +192,9 @@ export function Sidebar({ health, mobileOpen }: SidebarProps) {
           setExpanded(item.key, true)
         }
       }
+    }
+    if (location.pathname.startsWith('/settings') || location.pathname.startsWith('/system')) {
+      setExpanded('settings:collapsed', false)
     }
   }, [location.pathname, sections, setExpanded])
 
@@ -210,15 +222,87 @@ export function Sidebar({ health, mobileOpen }: SidebarProps) {
 
         {error && <div className={styles.errorState} role="status">{error}</div>}
 
-        {sections.map((section) => (
-          <div key={section.key} className={section.pinToBottom ? styles.systemSection : undefined}>
-            {/* Section labels come from the server too — the host no longer hardcodes "Main"/"Apps". */}
-            <div className={styles.sectionLabel}>{section.label}</div>
-            {section.items.map((item) => (
-              <NavRow key={item.key} node={item} health={health} />
-            ))}
-          </div>
-        ))}
+        {sections.map((section) => {
+          if (section.key === 'system') {
+            if (settingsGroups.length === 0) return null
+            const myRequestsNode = section.items.find((item) => item.key === 'host.my-requests')
+            const isSettingsOpen = !expanded.has('settings:collapsed')
+
+            return (
+              <div key={section.key} className={styles.systemSection}>
+                <div className={styles.rowWrap}>
+                  <button
+                    type="button"
+                    className={classNames(
+                      navItemStyles.navItem,
+                      styles.groupHeader,
+                      styles.settingsAccordionBtn,
+                    )}
+                    aria-expanded={isSettingsOpen}
+                    onClick={() => toggleExpanded('settings:collapsed')}
+                  >
+                    <span className={navItemStyles.navIcon} aria-hidden="true">
+                      <Icon.Settings width={17} height={17} />
+                    </span>
+                    <span className={navItemStyles.navLabel}>Settings</span>
+                    <span
+                      className={classNames(
+                        navItemStyles.navChevron,
+                        isSettingsOpen && navItemStyles.navChevronOpen,
+                      )}
+                      aria-hidden="true"
+                    >
+                      <Icon.ChevronRight width={14} height={14} />
+                    </span>
+                  </button>
+                </div>
+
+                {isSettingsOpen && (
+                  <div className={styles.settingsSubmenu}>
+                    {settingsGroups.map((group) => (
+                      <div key={group.category} className={styles.sidebarGroupBlock}>
+                        <div className={styles.categorySubLabel}>{group.category}</div>
+                        {group.items.map((item) => {
+                          const ItemIcon = resolveIcon(item.icon, Icon.Settings)
+                          return (
+                            <div key={item.tab} className={styles.rowWrap}>
+                              <NavLink
+                                to={item.routePath}
+                                className={({ isActive }) =>
+                                  classNames(navItemClass({ isActive }))
+                                }
+                              >
+                                <span className={navItemStyles.navIcon} aria-hidden="true">
+                                  <ItemIcon width={16} height={16} />
+                                </span>
+                                <span className={navItemStyles.navLabel}>{item.label}</span>
+                              </NavLink>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    ))}
+                    {myRequestsNode && (
+                      <div className={styles.sidebarGroupBlock}>
+                        <NavRow key={myRequestsNode.key} node={myRequestsNode} health={health} />
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )
+          }
+
+          return (
+            <div key={section.key} className={section.pinToBottom ? styles.systemSection : undefined}>
+              {/* Section labels come from the server too — the host no longer hardcodes "Main"/"Apps". */}
+              <div className={styles.sectionLabel}>{section.label}</div>
+              {section.items.map((item) => (
+                <NavRow key={item.key} node={item} health={health} />
+              ))}
+            </div>
+          )
+        })}
       </nav>
     </aside>
   )

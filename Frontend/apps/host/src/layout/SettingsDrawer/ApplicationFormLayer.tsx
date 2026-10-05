@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../features/auth/store/authStore'
 import { remoteAppsApi, type RemoteAppDto } from '../../features/settings-applications/api/remoteAppsApi'
 import { isApprovalPending, type ApprovalPendingDto } from '../../features/approvals/api/approvalsApi'
@@ -39,14 +40,9 @@ const APP_ICON_OPTIONS: { key: string; Comp: typeof Icon.Box }[] = [
 /** Returns a human-readable field label from an ASP.NET ProblemDetails field name. */
 function humanise(field: string): string {
   const map: Record<string, string> = {
-    ManifestUrl: 'Manifest URL',
-    PermissionsSourceUrl: 'Permissions Discovery URL',
-    Key: 'Application Key',
-    DisplayName: 'Display Name',
-    SidebarOrder: 'Sidebar Sort Order',
-    manifestUrl: 'Manifest URL',
-    permissionsSourceUrl: 'Permissions Discovery URL',
     key: 'Application Key',
+    manifestUrl: 'Manifest URL',
+    permissionsSourceUrl: 'Permissions URL',
     displayName: 'Display Name',
     sidebarOrder: 'Sidebar Sort Order',
   }
@@ -72,11 +68,18 @@ function isValidHttpUrl(value: string): boolean {
 
 export function ApplicationFormLayer({ appId }: ApplicationFormLayerProps) {
   const isEdit = Boolean(appId)
+  const navigate = useNavigate()
   const accessToken = useAuthStore((s) => s.accessToken)
   // A token refresh must not re-run a load (and reset what the user is editing) — only its first arrival.
   const hasAccessToken = Boolean(accessToken)
   const ensureFreshAccessToken = useAuthStore((s) => s.ensureFreshAccessToken)
   const popLayer = useSettingsDrawerStore((s) => s.popLayer)
+
+  const finish = () => {
+    const { returnPath, close } = useSettingsDrawerStore.getState()
+    close()
+    navigate(returnPath.startsWith('/settings/applications') ? returnPath : '/settings/applications')
+  }
 
   const [loading, setLoading] = useState(isEdit)
   const [saving, setSaving] = useState(false)
@@ -215,7 +218,7 @@ export function ApplicationFormLayer({ appId }: ApplicationFormLayerProps) {
           // drawer just closes rather than showing a dedicated interstitial (mirrors UserFormLayer's
           // own update path).
           toast.success(result.message)
-          useSettingsDrawerStore.getState().resetToRoot('applications')
+          finish()
           return
         }
 
@@ -244,7 +247,7 @@ export function ApplicationFormLayer({ appId }: ApplicationFormLayerProps) {
       const { useNavigationStore } = await import('../../shared/stores/navigationStore')
       void useNavigationStore.getState().fetch(token)
       invalidate(TOPICS.applications, TOPICS.approvals, TOPICS.kpis)
-      useSettingsDrawerStore.getState().resetToRoot('applications')
+      finish()
     } catch (err: any) {
       if (err instanceof ApiError && err.errors) {
         // Show per-field validation errors from ASP.NET ValidationProblemDetails
@@ -296,7 +299,7 @@ export function ApplicationFormLayer({ appId }: ApplicationFormLayerProps) {
             <button
               type="button"
               className={styles.doneBtn}
-              onClick={() => useSettingsDrawerStore.getState().resetToRoot('applications')}
+              onClick={finish}
             >
               Done &amp; Return to Applications List
             </button>
@@ -385,7 +388,7 @@ export function ApplicationFormLayer({ appId }: ApplicationFormLayerProps) {
         <button
           type="button"
           className={styles.closeBtn}
-          onClick={popLayer}
+          onClick={finish}
           aria-label="Close"
         >
           <Icon.X width={20} height={20} />
@@ -587,7 +590,7 @@ export function ApplicationFormLayer({ appId }: ApplicationFormLayerProps) {
 
         {/* Sticky Bottom Bar */}
         <div className={styles.bottomBar}>
-          <button type="button" className={styles.cancelBtn} onClick={popLayer}>
+          <button type="button" className={styles.cancelBtn} onClick={finish}>
             Cancel
           </button>
           <button type="submit" className={styles.saveBtn} disabled={saving}>

@@ -936,6 +936,27 @@
   font-weight: var(--omni-font-weight-bold);
 }
 
+.userActionBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px;
+  border-radius: 5px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #2563eb;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.userActionBtn:hover {
+  background: #dbeafe;
+  color: #1d4ed8;
+  border-color: #93c5fd;
+}
+
 .emptyUsersCell {
   text-align: center;
   padding: 32px 20px;

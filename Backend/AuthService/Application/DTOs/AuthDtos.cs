@@ -49,7 +49,20 @@ public record CurrentUserDto(
     IReadOnlyList<string> Permissions,
     string AuthProvider,
     bool IsActive,
-    DateTimeOffset? LastLoginAt);
+    DateTimeOffset? LastLoginAt,
+    PasswordExpiryDto? PasswordExpiry = null);
+
+/// <summary>
+/// Where the signed-in user's password stands, in the form the frontend needs and nothing more.
+/// <para>
+/// <paramref name="IsExpired"/> lets the blocking screen say "your password has expired" rather than the
+/// temporary-password wording that shares the same <c>MustChangePassword</c> flag.
+/// <paramref name="ShowReminder"/> is already resolved against the administrator's channel choice
+/// (in-app on/off) and the warning window, so the client has one boolean to obey instead of re-deriving
+/// policy it has no business knowing. Dates and days are null when the password does not expire.
+/// </para>
+/// </summary>
+public record PasswordExpiryDto(DateTimeOffset? ExpiresAt, int? DaysRemaining, bool IsExpired, bool ShowReminder);
 
 public record LoginResponse(string AccessToken, DateTimeOffset ExpiresAt, CurrentUserDto User);
 

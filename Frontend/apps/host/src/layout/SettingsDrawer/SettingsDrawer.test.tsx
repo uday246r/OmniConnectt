@@ -40,17 +40,19 @@ function renderDrawer(initialRoute = '/settings/roles') {
 
 describe('isDrawerRoute', () => {
   it('identifies drawer-hosted routes correctly', () => {
-    expect(isDrawerRoute('/settings')).toBe(true)
-    expect(isDrawerRoute('/settings/')).toBe(true)
-    expect(isDrawerRoute('/settings/roles')).toBe(true)
     expect(isDrawerRoute('/settings/roles/new')).toBe(true)
     expect(isDrawerRoute('/settings/roles/role-123')).toBe(true)
-    expect(isDrawerRoute('/settings/applications')).toBe(true)
-    expect(isDrawerRoute('/settings/checker-assignment')).toBe(true)
+    expect(isDrawerRoute('/settings/applications/new')).toBe(true)
+    expect(isDrawerRoute('/settings/applications/app-123')).toBe(true)
     expect(isDrawerRoute('/settings/users/new')).toBe(true)
   })
 
   it('identifies non-drawer pages correctly', () => {
+    expect(isDrawerRoute('/settings')).toBe(false)
+    expect(isDrawerRoute('/settings/')).toBe(false)
+    expect(isDrawerRoute('/settings/roles')).toBe(false)
+    expect(isDrawerRoute('/settings/applications')).toBe(false)
+    expect(isDrawerRoute('/settings/checker-assignment')).toBe(false)
     expect(isDrawerRoute('/settings/users')).toBe(false)
     expect(isDrawerRoute('/settings/users/user-123')).toBe(false)
     expect(isDrawerRoute('/')).toBe(false)
@@ -62,7 +64,7 @@ describe('isDrawerRoute', () => {
   })
 
   it('handles query parameters and trailing slashes', () => {
-    expect(isDrawerRoute('/settings/roles?tab=permissions')).toBe(true)
+    expect(isDrawerRoute('/settings/roles/new?tab=permissions')).toBe(true)
     expect(isDrawerRoute('/settings/users?page=2')).toBe(false)
     expect(isDrawerRoute('/settings/users/')).toBe(false)
   })
@@ -87,7 +89,7 @@ describe('settingsDrawerStore returnPath handling', () => {
 
   it('ignores drawer routes from becoming returnPath', () => {
     useSettingsDrawerStore.getState().setReturnPath('/settings/users')
-    useSettingsDrawerStore.getState().setReturnPath('/settings/roles')
+    useSettingsDrawerStore.getState().setReturnPath('/settings/roles/new')
     // Should still remain /settings/users
     expect(useSettingsDrawerStore.getState().returnPath).toBe('/settings/users')
   })
@@ -117,8 +119,8 @@ describe('SettingsDrawer close button and backdrop click', () => {
     const user = userEvent.setup()
     renderDrawer('/settings/roles')
 
-    // System Settings title and cross button should be visible
-    expect(screen.getByRole('heading', { name: 'System Settings' })).toBeInTheDocument()
+    // Settings title and cross button should be visible
+    expect(screen.getByRole('heading', { name: 'Settings' })).toBeInTheDocument()
     const closeButton = screen.getByRole('button', { name: 'Close Settings' })
 
     await user.click(closeButton)
@@ -159,7 +161,7 @@ describe('SettingsDrawer close button and backdrop click', () => {
       isOpen: true,
       activeTab: 'roles',
       layerStack: [{ type: 'root', tab: 'roles' }],
-      returnPath: '/settings/roles',
+      returnPath: '/settings/roles/new',
     })
 
     const user = userEvent.setup()

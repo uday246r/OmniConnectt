@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { useAuthStore } from '../../auth/store/authStore'
+import { useAuthStore, isSuperAdminOrAdmin } from '../../auth/store/authStore'
 import { useSettingsDrawerStore } from '../../../shared/stores/settingsDrawerStore'
 import { useDebouncedValue } from '../../../shared/hooks/useDebouncedValue'
 import { queryKeys } from '../../../shared/query/queryKeys'
@@ -76,7 +76,7 @@ function useUserSuggestions(accessToken: string | null, field: 'search' | 'name'
 export function UsersPage() {
   const navigate = useNavigate()
   const accessToken = useAuthStore((s) => s.accessToken)
-  const isAdministrator = Boolean(useAuthStore((s) => s.user)?.isAdministrator)
+  const isAdministrator = useAuthStore((s) => isSuperAdminOrAdmin(s.user))
   const hasCapability = useAuthStore((s) => s.hasCapability)
   const pushLayer = useSettingsDrawerStore((s) => s.pushLayer)
   const queryClient = useQueryClient()

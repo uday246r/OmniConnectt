@@ -1,7 +1,5 @@
 import { useRef, useState } from 'react'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { useSettingsDrawerStore } from '../../shared/stores/settingsDrawerStore'
-import { visibleSettingsSections } from '../../shared/settings/settingsSections'
+import { Link } from 'react-router-dom'
 import { useClickOutside } from '../../shared/hooks/useClickOutside'
 import { useMenuKeyboardNav } from '../../shared/hooks/useMenuKeyboardNav'
 import { useAuthStore } from '../../features/auth/store/authStore'
@@ -33,27 +31,12 @@ export function Topbar({ userName, onLogout, onMobileMenuToggle }: TopbarProps) 
   const menuRef      = useRef<HTMLDivElement>(null)
   const triggerRef   = useRef<HTMLButtonElement>(null)
 
-  // Inside the page routes this is the page on screen — while the drawer is open, the page behind it —
-  // which is exactly where closing Settings should return to.
-  const location = useLocation()
-  const navigate = useNavigate()
-  // Navigates rather than opening the store directly, so the gear icon produces a real URL.
-  const openSettings = () => {
-    useSettingsDrawerStore.getState().setReturnPath(`${location.pathname}${location.search}`)
-    navigate('/settings')
-  }
   // The signed-in user's real role, for the menu header. See the comment on that header below.
   const user = useAuthStore((s) => s.user)
-  const hasCapability = useAuthStore((s) => s.hasCapability)
 
   useClickOutside([menuRef], () => setMenuOpen(false), menuOpen)
   const handleKeyDown = useMenuKeyboardNav(menuRef, () => setMenuOpen(false), triggerRef)
 
-  // The gear shows when any settings section is visible to this user — the same registry that builds
-  // the drawer's tabs, so the gear can never hide a section the drawer would have offered.
-  const canAccessSettings =
-    visibleSettingsSections((featureKey, capability = 'View') => Boolean(user?.isAdministrator) || hasCapability(featureKey, capability))
-      .length > 0
   const displayName = userName || user?.name || '—'
   // Salutation prefixes the rendered text only — initials (getUserInitials(userName) below) stay
   // derived from the plain name, or "Mr. John Doe" would initial to "MJ" instead of "JD".
@@ -81,19 +64,6 @@ export function Topbar({ userName, onLogout, onMobileMenuToggle }: TopbarProps) 
 
       {/* Right actions */}
       <div className={styles.actions}>
-
-        {/* Settings gear */}
-        {canAccessSettings && (
-          <button
-            type="button"
-            className={styles.iconButton}
-            aria-label="Settings"
-            title="System Settings"
-            onClick={openSettings}
-          >
-            <Icon.Settings width={17} height={17} />
-          </button>
-        )}
 
         {/*
           Real notifications. The bell was a dead button with a red dot that was ALWAYS lit — it

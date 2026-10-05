@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useAuthStore } from '../../features/auth/store/authStore'
+import { useAuthStore, isSuperAdminOrAdmin } from '../../features/auth/store/authStore'
 import { rolesApi, type RoleListItemDto } from '../../features/settings-roles/api/rolesApi'
 import { isApprovalPending } from '../../features/approvals/api/approvalsApi'
 import { asPendingApprovalConflict, type PendingApprovalConflict } from '../../features/approvals/pendingConflict'
@@ -20,7 +20,7 @@ export function SettingsRolesTab() {
   const accessToken = useAuthStore((s) => s.accessToken)
   // A token refresh must not re-run a load (and reset what the user is editing) — only its first arrival.
   const hasAccessToken = Boolean(accessToken)
-  const isAdministrator = Boolean(useAuthStore((s) => s.user)?.isAdministrator)
+  const isAdministrator = useAuthStore((s) => isSuperAdminOrAdmin(s.user))
   const hasCapability = useAuthStore((s) => s.hasCapability)
   // The role the signed-in user currently holds — deleting it would strip their own access, and the
   // server refuses it. Previously this component never read it, so the Delete button appeared on the

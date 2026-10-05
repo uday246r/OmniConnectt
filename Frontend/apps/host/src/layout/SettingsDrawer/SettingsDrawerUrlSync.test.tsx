@@ -79,11 +79,11 @@ describe('the page behind the drawer', () => {
     render(<Harness start="/" />)
     expect(mounts.dashboard).toBe(1)
 
-    go('/settings/roles')
+    go('/settings/roles/new')
     expect(screen.getByText('dashboard page')).toBeInTheDocument()
     expect(useSettingsDrawerStore.getState().isOpen).toBe(true)
 
-    go('/settings/applications')
+    go('/settings/applications/new')
     go('/')
 
     expect(mounts.dashboard).toBe(1)
@@ -93,7 +93,7 @@ describe('the page behind the drawer', () => {
     useSettingsDrawerStore.setState({ returnPath: '/apps/lead/create-lead' })
     render(<Harness start="/apps/lead/create-lead" />)
 
-    go('/settings/roles')
+    go('/settings/roles/new')
 
     expect(screen.getByText('remote lead/create-lead')).toBeInTheDocument()
     expect(screen.queryByText('not found')).not.toBeInTheDocument()
@@ -103,7 +103,7 @@ describe('the page behind the drawer', () => {
     useSettingsDrawerStore.setState({ returnPath: '/settings/users/42' })
     render(<Harness start="/settings/users/42" />)
 
-    go('/settings/checker-assignment')
+    go('/settings/users/new')
 
     expect(screen.getByText('user-detail page')).toBeInTheDocument()
     expect(mounts['user-detail']).toBe(1)
@@ -141,11 +141,11 @@ describe('the drawer follows the real URL, not the page behind it', () => {
     )
   }
 
-  it('stays open after the gear sends a bare /settings, even though the page routes still see the dashboard', () => {
+  it('stays open on a form route, even though the page routes still see the dashboard', () => {
     useSettingsDrawerStore.setState({ returnPath: '/apps/products/dashboard' })
     render(<ShellHarness start="/apps/products/dashboard" />)
 
-    go('/settings')
+    go('/settings/roles/new')
 
     expect(screen.getByTestId('inner-path')).toHaveTextContent('/apps/products/dashboard')
     expect(useSettingsDrawerStore.getState().isOpen).toBe(true)
@@ -154,7 +154,7 @@ describe('the drawer follows the real URL, not the page behind it', () => {
 
   it('closes when the operator navigates to a page that is not a settings screen', () => {
     render(<ShellHarness start="/" />)
-    go('/settings/applications')
+    go('/settings/applications/new')
     expect(useSettingsDrawerStore.getState().isOpen).toBe(true)
 
     go('/system/audit-logs')
@@ -174,21 +174,6 @@ describe('the drawer follows the real URL, not the page behind it', () => {
 })
 
 describe('opening the drawer from a URL', () => {
-  it('opens only the checker-assignment section for someone whose only settings permission is that', () => {
-    signIn(false, ['host.system.checker-assignment:View'])
-    render(<Harness start="/settings" />)
-
-    expect(useSettingsDrawerStore.getState().activeTab).toBe('checker-assignment')
-    expect(useSettingsDrawerStore.getState().isOpen).toBe(true)
-  })
-
-  it('opens the first tab the operator can use for a bare /settings', () => {
-    signIn(false, ['host.settings.applications:View'])
-    render(<Harness start="/settings" />)
-
-    expect(useSettingsDrawerStore.getState().activeTab).toBe('applications')
-  })
-
   it('opens a record for editing from its address', () => {
     render(<Harness start="/settings/roles/r-1" />)
 

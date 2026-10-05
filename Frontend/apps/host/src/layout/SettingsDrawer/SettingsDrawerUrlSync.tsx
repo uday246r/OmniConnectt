@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { useLocation, useNavigate, type Location } from 'react-router-dom'
-import { useAuthStore } from '../../features/auth/store/authStore'
+import { useAuthStore, isSuperAdminOrAdmin } from '../../features/auth/store/authStore'
 import { isDrawerRoute, useSettingsDrawerStore } from '../../shared/stores/settingsDrawerStore'
 import { defaultSettingsSection, findSettingsSection } from '../../shared/settings/settingsSections'
 
@@ -24,28 +24,12 @@ export function useSettingsBackgroundLocation(): Location {
 
 /**
  * Keeps the settings drawer in step with the URL, in both directions.
- *
- * @remarks
- * Drawer URLs render the page the operator came from (see `useSettingsBackgroundLocation`), so that
- * page stays mounted instead of being swapped for a copy that refetches everything. The price is that
- * anything rendered INSIDE the page routes sees that background location, never `/settings/...`.
- *
- * That is exactly how the drawer broke: AppShell, inside the routes, closed the drawer whenever "the
- * route" was not a settings URL — and from inside the routes it never was. The gear changed the address
- * to `/settings/roles`, this component opened the drawer, and AppShell closed it in the same tick, so
- * nothing appeared. Both halves of the rule now live here, outside `<Routes>`, where the real URL is
- * visible:
- *
- * - entering a settings URL opens the matching section and form, after checking the capability that
- *   screen needs (sections, capabilities and forms come from `SETTINGS_SECTIONS`);
- * - leaving for any other URL closes the drawer — except a form layer a page opened on itself (Edit
- *   User on the Users page), which stays until the operator actually navigates away.
  */
 export function SettingsDrawerUrlSync() {
   const location = useLocation()
   const navigate = useNavigate()
   const status = useAuthStore((s) => s.status)
-  const isAdministrator = useAuthStore((s) => Boolean(s.user?.isAdministrator))
+  const isAdministrator = useAuthStore((s) => isSuperAdminOrAdmin(s.user))
   const hasCapability = useAuthStore((s) => s.hasCapability)
   const openTab = useSettingsDrawerStore((s) => s.open)
   const pushLayer = useSettingsDrawerStore((s) => s.pushLayer)
@@ -83,8 +67,16 @@ export function SettingsDrawerUrlSync() {
 
     // open() resets the layer stack, so a form layer is pushed after it.
     openTab(section.tab)
-    if (sub && section.formLayer) pushLayer(section.formLayer(sub === 'new' ? undefined : sub))
-  }, [location.pathname, status, isAdministrator, hasCapability, openTab, pushLayer, navigate])
+    if (sub && section.formLayer) {
+      if (tab === 'checker-assignment') {
+        const params = new URLSearchParams(location.search)
+        const appId = params.get('appId') || undefined
+        pushLayer({ type: 'checker-assignment-form', module: sub === 'new' ? undefined : sub, appId })
+      } else {
+        pushLayer(section.formLayer(sub === 'new' ? undefined : sub))
+      }
+    }
+  }, [location.pathname, location.search, status, isAdministrator, hasCapability, openTab, pushLayer, navigate])
 
   return null
 }

@@ -15,13 +15,12 @@ namespace AuthService.Controllers;
 public class AuthController(
     AuthAppService authAppService,
     IOptions<AuthCookieOptions> cookieOptions,
-    IOptions<PasswordPolicyOptions> passwordPolicyOptions,
+    PasswordPolicyAppService passwordPolicy,
     SetPasswordInviteService invites,
     PasswordResetService passwordReset,
     IWebHostEnvironment env) : ControllerBase
 {
     private readonly AuthCookieOptions _cookieOptions = cookieOptions.Value;
-    private readonly PasswordPolicyOptions _passwordPolicy = passwordPolicyOptions.Value;
 
     [HttpPost("login")]
     [EnableRateLimiting(RateLimitPolicies.Authentication)]
@@ -228,15 +227,20 @@ public class AuthController(
     [HttpGet("password-policy")]
     [Authorize]
     [AllowWhenPasswordChangeRequired]
-    public ActionResult<PasswordPolicyDto> PasswordPolicy() =>
-        Ok(new PasswordPolicyDto(
-            _passwordPolicy.MinimumLength,
-            _passwordPolicy.MaximumLength,
-            _passwordPolicy.RequireUppercase,
-            _passwordPolicy.RequireLowercase,
-            _passwordPolicy.RequireDigit,
-            _passwordPolicy.RequireNonAlphanumeric,
-            _passwordPolicy.Describe()));
+    public async Task<ActionResult<PasswordPolicyDto>> PasswordPolicy(CancellationToken ct)
+    {
+        // Read from the database on every call, so an administrator's edit is what the change-password
+        // form's live requirement checklist shows on its next load.
+        var rules = await passwordPolicy.GetComplexityAsync(ct);
+        return Ok(new PasswordPolicyDto(
+            rules.MinimumLength,
+            rules.MaximumLength,
+            rules.RequireUppercase,
+            rules.RequireLowercase,
+            rules.RequireDigit,
+            rules.RequireNonAlphanumeric,
+            rules.Describe()));
+    }
 
     /// <summary>
     /// Changes the caller's OWN password. The account is taken from the validated token, never from

@@ -50,9 +50,10 @@ public class UserAppServiceTests : IDisposable
         // tolerates a null HttpContext and these tests exercise the service outside a request.
         var auditLog = new AuditLogAppService(db, events, new HttpContextAccessor());
         var gating = new ApprovalGatingService(db, auditLog, events);
+        var passwordPolicy = new PasswordPolicyAppService(db, auditLog, MsOptions.Create(new PasswordPolicyOptions()));
         var invites = new SetPasswordInviteService(
             db, new NoOpEmailSender(), passwordHasher,
-            MsOptions.Create(new SmtpOptions()), MsOptions.Create(new PasswordPolicyOptions()),
+            MsOptions.Create(new SmtpOptions()), passwordPolicy,
             auditLog, NullLogger<SetPasswordInviteService>.Instance);
         var fineCapabilities = new FineCapabilityService(db, new MemoryPlatformCache(new MemoryCache(new MemoryCacheOptions())));
         var fieldSchema = new UserFieldSchemaAppService(db, auditLog);
@@ -62,7 +63,7 @@ public class UserAppServiceTests : IDisposable
 
         service = new UserAppService(
             db, passwordHasher, auditLog, new HttpContextAccessor(), gating, invites,
-            fineCapabilities, fieldSchema, schemaValidator, validationPresets, salutations);
+            fineCapabilities, fieldSchema, schemaValidator, validationPresets, salutations, passwordPolicy);
 
         // ValidateAndBuildExtraAttributesAsync drops any custom-field key the schema doesn't
         // currently recognise, on both the "preserve" and "replace" paths — so aadharNumber/

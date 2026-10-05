@@ -15,7 +15,8 @@ public class UserAppService(
     IHttpContextAccessor httpContextAccessor, ApprovalGatingService gating,
     SetPasswordInviteService invites, FineCapabilityService fineCapabilities,
     UserFieldSchemaAppService fieldSchema, UserSchemaValidator schemaValidator,
-    ValidationPresetAppService validationPresets, SalutationAppService salutations)
+    ValidationPresetAppService validationPresets, SalutationAppService salutations,
+    PasswordPolicyAppService passwordPolicy)
 {
     private const string ServiceName = "AuthService";
 
@@ -193,7 +194,7 @@ public class UserAppService(
     {
         var user = await FindWithRoleAsync(id, ct) ?? throw NotFound(id);
         var overrides = await LoadOverridesAsync(id, ct);
-        return ToDetailDto(user, overrides);
+        return await ToDetailDtoAsync(user, overrides, ct);
     }
 
     public async Task<MutationResult<CreateUserResponse>> CreateAsync(
@@ -331,7 +332,8 @@ public class UserAppService(
             entityType: "User", entityId: user.Id.ToString(), details: auditDetail,
             entityLabel: user.Name, sourceIp: SourceIp, userAgent: UserAgent, ct: ct);
 
-        return MutationResult<CreateUserResponse>.Ok(new CreateUserResponse(ToDetailDto(saved, savedOverrides), inviteEmailed));
+        var detail = await ToDetailDtoAsync(saved, savedOverrides, ct);
+        return MutationResult<CreateUserResponse>.Ok(new CreateUserResponse(detail, inviteEmailed));
     }
 
     public async Task<MutationResult<UserDetailDto>> UpdateAsync(
@@ -528,7 +530,7 @@ public class UserAppService(
         }
 
         var savedOverrides = await LoadOverridesAsync(id, ct);
-        return MutationResult<UserDetailDto>.Ok(ToDetailDto(user, savedOverrides));
+        return MutationResult<UserDetailDto>.Ok(await ToDetailDtoAsync(user, savedOverrides, ct));
     }
 
     public async Task<MutationResult<UserDetailDto>> UpdateStatusAsync(
@@ -578,7 +580,7 @@ public class UserAppService(
             entityLabel: user.Name, sourceIp: SourceIp, userAgent: UserAgent, ct: ct);
 
         var overrides = await LoadOverridesAsync(id, ct);
-        return MutationResult<UserDetailDto>.Ok(ToDetailDto(user, overrides));
+        return MutationResult<UserDetailDto>.Ok(await ToDetailDtoAsync(user, overrides, ct));
     }
 
     public async Task<ApprovalPendingDto?> DeleteAsync(
@@ -965,11 +967,20 @@ public class UserAppService(
         u.Id, u.Salutation, u.Name, u.Email, u.PhoneNumber, u.RoleId, u.Role?.Name,
         u.Role != null && u.Role.IsAdministrator, u.Status == UserStatus.Active, u.LastLoginAt, u.AuthProvider.ToString());
 
-    private static UserDetailDto ToDetailDto(User u, IReadOnlyList<PermissionOverrideDto> overrides) => new(
+    private async Task<UserDetailDto> ToDetailDtoAsync(User u, IReadOnlyList<PermissionOverrideDto> overrides, CancellationToken ct)
+    {
+        var expiry = PasswordPolicyAppService.Evaluate(u, await passwordPolicy.GetPolicyAsync(ct));
+        return ToDetailDto(u, overrides, expiry);
+    }
+
+    private static UserDetailDto ToDetailDto(User u, IReadOnlyList<PermissionOverrideDto> overrides, PasswordExpiryStatusDto expiry) => new(
         u.Id, u.Salutation, u.Name, u.Email, u.PhoneNumber, u.RoleId, u.Role?.Name,
         u.Role != null && u.Role.IsAdministrator, u.Status == UserStatus.Active, u.MustChangePassword,
         u.LastLoginAt, u.CreatedAt, u.UpdatedAt, overrides, u.AuthProvider.ToString(),
-        DeserializeExtraAttributes(u.ExtraAttributes));
+        DeserializeExtraAttributes(u.ExtraAttributes),
+        u.PasswordChangedAt,
+        expiry.ExpiresAt,
+        expiry.IsExpired);
 
     private static NotFoundAppException NotFound(Guid id) => new($"User '{id}' was not found.");
 }

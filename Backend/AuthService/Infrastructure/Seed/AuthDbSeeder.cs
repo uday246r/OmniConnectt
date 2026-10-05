@@ -24,6 +24,7 @@ public static class AuthDbSeeder
         public const string SettingsUsers = "host.settings.users";
         public const string SettingsRoles = "host.settings.roles";
         public const string SettingsApplications = "host.settings.applications";
+        public const string SettingsPasswordPolicy = "host.settings.password-policy";
         public const string SystemAuditLogs = "host.system.audit-logs";
         public const string SystemLogs = "host.system.system-logs";
         public const string SystemApprovals = "host.system.approvals";
@@ -40,6 +41,9 @@ public static class AuthDbSeeder
     // Export. See RenameLegacyCapabilityAsync for how the Create→Register migration preserves
     // existing role grants instead of silently dropping them.
     private static readonly string[] UsersCapabilities = ["View", "Create", "Edit", "Delete", "Disable"];
+    // Deliberately just View/Edit and a feature of its own, not a Settings > Users capability: whoever
+    // shapes the user form is not necessarily who should decide how long a credential lives.
+    private static readonly string[] PasswordPolicyCapabilities = ["View", "Edit"];
     private static readonly string[] ApplicationsCapabilities = ["View", "Register", "Edit", "Delete", "Disable"];
     private static readonly string[] AuditLogsCapabilities = ["View", "Export"];
     private static readonly string[] SystemLogsCapabilities = ["View", "Export"];
@@ -87,11 +91,126 @@ public static class AuthDbSeeder
         var roles = await SeedRolesAsync(db, features, ct);
         await SeedSuperAdminUserAsync(db, roles, logger, ct);
         await SeedNavigationAsync(db, logger, ct);
+        await SeedFieldTemplateCatalogAsync(db, ct);
+        await SeedFieldSectionCatalogAsync(db, ct);
         await LegacyFeatureCleanup.RunAsync(db, logger, ct);
 
         // Diagnostic only — logs grants the claims builder will no longer mint. Runs last, so it sees
         // the catalog exactly as the rest of startup left it.
         await StaleGrantReport.RunAsync(db, logger, ct);
+    }
+
+    /// <summary>
+    /// Creates the section catalog on first boot. Insert-only: once a row exists an administrator owns it.
+    /// <para>
+    /// Sections used to be free text on each field, so an existing deployment may already have fields in
+    /// sections an admin invented ("Employment Details"). Seeding only the three defaults would leave
+    /// those fields resolving to the system section on the next read and quietly flatten the admin's
+    /// layout. So the first row is the defaults PLUS every distinct legacy section name found in the
+    /// current field schema, in first-seen order, each given a slugged key.
+    /// </para>
+    /// </summary>
+    private static async Task SeedFieldSectionCatalogAsync(AuthDbContext db, CancellationToken ct)
+    {
+        if (await db.FieldSectionCatalogs.AnyAsync(ct)) return;
+
+        var options = new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web);
+        var sections = AuthService.Application.Services.FieldSectionAppService.DefaultSections();
+
+        var schemaRow = await db.UserFieldSchemas.AsNoTracking().OrderByDescending(r => r.UpdatedAt).FirstOrDefaultAsync(ct);
+        if (schemaRow is not null)
+        {
+            List<Application.DTOs.FieldDefinitionDto> fields;
+            try
+            {
+                fields = System.Text.Json.JsonSerializer.Deserialize<List<Application.DTOs.FieldDefinitionDto>>(schemaRow.SchemaJson, options) ?? [];
+            }
+            catch (System.Text.Json.JsonException)
+            {
+                fields = [];
+            }
+
+            foreach (var legacy in fields.Select(f => f.Section?.Trim()).Where(l => !string.IsNullOrEmpty(l)).Distinct(StringComparer.OrdinalIgnoreCase))
+            {
+                if (sections.Any(x => string.Equals(x.Label, legacy, StringComparison.OrdinalIgnoreCase) ||
+                                      string.Equals(x.Key, legacy, StringComparison.OrdinalIgnoreCase)))
+                {
+                    continue;
+                }
+
+                var baseKey = AuthService.Application.Services.FieldSectionAppService.Slugify(legacy!);
+                var key = baseKey;
+                for (var n = 2; sections.Any(x => string.Equals(x.Key, key, StringComparison.OrdinalIgnoreCase)); n++)
+                {
+                    key = $"{baseKey}-{n}";
+                }
+
+                sections.Add(new Application.DTOs.FieldSectionDto(key, legacy!, sections.Count + 1));
+            }
+        }
+
+        db.FieldSectionCatalogs.Add(new Domain.Entities.FieldSectionCatalog
+        {
+            Id = Guid.NewGuid(),
+            SectionsJson = System.Text.Json.JsonSerializer.Serialize(sections, options),
+            Version = 1,
+            UpdatedAt = DateTimeOffset.UtcNow,
+        });
+        await db.SaveChangesAsync(ct);
+    }
+
+    private static async Task SeedFieldTemplateCatalogAsync(AuthDbContext db, CancellationToken ct)
+    {
+        var existingCatalog = await db.FieldTemplateCatalogs.OrderByDescending(c => c.UpdatedAt).FirstOrDefaultAsync(ct);
+        if (existingCatalog is null)
+        {
+            var templatesJson = System.Text.Json.JsonSerializer.Serialize(
+                AuthService.Application.Services.FieldTemplateAppService.DefaultTemplates(),
+                new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web));
+
+            db.FieldTemplateCatalogs.Add(new Domain.Entities.FieldTemplateCatalog
+            {
+                Id = Guid.NewGuid(),
+                TemplatesJson = templatesJson,
+                Version = 1,
+                UpdatedAt = DateTimeOffset.UtcNow,
+            });
+            await db.SaveChangesAsync(ct);
+        }
+        else if (existingCatalog.TemplatesJson.Contains("org-department") 
+                 || existingCatalog.TemplatesJson.Contains("contact-street-address")
+                 || existingCatalog.TemplatesJson.Contains("contact-phone"))
+        {
+            var current = System.Text.Json.JsonSerializer.Deserialize<List<Application.DTOs.FieldTemplateDto>>(
+                existingCatalog.TemplatesJson,
+                new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web)) ?? [];
+
+            var filtered = current
+                .Where(t => t.Id != "org-department" && t.Id != "org-employment-type" && t.Id != "gen-gender" &&
+                            t.Id != "contact-street-address" && t.Id != "contact-phone")
+                .ToList();
+
+            var defaults = AuthService.Application.Services.FieldTemplateAppService.DefaultTemplates();
+            foreach (var def in defaults)
+            {
+                var idx = filtered.FindIndex(t => t.Id == def.Id);
+                if (idx < 0)
+                {
+                    filtered.Add(def);
+                }
+                else if (filtered[idx].IsSystem)
+                {
+                    filtered[idx] = def;
+                }
+            }
+
+            existingCatalog.TemplatesJson = System.Text.Json.JsonSerializer.Serialize(
+                filtered,
+                new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web));
+            existingCatalog.Version += 1;
+            existingCatalog.UpdatedAt = DateTimeOffset.UtcNow;
+            await db.SaveChangesAsync(ct);
+        }
     }
 
     /// <summary>
@@ -140,6 +259,7 @@ public static class AuthDbSeeder
             // ValidationPresetsController/SalutationsController: managing the user-creation form is
             // part of the Users capability, not a separate permission to seed and expose in Roles.
             new HostNavItem { Id = Guid.NewGuid(), Key = "host.settings.fields", Label = "Manage Fields", IconKey = "FileText", RoutePath = "/settings/fields", SectionKey = "system", SortOrder = 50, RequiredFeatureKey = HostFeatureKeys.SettingsUsers, RequiredCapability = "View" },
+            new HostNavItem { Id = Guid.NewGuid(), Key = "host.settings.password-policy", Label = "Manage Password Policy", IconKey = "Lock", RoutePath = "/settings/password-policy", SectionKey = "system", SortOrder = 70, RequiredFeatureKey = HostFeatureKeys.SettingsPasswordPolicy, RequiredCapability = "View" },
             new HostNavItem { Id = Guid.NewGuid(), Key = "host.settings.formats", Label = "Manage Formats", IconKey = "Key", RoutePath = "/settings/formats", SectionKey = "system", SortOrder = 60, RequiredFeatureKey = HostFeatureKeys.SettingsUsers, RequiredCapability = "View" },
         };
 
@@ -232,6 +352,7 @@ public static class AuthDbSeeder
             new { Key = HostFeatureKeys.SettingsUsers, DisplayName = "Setup — User", SortOrder = 10, Capabilities = UsersCapabilities },
             new { Key = HostFeatureKeys.SettingsRoles, DisplayName = "Setup — Role", SortOrder = 20, Capabilities = StandardCrud },
             new { Key = HostFeatureKeys.SettingsApplications, DisplayName = "Setup — Applications", SortOrder = 30, Capabilities = ApplicationsCapabilities },
+            new { Key = HostFeatureKeys.SettingsPasswordPolicy, DisplayName = "Setup — Password Policy", SortOrder = 35, Capabilities = PasswordPolicyCapabilities },
             new { Key = HostFeatureKeys.SystemAuditLogs, DisplayName = "System — Audit Logs", SortOrder = 40, Capabilities = AuditLogsCapabilities },
             new { Key = HostFeatureKeys.SystemLogs, DisplayName = "System — System Logs", SortOrder = 45, Capabilities = SystemLogsCapabilities },
             new { Key = HostFeatureKeys.SystemApprovals, DisplayName = "System — Approval Center", SortOrder = 50, Capabilities = ApprovalsCapabilities },
@@ -323,6 +444,8 @@ public static class AuthDbSeeder
                 [HostFeatureKeys.SettingsUsers] = ["View", "Create", "Edit", "Disable"],
                 [HostFeatureKeys.SettingsRoles] = ["View", "Create", "Edit"],
                 [HostFeatureKeys.SettingsApplications] = ["View", "Register", "Edit", "Disable"],
+                // View only: rewriting the password policy stays with Super Admin, like Checker Assignment's Manage.
+                [HostFeatureKeys.SettingsPasswordPolicy] = ["View"],
                 [HostFeatureKeys.SystemAuditLogs] = ["View", "Export"],
                 [HostFeatureKeys.SystemLogs] = ["View", "Export"],
                 // Export matches what Admin already holds on the two log features — this role exists
@@ -351,6 +474,7 @@ public static class AuthDbSeeder
                 [HostFeatureKeys.SettingsUsers] = ["View"],
                 [HostFeatureKeys.SettingsRoles] = ["View"],
                 [HostFeatureKeys.SettingsApplications] = ["View"],
+                [HostFeatureKeys.SettingsPasswordPolicy] = ["View"],
                 [HostFeatureKeys.SystemAuditLogs] = ["View"],
                 [HostFeatureKeys.SystemLogs] = ["View"],
                 [HostFeatureKeys.SystemApprovals] = ["View"],

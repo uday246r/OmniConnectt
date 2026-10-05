@@ -1,0 +1,454 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-width: 1340px;
+  width: 100%;
+  padding-bottom: 36px;
+  animation: pageFadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes pageFadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Summary KPI cards ───────────────────────────────────────────── */
+.summaryGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+
+@media (max-width: 1100px) {
+  .summaryGrid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 600px) {
+  .summaryGrid { grid-template-columns: 1fr; }
+}
+
+.summaryCard {
+  background: var(--omni-color-surface, #ffffff);
+  border: 1.5px solid #e8edf5;
+  border-radius: var(--omni-radius-xl, 18px);
+  padding: 18px 20px 16px;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.03), 0 8px 20px -4px rgba(15, 23, 42, 0.04);
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  position: relative;
+  overflow: hidden;
+  transition: box-shadow 0.18s ease, transform 0.18s ease, border-color 0.18s ease;
+}
+
+.summaryCard:hover {
+  border-color: var(--omni-color-primary-200, #bfdbfe);
+  box-shadow: 0 12px 28px -4px rgba(37, 99, 235, 0.12);
+  transform: translateY(-2.5px);
+}
+
+.summaryCard::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3.5px;
+  border-radius: 16px 16px 0 0;
+}
+
+.summaryCard:nth-child(1)::before { background: linear-gradient(90deg, #2563eb, #60a5fa); }
+.summaryCard:nth-child(2)::before { background: linear-gradient(90deg, #7c3aed, #a78bfa); }
+.summaryCard:nth-child(3)::before { background: linear-gradient(90deg, #059669, #34d399); }
+.summaryCard:nth-child(4)::before { background: linear-gradient(90deg, #d97706, #fbbf24); }
+
+.summaryIcon {
+  width: 42px;
+  height: 42px;
+  border-radius: var(--omni-radius-lg, 12px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+}
+
+.iconBlue   { background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); color: #2563eb; border: 1px solid #bfdbfe; }
+.iconPurple { background: linear-gradient(135deg, #ede9fe 0%, #ddd6fe 100%); color: #7c3aed; border: 1px solid #c4b5fd; }
+.iconGreen  { background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%); color: #059669; border: 1px solid #a7f3d0; }
+.iconAmber  { background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%); color: #d97706; border: 1px solid #fde68a; }
+
+.summaryContent {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.summaryLabel {
+  font-size: 11px;
+  font-weight: 700;
+  color: #64748b;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.summaryValue {
+  font-size: 27px;
+  font-weight: 800;
+  color: var(--omni-color-text-primary, #0f172a);
+  line-height: 1;
+  letter-spacing: -0.03em;
+}
+
+/* ── Card container & Toolbar ────────────────────────────────────── */
+.card {
+  background: var(--omni-color-surface, #ffffff);
+  border-radius: 18px;
+  border: 1.5px solid #e8edf5;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 14px 18px;
+  border-bottom: 1.5px solid #eaeff7;
+}
+
+.toolbarSearch {
+  position: relative;
+  flex: 1 1 260px;
+  max-width: 380px;
+}
+
+.appFilterSelectWrap {
+  width: 200px;
+}
+
+.statusFilterSelectWrap {
+  width: 160px;
+}
+
+.toolbarActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+  flex-wrap: wrap;
+}
+
+.errorBanner {
+  padding: 12px 18px;
+  border-radius: var(--omni-radius-lg, 12px);
+  background: #fef2f2;
+  border: 1.5px solid #fca5a5;
+  color: #991b1b;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* ── Grouped Application Accordions ──────────────────────────────── */
+.groupsContainer {
+  display: flex;
+  flex-direction: column;
+}
+
+.appGroupSection {
+  border-bottom: 1px solid #eaeff7;
+}
+
+.appGroupSection:last-child {
+  border-bottom: none;
+}
+
+.appGroupHeader {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px;
+  background: #f8fafc;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s ease;
+}
+
+.appGroupHeader:hover {
+  background: #f1f5f9;
+}
+
+.appGroupHeaderLeft {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.appGroupIconWrap {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.iconBoxHost {
+  background: #eff6ff;
+  color: #2563eb;
+  border: 1px solid #bfdbfe;
+}
+
+.iconBoxRemote {
+  background: #ede9fe;
+  color: #7c3aed;
+  border: 1px solid #ddd6fe;
+}
+
+.appGroupName {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.appGroupGatedBadge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  background: #ede9fe;
+  color: #6d28d9;
+  border: 1px solid #ddd6fe;
+}
+
+.appGroupHeaderRight {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.assignWholeAppBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #1e40af;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.assignWholeAppBtn:hover {
+  background: #dbeafe;
+  color: #1d4ed8;
+  border-color: #93c5fd;
+  transform: translateY(-1px);
+}
+
+.chevronIcon {
+  color: #64748b;
+  transition: transform 0.2s ease;
+  display: flex;
+  align-items: center;
+}
+
+.chevronOpen {
+  transform: rotate(180deg);
+}
+
+/* ── Module Table inside App Group ───────────────────────────────── */
+.moduleTable {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.moduleTableHeader {
+  background: #ffffff;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.moduleTableHeader th {
+  padding: 10px 20px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #64748b;
+  text-align: left;
+}
+
+.moduleRow {
+  border-bottom: 1px solid #f1f5f9;
+  transition: background 0.12s ease;
+}
+
+.moduleRow:hover {
+  background: #fbfcfe;
+}
+
+.moduleRow td {
+  padding: 12px 20px;
+  vertical-align: middle;
+}
+
+.moduleInfoCell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.moduleIcon {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: #f1f5f9;
+  color: #475569;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.moduleDetails {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.moduleLabel {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.moduleKey {
+  font-size: 11.5px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  color: #64748b;
+}
+
+/* Checker Chip list */
+.checkerList {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.checkerChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px 3px 4px;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 9999px;
+  font-size: 12px;
+  color: #334155;
+}
+
+.checkerAvatar {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #2563eb;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.checkerName {
+  font-weight: 600;
+}
+
+.checkerRemoveBtn {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1px;
+  border-radius: 50%;
+  transition: color 0.15s ease;
+}
+
+.checkerRemoveBtn:hover {
+  color: #ef4444;
+}
+
+.noChecker {
+  font-size: 12.5px;
+  color: #94a3b8;
+  font-style: italic;
+}
+
+.actionCell {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.actionIconBtn {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #475569;
+  transition: all 0.15s ease;
+}
+
+.actionIconBtn:hover {
+  border-color: #cbd5e1;
+  background: #f8fafc;
+}
+
+.actionEdit:hover {
+  border-color: #93c5fd;
+  background: #eff6ff;
+  color: #2563eb;
+}
+
+/* ── Modal Dialog Content ────────────────────────────────────────── */
+.modalBody {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 6px 0;
+}
+
+.modalText {
+  font-size: 14px;
+  color: #475569;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.modalActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 16px;
+}

@@ -26,6 +26,9 @@ public class AuthDbContext(DbContextOptions<AuthDbContext> options) : DbContext(
     public DbSet<UserFieldSchema> UserFieldSchemas => Set<UserFieldSchema>();
     public DbSet<ValidationPresetCatalog> ValidationPresetCatalogs => Set<ValidationPresetCatalog>();
     public DbSet<SalutationCatalog> SalutationCatalogs => Set<SalutationCatalog>();
+    public DbSet<FieldTemplateCatalog> FieldTemplateCatalogs => Set<FieldTemplateCatalog>();
+    public DbSet<FieldSectionCatalog> FieldSectionCatalogs => Set<FieldSectionCatalog>();
+    public DbSet<PasswordPolicyCatalog> PasswordPolicyCatalogs => Set<PasswordPolicyCatalog>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -91,6 +94,24 @@ public class AuthDbContext(DbContextOptions<AuthDbContext> options) : DbContext(
         {
             entity.Property(c => c.SalutationsJson).HasColumnType("jsonb");
             // Two admins saving at once: the second write fails instead of silently undoing the first.
+            entity.Property(c => c.Version).IsConcurrencyToken();
+        });
+
+        modelBuilder.Entity<FieldTemplateCatalog>(entity =>
+        {
+            entity.Property(c => c.TemplatesJson).HasColumnType("jsonb");
+            entity.Property(c => c.Version).IsConcurrencyToken();
+        });
+
+        modelBuilder.Entity<FieldSectionCatalog>(entity =>
+        {
+            entity.Property(c => c.SectionsJson).HasColumnType("jsonb");
+            entity.Property(c => c.Version).IsConcurrencyToken();
+        });
+
+        modelBuilder.Entity<PasswordPolicyCatalog>(entity =>
+        {
+            entity.Property(c => c.PolicyJson).HasColumnType("jsonb");
             entity.Property(c => c.Version).IsConcurrencyToken();
         });
 

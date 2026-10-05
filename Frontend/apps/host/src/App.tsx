@@ -16,7 +16,7 @@ import { RouteFallback } from './shared/components/RouteFallback/RouteFallback'
 import { LoginPage } from './pages/LoginPage/LoginPage'
 import { PageSkeleton } from './shared/components/PageSkeleton/PageSkeleton'
 import { UserDetailSkeleton } from './features/settings-users/components/UserDetailSkeleton/UserDetailSkeleton'
-import { ForbiddenPage } from './pages/ForbiddenPage/ForbiddenPage'
+import { isSuperAdminOrAdmin } from './features/auth/store/authStore'
 import { lazyWithPreload, preloadWhenIdle } from './shared/utils/lazyWithPreload'
 
 /**
@@ -73,6 +73,18 @@ const ManageFieldsPage = lazy(() =>
 const ManageFormatsPage = lazy(() =>
   import('./features/settings-user-fields/pages/ManageFormatsPage').then((m) => ({ default: m.ManageFormatsPage })),
 )
+const ManagePasswordPolicyPage = lazy(() =>
+  import('./features/settings-password-policy/pages/ManagePasswordPolicyPage').then((m) => ({ default: m.ManagePasswordPolicyPage })),
+)
+const RolesPage = lazy(() =>
+  import('./features/settings-roles/pages/RolesPage').then((m) => ({ default: m.RolesPage })),
+)
+const ApplicationsPage = lazy(() =>
+  import('./features/settings-applications/pages/ApplicationsPage').then((m) => ({ default: m.ApplicationsPage })),
+)
+const CheckerAssignmentPage = lazy(() =>
+  import('./features/approvals/pages/CheckerAssignmentPage').then((m) => ({ default: m.CheckerAssignmentPage })),
+)
 
 const SystemLogsPage = lazy(() => import('./features/system-logs/pages/SystemLogsPage').then((m) => ({ default: m.SystemLogsPage })))
 
@@ -89,6 +101,8 @@ const FEATURE_KEYS = {
   // of the same Users capability, not a separate permission (see UserSchemaController's own gating).
   fields: 'host.settings.users',
   formats: 'host.settings.users',
+  // Its own feature: password policy is a security control and is granted separately from user administration.
+  passwordPolicy: 'host.settings.password-policy',
 } as const
 
 /**
@@ -106,7 +120,7 @@ const FEATURE_KEYS = {
  * it is a far better destination — and it is the server's answer, not a guess made here.
  */
 function DashboardRoute() {
-  const isAdministrator = useAuthStore((s) => Boolean(s.user?.isAdministrator))
+  const isAdministrator = useAuthStore((s) => isSuperAdminOrAdmin(s.user))
   const hasCapability = useAuthStore((s) => s.hasCapability)
   const navStatus = useNavigationStore((s) => s.status)
   const sections = useNavigationStore((s) => s.sections)
@@ -123,7 +137,7 @@ function DashboardRoute() {
   const firstReachable = sections.flatMap((s) => s.items).find((i) => i.routePath !== '/')
   return firstReachable
     ? <Navigate to={firstReachable.routePath} replace />
-    : <ForbiddenPage what="the dashboard" />
+    : <NotFoundPage />
 }
 
 function LoginRoute() {
@@ -450,6 +464,7 @@ function AppRoutes() {
               </RequireCapability>
             }
           />
+          <Route path="system/checker-assignment" element={<Navigate to="/settings/checker-assignment" replace />} />
 
           {/* No capability gate — every authenticated user tracks their own submitted requests
               regardless of whether they hold Approval Center access; the backend scopes this to the
@@ -457,11 +472,11 @@ function AppRoutes() {
           <Route path="my-requests" element={<MyRequestsPage />} />
 
           {/*
-            Settings pages. The drawer screens (roles, applications, checker assignment, create user)
-            have no route here at all: their URLs render the page the operator came from (see
-            routesLocation in AppRoutes) and SettingsDrawerUrlSync opens the drawer over it.
+            Settings pages. Roles, applications, checker assignment, and users render as full pages.
+            Their create/edit forms open in the slide-over drawer via pushLayer.
           */}
           <Route path="settings">
+            <Route index element={<Navigate to="users" replace />} />
             <Route path="users">
               <Route
                 index
@@ -483,6 +498,33 @@ function AppRoutes() {
               />
             </Route>
 
+            <Route
+              path="roles"
+              element={
+                <RequireCapability featureKey={FEATURE_KEYS.roles}>
+                  <RolesPage />
+                </RequireCapability>
+              }
+            />
+
+            <Route
+              path="applications"
+              element={
+                <RequireCapability featureKey={FEATURE_KEYS.applications}>
+                  <ApplicationsPage />
+                </RequireCapability>
+              }
+            />
+
+            <Route
+              path="checker-assignment"
+              element={
+                <RequireCapability featureKey={FEATURE_KEYS.checkerAssignment}>
+                  <CheckerAssignmentPage />
+                </RequireCapability>
+              }
+            />
+
             {/* Real pages, not drawer tabs. Both screens edit everything inline (a modal per
                 field/format), so no sub-route is needed. */}
             <Route
@@ -498,6 +540,14 @@ function AppRoutes() {
               element={
                 <RequireCapability featureKey={FEATURE_KEYS.formats}>
                   <ManageFormatsPage />
+                </RequireCapability>
+              }
+            />
+            <Route
+              path="password-policy"
+              element={
+                <RequireCapability featureKey={FEATURE_KEYS.passwordPolicy}>
+                  <ManagePasswordPolicyPage />
                 </RequireCapability>
               }
             />

@@ -215,4 +215,259 @@ public class UserFieldSchemaAppServiceTests : IDisposable
         await Assert.ThrowsAsync<ValidationAppException>(
             () => service.UpdateAsync(new UpdateUserFieldSchemaRequest(fields), actingUserId: null));
     }
+
+    [Fact]
+    public async Task A_dropdown_field_with_options_is_saved_and_retrieved()
+    {
+        var countryField = new FieldDefinitionDto(
+            "country", "Country", false, "dropdown", true, 4, [],
+            Options: ["India", "United States", "United Kingdom"], Template: "country");
+        var fields = DefaultCoreFields().Append(countryField).ToList();
+
+        var result = await service.UpdateAsync(new UpdateUserFieldSchemaRequest(fields), actingUserId: null);
+
+        var retrieved = Assert.Single(result.Fields, f => f.Key == "country");
+        Assert.Equal("dropdown", retrieved.DataType);
+        Assert.NotNull(retrieved.Options);
+        Assert.Equal(3, retrieved.Options.Count);
+        Assert.Equal("country", retrieved.Template);
+    }
+
+    [Fact]
+    public async Task A_dropdown_field_without_options_is_rejected()
+    {
+        var emptyDropdown = new FieldDefinitionDto(
+            "customTag", "Custom Tag", false, "dropdown", true, 4, [], Options: []);
+        var fields = DefaultCoreFields().Append(emptyDropdown).ToList();
+
+        var ex = await Assert.ThrowsAsync<ValidationAppException>(
+            () => service.UpdateAsync(new UpdateUserFieldSchemaRequest(fields), actingUserId: null));
+
+        Assert.Contains("must have at least one option", ex.Message);
+    }
+
+    [Fact]
+    public async Task A_dynamic_cascading_dropdown_such_as_state_is_allowed_without_options()
+    {
+        var stateDropdown = new FieldDefinitionDto(
+            "stateProvince", "State / Province", false, "dropdown", true, 4, [], Options: [], Template: "contact-state");
+        var fields = DefaultCoreFields().Append(stateDropdown).ToList();
+
+        var result = await service.UpdateAsync(new UpdateUserFieldSchemaRequest(fields), actingUserId: null);
+
+        var retrieved = Assert.Single(result.Fields, f => f.Key == "stateProvince");
+        Assert.Equal("dropdown", retrieved.DataType);
+        Assert.NotNull(retrieved.Options);
+        Assert.Empty(retrieved.Options);
+    }
+
+    [Fact]
+    public async Task A_core_field_cannot_be_a_dropdown()
+    {
+        var badCore = new FieldDefinitionDto(
+            "name", "Full Name", true, "dropdown", true, 1, [], Options: ["Alice", "Bob"]);
+        var fields = new List<FieldDefinitionDto>
+        {
+            badCore,
+            new("email", "Email", true, "email", true, 2, []),
+            new("phoneNumber", "Phone", true, "text", true, 3, []),
+        };
+
+        var ex = await Assert.ThrowsAsync<ValidationAppException>(
+            () => service.UpdateAsync(new UpdateUserFieldSchemaRequest(fields), actingUserId: null));
+
+        Assert.Contains("cannot be a dropdown", ex.Message);
+    }
+
+    [Fact]
+    public void System_text_json_deserializes_incoming_update_request_with_options_and_template()
+    {
+        var json = """
+        {
+            "fields": [
+                {
+                    "key": "name",
+                    "label": "Full Name",
+                    "core": true,
+                    "dataType": "text",
+                    "required": true,
+                    "order": 1,
+                    "validations": []
+                },
+                {
+                    "key": "country",
+                    "label": "Country",
+                    "core": false,
+                    "dataType": "dropdown",
+                    "required": true,
+                    "order": 2,
+                    "validations": [],
+                    "options": ["India", "United States", "Germany"],
+                    "template": "contact-country"
+                }
+            ],
+            "expectedVersion": 1
+        }
+        """;
+
+        var request = System.Text.Json.JsonSerializer.Deserialize<UpdateUserFieldSchemaRequest>(
+            json, new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web));
+
+        Assert.NotNull(request);
+        Assert.Equal(2, request.Fields.Count);
+        var country = Assert.Single(request.Fields, f => f.Key == "country");
+        Assert.NotNull(country.Options);
+        Assert.Equal(3, country.Options.Count);
+        Assert.Equal("contact-country", country.Template);
+    }
+
+    // ---------------------------------------------------------------- sections
+
+    private static FieldDefinitionDto InSection(string key, int order, string? section) =>
+        new(key, key, false, "text", false, order, [], Section: section);
+
+    private async Task SeedSectionsAsync(params FieldSectionDto[] sections)
+    {
+        await new FieldSectionAppService(db, TestAudit.For(db))
+            .UpdateAsync(new UpdateFieldSectionCatalogRequest(sections), actingUserId: null);
+    }
+
+    /// <summary>Writes a schema row exactly as an older build would have — bypassing UpdateAsync, which
+    /// now canonicalises sections on save and so can no longer produce a legacy row.</summary>
+    private async Task SeedLegacyRowAsync(params FieldDefinitionDto[] fields)
+    {
+        db.UserFieldSchemas.Add(new AuthService.Domain.Entities.UserFieldSchema
+        {
+            Id = Guid.NewGuid(),
+            SchemaJson = System.Text.Json.JsonSerializer.Serialize(fields,
+                new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web)),
+            Version = 1,
+            UpdatedAt = DateTimeOffset.UtcNow,
+        });
+        await db.SaveChangesAsync();
+    }
+
+    [Fact]
+    public async Task GetAsync_upgrades_a_legacy_section_label_to_its_key_without_rewriting_the_stored_row()
+    {
+        // Schemas saved while a section was free text carry the LABEL ("Address"). Reads must resolve
+        // that to the catalog key so every consumer sees one identity, with no data migration.
+        await SeedLegacyRowAsync([.. DefaultCoreFields(), InSection("street", 4, "Address")]);
+
+        var result = await service.GetAsync();
+
+        Assert.Equal("address", result.Fields.Single(f => f.Key == "street").Section);
+        Assert.Contains("\"Address\"", (await db.UserFieldSchemas.SingleAsync()).SchemaJson);
+    }
+
+    [Fact]
+    public async Task GetAsync_places_a_field_whose_section_no_longer_exists_in_the_system_section()
+    {
+        await SeedLegacyRowAsync([.. DefaultCoreFields(), InSection("legacy", 4, "Long Gone")]);
+
+        var result = await service.GetAsync();
+
+        Assert.Equal("personal-details", result.Fields.Single(f => f.Key == "legacy").Section);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_rejects_a_field_naming_a_section_that_does_not_exist()
+    {
+        var ex = await Assert.ThrowsAsync<ValidationAppException>(() => service.UpdateAsync(
+            new UpdateUserFieldSchemaRequest([.. DefaultCoreFields(), InSection("employer", 4, "employment")]), null));
+
+        Assert.Contains("section that no longer exists", ex.Message);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_accepts_a_section_by_label_and_stores_the_key()
+    {
+        var result = await service.UpdateAsync(
+            new UpdateUserFieldSchemaRequest([.. DefaultCoreFields(), InSection("street", 4, "Address")]), null);
+
+        Assert.Equal("address", result.Fields.Single(f => f.Key == "street").Section);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_renumbers_order_per_section_and_lays_fields_out_in_section_order()
+    {
+        await SeedSectionsAsync(
+            new FieldSectionDto("personal-details", "Personal Details", 1),
+            new FieldSectionDto("address", "Address", 2));
+
+        // Sent deliberately interleaved and with a global-looking order — the way the old single
+        // sequence looked. Per-section 1..n is what makes "move up" mean something inside a group.
+        var result = await service.UpdateAsync(new UpdateUserFieldSchemaRequest(
+        [
+            InSection("street", 7, "address"),
+            .. DefaultCoreFields(),
+            InSection("city", 9, "address"),
+            InSection("nickname", 5, "personal-details"),
+        ]), null);
+
+        Assert.Equal(["name", "email", "phoneNumber", "nickname", "street", "city"], result.Fields.Select(f => f.Key));
+        Assert.Equal([1, 2, 3, 4], result.Fields.Where(f => f.Section == "personal-details").Select(f => f.Order));
+        Assert.Equal([1, 2], result.Fields.Where(f => f.Section == "address").Select(f => f.Order));
+    }
+
+    [Fact]
+    public async Task UpdateAsync_lets_a_field_move_between_sections_by_changing_only_its_section()
+    {
+        await SeedSectionsAsync(
+            new FieldSectionDto("personal-details", "Personal Details", 1),
+            new FieldSectionDto("address", "Address", 2));
+        await service.UpdateAsync(new UpdateUserFieldSchemaRequest([.. DefaultCoreFields(), InSection("street", 4, "personal-details")]), null);
+
+        var result = await service.UpdateAsync(new UpdateUserFieldSchemaRequest([.. DefaultCoreFields(), InSection("street", 4, "address")]), null);
+
+        var street = result.Fields.Single(f => f.Key == "street");
+        Assert.Equal("address", street.Section);
+        Assert.Equal(1, street.Order);
+    }
+
+    [Fact]
+    public async Task GetAsync_puts_an_address_shaped_field_with_no_stored_section_under_address_as_the_old_form_did()
+    {
+        await SeedLegacyRowAsync([.. DefaultCoreFields(), InSection("country", 4, null), InSection("nickname", 5, null)]);
+
+        var result = await service.GetAsync();
+
+        Assert.Equal("address", result.Fields.Single(f => f.Key == "country").Section);
+        Assert.Equal("personal-details", result.Fields.Single(f => f.Key == "nickname").Section);
+    }
+
+    [Fact]
+    public async Task GetAsync_never_lets_the_legacy_address_guess_override_an_explicit_section()
+    {
+        await SeedSectionsAsync(
+            new FieldSectionDto("personal-details", "Personal Details", 1),
+            new FieldSectionDto("address", "Address", 2),
+            new FieldSectionDto("employment", "Employment", 3));
+        await SeedLegacyRowAsync([.. DefaultCoreFields(), InSection("country", 4, "employment")]);
+
+        var result = await service.GetAsync();
+
+        Assert.Equal("employment", result.Fields.Single(f => f.Key == "country").Section);
+    }
+
+    [Fact]
+    public async Task GetAsync_matches_legacy_address_keys_exactly_so_estate_is_not_state()
+    {
+        await SeedLegacyRowAsync([.. DefaultCoreFields(), InSection("estate", 4, null)]);
+
+        var result = await service.GetAsync();
+
+        Assert.Equal("personal-details", result.Fields.Single(f => f.Key == "estate").Section);
+    }
+
+    [Fact]
+    public async Task GetAsync_stops_guessing_address_once_that_section_has_been_deleted()
+    {
+        await SeedSectionsAsync(new FieldSectionDto("personal-details", "Personal Details", 1));
+        await SeedLegacyRowAsync([.. DefaultCoreFields(), InSection("city", 4, null)]);
+
+        var result = await service.GetAsync();
+
+        Assert.Equal("personal-details", result.Fields.Single(f => f.Key == "city").Section);
+    }
 }

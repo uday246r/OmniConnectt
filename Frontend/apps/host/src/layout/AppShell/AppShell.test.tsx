@@ -62,20 +62,20 @@ beforeEach(() => {
 })
 
 describe('AppShell with the settings drawer', () => {
-  it('keeps the drawer open after the gear navigates to /settings', async () => {
+  it('keeps the drawer open after navigating to a settings drawer form', async () => {
     renderApp('/apps/products/dashboard')
 
-    go('/settings')
+    go('/settings/roles/new')
 
     expect(useSettingsDrawerStore.getState().isOpen).toBe(true)
     expect(await screen.findByRole('dialog', { name: 'System Settings' })).toBeInTheDocument()
     expect(screen.getByText('page behind')).toBeInTheDocument()
   })
 
-  it('keeps it open while switching tabs, and closes it on leaving settings', async () => {
+  it('keeps it open while switching drawer forms, and closes it on leaving settings', async () => {
     renderApp('/apps/products/dashboard')
-    go('/settings/roles')
-    go('/settings/applications')
+    go('/settings/roles/new')
+    go('/settings/applications/new')
     expect(await screen.findByRole('dialog', { name: 'System Settings' })).toBeInTheDocument()
 
     go('/apps/products/dashboard')

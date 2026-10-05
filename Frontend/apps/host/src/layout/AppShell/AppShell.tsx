@@ -2,6 +2,7 @@ import { Suspense, useEffect, useState, useCallback } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 import { Sidebar } from '../Sidebar/Sidebar'
 import { Topbar } from '../Topbar/Topbar'
+import { PasswordExpiryBanner } from './PasswordExpiryBanner'
 import { useSettingsDrawerStore } from '../../shared/stores/settingsDrawerStore'
 import { lazyWithPreload, preloadWhenIdle } from '../../shared/utils/lazyWithPreload'
 import styles from './AppShell.module.css'
@@ -96,6 +97,7 @@ export function AppShell({ appHealth, userName, onLogout }: AppShellProps) {
           onMobileMenuToggle={() => setSidebarOpen((v) => !v)}
         />
         <div className={styles.content}>
+          <PasswordExpiryBanner />
           <Outlet />
         </div>
       </div>

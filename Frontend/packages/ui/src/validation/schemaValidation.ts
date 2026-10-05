@@ -22,8 +22,18 @@ export interface FieldDefinition {
   core: boolean
   dataType: string
   required: boolean
+  /** Position WITHIN the field's section (1..n per section), not across the whole form. */
   order: number
   validations: ValidationRule[]
+  options?: string[]
+  template?: string
+  /**
+   * The key of the section this field belongs to, resolved against the admin-managed Field Sections
+   * catalog (`/api/field-sections`). Older schemas may carry a section's display label, or nothing; both
+   * are resolved server-side and by the host's `resolveSectionKey`. The rule engine itself is
+   * section-agnostic — this only affects layout.
+   */
+  section?: string
 }
 
 export interface UserFieldSchema {
@@ -202,6 +212,13 @@ export function validateFieldValue(
 
   if (!value) {
     return undefined
+  }
+
+  if (field.dataType === 'dropdown' && field.options && field.options.length > 0) {
+    const match = field.options.some((opt) => opt.toLowerCase() === value.toLowerCase())
+    if (!match) {
+      return `Please select a valid option for ${field.label}.`
+    }
   }
 
   for (const rule of field.validations) {

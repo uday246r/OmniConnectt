@@ -92,6 +92,9 @@ builder.Services.AddScoped<UserAppService>();
 builder.Services.AddScoped<UserFieldSchemaAppService>();
 builder.Services.AddScoped<ValidationPresetAppService>();
 builder.Services.AddScoped<SalutationAppService>();
+builder.Services.AddScoped<FieldTemplateAppService>();
+builder.Services.AddScoped<FieldSectionAppService>();
+builder.Services.AddScoped<PasswordPolicyAppService>();
 builder.Services.AddScoped<AuthService.Infrastructure.Validation.UserSchemaValidator>();
 builder.Services.AddScoped<RoleAppService>();
 builder.Services.AddScoped<ApprovalAppService>();
@@ -194,6 +197,10 @@ builder.Services.AddHealthChecks().AddDbContextCheck<AuthDbContext>("database");
 
 builder.Services.Configure<RefreshTokenCleanupOptions>(builder.Configuration.GetSection(RefreshTokenCleanupOptions.SectionName));
 builder.Services.AddHostedService<RefreshTokenCleanupService>();
+
+builder.Services.Configure<PasswordExpiryReminderOptions>(builder.Configuration.GetSection(PasswordExpiryReminderOptions.SectionName));
+builder.Services.AddScoped<PasswordExpiryReminderSweeper>();
+builder.Services.AddHostedService<PasswordExpiryReminderService>();
 
 builder.Services.AddCors(options =>
 {

@@ -7,6 +7,12 @@ namespace AuthService.Options;
 /// The defaults follow common Indian banking practice for staff console credentials: at least 12
 /// characters with all four character classes. They are deliberately stricter than the ASP.NET
 /// Identity defaults, and the seeder's temporary-password generator must keep satisfying them.
+/// <para>
+/// These values are now only the SEED. Until an administrator first saves the policy on Settings &gt;
+/// Manage Password Policy they are what is enforced; from that first save the database row is the
+/// authority and this section is no longer read for rules. Validation and the human-readable
+/// description live on <c>PasswordComplexityDto</c>, next to the row they apply to.
+/// </para>
 /// </summary>
 public class PasswordPolicyOptions
 {
@@ -31,33 +37,4 @@ public class PasswordPolicyOptions
     /// "changing" a password to itself to satisfy a rotation prompt.
     /// </summary>
     public bool RejectSameAsCurrent { get; set; } = true;
-
-    /// <summary>
-    /// Human-readable description of the rules, for the API's validation message. Built from the
-    /// options themselves so it can never drift from what is actually enforced.
-    /// </summary>
-    public string Describe()
-    {
-        var parts = new List<string> { $"at least {MinimumLength} characters" };
-        if (RequireUppercase) parts.Add("an uppercase letter");
-        if (RequireLowercase) parts.Add("a lowercase letter");
-        if (RequireDigit) parts.Add("a digit");
-        if (RequireNonAlphanumeric) parts.Add("a symbol");
-
-        return parts.Count == 1
-            ? $"Password must be {parts[0]}."
-            : $"Password must contain {string.Join(", ", parts.Take(parts.Count - 1))} and {parts[^1]}.";
-    }
-
-    /// <summary>Returns null when the candidate satisfies the policy, or the reason it doesn't.</summary>
-    public string? Validate(string password)
-    {
-        if (string.IsNullOrWhiteSpace(password)) return "Password is required.";
-        if (password.Length < MinimumLength || password.Length > MaximumLength) return Describe();
-        if (RequireUppercase && !password.Any(char.IsUpper)) return Describe();
-        if (RequireLowercase && !password.Any(char.IsLower)) return Describe();
-        if (RequireDigit && !password.Any(char.IsDigit)) return Describe();
-        if (RequireNonAlphanumeric && password.All(char.IsLetterOrDigit)) return Describe();
-        return null;
-    }
 }

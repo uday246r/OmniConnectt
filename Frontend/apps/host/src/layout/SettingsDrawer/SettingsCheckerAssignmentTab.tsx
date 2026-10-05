@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useAuthStore } from '../../features/auth/store/authStore'
+import { useAuthStore, isSuperAdminOrAdmin } from '../../features/auth/store/authStore'
 import { checkerAssignmentsApi, type AssignableModuleDto, type CheckerAssignmentDto } from '../../features/approvals/api/checkerAssignmentsApi'
 import { groupModulesByApp, type ModuleAppGroup } from '../../features/approvals/utils/moduleAppGrouping'
 import { remoteAppsApi, type RemoteAppDto } from '../../features/settings-applications/api/remoteAppsApi'
@@ -36,7 +36,7 @@ export function SettingsCheckerAssignmentTab() {
   const accessToken = useAuthStore((s) => s.accessToken)
   // A token refresh must not re-run a load (and reset what the user is editing) — only its first arrival.
   const hasAccessToken = Boolean(accessToken)
-  const isAdministrator = Boolean(useAuthStore((s) => s.user)?.isAdministrator)
+  const isAdministrator = useAuthStore((s) => isSuperAdminOrAdmin(s.user))
   const hasCapability = useAuthStore((s) => s.hasCapability)
   const pushLayer = useSettingsDrawerStore((s) => s.pushLayer)
   const dataRevision = useDataRevision(TOPICS.checkerAssignments)

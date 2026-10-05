@@ -57,6 +57,14 @@ const normalize = (text: string) => text.normalize('NFKD').replace(/\p{Diacritic
  * ArrowUp/ArrowDown/Home/End/Enter/Escape/Tab behave as a screen-reader user expects. The list is
  * portalled to `document.body` so a table's or drawer's overflow never clips it.
  */
+interface ComboboxPlacement {
+  top?: number
+  bottom?: number
+  left: number
+  width: number
+  maxHeight: number
+}
+
 export function Combobox({
   options,
   value,
@@ -81,7 +89,7 @@ export function Combobox({
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [active, setActive] = useState(0)
-  const [rect, setRect] = useState<{ top: number; left: number; width: number } | null>(null)
+  const [placement, setPlacement] = useState<ComboboxPlacement | null>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const listRef = useRef<HTMLUListElement>(null)
@@ -118,7 +126,36 @@ export function Combobox({
     if (!open) return
     const update = () => {
       const r = wrapRef.current?.getBoundingClientRect()
-      if (r) setRect({ top: r.bottom + 4, left: r.left, width: r.width })
+      if (!r) return
+
+      const vh = window.innerHeight || document.documentElement.clientHeight || 768
+      const vw = window.innerWidth || document.documentElement.clientWidth || 1024
+
+      const spaceBelow = vh - r.bottom - 12
+      const spaceAbove = r.top - 12
+
+      // Open upwards if space below is constrained (< 240px) and there is more room above
+      const openUp = spaceBelow < 240 && spaceAbove > spaceBelow
+      const availableSpace = openUp ? spaceAbove : spaceBelow
+      const maxHeight = Math.min(280, Math.max(120, availableSpace))
+
+      const top = openUp ? undefined : Math.round(r.bottom + 4)
+      const bottom = openUp ? Math.round(vh - r.top + 4) : undefined
+
+      const targetWidth = Math.max(r.width, 220)
+      let left = Math.round(r.left)
+      if (left + targetWidth > vw - 12) {
+        left = Math.max(8, vw - targetWidth - 12)
+      }
+      if (left < 8) left = 8
+
+      setPlacement({
+        top,
+        bottom,
+        left,
+        width: Math.round(r.width),
+        maxHeight: Math.round(maxHeight),
+      })
     }
     update()
     window.addEventListener('resize', update)
@@ -254,14 +291,20 @@ export function Combobox({
         </svg>
       </span>
 
-      {open && rect && createPortal(
+      {open && placement && createPortal(
         <ul
           ref={listRef}
           id={listId}
           role="listbox"
           aria-label={aria['aria-label']}
           className={styles.list}
-          style={{ top: rect.top, left: rect.left, minWidth: rect.width }}
+          style={{
+            top: placement.top !== undefined ? placement.top : undefined,
+            bottom: placement.bottom !== undefined ? placement.bottom : undefined,
+            left: placement.left,
+            minWidth: placement.width,
+            maxHeight: placement.maxHeight,
+          }}
         >
           {loading && <li className={styles.status} role="presentation">Searching…</li>}
           {!loading && rows.length === 0 && <li className={styles.status} role="presentation">{emptyMessage}</li>}

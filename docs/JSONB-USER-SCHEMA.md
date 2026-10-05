@@ -61,6 +61,13 @@ JSON column, a `Version` counter):
 | `ValidationPresetCatalog` | `PresetsJson` | Manage Formats | Reusable named formats a field can reference |
 | `SalutationCatalog` | `SalutationsJson` | Manage Fields (top card) | The Mr./Ms./Dr. dropdown list |
 
+> **Update — sections.** A fourth config catalog now exists: `FieldSectionCatalog` (`SectionsJson`,
+> Manage Fields → Sections tab; `api/field-sections`). A field's `section` is the section's **key**;
+> `order` is per section. See CLAUDE.md for the resolve/arrange rules. The three-way hardcoded layout
+> described in §12.6 (`personalFields` / `addressFields` / `passwordPolicyFields`) no longer exists —
+> `UserFormLayer` loops over the catalog. The password-policy tab that briefly lived on Manage Fields
+> has moved to its own **Manage Password Policy** page and is not part of this schema system.
+
 Plus a fourth JSONB column that holds the **values**, not the config:
 
 | Entity | Column | What it holds |

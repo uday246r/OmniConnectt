@@ -53,6 +53,9 @@ export interface UserDetailDto {
   authProvider: AuthProviderValue
   /** Values for admin-defined custom fields (e.g. "aadharNumber") — see UserFieldSchema. */
   customFields: Record<string, string> | null
+  passwordChangedAt?: string | null
+  passwordExpiresAt?: string | null
+  isPasswordExpired?: boolean
 }
 
 /** authProvider defaults "Local" and is immutable after creation — see the backend DTO's doc comment. */

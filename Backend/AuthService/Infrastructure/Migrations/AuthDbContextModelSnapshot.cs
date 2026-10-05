@@ -331,6 +331,56 @@ namespace AuthService.Infrastructure.Migrations
                     b.ToTable("FeatureNavItems");
                 });
 
+            modelBuilder.Entity("AuthService.Domain.Entities.FieldSectionCatalog", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("SectionsJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("FieldSectionCatalogs");
+                });
+
+            modelBuilder.Entity("AuthService.Domain.Entities.FieldTemplateCatalog", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("TemplatesJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("FieldTemplateCatalogs");
+                });
+
             modelBuilder.Entity("AuthService.Domain.Entities.HostNavItem", b =>
                 {
                     b.Property<Guid>("Id")
@@ -402,6 +452,31 @@ namespace AuthService.Infrastructure.Migrations
                     b.HasKey("Key");
 
                     b.ToTable("NavSections");
+                });
+
+            modelBuilder.Entity("AuthService.Domain.Entities.PasswordPolicyCatalog", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("PolicyJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("PasswordPolicyCatalogs");
                 });
 
             modelBuilder.Entity("AuthService.Domain.Entities.PasswordResetToken", b =>
@@ -903,6 +978,12 @@ namespace AuthService.Infrastructure.Migrations
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
+
+                    b.Property<DateTimeOffset?>("PasswordChangedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("PasswordExpiryReminderSentDay")
+                        .HasColumnType("integer");
 
                     b.Property<string>("PasswordHash")
                         .HasColumnType("text");

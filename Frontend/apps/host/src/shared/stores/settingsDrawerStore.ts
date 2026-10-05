@@ -1,7 +1,20 @@
 import { create } from 'zustand'
 import { isSettingsDrawerPath } from '../settings/settingsSections'
 
-export type SettingsTab = 'users' | 'roles' | 'applications' | 'departments' | 'general' | 'checker-assignment'
+export type SettingsTab =
+  | 'users'
+  | 'roles'
+  | 'applications'
+  | 'departments'
+  | 'general'
+  | 'checker-assignment'
+  | 'fields'
+  | 'formats'
+  | 'password-policy'
+  | 'approvals'
+  | 'audit-logs'
+  | 'system-logs'
+
 
 export type DrawerLayer =
   | { type: 'root'; tab?: SettingsTab }
@@ -106,9 +119,7 @@ export const useSettingsDrawerStore = create<SettingsDrawerState>((set, get) => 
       }
       const newStack = state.layerStack.slice(0, -1)
       const top = newStack[newStack.length - 1]
-      const shouldClose =
-        top.type === 'root' &&
-        (top.tab === 'users' || (typeof window !== 'undefined' && !isDrawerRoute(window.location.pathname)))
+      const shouldClose = top.type === 'root'
       return {
         isOpen: !shouldClose,
         layerStack: shouldClose ? [{ type: 'root', tab: state.activeTab }] : newStack,
@@ -120,7 +131,7 @@ export const useSettingsDrawerStore = create<SettingsDrawerState>((set, get) => 
   resetToRoot: (tab) => {
     const targetTab = tab ?? get().activeTab
     set({
-      isOpen: true,
+      isOpen: false,
       activeTab: targetTab,
       layerStack: [{ type: 'root', tab: targetTab }],
     })

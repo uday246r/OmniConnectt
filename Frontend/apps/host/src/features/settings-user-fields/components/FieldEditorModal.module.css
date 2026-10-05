@@ -1,127 +1,604 @@
-.form { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
-
-.errorBanner {
-  padding: 10px 12px;
-  border: 1px solid var(--omni-color-danger-200, #fecaca);
-  border-left: 3px solid #ef4444;
-  border-radius: var(--omni-radius-lg-minus);
-  background: var(--omni-color-danger-50, #fef2f2);
-  color: var(--omni-color-danger-700, #b91c1c);
-  font-size: var(--omni-font-size-sm);
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
 }
 
-.formGroup { display: flex; flex-direction: column; gap: 5px; }
+.errorBanner {
+  padding: 10px 14px;
+  border: 1px solid #fecaca;
+  border-left: 4px solid #ef4444;
+  border-radius: var(--omni-radius-md, 8px);
+  background: #fef2f2;
+  color: #991b1b;
+  font-size: var(--omni-font-size-xs, 12px);
+  font-weight: 500;
+}
 
-.formGroupRow2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+/* ── Active Rules Summary Card ────────────────────────────────────── */
+.activeRulesSummary {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: #f8fafc;
+  border: 1.5px solid #e8edf5;
+  border-radius: 12px;
+  padding: 14px 16px;
+}
+
+.activeRulesHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.activeRulesTitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.activeRulesBadge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #2563eb;
+  border: 1px solid #bfdbfe;
+}
+
+.activeRulesList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.activeRuleChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #ffffff;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 12px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+}
+
+.activeRuleChipIcon {
+  color: #059669;
+  display: flex;
+  align-items: center;
+}
+
+.activeRuleChipName {
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.activeRuleChipDetail {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 11px;
+  color: #475569;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+.activeRuleChipMsg {
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.noRulesHint {
+  font-size: 12px;
+  color: #64748b;
+  font-style: italic;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ── Live Preview Card ────────────────────────────────────────────── */
+.previewBox {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px;
+  background: #f8fafc;
+  border: 1.5px dashed #cbd5e1;
+  border-radius: var(--omni-radius-lg, 12px);
+}
+
+.previewHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.previewField {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.previewLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1e293b;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.previewAsterisk {
+  color: #ef4444;
+  font-weight: bold;
+}
+
+.previewInput {
+  padding: 8px 12px;
+  font-size: 13px;
+  background: #ffffff;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 6px;
+  color: #94a3b8;
+  cursor: not-allowed;
+}
+
+.previewRulesHint {
+  font-size: 11px;
+  color: #64748b;
+  font-style: italic;
+}
+
+/* ── Form Groups ──────────────────────────────────────────────────── */
+.formGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.formGroupRow2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
 
 .formGroupRow {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 10px 12px;
-  background: var(--omni-color-surface-alt);
-  border-radius: var(--omni-radius-md);
+  gap: 16px;
+  padding: 12px 16px;
+  background: #f8fafc;
+  border: 1.5px solid #e8edf5;
+  border-radius: var(--omni-radius-lg, 12px);
 }
 
 .label {
-  font-size: var(--omni-font-size-xs);
-  font-weight: var(--omni-font-weight-semibold);
-  color: var(--omni-color-text-primary);
+  font-size: var(--omni-font-size-xs, 12px);
+  font-weight: 600;
+  color: var(--omni-color-text-primary, #0f172a);
 }
 
 .labelSm {
-  font-size: var(--omni-font-size-2xs-plus);
-  font-weight: var(--omni-font-weight-medium);
+  font-size: 11px;
+  font-weight: 500;
   color: #64748b;
 }
 
 .hint {
   display: flex;
   align-items: center;
-  gap: 4px;
-  font-size: var(--omni-font-size-2xs-plus);
+  gap: 5px;
+  font-size: 11.5px;
   color: #64748b;
+  margin-top: 2px;
 }
 
-.hintInline { font-size: var(--omni-font-size-2xs-plus); color: #64748b; display: block; margin-top: 2px; }
+.hintInline {
+  font-size: 11.5px;
+  color: #64748b;
+  display: block;
+  margin-top: 2px;
+}
 
 .input,
 .inputMono,
 .select {
-  border: 1.5px solid #e2e8f0;
-  border-radius: var(--omni-radius-md);
-  padding: 8px 10px;
-  font-size: var(--omni-font-size-sm);
-  color: var(--omni-color-text-primary);
-  background: var(--omni-color-surface);
+  border: 1.5px solid #cbd5e1;
+  border-radius: var(--omni-radius-md, 8px);
+  padding: 8px 12px;
+  font-size: var(--omni-font-size-sm, 13px);
+  color: var(--omni-color-text-primary, #0f172a);
+  background: var(--omni-color-surface, #ffffff);
   width: 100%;
+  box-sizing: border-box;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  font-family: inherit;
 }
 
 .input:focus,
 .inputMono:focus,
 .select:focus {
   outline: none;
-  border-color: var(--omni-color-primary-400, #60a5fa);
+  border-color: var(--omni-color-primary-500, #3b82f6);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
 }
 
-.inputMono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+.inputMono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
 
-.toggle { position: relative; display: inline-block; width: 38px; height: 22px; flex-shrink: 0; }
-.toggle input { opacity: 0; width: 0; height: 0; }
+/* ── Toggle Switch ────────────────────────────────────────────────── */
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.toggle input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
 .toggleTrack {
-  position: absolute; inset: 0; background: #cbd5e1; border-radius: 999px; transition: background 140ms ease;
+  display: block;
+  width: 38px;
+  height: 22px;
+  background: #cbd5e1;
+  border-radius: 999px;
+  position: relative;
+  transition: background 0.18s ease;
 }
+
+.toggle input:checked + .toggleTrack {
+  background: #2563eb;
+}
+
 .toggleThumb {
-  position: absolute; left: 2px; top: 2px; width: 18px; height: 18px; background: #fff; border-radius: 50%;
-  transition: transform 140ms ease; box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  display: block;
+  width: 16px;
+  height: 16px;
+  background: #ffffff;
+  border-radius: 50%;
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  transition: transform 0.18s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
-.toggle input:checked + .toggleTrack { background: var(--omni-color-primary-600, #2563eb); }
-.toggle input:checked + .toggleTrack .toggleThumb { transform: translateX(16px); }
-.toggle input:disabled + .toggleTrack { opacity: 0.6; }
 
-.rulesSection { display: flex; flex-direction: column; gap: 10px; border-top: 1px solid #eaecf0; padding-top: 12px; }
-.rulesSectionHeader { display: flex; flex-direction: column; gap: 2px; }
+.toggle input:checked + .toggleTrack .toggleThumb {
+  transform: translateX(16px);
+}
 
-.ruleCard {
+.toggle input:disabled + .toggleTrack {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ── Rules Section ────────────────────────────────────────────────── */
+.rulesSection {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  background: var(--omni-color-surface-alt);
-  border: 1px solid #eaecf0;
-  border-radius: var(--omni-radius-lg-minus);
-  padding: 10px 12px;
+  gap: 12px;
+  border-top: 1.5px solid #eaeff7;
+  padding-top: 16px;
 }
 
-.ruleCardHeader { display: flex; align-items: center; justify-content: space-between; }
-.ruleName { font-size: var(--omni-font-size-sm); font-weight: var(--omni-font-weight-semibold); color: var(--omni-color-text-primary); }
-
-.removeRuleBtn {
-  background: none; border: none; padding: 5px; border-radius: var(--omni-radius-md); cursor: pointer;
-  color: var(--omni-color-text-muted); display: flex; align-items: center; justify-content: center;
-  transition: background 120ms ease, color 120ms ease;
+/* ── Tester Row (for FormatEditorModal) ────────────────────────────── */
+.testerRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding-top: 8px;
 }
-.removeRuleBtn:hover { background: var(--omni-color-danger-50); color: var(--omni-color-danger-500); }
 
-.testerRow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .testerInput {
   flex: 1;
-  min-width: 160px;
+  min-width: 180px;
   border: 1.5px dashed #cbd5e1;
-  border-radius: var(--omni-radius-md);
-  padding: 7px 10px;
-  font-size: var(--omni-font-size-xs);
-  background: var(--omni-color-surface);
+  border-radius: var(--omni-radius-md, 8px);
+  padding: 8px 12px;
+  font-size: var(--omni-font-size-xs, 12px);
+  background: var(--omni-color-surface, #ffffff);
+  transition: border-color 0.15s ease;
+  box-sizing: border-box;
 }
-.testerInput:focus { outline: none; border-color: var(--omni-color-primary-400, #60a5fa); border-style: solid; }
 
-.testerPass, .testerFail {
-  display: inline-flex; align-items: center; gap: 4px;
-  font-size: var(--omni-font-size-2xs-plus);
-  font-weight: var(--omni-font-weight-semibold);
+.testerInput:focus {
+  outline: none;
+  border-color: var(--omni-color-primary-400, #60a5fa);
+  border-style: solid;
+}
+
+.testerPass,
+.testerFail {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 999px;
   white-space: nowrap;
 }
-.testerPass { color: #15803d; }
-.testerFail { color: var(--omni-color-danger-600, #dc2626); }
 
-.addRuleRow { display: flex; }
+.testerPass {
+  background: #f0fdf4;
+  color: #15803d;
+  border: 1px solid #bbf7d0;
+}
+
+.testerFail {
+  background: #fef2f2;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+}
+
+/* ── Field Type & Template Selectors ──────────────────────────────── */
+.typeSelector {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.typeCard {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: var(--omni-radius-md, 8px);
+  border: 1.5px solid #e2e8f0;
+  background: #ffffff;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: left;
+}
+
+.typeCard:hover {
+  border-color: #cbd5e1;
+  background: #f8fafc;
+}
+
+.typeCardActive {
+  border-color: var(--omni-color-primary-500, #2563eb);
+  background: #eff6ff;
+  box-shadow: 0 0 0 1px var(--omni-color-primary-500, #2563eb);
+}
+
+.typeCardIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  background: #f1f5f9;
+  color: #475569;
+  flex-shrink: 0;
+}
+
+.typeCardActive .typeCardIcon {
+  background: #dbeafe;
+  color: #2563eb;
+}
+
+.typeCardContent {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.typeCardTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.typeCardDesc {
+  font-size: 11.5px;
+  color: #64748b;
+  line-height: 1.3;
+}
+
+/* ── Options Manager Card ─────────────────────────────────────────── */
+.optionsCard {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: #f8fafc;
+  border: 1.5px solid #e2e8f0;
+  border-radius: var(--omni-radius-lg, 12px);
+  padding: 16px;
+}
+
+.optionsHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.optionsTitleGroup {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.optionsTitle {
+  font-size: 13px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.optionsBadge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #2563eb;
+  border: 1px solid #bfdbfe;
+}
+
+.optionsActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.textActionBtn {
+  background: none;
+  border: none;
+  color: #64748b;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 3px 6px;
+  border-radius: 4px;
+}
+
+.textActionBtn:hover {
+  color: #0f172a;
+  background: #e2e8f0;
+}
+
+.saveTemplateBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #2563eb;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 3px 8px;
+  border-radius: 4px;
+  transition: all 0.15s ease;
+}
+
+.saveTemplateBtn:hover:not(:disabled) {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.saveTemplateBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.addOptionRow {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.addOptionInput {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1.5px solid #cbd5e1;
+  border-radius: var(--omni-radius-md, 8px);
+  font-size: 13px;
+  background: #ffffff;
+}
+
+.addOptionInput:focus {
+  outline: none;
+  border-color: var(--omni-color-primary-500, #2563eb);
+}
+
+.optionsFilterInput {
+  padding: 6px 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  font-size: 12px;
+  background: #ffffff;
+  color: #334155;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.optionsFilterInput:focus {
+  outline: none;
+  border-color: #94a3b8;
+}
+
+.optionsChipsList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-height: 180px;
+  overflow-y: auto;
+  padding: 8px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+}
+
+.optionChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  font-size: 12px;
+  color: #1e293b;
+  font-weight: 500;
+}
+
+.optionChipRemove {
+  background: none;
+  border: none;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #94a3b8;
+  cursor: pointer;
+  border-radius: 3px;
+  font-size: 14px;
+  line-height: 1;
+  width: 14px;
+  height: 14px;
+}
+
+.optionChipRemove:hover {
+  color: #ef4444;
+  background: #fee2e2;
+}
+
+.emptyOptionsNotice {
+  padding: 12px;
+  text-align: center;
+  color: #64748b;
+  font-size: 12px;
+  font-style: italic;
+  background: #ffffff;
+  border: 1px dashed #cbd5e1;
+  border-radius: 8px;
+}
+

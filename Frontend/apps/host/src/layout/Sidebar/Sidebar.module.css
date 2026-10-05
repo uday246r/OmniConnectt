@@ -135,6 +135,31 @@
   border-top: 1px solid var(--omni-sidebar-divider);
 }
 
+.settingsAccordionBtn {
+  font-weight: var(--omni-font-weight-semibold);
+  margin-bottom: 2px;
+  cursor: pointer;
+}
+
+.settingsSubmenu {
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebarGroupBlock {
+  margin-bottom: 6px;
+}
+
+.categorySubLabel {
+  padding: 10px 8px 3px;
+  font-size: 10px;
+  font-weight: var(--omni-font-weight-bold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--omni-color-text-muted);
+  user-select: none;
+}
+
 /* ── Mobile responsive sidebar ──────────────────────────────── */
 @media (max-width: 768px) {
   .sidebar {
@@ -178,9 +203,12 @@
   /* Wordmark down to just the mark; section headings and count badges have no room. */
   .brandNames,
   .sectionLabel,
+  .categorySubLabel,
+  .settingsSectionHeader,
   .unreachableBadge {
     display: none;
   }
+
 
   .brand {
     justify-content: center;

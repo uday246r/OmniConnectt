@@ -43,6 +43,18 @@ public class UserSchemaValidator
                 continue;
             }
 
+            if (string.Equals(field.DataType, "dropdown", StringComparison.OrdinalIgnoreCase)
+                && field.Options is { Count: > 0 }
+                && !string.IsNullOrEmpty(value))
+            {
+                var match = field.Options.Any(opt => string.Equals(opt, value, StringComparison.OrdinalIgnoreCase));
+                if (!match)
+                {
+                    errors.Add(new FieldValidationErrorDto(field.Key, $"Please select a valid option for {field.Label}."));
+                    continue;
+                }
+            }
+
             var message = FieldRuleEngine.FirstFailure(field.Validations.Select(ToFieldRule), value, presets);
             if (message is not null)
             {

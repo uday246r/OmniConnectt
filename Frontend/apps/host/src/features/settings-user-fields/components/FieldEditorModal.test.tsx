@@ -262,3 +262,136 @@ describe('saving', () => {
     expect(onSave).not.toHaveBeenCalled()
   })
 })
+
+describe('templates and dropdown fields', () => {
+  it('switches to dropdown and rejects saving with no options', async () => {
+    const { onSave } = renderModal()
+    await userEvent.type(screen.getByPlaceholderText(/e\.g\. aadhar number/i), 'Department')
+    const dropdownBtn = screen.getByRole('radio', { name: /dropdown/i })
+    await userEvent.click(dropdownBtn)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Add Field' }))
+
+    expect(screen.getByRole('alert')).toHaveTextContent(/dropdown fields require at least one option/i)
+    expect(onSave).not.toHaveBeenCalled()
+  })
+
+  it('allows adding and removing custom options for a dropdown field', async () => {
+    const { onSave } = renderModal()
+    await userEvent.type(screen.getByPlaceholderText(/e\.g\. aadhar number/i), 'Priority')
+    await userEvent.click(screen.getByRole('radio', { name: /dropdown/i }))
+
+    const optionInput = screen.getByPlaceholderText(/add option and press enter/i)
+    await userEvent.type(optionInput, 'High')
+    await userEvent.click(screen.getByRole('button', { name: 'Add Option' }))
+
+    expect(screen.getByText('High')).toBeInTheDocument()
+
+    await userEvent.type(optionInput, 'Low')
+    fireEvent.keyDown(optionInput, { key: 'Enter' })
+
+    expect(screen.getByText('Low')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Add Field' }))
+
+    expect(onSave).toHaveBeenCalledWith(
+      expect.objectContaining({
+        key: 'priority',
+        label: 'Priority',
+        dataType: 'dropdown',
+        options: ['High', 'Low'],
+        validations: [],
+      }),
+    )
+  })
+
+  it('choosing the Country template auto-populates country label and 240+ countries', async () => {
+    const { onSave } = renderModal()
+
+    const templateCombobox = screen.getByRole('combobox', { name: /template \(pre-configured\)/i })
+    fireEvent.mouseDown(templateCombobox)
+    const countryOption = screen.getAllByRole('option').find((o) => o.textContent?.includes('Country'))
+    expect(countryOption).toBeDefined()
+    fireEvent.click(countryOption!)
+
+    expect(screen.getByDisplayValue('Country')).toBeInTheDocument()
+    expect(screen.getByText(/250 options/i)).toBeInTheDocument()
+    expect(screen.getByText('India')).toBeInTheDocument()
+    expect(screen.getByText('United States')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Add Field' }))
+
+    expect(onSave).toHaveBeenCalledWith(
+      expect.objectContaining({
+        key: 'country',
+        label: 'Country',
+        dataType: 'dropdown',
+        template: 'contact-country',
+        options: expect.arrayContaining(['India', 'United States', 'United Kingdom']),
+      }),
+    )
+  })
+})
+
+describe('form section', () => {
+  const sections = [
+    { key: 'personal-details', label: 'Personal Details', order: 1, isSystem: true },
+    { key: 'address', label: 'Address', order: 2, isSystem: false },
+    { key: 'employment', label: 'Employment Details', order: 3, isSystem: false },
+  ]
+  const sectionSelect = () => screen.getByRole('combobox', { name: /form section/i })
+
+  it('offers exactly the admin-managed sections, by label, with no free-text escape hatch', () => {
+    renderModal({ sections })
+
+    fireEvent.mouseDown(sectionSelect())
+
+    const labels = screen.getAllByRole('option').map((o) => o.textContent)
+    expect(labels).toEqual(expect.arrayContaining(['Personal Details', 'Address', 'Employment Details']))
+    expect(labels.some((l) => l?.includes('Custom Section'))).toBe(false)
+  })
+
+  it('preselects the section whose Add Field was clicked and saves its KEY, not its label', async () => {
+    const { onSave } = renderModal({ sections, initialSection: 'employment' })
+    await userEvent.type(screen.getByPlaceholderText(/e\.g\. aadhar number/i), 'Employer')
+    addFormat('Aadhar number')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Add Field' }))
+
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ key: 'employer', section: 'employment' }))
+  })
+
+  it('shows an existing field in its real section even when it stored an old label', async () => {
+    const legacy: FieldDefinition = {
+      key: 'street', label: 'Street', core: false, dataType: 'text', required: false, order: 1, validations: [],
+      section: 'Address',
+    }
+    const { onSave } = renderModal({ sections, field: legacy })
+
+    await userEvent.click(screen.getByRole('button', { name: 'Save Field' }))
+
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ section: 'address' }))
+  })
+
+  it('falls back to the default section for a field pointing at a section that was deleted', async () => {
+    const orphan: FieldDefinition = {
+      key: 'lost', label: 'Lost', core: false, dataType: 'text', required: false, order: 1, validations: [],
+      section: 'deleted-section',
+    }
+    const { onSave } = renderModal({ sections, field: orphan })
+
+    await userEvent.click(screen.getByRole('button', { name: 'Save Field' }))
+
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ section: 'personal-details' }))
+  })
+
+  it('hides the section picker for a core field, whose placement is not the admin\'s to change', () => {
+    const core: FieldDefinition = {
+      key: 'name', label: 'Full Name', core: true, dataType: 'text', required: true, order: 1, validations: [],
+      section: 'personal-details',
+    }
+    renderModal({ sections, field: core })
+
+    expect(screen.queryByRole('combobox', { name: /form section/i })).not.toBeInTheDocument()
+  })
+})

@@ -116,9 +116,29 @@ function refreshOnce(): Promise<RefreshResponse> {
   return inFlightRefresh
 }
 
+export function isSuperAdminOrAdmin(user: CurrentUserDto | null | undefined): boolean {
+  if (!user) return false
+  if (user.isAdministrator) return true
+  const role = user.roleName?.trim().toLowerCase() ?? ''
+  return (
+    role === 'super admin' ||
+    role === 'super administrator' ||
+    role === 'administrator' ||
+    role.includes('admin')
+  )
+}
+
+function normalizeUser(user: CurrentUserDto): CurrentUserDto {
+  const isAdmin = isSuperAdminOrAdmin(user)
+  if (isAdmin && !user.isAdministrator) {
+    return { ...user, isAdministrator: true }
+  }
+  return user
+}
+
 function applySession(session: { accessToken: string; expiresAt: string; user: CurrentUserDto }) {
   return {
-    user: session.user,
+    user: normalizeUser(session.user),
     accessToken: session.accessToken,
     accessTokenExpiresAt: new Date(session.expiresAt).getTime(),
     status: 'authenticated' as const,
@@ -248,7 +268,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   hasCapability(featureKey, capability) {
     const { user, fineCapabilities } = get()
     if (!user) return false
-    if (user.isAdministrator) return true
+    if (isSuperAdminOrAdmin(user)) return true
 
     const required = `${featureKey}:${capability}`
     return user.permissions.includes(required) || fineCapabilities.includes(required)

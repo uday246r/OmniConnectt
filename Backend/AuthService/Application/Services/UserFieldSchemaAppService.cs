@@ -37,7 +37,12 @@ public class UserFieldSchemaAppService(AuthDbContext db, AuditLogAppService audi
         }
 
         var fields = JsonSerializer.Deserialize<List<FieldDefinitionDto>>(row.SchemaJson, JsonOptions) ?? [];
-        return new UserFieldSchemaDto(fields, row.Version, row.UpdatedAt);
+
+        // Read-time upgrade: schemas saved while sections were free text carry labels ("Address") or
+        // nothing at all. Resolving here means every consumer — the form, the detail page, the server
+        // validator — sees real section keys without a data migration having to rewrite the row.
+        var sections = await FieldSectionAppService.ReadSectionsAsync(db, ct);
+        return new UserFieldSchemaDto(Arrange(fields, sections), row.Version, row.UpdatedAt);
     }
 
     /// <summary>Fields only — for UserAppService's server-side validation of a create/update-user
@@ -53,6 +58,21 @@ public class UserFieldSchemaAppService(AuthDbContext db, AuditLogAppService audi
     {
         ValidateShape(request.Fields);
 
+        // Strict on save, lenient on read: a field naming a section that does not exist is an editor
+        // bug or a stale tab, and is refused here rather than being quietly re-homed to the system
+        // section. A blank section is fine — it means "no opinion" and resolves to the system section.
+        var sections = await FieldSectionAppService.ReadSectionsAsync(db, ct);
+        foreach (var field in request.Fields)
+        {
+            if (!FieldSectionAppService.IsKnownSection(field.Section, sections))
+            {
+                throw new ValidationAppException(
+                    $"Field '{field.Label}' is in a section that no longer exists. Reload to see the current sections.");
+            }
+        }
+
+        var fields = Arrange(request.Fields, sections);
+
         var row = await db.UserFieldSchemas.OrderByDescending(s => s.UpdatedAt).FirstOrDefaultAsync(ct);
 
         // Two administrators editing at once: a save based on an older version is refused rather than
@@ -63,7 +83,7 @@ public class UserFieldSchemaAppService(AuthDbContext db, AuditLogAppService audi
         }
 
         var now = DateTimeOffset.UtcNow;
-        var schemaJson = JsonSerializer.Serialize(request.Fields, JsonOptions);
+        var schemaJson = JsonSerializer.Serialize(fields, JsonOptions);
 
         if (row is null)
         {
@@ -111,7 +131,69 @@ public class UserFieldSchemaAppService(AuthDbContext db, AuditLogAppService audi
                      $"Fields: {string.Join(", ", request.Fields.Select(f => f.Key))}.",
             ct: ct);
 
-        return new UserFieldSchemaDto(request.Fields, row.Version, row.UpdatedAt);
+        return new UserFieldSchemaDto(fields, row.Version, row.UpdatedAt);
+    }
+
+    /// <summary>
+    /// Puts every field into a real section and lays them out: sections in catalog order, fields in
+    /// their existing relative order within each, <c>Order</c> renumbered 1..n PER SECTION.
+    /// <para>
+    /// Order used to be one global sequence, so "move this field up" had no meaning once fields were
+    /// grouped — the neighbour above it might be in a different section entirely. Per-section order is
+    /// what makes a move within a section, and a move between sections, independent operations.
+    /// </para>
+    /// </summary>
+    public static List<FieldDefinitionDto> Arrange(
+        IReadOnlyList<FieldDefinitionDto> fields, IReadOnlyList<FieldSectionDto> sections)
+    {
+        var sectionRank = sections.Select((s, i) => (s.Key, Rank: i)).ToDictionary(p => p.Key, p => p.Rank, StringComparer.OrdinalIgnoreCase);
+
+        var placed = fields
+            .Select((f, i) => (Field: f with { Section = FieldSectionAppService.ResolveSectionKey(
+                string.IsNullOrWhiteSpace(f.Section) ? LegacyDefaultSectionKey(f, sections) : f.Section, sections) }, Index: i))
+            .OrderBy(p => sectionRank.GetValueOrDefault(p.Field.Section!, int.MaxValue))
+            .ThenBy(p => p.Field.Order)
+            .ThenBy(p => p.Index)
+            .Select(p => p.Field)
+            .ToList();
+
+        var counters = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        for (var i = 0; i < placed.Count; i++)
+        {
+            var key = placed[i].Section!;
+            counters[key] = counters.GetValueOrDefault(key) + 1;
+            placed[i] = placed[i] with { Order = counters[key] };
+        }
+
+        return placed;
+    }
+
+    private static readonly HashSet<string> LegacyAddressTemplates = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "contact-country", "contact-state", "contact-city", "contact-postal-code", "contact-street-address",
+    };
+
+    private static readonly HashSet<string> LegacyAddressKeys = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "country", "stateProvince", "city", "postalCode", "address",
+    };
+
+    /// <summary>
+    /// The section an address-shaped field used to land in when it had none stored. Applied only to a
+    /// BLANK section (an explicit choice always wins) and only while an <c>address</c> section still
+    /// exists, so deleting it does not pull fields back into a section the admin removed. Exact matches
+    /// only — the old substring guesses treated "estate" as "state". Kept in step with
+    /// <c>legacyDefaultSectionKey</c> in the host's utils/sections.ts.
+    /// </summary>
+    public static string? LegacyDefaultSectionKey(FieldDefinitionDto field, IReadOnlyList<FieldSectionDto> sections)
+    {
+        var address = sections.FirstOrDefault(s => string.Equals(s.Key, "address", StringComparison.OrdinalIgnoreCase));
+        if (address is null) return null;
+
+        var isAddressShaped =
+            (field.Template is not null && LegacyAddressTemplates.Contains(field.Template)) ||
+            LegacyAddressKeys.Contains(field.Key);
+        return isAddressShaped ? address.Key : null;
     }
 
     private async Task<string?> ResolveActorNameAsync(Guid? actingUserId, CancellationToken ct) =>
@@ -157,6 +239,19 @@ public class UserFieldSchemaAppService(AuthDbContext db, AuditLogAppService audi
                 throw new ValidationAppException($"'{field.Key}' is a reserved core field name.");
             }
 
+            if (string.Equals(field.DataType, "dropdown", StringComparison.OrdinalIgnoreCase))
+            {
+                if (field.Core)
+                {
+                    throw new ValidationAppException($"Core field '{field.Label}' cannot be a dropdown.");
+                }
+
+                if (!IsDynamicDropdown(field) && (field.Options is null || field.Options.Count == 0 || field.Options.All(string.IsNullOrWhiteSpace)))
+                {
+                    throw new ValidationAppException($"Dropdown field '{field.Label}' must have at least one option.");
+                }
+            }
+
             foreach (var rule in field.Validations)
             {
                 if (rule.Type == FieldPresets.Custom)
@@ -192,8 +287,26 @@ public class UserFieldSchemaAppService(AuthDbContext db, AuditLogAppService audi
     /// <summary>Seed shape — also used as GetAsync's fallback if the DB row is ever missing.</summary>
     public static List<FieldDefinitionDto> DefaultFields() =>
     [
-        new("name", "Full Name", true, "text", true, 1, []),
-        new("email", "Email Address", true, "email", true, 2, []),
-        new("phoneNumber", "Mobile Number", true, "text", true, 3, []),
+        new("name", "Full Name", true, "text", true, 1, [], null, null, FieldSectionAppService.SystemSectionKey),
+        new("email", "Email Address", true, "email", true, 2, [], null, null, FieldSectionAppService.SystemSectionKey),
+        new("phoneNumber", "Mobile Number", true, "text", true, 3, [], null, null, FieldSectionAppService.SystemSectionKey),
     ];
+
+    public static bool IsDynamicDropdown(FieldDefinitionDto field)
+    {
+        if (field.Template is "contact-state" or "contact-city" or "contact-phone")
+            return true;
+
+        if (string.Equals(field.Key, "state", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(field.Key, "stateProvince", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(field.Key, "city", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(field.Key, "phoneNumber", StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        var label = (field.Label ?? string.Empty).Trim().ToLowerInvariant();
+        if (label.Contains("state") || label.Contains("province") || label.Contains("city") || label.Contains("phone"))
+            return true;
+
+        return false;
+    }
 }

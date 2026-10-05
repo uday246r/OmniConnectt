@@ -1,37 +1,91 @@
 .overlay {
   position: fixed;
   inset: 0;
-  background: color-mix(in srgb, var(--omni-color-text-primary) 45%, transparent);
+  background: rgba(15, 23, 42, 0.5);
+  backdrop-filter: blur(2px);
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: var(--omni-space-4);
-  z-index: var(--omni-z-modal);
+  padding: 24px;
+  z-index: var(--omni-z-modal, 1000);
+  animation: modalFadeIn 0.18s ease-out;
+}
+
+@keyframes modalFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
 .dialog {
   width: 100%;
-  max-width: 420px;
-  background: var(--omni-color-surface);
-  border-radius: var(--omni-radius-lg);
-  box-shadow: var(--omni-shadow-lg);
-  padding: var(--omni-space-6);
+  max-width: 440px;
+  max-height: min(88vh, 820px);
+  background: var(--omni-color-surface, #ffffff);
+  border-radius: var(--omni-radius-xl, 18px);
+  box-shadow: 0 24px 64px -12px rgba(15, 23, 42, 0.28), 0 0 0 1.5px rgba(15, 23, 42, 0.06);
+  padding: 24px 28px;
   display: flex;
   flex-direction: column;
-  gap: var(--omni-space-4);
+  gap: 16px;
+  overflow: hidden;
+  box-sizing: border-box;
+  animation: dialogScaleUp 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes dialogScaleUp {
+  from { opacity: 0; transform: scale(0.97) translateY(6px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.dialogSm {
+  max-width: 440px;
+}
+
+.dialogMd {
+  max-width: 580px;
+}
+
+.dialogLg {
+  max-width: 720px;
+}
+
+.dialogXl {
+  max-width: 880px;
 }
 
 .title {
-  color: var(--omni-color-text-primary);
+  color: var(--omni-color-text-primary, #0f172a);
+  font-size: 18px;
+  font-weight: 700;
+  margin: 0;
+  line-height: 1.3;
 }
 
 .body {
-  color: var(--omni-color-text-secondary);
+  color: var(--omni-color-text-secondary, #475569);
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+  padding-right: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+.body::-webkit-scrollbar {
+  width: 6px;
+}
+
+.body::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 999px;
 }
 
 .actions {
   display: flex;
   justify-content: flex-end;
-  gap: var(--omni-space-3);
-  margin-top: var(--omni-space-2);
+  gap: 10px;
+  padding-top: 14px;
+  border-top: 1.5px solid #eaeff7;
+  flex-shrink: 0;
+  background: var(--omni-color-surface, #ffffff);
 }

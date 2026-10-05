@@ -28,12 +28,11 @@ public class PasswordResetService(
     PasswordHasher passwordHasher,
     RefreshTokenService refreshTokenService,
     IOptions<SmtpOptions> smtpOptions,
-    IOptions<PasswordPolicyOptions> passwordPolicyOptions,
+    PasswordPolicyAppService passwordPolicy,
     AuditLogAppService auditLog,
     ILogger<PasswordResetService> logger)
 {
     private readonly SmtpOptions _smtp = smtpOptions.Value;
-    private readonly PasswordPolicyOptions _passwordPolicy = passwordPolicyOptions.Value;
 
     public bool IsEnabled => email.IsEnabled;
 
@@ -150,7 +149,7 @@ public class PasswordResetService(
         var token = await FindRedeemableAsync(rawToken, ct);
         if (token?.User is null) return "This link is invalid, has already been used, or has expired.";
 
-        var policyProblem = _passwordPolicy.Validate(newPassword);
+        var policyProblem = (await passwordPolicy.GetComplexityAsync(ct)).Validate(newPassword);
         if (policyProblem is not null) return policyProblem;
 
         token.UsedAt = DateTimeOffset.UtcNow;
@@ -159,6 +158,8 @@ public class PasswordResetService(
         // first-login rotation that exists for administrator-generated temporary passwords is not
         // relevant here — same reasoning SetPasswordInviteService applies on redemption.
         token.User.MustChangePassword = false;
+        token.User.PasswordChangedAt = DateTimeOffset.UtcNow;
+        token.User.PasswordExpiryReminderSentDay = null;
         token.User.UpdatedAt = DateTimeOffset.UtcNow;
 
         await db.SaveChangesAsync(ct);

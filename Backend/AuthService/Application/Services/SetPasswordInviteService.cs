@@ -28,12 +28,11 @@ public class SetPasswordInviteService(
     IEmailSender email,
     PasswordHasher passwordHasher,
     IOptions<SmtpOptions> smtpOptions,
-    IOptions<PasswordPolicyOptions> passwordPolicyOptions,
+    PasswordPolicyAppService passwordPolicy,
     AuditLogAppService auditLog,
     ILogger<SetPasswordInviteService> logger)
 {
     private readonly SmtpOptions _smtp = smtpOptions.Value;
-    private readonly PasswordPolicyOptions _passwordPolicy = passwordPolicyOptions.Value;
 
     /// <summary>How long a freshly issued invite is protected from being superseded by another one.</summary>
     private static readonly TimeSpan ResendCooldown = TimeSpan.FromMinutes(1);
@@ -206,7 +205,7 @@ public class SetPasswordInviteService(
 
         // The same policy the change-password flow enforces — a password chosen through an invite is
         // no less privileged than one set from inside the app.
-        var policyProblem = _passwordPolicy.Validate(newPassword);
+        var policyProblem = (await passwordPolicy.GetComplexityAsync(ct)).Validate(newPassword);
         if (policyProblem is not null) return policyProblem;
 
         invite.UsedAt = DateTimeOffset.UtcNow;
@@ -214,6 +213,9 @@ public class SetPasswordInviteService(
         // The user chose this password themselves, so the forced-change-on-first-login that exists
         // for administrator-generated temporary passwords would be pure friction here.
         invite.User.MustChangePassword = false;
+        invite.User.PasswordChangedAt = DateTimeOffset.UtcNow;
+        invite.User.PasswordExpiryReminderSentDay = null;
+        invite.User.UpdatedAt = DateTimeOffset.UtcNow;
 
         await db.SaveChangesAsync(ct);
         logger.LogInformation("Set-password invite redeemed for user {UserId}.", invite.UserId);

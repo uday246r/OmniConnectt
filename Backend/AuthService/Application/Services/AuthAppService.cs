@@ -34,11 +34,10 @@ public class AuthAppService(
     PermissionClaimsBuilder permissionClaimsBuilder,
     AuditLogAppService auditLog,
     IOptions<GoogleAuthOptions> googleOptions,
-    IOptions<PasswordPolicyOptions> passwordPolicyOptions)
+    PasswordPolicyAppService passwordPolicy)
 {
     private const string ServiceName = "AuthService";
     private readonly GoogleAuthOptions _google = googleOptions.Value;
-    private readonly PasswordPolicyOptions _passwordPolicy = passwordPolicyOptions.Value;
 
     public async Task<AuthResult> LoginAsync(string email, string password, string? clientIp, string? userAgent, CancellationToken ct = default)
     {
@@ -63,10 +62,13 @@ public class AuthAppService(
             throw new AccountInactiveException();
         }
 
+        var policy = await passwordPolicy.GetPolicyAsync(ct);
+        await EnforcePasswordExpiryAsync(user, policy, ct);
+
         user.LastLoginAt = DateTimeOffset.UtcNow;
         await db.SaveChangesAsync(ct);
 
-        var result = await IssueSessionAsync(user, clientIp, ct);
+        var result = await IssueSessionAsync(user, clientIp, policy, ct);
 
         await auditLog.WriteHostAsync(
             user.Id, user.Name, "auth.login_succeeded",
@@ -134,7 +136,7 @@ public class AuthAppService(
         user.LastLoginAt = DateTimeOffset.UtcNow;
         await db.SaveChangesAsync(ct);
 
-        var result = await IssueSessionAsync(user, clientIp, ct);
+        var result = await IssueSessionAsync(user, clientIp, await passwordPolicy.GetPolicyAsync(ct), ct);
 
         await auditLog.WriteHostAsync(
             user.Id, user.Name, "auth.login_succeeded",
@@ -209,6 +211,14 @@ public class AuthAppService(
             throw new AccountInactiveException();
         }
 
+        // Login is not the only door: a session opened yesterday keeps refreshing for up to
+        // AbsoluteSessionHours, so a password that expired overnight would otherwise stay usable until
+        // the session hard-ends. Re-checking here means the next refresh issues a token carrying
+        // mustChangePassword, and MustChangePasswordFilter closes the API behind it.
+        var policy = await passwordPolicy.GetPolicyAsync(ct);
+        await EnforcePasswordExpiryAsync(user, policy, ct);
+        await db.SaveChangesAsync(ct);
+
         var permissions = await permissionClaimsBuilder.BuildAsync(user, ct);
         var access = jwtTokenService.CreateAccessToken(user, permissions);
 
@@ -217,7 +227,31 @@ public class AuthAppService(
             access.ExpiresAt,
             newToken.RawToken,
             newToken.ExpiresAt,
-            ToCurrentUserDto(user, permissions));
+            ToCurrentUserDto(user, permissions, policy));
+    }
+
+    /// <summary>
+    /// If the user's password has outlived the policy, flags the account so the session that follows is
+    /// restricted to changing it. Persisted by the caller's SaveChanges — the flag is the same one an
+    /// administrator-issued temporary password uses, so the existing filter and the frontend gate handle
+    /// both with no second mechanism. Audited once, on the transition, not on every sign-in afterwards.
+    /// </summary>
+    private async Task EnforcePasswordExpiryAsync(User user, PasswordPolicyDefinitionDto policy, CancellationToken ct)
+    {
+        var status = PasswordPolicyAppService.Evaluate(user, policy);
+        if (!status.IsExpired || user.MustChangePassword)
+        {
+            return;
+        }
+
+        user.MustChangePassword = true;
+        await auditLog.WriteHostAsync(
+            user.Id, user.Name, "auth.password_expired",
+            AuditLogAppService.Modules.Authentication, AuditLogAppService.Categories.Auth,
+            entityType: "User", entityId: user.Id.ToString(), entityLabel: user.Email,
+            details: $"Password expired on {status.ExpiresAt:u} ({status.EffectiveExpiryDays}-day policy). " +
+                     "The account must set a new password before it can be used.",
+            authMethod: "Local", ct: ct);
     }
 
     /// <summary>
@@ -275,19 +309,22 @@ public class AuthAppService(
             throw new PasswordChangeRejectedException("Your current password is incorrect.");
         }
 
-        var policyProblem = _passwordPolicy.Validate(newPassword);
+        var complexity = await passwordPolicy.GetComplexityAsync(ct);
+        var policyProblem = complexity.Validate(newPassword);
         if (policyProblem is not null)
         {
             throw new PasswordChangeRejectedException(policyProblem);
         }
 
-        if (_passwordPolicy.RejectSameAsCurrent && passwordHasher.Verify(user, user.PasswordHash, newPassword))
+        if (complexity.RejectSameAsCurrent && passwordHasher.Verify(user, user.PasswordHash, newPassword))
         {
             throw new PasswordChangeRejectedException("The new password must be different from your current one.");
         }
 
         user.PasswordHash = passwordHasher.Hash(user, newPassword);
         user.MustChangePassword = false;
+        user.PasswordChangedAt = DateTimeOffset.UtcNow;
+        user.PasswordExpiryReminderSentDay = null;
         user.UpdatedAt = DateTimeOffset.UtcNow;
         await db.SaveChangesAsync(ct);
 
@@ -352,10 +389,10 @@ public class AuthAppService(
         }
 
         var permissions = await permissionClaimsBuilder.BuildAsync(user, ct);
-        return ToCurrentUserDto(user, permissions);
+        return ToCurrentUserDto(user, permissions, await passwordPolicy.GetPolicyAsync(ct));
     }
 
-    private async Task<AuthResult> IssueSessionAsync(User user, string? clientIp, CancellationToken ct)
+    private async Task<AuthResult> IssueSessionAsync(User user, string? clientIp, PasswordPolicyDefinitionDto policy, CancellationToken ct)
     {
         var permissions = await permissionClaimsBuilder.BuildAsync(user, ct);
         var access = jwtTokenService.CreateAccessToken(user, permissions);
@@ -369,10 +406,10 @@ public class AuthAppService(
             access.ExpiresAt,
             refresh.RawToken,
             refresh.ExpiresAt,
-            ToCurrentUserDto(user, permissions));
+            ToCurrentUserDto(user, permissions, policy));
     }
 
-    private static CurrentUserDto ToCurrentUserDto(User user, PermissionClaimsResult permissions) => new(
+    private static CurrentUserDto ToCurrentUserDto(User user, PermissionClaimsResult permissions, PasswordPolicyDefinitionDto policy) => new(
         user.Id,
         user.Salutation,
         user.Name,
@@ -385,5 +422,17 @@ public class AuthAppService(
         permissions.Permissions,
         user.AuthProvider.ToString(),
         user.Status == UserStatus.Active,
-        user.LastLoginAt);
+        user.LastLoginAt,
+        ToPasswordExpiryDto(user, policy));
+
+    private static PasswordExpiryDto ToPasswordExpiryDto(User user, PasswordPolicyDefinitionDto policy)
+    {
+        var status = PasswordPolicyAppService.Evaluate(user, policy);
+        return new PasswordExpiryDto(
+            status.ExpiresAt,
+            status.DaysRemaining,
+            status.IsExpired,
+            // Resolved here, against the administrator's channel choice, so the client obeys one boolean.
+            ShowReminder: status.IsInWarningWindow && policy.Notifications.InApp);
+    }
 }

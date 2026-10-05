@@ -34,8 +34,19 @@ public class User
     public Guid? RoleId { get; set; }
     public Role? Role { get; set; }
 
-    /// <summary>Forces a password change on next login — used for system-generated temporary passwords.</summary>
+    /// <summary>Forces a password change on next login — used for system-generated temporary passwords or expired passwords.</summary>
     public bool MustChangePassword { get; set; }
+
+    /// <summary>When the user last set or rotated their password — the start of the expiry clock. Null for
+    /// an account that has never recorded a change, in which case <see cref="CreatedAt"/> is used.</summary>
+    public DateTimeOffset? PasswordChangedAt { get; set; }
+
+    /// <summary>
+    /// The smallest reminder threshold (days before expiry) already emailed for the CURRENT password, so
+    /// the reminder job sends each threshold once. Cleared whenever the password changes, which is what
+    /// restarts the sequence for the next rotation.
+    /// </summary>
+    public int? PasswordExpiryReminderSentDay { get; set; }
 
     public DateTimeOffset? LastLoginAt { get; set; }
 

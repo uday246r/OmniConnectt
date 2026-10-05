@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { Sidebar } from './Sidebar'
 import { useNavigationStore } from '../../shared/stores/navigationStore'
+import { useAuthStore } from '../../features/auth/store/authStore'
 import type { NavNodeDto, NavSectionDto } from '../../shared/api/navigationApi'
 
 /**
@@ -237,3 +238,120 @@ describe('active state', () => {
     expect(current).toEqual(['/apps/lead/view-lead'])
   })
 })
+
+describe('system section replacement with grouped Settings', () => {
+  it('renders Settings heading and groups for an administrator', () => {
+    useAuthStore.setState({
+      user: {
+        id: 'admin-1',
+        name: 'Super Admin',
+        email: 'admin@omniconnect.com',
+        isAdministrator: true,
+      },
+      status: 'authenticated',
+    })
+
+    const systemSection: NavSectionDto = {
+      key: 'system',
+      label: 'System',
+      order: 30,
+      pinToBottom: true,
+      items: [
+        node({ key: 'host.system.approvals', label: 'Approval Center', routePath: '/system/approvals' }),
+      ],
+    }
+
+    renderSidebar([systemSection])
+
+    // Should render "Settings" rather than "System"
+    expect(screen.getByText('Settings')).toBeInTheDocument()
+    expect(screen.getByText('ACCESS MANAGEMENT')).toBeInTheDocument()
+    expect(screen.getByText('CONFIGURATION')).toBeInTheDocument()
+    expect(screen.getByText('GOVERNANCE')).toBeInTheDocument()
+
+    expect(screen.getByRole('link', { name: /users/i })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /roles & permissions/i })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /applications/i })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /checker assignment/i })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /manage fields/i })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /manage formats/i })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /manage password policy/i })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /approval center/i })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /audit logs/i })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /system logs/i })).toBeInTheDocument()
+  })
+
+  it('omits unauthorized groups and items for a user with restricted capabilities', () => {
+    useAuthStore.setState({
+      user: {
+        id: 'user-1',
+        name: 'Audit Reviewer',
+        email: 'auditor@omniconnect.com',
+        isAdministrator: false,
+        permissions: ['host.system.audit-logs:View'],
+      },
+      status: 'authenticated',
+    })
+
+    const systemSection: NavSectionDto = {
+      key: 'system',
+      label: 'System',
+      order: 30,
+      pinToBottom: true,
+      items: [
+        node({ key: 'host.system.audit-logs', label: 'Audit Logs', routePath: '/system/audit-logs' }),
+      ],
+    }
+
+    renderSidebar([systemSection])
+
+    expect(screen.getByText('Settings')).toBeInTheDocument()
+    expect(screen.queryByText('ACCESS MANAGEMENT')).not.toBeInTheDocument()
+    expect(screen.queryByText('CONFIGURATION')).not.toBeInTheDocument()
+    expect(screen.getByText('GOVERNANCE')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /audit logs/i })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /users/i })).not.toBeInTheDocument()
+  })
+
+  it('collapses and expands the Settings section when clicking the accordion header', async () => {
+    useAuthStore.setState({
+      user: {
+        id: 'admin-1',
+        name: 'Super Admin',
+        email: 'admin@omniconnect.com',
+        isAdministrator: true,
+      },
+      status: 'authenticated',
+    })
+
+    const systemSection: NavSectionDto = {
+      key: 'system',
+      label: 'System',
+      order: 30,
+      pinToBottom: true,
+      items: [
+        node({ key: 'host.system.approvals', label: 'Approval Center', routePath: '/system/approvals' }),
+      ],
+    }
+
+    renderSidebar([systemSection])
+
+    const user = userEvent.setup()
+    const settingsButton = screen.getByRole('button', { name: /settings/i })
+
+    // Expanded by default
+    expect(settingsButton).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByText('ACCESS MANAGEMENT')).toBeInTheDocument()
+
+    // Click to collapse
+    await user.click(settingsButton)
+    expect(settingsButton).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByText('ACCESS MANAGEMENT')).not.toBeInTheDocument()
+
+    // Click to expand again
+    await user.click(settingsButton)
+    expect(settingsButton).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByText('ACCESS MANAGEMENT')).toBeInTheDocument()
+  })
+})
+

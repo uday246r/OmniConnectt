@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../features/auth/store/authStore'
 import { permissionsApi, type PermissionFeatureDto } from '../../shared/api/permissionsApi'
 import { rolesApi, type RolePermissionGrantDto, type RoleUserDto } from '../../features/settings-roles/api/rolesApi'
@@ -34,12 +35,19 @@ const STEP_META: Record<TabType, { title: string; desc: string }> = {
 
 export function RoleFormLayer({ roleId, initialTab }: RoleFormLayerProps) {
   const isEdit = Boolean(roleId)
+  const navigate = useNavigate()
   const accessToken = useAuthStore((s) => s.accessToken)
   // A token refresh must not re-run a load (and reset what the user is editing) — only its first arrival.
   const hasAccessToken = Boolean(accessToken)
   const ensureFreshAccessToken = useAuthStore((s) => s.ensureFreshAccessToken)
   const refreshSession = useAuthStore((s) => s.refreshSession)
-  const popLayer = useSettingsDrawerStore((s) => s.popLayer)
+  const pushLayer = useSettingsDrawerStore((s) => s.pushLayer)
+
+  const finish = () => {
+    const { returnPath, close } = useSettingsDrawerStore.getState()
+    close()
+    navigate(returnPath.startsWith('/settings/roles') ? returnPath : '/settings/roles')
+  }
 
   const [activeTab, setActiveTab] = useState<TabType>((initialTab as TabType) || 'basic')
   const [loading, setLoading] = useState(true)
@@ -387,7 +395,7 @@ export function RoleFormLayer({ roleId, initialTab }: RoleFormLayerProps) {
           // Mirrors UserFormLayer's own update path: the drawer just closes back to the list — there's
           // an existing role row to return to, so a dedicated interstitial screen adds nothing.
           toast.success(result.message)
-          useSettingsDrawerStore.getState().resetToRoot('roles')
+          finish()
           return
         }
 
@@ -402,7 +410,7 @@ export function RoleFormLayer({ roleId, initialTab }: RoleFormLayerProps) {
       toast.success(`Role '${name}' ${isEdit ? 'updated' : 'created'} successfully.`)
       void refreshSession()
       invalidate(TOPICS.roles, TOPICS.approvals, TOPICS.kpis)
-      useSettingsDrawerStore.getState().resetToRoot('roles')
+      finish()
     } catch (err: any) {
       // Blocked by an in-flight request on this same role — explained in a dialog rather than as a
       // form error, since nothing about the form input is wrong.
@@ -438,7 +446,7 @@ export function RoleFormLayer({ roleId, initialTab }: RoleFormLayerProps) {
               <p className={styles.subtitle}>Define role scope, host permissions, and application access</p>
             </div>
           </div>
-          <button type="button" className={styles.closeBtn} onClick={popLayer} aria-label="Close Role Editor">
+          <button type="button" className={styles.closeBtn} onClick={finish} aria-label="Close Role Editor">
             <Icon.X width={20} height={20} />
           </button>
         </div>
@@ -458,7 +466,7 @@ export function RoleFormLayer({ roleId, initialTab }: RoleFormLayerProps) {
             <button
               type="button"
               className={styles.doneBtn}
-              onClick={() => useSettingsDrawerStore.getState().resetToRoot('roles')}
+              onClick={finish}
             >
               Done &amp; Return to Roles List
             </button>
@@ -568,7 +576,7 @@ export function RoleFormLayer({ roleId, initialTab }: RoleFormLayerProps) {
         <button
           type="button"
           className={styles.closeBtn}
-          onClick={popLayer}
+          onClick={finish}
           aria-label="Close Role Editor"
         >
           <Icon.X width={16} height={16} />
@@ -1087,6 +1095,7 @@ export function RoleFormLayer({ roleId, initialTab }: RoleFormLayerProps) {
                       <th>USER</th>
                       <th>EMAIL ADDRESS</th>
                       <th>STATUS</th>
+                      <th style={{ textAlign: 'right' }}>ACTIONS</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1108,11 +1117,22 @@ export function RoleFormLayer({ roleId, initialTab }: RoleFormLayerProps) {
                               Active
                             </span>
                           </td>
+                          <td style={{ textAlign: 'right' }}>
+                            <button
+                              type="button"
+                              className={styles.userActionBtn}
+                              onClick={() => pushLayer({ type: 'user-form', userId: u.id })}
+                              title={`Edit ${u.name} and manage their assigned role`}
+                            >
+                              <Icon.Edit width={12} height={12} />
+                              <span>Edit User</span>
+                            </button>
+                          </td>
                         </tr>
                       ))
                     ) : (
                       <tr>
-                        <td colSpan={3} className={styles.emptyUsersCell}>
+                        <td colSpan={4} className={styles.emptyUsersCell}>
                           <div className={styles.emptyUsersIconBox}>
                             <Icon.Users width={20} height={20} />
                           </div>
@@ -1141,7 +1161,7 @@ export function RoleFormLayer({ roleId, initialTab }: RoleFormLayerProps) {
         <div className={styles.bottomBar}>
           {currentStepIndex === 0 ? (
             <>
-              <button type="button" className={styles.cancelBtn} onClick={popLayer}>
+              <button type="button" className={styles.cancelBtn} onClick={finish}>
                 Cancel
               </button>
               <button type="submit" form="role-basic-form" className={styles.primaryNextBtn}>

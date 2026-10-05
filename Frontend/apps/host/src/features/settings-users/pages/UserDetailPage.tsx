@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { useAuthStore } from '../../auth/store/authStore'
+import { useAuthStore, isSuperAdminOrAdmin } from '../../auth/store/authStore'
 import { useRemoteHealthStore } from '../../../shared/stores/remoteHealthStore'
 import { useSettingsDrawerStore } from '../../../shared/stores/settingsDrawerStore'
 import { TOPICS, invalidate, useDataRevision } from '../../../shared/stores/invalidationStore'
@@ -10,6 +10,8 @@ import { toast } from '../../../shared/stores/toastStore'
 import { usersApi, type UserDetailDto } from '../api/usersApi'
 import { userSchemaApi } from '../../settings-user-fields/api/userSchemaApi'
 import type { FieldDefinition } from '@omniconnect/ui/validation'
+import { fieldSectionsApi, type FieldSection } from '../../settings-user-fields/api/fieldSectionsApi'
+import { FALLBACK_SECTIONS, SYSTEM_SECTION_KEY, groupFieldsBySection } from '../../settings-user-fields/utils/sections'
 import { rolesApi, type RoleDetailDto } from '../../settings-roles/api/rolesApi'
 import { isApprovalPending } from '../../approvals/api/approvalsApi'
 import { asPendingApprovalConflict, type PendingApprovalConflict } from '../../approvals/pendingConflict'
@@ -44,7 +46,7 @@ export function UserDetailPage() {
   const accessToken = useAuthStore((s) => s.accessToken)
   // A token refresh must not re-run a load (and reset what the user is editing) — only its first arrival.
   const hasAccessToken = Boolean(accessToken)
-  const isAdministrator = Boolean(useAuthStore((s) => s.user)?.isAdministrator)
+  const isAdministrator = useAuthStore((s) => isSuperAdminOrAdmin(s.user))
   const hasCapability = useAuthStore((s) => s.hasCapability)
   const currentUserId = useAuthStore((s) => s.user?.id)
   const registryApps = useRemoteHealthStore((s) => s.entries)
@@ -61,6 +63,7 @@ export function UserDetailPage() {
   // Labels for any admin-defined custom field (Aadhar Number, etc.) so the Profile tab can show them
   // by name rather than raw dict keys — detail.customFields only carries fieldKey -> value.
   const [customFieldDefs, setCustomFieldDefs] = useState<FieldDefinition[]>([])
+  const [sections, setSections] = useState<FieldSection[]>(FALLBACK_SECTIONS)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [tab, setTab] = useState<DetailTab>('profile')
@@ -111,11 +114,13 @@ export function UserDetailPage() {
   useEffect(() => {
     if (!accessToken) return
     let cancelled = false
-    userSchemaApi
-      .get(accessToken)
-      .then((res) => {
+    // Read-only page, so a missing section catalog degrades to "everything in the default section"
+    // rather than hiding the user's data — nothing here writes the schema back.
+    Promise.all([userSchemaApi.get(accessToken), fieldSectionsApi.get(accessToken).catch(() => null)])
+      .then(([res, sectionsRes]) => {
         if (cancelled) return
-        setCustomFieldDefs(res.fields.filter((f) => !f.core).sort((a, b) => a.order - b.order))
+        setCustomFieldDefs(res.fields.filter((f) => !f.core))
+        if (sectionsRes) setSections(sectionsRes.sections)
       })
       .catch(() => {
         if (!cancelled) setCustomFieldDefs([])
@@ -130,6 +135,15 @@ export function UserDetailPage() {
     if (!detail || detail.isAdministrator) return []
     return computeEffectivePermissions(roleDetail?.permissions, detail.permissionOverrides)
   }, [detail, roleDetail])
+
+  // Custom fields grouped by the admin's section catalog. The default section always renders (it
+  // carries the core identity fields); any other section renders only if it holds a field.
+  const customSectionGroups = useMemo(
+    () => groupFieldsBySection(customFieldDefs, sections).filter(
+      (g) => g.fields.length > 0 || g.section.key === SYSTEM_SECTION_KEY,
+    ),
+    [customFieldDefs, sections],
+  )
 
   const isSelf = detail?.id === currentUserId
 
@@ -271,29 +285,61 @@ export function UserDetailPage() {
 
       <TabPanel id="user-detail-tabs" tabId="profile" active={tab === 'profile'}>
         <DetailSections>
-          <DetailSection title="Identity">
-            <DetailGrid>
-              <DetailField label="Salutation">{detail.salutation || EMPTY_VALUE}</DetailField>
-              <DetailField label="Full Name" icon={<Icon.User width={15} height={15} />}>{detail.name}</DetailField>
-              <DetailField label="Email" icon={<Icon.Mail width={15} height={15} />}>{detail.email}</DetailField>
-              <DetailField label="Phone" mono>{detail.phoneNumber}</DetailField>
-              <DetailField label="Auth Provider">{detail.authProvider}</DetailField>
-            </DetailGrid>
-          </DetailSection>
-          {customFieldDefs.length > 0 && (
-            <DetailSection title="Custom Fields">
+          {customSectionGroups.map((group) => (
+            <DetailSection key={group.section.key} title={group.section.label}>
               <DetailGrid>
-                {customFieldDefs.map((f) => (
+                {group.section.key === SYSTEM_SECTION_KEY && (
+                  <>
+                    <DetailField label="Salutation">{detail.salutation || EMPTY_VALUE}</DetailField>
+                    <DetailField label="Full Name" icon={<Icon.User width={15} height={15} />}>{detail.name}</DetailField>
+                    <DetailField label="Email" icon={<Icon.Mail width={15} height={15} />}>{detail.email}</DetailField>
+                    <DetailField label="Phone" mono>{detail.phoneNumber || EMPTY_VALUE}</DetailField>
+                    <DetailField label="Auth Provider">{detail.authProvider}</DetailField>
+                  </>
+                )}
+                {group.fields.map((f) => (
                   <DetailField key={f.key} label={f.label}>
                     {detail.customFields?.[f.key] || EMPTY_VALUE}
                   </DetailField>
                 ))}
               </DetailGrid>
             </DetailSection>
-          )}
+          ))}
+
+          <DetailSection title="Password Policy">
+            <DetailGrid>
+              <DetailField label="Password Status">
+                {detail.isPasswordExpired ? (
+                  <Badge tone="danger">Expired (Must change on next login)</Badge>
+                ) : (
+                  <Badge tone="success">Active</Badge>
+                )}
+              </DetailField>
+              <DetailField label="Password Expires" icon={<Icon.Clock width={15} height={15} />}>
+                {detail.passwordExpiresAt ? formatDateTime(detail.passwordExpiresAt) : 'Never'}
+              </DetailField>
+              <DetailField label="Last Password Change" icon={<Icon.Clock width={15} height={15} />}>
+                {detail.passwordChangedAt ? formatDateTime(detail.passwordChangedAt) : 'Never (Initial invite)'}
+              </DetailField>
+            </DetailGrid>
+          </DetailSection>
+
           <DetailSection title="Access">
             <DetailGrid>
-              <DetailField label="Role" icon={<Icon.ShieldCheck width={15} height={15} />}>{detail.roleName ?? (detail.isAdministrator ? 'Administrator' : 'No Role')}</DetailField>
+              <DetailField label="Role" icon={<Icon.ShieldCheck width={15} height={15} />}>
+                <span className={styles.roleFieldWrapper}>
+                  <span>{detail.roleName ?? (detail.isAdministrator ? 'Administrator' : 'No Role')}</span>
+                  {canEdit && (
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => pushLayer({ type: 'user-form', userId: detail.id })}
+                    >
+                      Change Role
+                    </Button>
+                  )}
+                </span>
+              </DetailField>
               <DetailField label="Status">{detail.isActive ? 'Active' : 'Inactive'}</DetailField>
               <DetailField label="Must Change Password">{detail.mustChangePassword ? 'Yes' : 'No'}</DetailField>
               <DetailField label="Last Login" icon={<Icon.Clock width={15} height={15} />}>{formatDateTime(detail.lastLoginAt)}</DetailField>

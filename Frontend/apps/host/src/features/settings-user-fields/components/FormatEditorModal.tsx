@@ -136,7 +136,8 @@ export function FormatEditorModal({ open, preset, existingKeys, onSave, onClose 
   return (
     <Modal
       open={open}
-      title={isEdit ? `Edit "${preset?.label}"` : 'Add Format'}
+      size="md"
+      title={isEdit ? `Edit "${preset?.label}"` : 'Add Custom Format'}
       onClose={onClose}
       actions={
         <>

@@ -208,6 +208,20 @@ describe('validateFieldValue', () => {
 
     expect(validateFieldValue(f, '   ')).toBe('Full Name is required.')
   })
+
+  it('validates dropdown field against allowed options', () => {
+    const f = field({
+      key: 'country',
+      label: 'Country',
+      dataType: 'dropdown',
+      required: true,
+      options: ['India', 'United States', 'Germany'],
+    })
+
+    expect(validateFieldValue(f, 'India')).toBeUndefined()
+    expect(validateFieldValue(f, 'india')).toBeUndefined()
+    expect(validateFieldValue(f, 'Atlantis')).toBe('Please select a valid option for Country.')
+  })
 })
 
 describe('validateFields', () => {

@@ -39,7 +39,10 @@ public record UserDetailDto(
     DateTimeOffset UpdatedAt,
     IReadOnlyList<PermissionOverrideDto> PermissionOverrides,
     string AuthProvider,
-    IReadOnlyDictionary<string, string>? CustomFields = null);
+    IReadOnlyDictionary<string, string>? CustomFields = null,
+    DateTimeOffset? PasswordChangedAt = null,
+    DateTimeOffset? PasswordExpiresAt = null,
+    bool IsPasswordExpired = false);
 
 /*
  * Field validation lives here as data annotations, so [ApiController] rejects a bad request with a 400
@@ -67,14 +70,9 @@ public record CreateUserRequest(
     [MaxLength(320, ErrorMessage = "Email cannot exceed 320 characters.")]
     string Email,
 
-    // Required, and digit-bounded rather than only character-checked. The old rule accepted "1" and a
-    // 40-digit string because it validated the alphabet but never how many digits were present.
-    // E.164 caps a full international number at 15 digits and nothing under 7 is dialable; the shape
-    // stays loose because +91 98765 43210, 098765-43210 and (022) 2222 3333 are all legitimate.
-    [Required(AllowEmptyStrings = false, ErrorMessage = "Phone number is required.")]
+    // Dynamic country-based phone number formatting; max length matches db column.
     [MaxLength(32, ErrorMessage = "Phone number cannot exceed 32 characters.")]
-    [RegularExpression(@"^(?=(?:\D*\d){7,15}\D*$)[0-9+()\-.\s]+$", ErrorMessage = "Enter a valid phone number (7-15 digits).")]
-    string PhoneNumber,
+    string? PhoneNumber,
 
     Guid? RoleId,
     bool IsActive = true,
@@ -122,14 +120,9 @@ public record UpdateUserRequest(
     [MaxLength(320, ErrorMessage = "Email cannot exceed 320 characters.")]
     string Email,
 
-    // Required, and digit-bounded rather than only character-checked. The old rule accepted "1" and a
-    // 40-digit string because it validated the alphabet but never how many digits were present.
-    // E.164 caps a full international number at 15 digits and nothing under 7 is dialable; the shape
-    // stays loose because +91 98765 43210, 098765-43210 and (022) 2222 3333 are all legitimate.
-    [Required(AllowEmptyStrings = false, ErrorMessage = "Phone number is required.")]
+    // Dynamic country-based phone number formatting; max length matches db column.
     [MaxLength(32, ErrorMessage = "Phone number cannot exceed 32 characters.")]
-    [RegularExpression(@"^(?=(?:\D*\d){7,15}\D*$)[0-9+()\-.\s]+$", ErrorMessage = "Enter a valid phone number (7-15 digits).")]
-    string PhoneNumber,
+    string? PhoneNumber,
 
     Guid? RoleId,
 

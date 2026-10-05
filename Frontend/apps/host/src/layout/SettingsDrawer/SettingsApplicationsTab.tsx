@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useAuthStore } from '../../features/auth/store/authStore'
+import { useAuthStore, isSuperAdminOrAdmin } from '../../features/auth/store/authStore'
 import { remoteAppsApi, type RemoteAppDto, type RemoteAppStatus } from '../../features/settings-applications/api/remoteAppsApi'
 import { isApprovalPending } from '../../features/approvals/api/approvalsApi'
 import { useSettingsDrawerStore } from '../../shared/stores/settingsDrawerStore'
@@ -20,7 +20,7 @@ export function SettingsApplicationsTab() {
   const accessToken = useAuthStore((s) => s.accessToken)
   // A token refresh must not re-run a load (and reset what the user is editing) — only its first arrival.
   const hasAccessToken = Boolean(accessToken)
-  const isAdministrator = Boolean(useAuthStore((s) => s.user)?.isAdministrator)
+  const isAdministrator = useAuthStore((s) => isSuperAdminOrAdmin(s.user))
   const hasCapability = useAuthStore((s) => s.hasCapability)
   const pushLayer = useSettingsDrawerStore((s) => s.pushLayer)
   const dataRevision = useDataRevision(TOPICS.applications)

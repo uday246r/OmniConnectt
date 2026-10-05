@@ -23,7 +23,10 @@ public record FieldDefinitionDto(
     string DataType,
     bool Required,
     int Order,
-    IReadOnlyList<ValidationRuleDto> Validations);
+    IReadOnlyList<ValidationRuleDto> Validations,
+    IReadOnlyList<string>? Options = null,
+    string? Template = null,
+    string? Section = null);
 
 public record UserFieldSchemaDto(IReadOnlyList<FieldDefinitionDto> Fields, int Version, DateTimeOffset UpdatedAt);
 

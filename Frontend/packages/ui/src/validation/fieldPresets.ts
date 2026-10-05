@@ -96,14 +96,6 @@ export const FIELD_PRESETS: FieldPreset[] = [
     example: { valid: 'jane@example.com', invalid: 'jane@example' },
   },
   {
-    id: 'mobileIN',
-    kind: 'builtin',
-    group: 'format',
-    label: 'Mobile number',
-    defaultMessage: 'Enter a valid mobile number.',
-    example: { valid: '+91 98765 43210', invalid: '12' },
-  },
-  {
     id: 'aadharFormat',
     kind: 'jsonSchema',
     group: 'format',
