@@ -19,7 +19,8 @@
     "axios": "^1.19.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
-    "zustand": "^5.0.15"
+    "zustand": "^5.0.15",
+    "@omniconnect/host-bridge": "workspace:*"
   },
   "devDependencies": {
     "@module-federation/vite": "^1.20.7",
@@ -37,5 +38,8 @@
     "@testing-library/user-event": "^14.6.7",
     "jsdom": "^30.0.1",
     "vitest": "^5.0.0"
+  },
+  "omniconnect": {
+    "requiredHostBridge": "^1.0.0"
   }
 }

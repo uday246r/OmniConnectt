@@ -40,6 +40,9 @@ interface State {
  * diagnostics, not something an operator or a bank's end user can act on. The real text is kept,
  * one disclosure away, because it IS what a developer needs.
  */
+/** By name rather than instanceof, so a class from another bundle copy is still recognised. */
+const isIncompatible = (error: Error) => error.name === 'RemoteIncompatibleError'
+
 export class FederationErrorBoundary extends Component<FederationErrorBoundaryProps, State> {
   state: State = { error: null, autoRetriesUsed: 0, countdown: null, showDetails: false }
 
@@ -51,7 +54,10 @@ export class FederationErrorBoundary extends Component<FederationErrorBoundaryPr
 
   componentDidCatch(error: Error, info: ErrorInfo) {
     console.error(`Failed to render remote app "${this.props.appDisplayName}":`, error, info.componentStack)
-    this.scheduleAutoRetry()
+    // An incompatible build stays incompatible: retrying would only hammer the server.
+    if (!isIncompatible(error)) {
+      this.scheduleAutoRetry()
+    }
   }
 
   componentWillUnmount() {
@@ -110,6 +116,25 @@ export class FederationErrorBoundary extends Component<FederationErrorBoundaryPr
   render() {
     if (!this.state.error) {
       return this.props.children
+    }
+
+    if (isIncompatible(this.state.error)) {
+      return (
+        <div className={styles.wrapper} role="alert" aria-live="assertive">
+          <div className={styles.icon} aria-hidden="true">
+            ⚠
+          </div>
+          <h1>{this.props.appDisplayName} needs a platform update</h1>
+          <p className={styles.message}>
+            The version of this app that is published was built for a newer version of the platform than
+            the one running here. Please contact your administrator — reloading will not help.
+          </p>
+          <details className={styles.details}>
+            <summary className={styles.detailsSummary}>Technical details</summary>
+            <pre className={styles.detailsBody}>{this.state.error.message}</pre>
+          </details>
+        </div>
+      )
     }
 
     const { countdown, autoRetriesUsed } = this.state

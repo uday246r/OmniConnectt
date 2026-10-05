@@ -6,28 +6,12 @@
  * Lead Management and Customer 360 do.
  */
 
-export interface HostBridgeUser {
-  id: string;
-  name: string;
-  email: string;
-  isAdministrator: boolean;
-  roleName: string | null;
-  permissions: string[];
-}
+// The contract is shared with the host and versioned (@omniconnect/host-bridge): a field one side
+// invents is a bug the type checker can no longer see. This app's package.json states the range
+// of contract versions it was written against (omniconnect.requiredHostBridge).
+import type { HostBridgeUser, OmniConnectHostBridge } from '@omniconnect/host-bridge';
 
-export interface OmniConnectHostBridge {
-  getAccessToken: () => string | null;
-  ensureFreshAccessToken: () => Promise<string>;
-  hasCapability: (featureKey: string, capability: string) => boolean;
-  getUser: () => HostBridgeUser | null;
-  apiBaseUrls?: { authService: string };
-}
-
-declare global {
-  interface Window {
-    __omniconnectHost__?: OmniConnectHostBridge;
-  }
-}
+export type { HostBridgeUser, OmniConnectHostBridge };
 
 export const getBridge = (): OmniConnectHostBridge | null =>
   typeof window === 'undefined' ? null : (window.__omniconnectHost__ ?? null);

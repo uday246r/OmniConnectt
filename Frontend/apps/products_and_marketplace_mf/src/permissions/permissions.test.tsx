@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { featureKeyFor, hasCapability } from '../api/hostBridge'
 import { PlatformPermissionProvider, usePermissions } from './PermissionContext'
 import { PERMISSIONS } from './permissions'
+import { createFakeHostBridge } from '@omniconnect/host-bridge/testing'
 
 /**
  * The buttons this remote shows are the ones the signed-in user may actually use.
@@ -18,12 +19,10 @@ afterEach(() => {
 
 function installBridge(granted: string[], isAdministrator = false) {
   const hasCap = vi.fn((feature: string, capability: string) => granted.includes(`${feature}:${capability}`))
-  window.__omniconnectHost__ = {
-    getAccessToken: () => 't',
-    ensureFreshAccessToken: () => Promise.resolve('t'),
+  window.__omniconnectHost__ = createFakeHostBridge({
     hasCapability: hasCap,
-    getUser: () => ({ id: 'u', name: 'U', email: 'u@example.com', isAdministrator, roleName: null, permissions: [] }),
-  }
+    getUser: () => ({ id: 'u', name: 'U', email: 'u@example.com', isAdministrator }),
+  })
   return hasCap
 }
 

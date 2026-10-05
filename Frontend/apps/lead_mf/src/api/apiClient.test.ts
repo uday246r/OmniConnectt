@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { OmniConnectHostBridge } from './hostBridge'
+import { createFakeHostBridge } from '@omniconnect/host-bridge/testing'
 
 /**
  * Every Lead read goes through one request cache.
@@ -23,12 +23,10 @@ beforeEach(() => {
   fetchMock.mockReset()
   vi.stubGlobal('fetch', fetchMock)
   userId = 'u1'
-  window.__omniconnectHost__ = {
-    getAccessToken: () => 'token',
-    ensureFreshAccessToken: () => Promise.resolve('token'),
+  window.__omniconnectHost__ = createFakeHostBridge({
     hasCapability: () => true,
-    getUser: () => ({ id: userId, name: 'T', email: 't@example.com', isAdministrator: true, roleName: null, permissions: [] }),
-  } as OmniConnectHostBridge
+    getUser: () => ({ id: userId, name: 'T', email: 't@example.com', isAdministrator: true }),
+  })
 })
 
 afterEach(() => {

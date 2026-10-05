@@ -3,6 +3,7 @@ import type { AxiosAdapter, InternalAxiosRequestConfig } from 'axios'
 import { ApiError, ApprovalPendingError, fieldErrorsOf, httpClient, isApprovalPending } from './httpClient'
 import { useToastStore } from '../stores/useToastStore'
 import type { OmniConnectHostBridge } from '../api/hostBridge'
+import { createFakeHostBridge } from '@omniconnect/host-bridge/testing'
 
 /**
  * How this remote talks to its API: who it says it is, and what it does with the platform's answers.
@@ -14,13 +15,12 @@ import type { OmniConnectHostBridge } from '../api/hostBridge'
  */
 
 function installBridge(over: Partial<OmniConnectHostBridge> = {}) {
-  window.__omniconnectHost__ = {
+  window.__omniconnectHost__ = createFakeHostBridge({
     getAccessToken: () => 'token-1',
     ensureFreshAccessToken: () => Promise.resolve('token-2'),
-    hasCapability: () => false,
     getUser: () => null,
     ...over,
-  }
+  })
 }
 
 type Reply = { status: number; data?: unknown }

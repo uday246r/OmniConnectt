@@ -13,6 +13,7 @@ import {
   isRunningInHost,
   type OmniConnectHostBridge,
 } from './hostBridge'
+import { createFakeHostBridge } from '@omniconnect/host-bridge/testing'
 
 /**
  * How this remote decides what to show, which is entirely a question of what it asks the host.
@@ -23,20 +24,7 @@ import {
  */
 
 function installBridge(over: Partial<OmniConnectHostBridge> = {}) {
-  const bridge: OmniConnectHostBridge = {
-    getAccessToken: () => 'token',
-    ensureFreshAccessToken: () => Promise.resolve('token'),
-    hasCapability: () => false,
-    getUser: () => ({
-      id: 'u1',
-      name: 'Tester',
-      email: 'tester@example.com',
-      isAdministrator: false,
-      roleName: null,
-      permissions: [],
-    }),
-    ...over,
-  }
+  const bridge: OmniConnectHostBridge = createFakeHostBridge(over)
   window.__omniconnectHost__ = bridge
   return bridge
 }

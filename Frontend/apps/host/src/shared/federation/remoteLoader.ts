@@ -1,5 +1,48 @@
 import { loadRemote, registerRemotes } from '@module-federation/runtime'
+import { checkRemoteCompatibility, type RemoteCompatibilityMetadata } from '@omniconnect/host-bridge'
 import type { RemoteAppModule } from './types'
+
+/**
+ * A remote whose build needs a newer host contract than this host provides. Not a transient failure —
+ * retrying cannot fix it — so the error boundary shows it as its own state and does not auto-retry.
+ */
+export class RemoteIncompatibleError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'RemoteIncompatibleError'
+  }
+}
+
+/** Manifests already checked in this document, by URL. A versioned URL never changes content. */
+const compatible = new Set<string>()
+
+/**
+ * Reads the remote's manifest and refuses to mount a build this host cannot run.
+ *
+ * AuthService already refuses to PROMOTE such a build; this is the second line, for a host older than
+ * the build (a cached index.html, a host rollback). The manifest is the same immutable file Module
+ * Federation reads next, so in production the second read is a cache hit. A manifest that cannot be
+ * read is left for Module Federation to report — that is a load failure, not an incompatibility.
+ */
+async function assertCompatible(app: RemoteAppRef) {
+  if (compatible.has(app.manifestUrl)) return
+
+  let metadata: RemoteCompatibilityMetadata | undefined
+  try {
+    const response = await fetch(app.manifestUrl, { credentials: 'same-origin' })
+    if (!response.ok) return
+    const manifest = (await response.json()) as { metaData?: { omniconnect?: RemoteCompatibilityMetadata } }
+    metadata = manifest.metaData?.omniconnect
+  } catch {
+    return
+  }
+
+  const verdict = checkRemoteCompatibility(metadata)
+  if (!verdict.compatible) {
+    throw new RemoteIncompatibleError(`This version of "${app.displayName ?? app.key}" ${verdict.reason}.`)
+  }
+  compatible.add(app.manifestUrl)
+}
 
 // The host's ModuleFederation instance (name: "omniconnect_host") is auto-initialized by the
 // @module-federation/vite plugin as part of the app's bootstrap (see vite.config.ts) — we never
@@ -58,6 +101,7 @@ export async function loadRemoteAppModule(app: RemoteAppRef): Promise<RemoteAppM
     throw new Error(`A new version of "${app.displayName ?? app.key}" was published. Reload the page to use it.`)
   }
 
+  await assertCompatible(app)
   registerRemoteApp(app)
 
   const mod = await loadRemote<RemoteAppModule>(`${app.key}/App`)
@@ -75,4 +119,5 @@ export async function loadRemoteAppModule(app: RemoteAppRef): Promise<RemoteAppM
 export function resetRemoteLoaderForTests() {
   registered.clear()
   loaded.clear()
+  compatible.clear()
 }

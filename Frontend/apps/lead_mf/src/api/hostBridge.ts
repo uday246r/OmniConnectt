@@ -4,36 +4,12 @@
  * conforming with the OmniConnect Host App remote architecture.
  */
 
-export interface HostBridgeUser {
-  id: string;
-  name: string;
-  email: string;
-  isAdministrator: boolean;
-  roleName: string | null;
-  permissions: string[];
-}
+// The contract is shared with the host and versioned (@omniconnect/host-bridge): a field one side
+// invents is a bug the type checker can no longer see. This app's package.json states the range
+// of contract versions it was written against (omniconnect.requiredHostBridge).
+import type { HostBridgeUser, OmniConnectHostBridge } from '@omniconnect/host-bridge';
 
-export interface OmniConnectHostBridge {
-  getAccessToken: () => string | null;
-  ensureFreshAccessToken: () => Promise<string>;
-  hasCapability: (featureKey: string, capability: string) => boolean;
-  getUser: () => HostBridgeUser | null;
-  /*
-   * No navigation member: the host hands this remote its current page as the `page` prop and an
-   * `onNavigate` callback to request a move (see `navigation/HostNavigation.tsx` and the host's
-   * RemoteAppPage). A `navigate: (to: string) => void` was declared here for a while that the host
-   * never implemented — anything that had called it would have thrown.
-   */
-  apiBaseUrls?: {
-    authService: string;
-  };
-}
-
-declare global {
-  interface Window {
-    __omniconnectHost__?: OmniConnectHostBridge;
-  }
-}
+export type { HostBridgeUser, OmniConnectHostBridge };
 
 export const getBridge = (): OmniConnectHostBridge | null => {
   if (typeof window === 'undefined') return null;

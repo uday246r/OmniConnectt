@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs'
+import path from 'node:path'
+
 /**
  * The single source of truth for Module Federation `shared` dependencies across the host and every
  * remote app.
@@ -90,15 +93,64 @@ export const REMOTE_ENTRY_MODULE = './App'
  *   Only list what you actually install and import: the federation plugin emits a prebuild module
  *   per shared entry, so naming an uninstalled package fails the build.
  */
-export function remoteFederationConfig(name, entry, uses = []) {
+export function remoteFederationConfig(name, entry, uses = [], release = readRemoteRelease(process.cwd())) {
+  // The manifest's buildVersion is read from this variable by the federation plugin. A release build
+  // sets it explicitly; otherwise it is the app's own package version, never the plugin's "1.0.0".
+  process.env.MF_BUILD_VERSION ??= release.version
+
   return {
     name,
     filename: 'remoteEntry.js',
-    manifest: true,
+    manifest: {
+      // What the platform needs to know about this build travels inside the manifest it already
+      // fetches: AuthService refuses to promote a remote the live host cannot run, and the host
+      // refuses to mount one, both reading metaData.omniconnect.
+      additionalData: ({ stats }) => {
+        stats.metaData = {
+          ...stats.metaData,
+          omniconnect: { version: release.version, requiredHostBridge: release.requiredHostBridge },
+        }
+        return stats
+      },
+    },
     dts: false,
     exposes: { [REMOTE_ENTRY_MODULE]: entry },
     shared: pickShared([...new Set([...BASELINE_SHARED, ...uses])]),
   }
+}
+
+/**
+ * A remote's release identity, from its own package.json:
+ *
+ *   "version": "4.7.3",
+ *   "omniconnect": { "requiredHostBridge": "^1.1.0" }
+ *
+ * `version` names the folder the build is published under (/modules/<key>/4.7.3/) and is what the
+ * release history records. `requiredHostBridge` is the range of @omniconnect/host-bridge contract
+ * versions the remote was written against. Both are required: a remote that cannot say what host it
+ * needs is exactly the one that fails at runtime as "undefined is not a function", so the build fails
+ * here instead.
+ *
+ * @param {string} appDir The remote's directory (where its package.json is).
+ */
+export function readRemoteRelease(appDir) {
+  const file = path.join(appDir, 'package.json')
+  const pkg = JSON.parse(readFileSync(file, 'utf8'))
+  const version = typeof pkg.version === 'string' ? pkg.version.trim() : ''
+  const requiredHostBridge = typeof pkg.omniconnect?.requiredHostBridge === 'string'
+    ? pkg.omniconnect.requiredHostBridge.trim()
+    : ''
+
+  if (!/^\d+\.\d+\.\d+([-+][0-9A-Za-z.-]+)?$/.test(version)) {
+    throw new Error(`[federation-config] ${file}: "version" must be SemVer (e.g. 1.4.0), got "${pkg.version}".`)
+  }
+  if (!requiredHostBridge) {
+    throw new Error(
+      `[federation-config] ${file}: declare "omniconnect": { "requiredHostBridge": "^1.1.0" } — the range of ` +
+        '@omniconnect/host-bridge versions this remote works with. See packages/host-bridge/src/contract.ts.',
+    )
+  }
+  return { version, requiredHostBridge }
 }
 
 /**

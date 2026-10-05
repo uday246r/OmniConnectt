@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 /**
  * How a promoted release reaches a tab that is already open.
@@ -17,7 +17,7 @@ const runtime = vi.hoisted(() => ({
 
 vi.mock('@module-federation/runtime', () => runtime)
 
-const { loadRemoteAppModule, needsReloadForNewVersion, resetRemoteLoaderForTests } = await import('./remoteLoader')
+const { loadRemoteAppModule, needsReloadForNewVersion, resetRemoteLoaderForTests, RemoteIncompatibleError } = await import('./remoteLoader')
 
 const V1 = { key: 'lead', manifestUrl: '/modules/lead/1.0.0/mf-manifest.json' }
 const V2 = { key: 'lead', manifestUrl: '/modules/lead/1.0.1/mf-manifest.json' }
@@ -64,5 +64,43 @@ describe('remoteLoader', () => {
     expect(needsReloadForNewVersion(V1)).toBe(false)
     expect((await rejectionOf(loadRemoteAppModule(V2))).message).toMatch(/reload/i)
     expect(runtime.registerRemotes).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('compatibility with this host', () => {
+  const manifest = (omniconnect?: object) =>
+    vi.fn(async () => new Response(JSON.stringify({ name: 'lead_mf', metaData: omniconnect ? { omniconnect } : {} })))
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('refuses a build that needs a newer host bridge, without registering it', async () => {
+    vi.stubGlobal('fetch', manifest({ requiredHostBridge: '^99.0.0' }))
+
+    const error = await rejectionOf(loadRemoteAppModule(V1))
+
+    expect(error).toBeInstanceOf(RemoteIncompatibleError)
+    expect(error.message).toContain('^99.0.0')
+    expect(runtime.registerRemotes).not.toHaveBeenCalled()
+  })
+
+  it('mounts a build whose range this host satisfies, and checks each URL once', async () => {
+    const fetch = manifest({ requiredHostBridge: '^1.0.0' })
+    vi.stubGlobal('fetch', fetch)
+
+    await loadRemoteAppModule(V1)
+    await loadRemoteAppModule(V1)
+
+    expect(runtime.loadRemote).toHaveBeenCalledTimes(2)
+    expect(fetch).toHaveBeenCalledTimes(1)
+  })
+
+  it('leaves an unreadable manifest for Module Federation to report as a load failure', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('nope', { status: 503 })))
+
+    await loadRemoteAppModule(V1)
+
+    expect(runtime.loadRemote).toHaveBeenCalled()
   })
 })

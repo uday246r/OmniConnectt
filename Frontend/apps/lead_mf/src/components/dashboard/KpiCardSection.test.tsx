@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { KpiCardSection } from './KpiCardSection'
 import { useLeadStore } from '../../store/useLeadStore'
-import type { OmniConnectHostBridge } from '../../api/hostBridge'
+import { createFakeHostBridge } from '@omniconnect/host-bridge/testing'
 
 /**
  * Which KPI cards the dashboard puts on screen.
@@ -17,20 +17,10 @@ import type { OmniConnectHostBridge } from '../../api/hostBridge'
  */
 
 function bridgeGranting(...granted: string[]) {
-  window.__omniconnectHost__ = {
-    getAccessToken: () => 'token',
-    ensureFreshAccessToken: () => Promise.resolve('token'),
+  window.__omniconnectHost__ = createFakeHostBridge({
     hasCapability: (featureKey: string, capability: string) =>
       granted.includes(`${featureKey}:${capability}`),
-    getUser: () => ({
-      id: 'u1',
-      name: 'Tester',
-      email: 'tester@example.com',
-      isAdministrator: false,
-      roleName: null,
-      permissions: [],
-    }),
-  } as OmniConnectHostBridge
+  })
 }
 
 /** Grants the dashboard cards by their capability key, which is what the manifest names them. */
