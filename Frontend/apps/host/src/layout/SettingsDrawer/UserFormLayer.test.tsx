@@ -192,71 +192,34 @@ describe('UserFormLayer - Dropdown and Searchable Combobox', () => {
     expect(countryCombobox).toHaveValue('India')
   })
 
-  it('provides an Add Field button for admins that opens the FieldEditorModal', async () => {
+  /*
+   * The create-user form used to carry a per-section "Add Field" button that defined a brand-new field
+   * and saved the WHOLE user schema — a change to the form template for every user, made from inside
+   * the wizard while filling one in, one click away from the fields being typed into. Defining fields
+   * belongs to Settings > Manage Fields, which is a deliberate visit rather than a mis-click. These
+   * two tests assert the affordance is gone and that this form never writes the schema.
+   */
+  it('offers no way to define a new field from the create-user form', async () => {
     renderComponent()
 
     await waitFor(() => {
       expect(screen.getByText('Personal Details')).toBeInTheDocument()
     })
 
-    const addFieldBtn = screen.getAllByRole('button', { name: /add field/i })[0]
-    expect(addFieldBtn).toBeInTheDocument()
-
-    await userEvent.click(addFieldBtn)
-
-    // FieldEditorModal opens with Title "Add Field"
-    await waitFor(() => {
-      expect(screen.getByRole('dialog')).toBeInTheDocument()
-      expect(screen.getByRole('heading', { name: 'Add Field' })).toBeInTheDocument()
-    })
+    expect(screen.queryAllByRole('button', { name: /add field/i })).toHaveLength(0)
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
-  it('allows adding a new dropdown field directly from user form and updating schema', async () => {
-    mockUserSchemaApi.update.mockImplementation(async (_token, payload) => ({
-      fields: payload.fields,
-      version: 2,
-      updatedAt: new Date().toISOString(),
-    }))
-
+  it('never saves the user-field schema while a user is being created', async () => {
     renderComponent()
 
     await waitFor(() => {
       expect(screen.getByText('Personal Details')).toBeInTheDocument()
     })
 
-    await userEvent.click(screen.getAllByRole('button', { name: /add field/i })[0])
+    await userEvent.type(screen.getByLabelText(/full name/i), 'Ada Lovelace')
 
-    await waitFor(() => {
-      expect(screen.getByRole('heading', { name: 'Add Field' })).toBeInTheDocument()
-    })
-
-    // Select the "State / Province (Contact Template)" template
-    const templateCombobox = screen.getByRole('combobox', { name: /template \(pre-configured\)/i })
-    fireEvent.mouseDown(templateCombobox)
-    const stateOption = screen.getAllByRole('option').find((o) => o.textContent?.includes('State / Province'))
-    expect(stateOption).toBeDefined()
-    fireEvent.click(stateOption!)
-
-    // Click "Add Field" in modal footer
-    const dialog = screen.getByRole('dialog')
-    const modalAddBtn = within(dialog).getByRole('button', { name: 'Add Field' })
-    await userEvent.click(modalAddBtn)
-
-    await waitFor(() => {
-      expect(mockUserSchemaApi.update).toHaveBeenCalledWith(
-        'test-token',
-        expect.objectContaining({
-          fields: expect.arrayContaining([
-            expect.objectContaining({
-              key: 'stateProvince',
-              label: 'State / Province',
-              dataType: 'dropdown',
-              template: 'contact-state',
-            }),
-          ]),
-        }),
-      )
-    })
+    expect(mockUserSchemaApi.update).not.toHaveBeenCalled()
   })
 
   it('cascades options from Country to State to City using country-state-city and resets downstream on country change', async () => {
@@ -534,7 +497,13 @@ describe('UserFormLayer - Dropdown and Searchable Combobox', () => {
       expect(await screen.findByLabelText(/orphaned field/i)).toBeInTheDocument()
     })
 
-    it('shows an empty section to an administrator so they can add its first field', async () => {
+    /*
+     * An empty section used to be rendered for anyone who could manage fields, purely to give the
+     * inline "Add Field" button somewhere to live. With that button gone a heading with nothing under
+     * it has nothing to offer, so it is left out — the default section still renders, because the
+     * salutation control lives there.
+     */
+    it('leaves out a section that has no fields in it', async () => {
       useSchema([])
       mockFieldSectionsApi.get.mockResolvedValue({
         sections: [
@@ -547,8 +516,8 @@ describe('UserFormLayer - Dropdown and Searchable Combobox', () => {
 
       renderComponent()
 
-      expect(await screen.findByText('Bank Details')).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: /add field to bank details/i })).toBeInTheDocument()
+      expect(await screen.findByText('Personal Details')).toBeInTheDocument()
+      expect(screen.queryByText('Bank Details')).not.toBeInTheDocument()
     })
   })
 })

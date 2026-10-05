@@ -56,9 +56,17 @@ public class PasswordPolicyAppService(
     private async Task<(PasswordPolicyDefinitionDto Policy, int Version, DateTimeOffset UpdatedAt)> ReadAsync(CancellationToken ct)
     {
         var row = await db.PasswordPolicyCatalogs.AsNoTracking().OrderByDescending(c => c.UpdatedAt).FirstOrDefaultAsync(ct);
-        return row is null
-            ? (DefaultPolicy(), 0, DateTimeOffset.UtcNow)
-            : (Parse(row.PolicyJson), row.Version, row.UpdatedAt);
+        var roleExpiries = await db.PasswordPolicyRoleExpiries.AsNoTracking()
+            .OrderBy(r => r.RoleId)
+            .Select(r => new RolePasswordExpiryDto(r.RoleId, r.ExpiryDays))
+            .ToListAsync(ct);
+
+        if (row is null)
+        {
+            return (DefaultPolicy() with { RoleExpiries = roleExpiries }, 0, DateTimeOffset.UtcNow);
+        }
+
+        return (Parse(row.PolicyJson) with { RoleExpiries = roleExpiries }, row.Version, row.UpdatedAt);
     }
 
     private async Task<IReadOnlyList<PasswordPolicyRoleDto>> LoadRolesAsync(CancellationToken ct)
@@ -147,7 +155,9 @@ public class PasswordPolicyAppService(
         }
 
         var now = DateTimeOffset.UtcNow;
-        var policyJson = JsonSerializer.Serialize(policy, JsonOptions);
+        // Role overrides are stored as rows (see PasswordPolicyRoleExpiry), not in the JSON, so the JSON
+        // carries the global settings only.
+        var policyJson = JsonSerializer.Serialize(policy with { RoleExpiries = [] }, JsonOptions);
 
         if (row is null)
         {
@@ -167,6 +177,21 @@ public class PasswordPolicyAppService(
             row.Version += 1;
             row.UpdatedAt = now;
             row.UpdatedBy = actingUserId;
+        }
+
+        // The role rows are replaced wholesale in the same save as the version bump, so a reader never sees
+        // the new global settings with the old role overrides (or the reverse).
+        var existingRoleExpiries = await db.PasswordPolicyRoleExpiries.ToListAsync(ct);
+        db.PasswordPolicyRoleExpiries.RemoveRange(existingRoleExpiries);
+        foreach (var role in policy.RoleExpiries)
+        {
+            db.PasswordPolicyRoleExpiries.Add(new PasswordPolicyRoleExpiry
+            {
+                RoleId = role.RoleId,
+                ExpiryDays = role.ExpiryDays,
+                UpdatedAt = now,
+                UpdatedBy = actingUserId,
+            });
         }
 
         try

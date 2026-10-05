@@ -11,6 +11,10 @@ import type { PasswordPolicyCatalogDto } from '../api/passwordPolicyApi'
  * flows worth pinning are the ones with a security consequence: an empty expiry box must never save as
  * 0 ("never expires"), a blank role row must send NO row (inherit) rather than a 0, the version the
  * page loaded must travel with the save, and someone without Edit must not be able to change anything.
+ *
+ * The page also opens read-only, so every test that changes something goes through `beginEditing`
+ * first — the same step a real administrator takes, and the reason a stray click on a number input
+ * can no longer alter the policy for everyone.
  */
 
 const mockApi = vi.hoisted(() => ({ get: vi.fn(), update: vi.fn() }))
@@ -48,7 +52,14 @@ function signInAs(admin: boolean) {
   })
 }
 
+type User = ReturnType<typeof userEvent.setup>
+
 const expiryInput = () => screen.getByLabelText(/passwords expire after/i)
+
+/** Turns the live controls on, the way an administrator does. */
+async function beginEditing(user: User) {
+  await user.click(screen.getByRole('button', { name: /^edit$/i }))
+}
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -78,18 +89,68 @@ describe('loading', () => {
   })
 })
 
+/*
+ * The guard this page exists behind, now that it has one. Every control used to be live on arrival, so
+ * looking the policy up and changing it were the same gesture.
+ */
+describe('edit mode', () => {
+  it('opens read-only even for an administrator, and offers Edit', async () => {
+    render(<ManagePasswordPolicyPage />)
+    await screen.findByDisplayValue('90')
+
+    expect(expiryInput()).toBeDisabled()
+    expect(screen.getByRole('switch', { name: /require a symbol/i })).toBeDisabled()
+    expect(screen.queryByRole('button', { name: /add reminder/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /remove reminder/i })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^edit$/i })).toBeInTheDocument()
+  })
+
+  it('makes the controls live once Edit is pressed, and says so', async () => {
+    const user = userEvent.setup()
+    render(<ManagePasswordPolicyPage />)
+    await screen.findByDisplayValue('90')
+
+    await beginEditing(user)
+
+    expect(expiryInput()).toBeEnabled()
+    expect(screen.getByRole('switch', { name: /require a symbol/i })).toBeEnabled()
+    expect(screen.getByRole('region', { name: /password policy actions/i })).toBeInTheDocument()
+    // Nothing has changed yet, so there is nothing to save.
+    expect(screen.getByRole('button', { name: /save changes/i })).toBeDisabled()
+    expect(screen.queryByRole('button', { name: /^edit$/i })).not.toBeInTheDocument()
+  })
+
+  it('goes back to read-only after a save, with the new value shown', async () => {
+    const user = userEvent.setup()
+    render(<ManagePasswordPolicyPage />)
+    await screen.findByDisplayValue('90')
+
+    await beginEditing(user)
+    await user.clear(expiryInput())
+    await user.type(expiryInput(), '60')
+    await user.click(screen.getByRole('button', { name: /save changes/i }))
+
+    await waitFor(() => expect(screen.getByRole('button', { name: /^edit$/i })).toBeInTheDocument())
+    expect(expiryInput()).toBeDisabled()
+    expect(screen.getByText('60 days')).toBeInTheDocument()
+  })
+})
+
 describe('global policy', () => {
-  it('starts clean, and offers Save only once something has changed', async () => {
+  it('offers Save only once something has changed', async () => {
     const user = userEvent.setup()
     render(<ManagePasswordPolicyPage />)
     await screen.findByDisplayValue('90')
 
     expect(screen.queryByRole('button', { name: /save changes/i })).not.toBeInTheDocument()
 
+    await beginEditing(user)
+    expect(screen.getByRole('button', { name: /save changes/i })).toBeDisabled()
+
     await user.clear(expiryInput())
     await user.type(expiryInput(), '60')
 
-    expect(screen.getByRole('button', { name: /save changes/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /save changes/i })).toBeEnabled()
   })
 
   it('sends the edited lifetime along with the version it loaded', async () => {
@@ -97,6 +158,7 @@ describe('global policy', () => {
     render(<ManagePasswordPolicyPage />)
     await screen.findByDisplayValue('90')
 
+    await beginEditing(user)
     await user.clear(expiryInput())
     await user.type(expiryInput(), '60')
     await user.click(screen.getByRole('button', { name: /save changes/i }))
@@ -112,6 +174,7 @@ describe('global policy', () => {
     render(<ManagePasswordPolicyPage />)
     await screen.findByDisplayValue('90')
 
+    await beginEditing(user)
     await user.clear(expiryInput())
     await user.click(screen.getByRole('button', { name: /save changes/i }))
 
@@ -124,6 +187,7 @@ describe('global policy', () => {
     render(<ManagePasswordPolicyPage />)
     await screen.findByDisplayValue('90')
 
+    await beginEditing(user)
     await user.clear(expiryInput())
     await user.type(expiryInput(), '0')
 
@@ -137,6 +201,7 @@ describe('global policy', () => {
 
     expect(screen.getByText(/at least 12 characters, an uppercase letter, a lowercase letter, a digit and a symbol/i)).toBeInTheDocument()
 
+    await beginEditing(user)
     await user.click(screen.getByRole('switch', { name: /require a symbol/i }))
 
     expect(screen.getByText(/a lowercase letter and a digit\./i)).toBeInTheDocument()
@@ -148,6 +213,7 @@ describe('reminders', () => {
     const user = userEvent.setup()
     render(<ManagePasswordPolicyPage />)
     await screen.findByDisplayValue('90')
+    await beginEditing(user)
 
     await user.type(screen.getByLabelText('Days before expiry'), '10')
     await user.click(screen.getByRole('button', { name: /add reminder/i }))
@@ -165,6 +231,7 @@ describe('reminders', () => {
     const user = userEvent.setup()
     render(<ManagePasswordPolicyPage />)
     await screen.findByDisplayValue('90')
+    await beginEditing(user)
 
     await user.click(screen.getByRole('button', { name: /remove reminder 14 days/i }))
 
@@ -178,6 +245,7 @@ describe('reminders', () => {
     }))
     render(<ManagePasswordPolicyPage />)
     await screen.findByDisplayValue('365')
+    await beginEditing(user)
 
     await user.type(screen.getByLabelText('Days before expiry'), '1')
     await user.click(screen.getByRole('button', { name: /add reminder/i }))
@@ -189,6 +257,7 @@ describe('reminders', () => {
     const user = userEvent.setup()
     render(<ManagePasswordPolicyPage />)
     await screen.findByDisplayValue('90')
+    await beginEditing(user)
 
     await user.clear(expiryInput())
     await user.type(expiryInput(), '10') // widest reminder is 14 days
@@ -200,22 +269,26 @@ describe('reminders', () => {
 })
 
 describe('role policies', () => {
-  async function openRoles() {
+  async function openRoles({ editing = true } = {}) {
     const user = userEvent.setup()
     render(<ManagePasswordPolicyPage />)
     await screen.findByDisplayValue('90')
+    if (editing) await beginEditing(user)
     await user.click(screen.getByRole('tab', { name: /role policies/i }))
     return user
   }
 
   it('lists every role with its user count and what it currently resolves to', async () => {
-    await openRoles()
+    await openRoles({ editing: false })
 
     expect(screen.getByLabelText('Password lifetime for Treasury')).toHaveValue(30)
     expect(screen.getByText('Expires after 30 days')).toBeInTheDocument()
     expect(screen.getByLabelText('Password lifetime for Analyst')).toHaveValue(null)
     expect(screen.getByText('Inherits the global lifetime (90 days)')).toBeInTheDocument()
     expect(screen.getByTitle('12 active users')).toBeInTheDocument()
+    // Read mode: the rows can be read but not retyped, and "Use global" is not on offer.
+    expect(screen.getByLabelText('Password lifetime for Treasury')).toBeDisabled()
+    expect(screen.queryByRole('button', { name: /use the global lifetime for treasury/i })).not.toBeInTheDocument()
   })
 
   it('gives a role its own lifetime and sends only the rows that have one', async () => {
@@ -255,6 +328,7 @@ describe('role policies', () => {
     const user = userEvent.setup()
     render(<ManagePasswordPolicyPage />)
     await screen.findByDisplayValue('90')
+    await beginEditing(user)
     await user.click(screen.getByRole('tab', { name: /role policies/i }))
     await user.type(screen.getByLabelText('Password lifetime for Analyst'), '0')
     await user.click(screen.getByRole('tab', { name: /global policy/i }))
@@ -270,6 +344,7 @@ describe('saving', () => {
     render(<ManagePasswordPolicyPage />)
     await screen.findByDisplayValue('90')
 
+    await beginEditing(user)
     await user.clear(expiryInput())
     await user.type(expiryInput(), '60')
     await user.click(screen.getByRole('button', { name: /save changes/i }))
@@ -284,6 +359,7 @@ describe('saving', () => {
     render(<ManagePasswordPolicyPage />)
     await screen.findByDisplayValue('90')
 
+    await beginEditing(user)
     await user.clear(expiryInput())
     await user.type(expiryInput(), '60')
     await user.click(screen.getByRole('button', { name: /save changes/i }))
@@ -293,28 +369,32 @@ describe('saving', () => {
     expect(within(banner).getByRole('button', { name: /reload/i })).toBeInTheDocument()
   })
 
-  it('discards edits back to the saved policy', async () => {
+  it('Cancel puts the edits back to the saved policy and leaves edit mode', async () => {
     const user = userEvent.setup()
     render(<ManagePasswordPolicyPage />)
     await screen.findByDisplayValue('90')
 
+    await beginEditing(user)
     await user.clear(expiryInput())
     await user.type(expiryInput(), '60')
-    await user.click(screen.getByRole('button', { name: /discard/i }))
+    await user.click(screen.getByRole('button', { name: /^cancel$/i }))
 
     expect(expiryInput()).toHaveValue(90)
+    expect(expiryInput()).toBeDisabled()
     expect(screen.queryByRole('button', { name: /save changes/i })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^edit$/i })).toBeInTheDocument()
   })
 })
 
 describe('read-only viewer', () => {
   beforeEach(() => signInAs(false))
 
-  it('sees the policy but cannot change any of it', async () => {
+  it('sees the policy but is not even offered Edit', async () => {
     const user = userEvent.setup()
     render(<ManagePasswordPolicyPage />)
     await screen.findByDisplayValue('90')
 
+    expect(screen.queryByRole('button', { name: /^edit$/i })).not.toBeInTheDocument()
     expect(expiryInput()).toBeDisabled()
     expect(screen.getByRole('switch', { name: /require a symbol/i })).toBeDisabled()
     expect(screen.queryByRole('button', { name: /add reminder/i })).not.toBeInTheDocument()

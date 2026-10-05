@@ -173,8 +173,11 @@ bumps `Version`) with a matching frontend page under **Settings → Manage Field
 ### Password policy (its own page and permission — **not** part of the user-schema system)
 `Settings → Manage Password Policy`, gated by `host.settings.password-policy` (View/Edit), deliberately
 separate from `host.settings.users`. One JSONB row (`PasswordPolicyCatalog`): global expiry days
-(`0` = never), per-role expiry days (a role's value *replaces* the global one; absent = inherit; `0` is
-not allowed per role), complexity rules, and reminder settings (email/in-app + lead days).
+(`0` = never), complexity rules, and reminder settings (email/in-app + lead days). Per-role expiry days
+live in their own table, `PasswordPolicyRoleExpiries`, keyed by `RoleId` with a real foreign key to
+`Roles` (cascade on delete), so the link is visible in the database rather than hidden in the JSON. A
+role's value *replaces* the global one; no row = inherit; `0` is not allowed per role. A save replaces
+the role rows in the same save as the catalog's version bump.
 `PasswordPolicyOptions` (appsettings) is only the **seed**: enforced until an admin first saves, the DB
 row after that. Expiry is enforced at **login and at token refresh** (`AuthAppService`), by setting the
 same `MustChangePassword` flag a temporary password uses — so `MustChangePasswordFilter` and the

@@ -449,4 +449,65 @@ public class PasswordPolicyAppServiceTests : IDisposable
         Assert.DoesNotContain("digit", text);
         Assert.DoesNotContain("symbol", text);
     }
+    // ---------------------------------------------------------------- role link storage
+
+    /*
+     * A role's override used to sit inside the policy JSON, where nothing in the database could see the
+     * link to Roles. These pin the table that replaced it: the link is a row keyed by the role, and the
+     * JSON no longer carries the overrides at all.
+     */
+
+    [Fact]
+    public async Task A_role_override_is_stored_as_a_row_keyed_by_the_role_not_inside_the_policy_json()
+    {
+        var treasury = await AddRoleAsync();
+
+        await service.UpdateAsync(new UpdatePasswordPolicyRequest(Policy(roles: [new(treasury, 30)])), null);
+
+        var row = await db.PasswordPolicyRoleExpiries.AsNoTracking().SingleAsync();
+        Assert.Equal(treasury, row.RoleId);
+        Assert.Equal(30, row.ExpiryDays);
+
+        var json = (await db.PasswordPolicyCatalogs.AsNoTracking().SingleAsync()).PolicyJson;
+        // The key stays for the shape of the document, but it carries nothing.
+        Assert.Contains("\"roleExpiries\":[]", json);
+        Assert.DoesNotContain(treasury.ToString(), json);
+    }
+
+    [Fact]
+    public async Task Saving_replaces_the_role_rows_rather_than_adding_to_them()
+    {
+        var treasury = await AddRoleAsync();
+        var analyst = await AddRoleAsync();
+        await service.UpdateAsync(new UpdatePasswordPolicyRequest(Policy(roles: [new(treasury, 30)])), null);
+
+        await service.UpdateAsync(new UpdatePasswordPolicyRequest(Policy(roles: [new(analyst, 45)])), null);
+
+        var rows = await db.PasswordPolicyRoleExpiries.AsNoTracking().ToListAsync();
+        Assert.Single(rows);
+        Assert.Equal(analyst, rows[0].RoleId);
+    }
+
+    [Fact]
+    public async Task Reading_the_policy_returns_the_role_rows_so_the_expiry_check_still_sees_them()
+    {
+        var treasury = await AddRoleAsync();
+        await service.UpdateAsync(new UpdatePasswordPolicyRequest(Policy(roles: [new(treasury, 30)])), null);
+
+        var policy = await service.GetPolicyAsync();
+
+        Assert.Equal([new RolePasswordExpiryDto(treasury, 30)], policy.RoleExpiries);
+    }
+
+    [Fact]
+    public async Task Deleting_a_role_removes_its_override_with_it()
+    {
+        var treasury = await AddRoleAsync();
+        await service.UpdateAsync(new UpdatePasswordPolicyRequest(Policy(roles: [new(treasury, 30)])), null);
+
+        db.Roles.Remove(await db.Roles.SingleAsync(r => r.Id == treasury));
+        await db.SaveChangesAsync();
+
+        Assert.Empty(await db.PasswordPolicyRoleExpiries.AsNoTracking().ToListAsync());
+    }
 }

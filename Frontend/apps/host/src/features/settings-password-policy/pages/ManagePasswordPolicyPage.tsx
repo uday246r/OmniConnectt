@@ -23,6 +23,11 @@ const NO_ERRORS: DraftErrors = { roles: {} }
  * Deliberately small: one lifetime, per-role lifetimes, what a new password must contain, and when people
  * are warned. Same flow as the other admin catalogs — edit a local draft, one Save, one PUT carrying the
  * version this page loaded so a concurrent edit is refused rather than overwritten.
+ *
+ * Read-only until Edit is pressed. Every control here was live the moment the page opened, so the policy
+ * that decides when the whole platform's credentials expire could be changed by one stray click or scroll
+ * over a number input while someone was only looking the settings up. Opening in a read mode makes
+ * changing it a decision: the one unlabelled state is "looking", and editing has to be asked for.
  */
 export function ManagePasswordPolicyPage() {
   const accessToken = useAuthStore((s) => s.accessToken)
@@ -32,6 +37,12 @@ export function ManagePasswordPolicyPage() {
   const canEdit = isAdministrator || hasCapability('host.settings.password-policy', 'Edit')
 
   const [activeTab, setActiveTab] = useState<TabKey>('global')
+  /**
+   * False until Edit is pressed. `canEdit` says whether this person is ALLOWED to change the policy;
+   * this says whether they have asked to. Both must hold before a single control accepts input, which
+   * is why they are kept apart rather than collapsed into one flag.
+   */
+  const [editing, setEditing] = useState(false)
   const [catalog, setCatalog] = useState<PasswordPolicyCatalogDto | null>(null)
   const [draft, setDraft] = useState<PolicyDraft | null>(null)
   const [errors, setErrors] = useState<DraftErrors>(NO_ERRORS)
@@ -50,6 +61,9 @@ export function ManagePasswordPolicyPage() {
       setErrors(NO_ERRORS)
       setError(null)
       setConflict(false)
+      // A reload replaces what was on screen, so whatever was being edited is gone either way — go back
+      // to reading rather than leaving live inputs over freshly loaded values.
+      setEditing(false)
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Could not load the password policy.')
     } finally {
@@ -63,6 +77,8 @@ export function ManagePasswordPolicyPage() {
 
   const dirty = useMemo(() => (catalog && draft ? isDirty(draft, catalog.policy) : false), [catalog, draft])
   const roles = catalog?.roles ?? []
+  /** What the controls themselves ask: allowed to change this, AND currently editing. */
+  const inputsLive = canEdit && editing
 
   function patch(change: Partial<PolicyDraft>) {
     setDraft((prev) => (prev ? { ...prev, ...change } : prev))
@@ -76,11 +92,21 @@ export function ManagePasswordPolicyPage() {
     setErrors((prev) => ({ ...prev, roles: { ...prev.roles, [roleId]: '' } }))
   }
 
-  function handleDiscard() {
+  function handleStartEditing() {
+    if (!canEdit || !catalog) return
+    // Start from what is saved, never from a draft left over from a previous editing session.
+    setDraft(toDraft(catalog.policy))
+    setErrors(NO_ERRORS)
+    setEditing(true)
+  }
+
+  /** Leaves edit mode and puts every control back to the saved policy. */
+  function handleCancel() {
     if (!catalog) return
     setDraft(toDraft(catalog.policy))
     setErrors(NO_ERRORS)
-    toast.info('Discarded unsaved policy changes.')
+    setEditing(false)
+    if (dirty) toast.info('Discarded unsaved policy changes.')
   }
 
   async function handleSave() {
@@ -106,6 +132,7 @@ export function ManagePasswordPolicyPage() {
       setErrors(NO_ERRORS)
       setConflict(false)
       setError(null)
+      setEditing(false)
       toast.success('Password policy updated. It applies from the next sign-in.')
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) {
@@ -130,6 +157,14 @@ export function ManagePasswordPolicyPage() {
         icon={<Icon.Lock width={22} height={22} />}
         title="Manage Password Policy"
         subtitle="Set how long passwords last, what a new password must contain, and when people are warned before theirs expires."
+        actions={
+          canEdit && !editing && !loading && catalog ? (
+            <Button variant="primary" size="sm" onClick={handleStartEditing}>
+              <Icon.Edit width={15} height={15} />
+              Edit
+            </Button>
+          ) : undefined
+        }
       />
 
       <div className={styles.summaryGrid}>
@@ -209,7 +244,7 @@ export function ManagePasswordPolicyPage() {
 
           {activeTab === 'global' && (
             <div id="pp-panel-global" role="tabpanel" aria-labelledby="pp-tab-global">
-              <GlobalPolicyCard draft={draft} errors={errors} canEdit={canEdit} onChange={patch} />
+              <GlobalPolicyCard draft={draft} errors={errors} canEdit={inputsLive} onChange={patch} />
             </div>
           )}
 
@@ -229,7 +264,7 @@ export function ManagePasswordPolicyPage() {
                 roleDays={draft.roleDays}
                 globalDays={draft.expiryDays}
                 errors={errors}
-                canEdit={canEdit}
+                canEdit={inputsLive}
                 onChange={setRoleDays}
               />
             </div>
@@ -237,15 +272,13 @@ export function ManagePasswordPolicyPage() {
         </>
       ) : null}
 
-      {canEdit && dirty && (
-        <div className={styles.saveBar} role="region" aria-label="Unsaved password policy changes">
-          <div className={styles.saveBarInfo}>
-            <Icon.AlertCircle width={18} height={18} />
-            <span>You have unsaved changes to the password policy.</span>
-          </div>
+      {inputsLive && (
+        <div className={styles.saveBar} role="region" aria-label="Password policy actions">
           <div className={styles.saveBarActions}>
-            <Button variant="secondary" size="sm" onClick={handleDiscard}>Discard</Button>
-            <Button variant="primary" size="sm" loading={saving} onClick={() => void handleSave()}>Save Changes</Button>
+            <Button variant="secondary" size="sm" onClick={handleCancel}>Cancel</Button>
+            <Button variant="primary" size="sm" loading={saving} disabled={!dirty} onClick={() => void handleSave()}>
+              Save Changes
+            </Button>
           </div>
         </div>
       )}

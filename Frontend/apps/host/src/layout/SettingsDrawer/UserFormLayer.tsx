@@ -24,7 +24,6 @@ import { userSchemaApi } from '../../features/settings-user-fields/api/userSchem
 import { salutationsApi } from '../../features/settings-user-fields/api/salutationsApi'
 import { customPresetsApi } from '../../features/settings-user-fields/api/customPresetsApi'
 import { fieldTemplatesApi } from '../../features/settings-user-fields/api/fieldTemplatesApi'
-import { FieldEditorModal } from '../../features/settings-user-fields/components/FieldEditorModal'
 import { getTemplateById, setCatalogTemplates, type FieldTemplate } from '../../features/settings-user-fields/constants/fieldTemplates'
 import { fieldSectionsApi, type FieldSection } from '../../features/settings-user-fields/api/fieldSectionsApi'
 import {
@@ -86,8 +85,6 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
   const refreshSession = useAuthStore((s) => s.refreshSession)
   // Gates which roles this operator may hand out — see filteredRoles.
   const isAdministrator = useAuthStore((s) => isSuperAdminOrAdmin(s.user))
-  const hasCapability = useAuthStore((s) => s.hasCapability)
-  const canManageFields = isAdministrator || hasCapability('host.settings.users', 'Edit')
   const navigate = useNavigate()
 
   /*
@@ -123,8 +120,6 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
   const [fields, setFields] = useState<FieldDefinition[]>([])
   const [fieldValues, setFieldValues] = useState<Record<string, string>>({})
   const [customPresets, setCustomPresets] = useState<CustomPreset[]>([])
-  const [fieldModalOpen, setFieldModalOpen] = useState(false)
-  const [fieldModalInitialSection, setFieldModalInitialSection] = useState<string>(SYSTEM_SECTION_KEY)
   const [sections, setSections] = useState<FieldSection[]>(FALLBACK_SECTIONS)
   const [salutationOptions, setSalutationOptions] = useState<string[]>([])
   const [salutation, setSalutation] = useState('')
@@ -284,8 +279,8 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
           rolesApi.list(accessToken!, { pageSize: 100 }),
           permissionsApi.catalog(accessToken!),
           userSchemaApi.get(accessToken!),
-          // Not soft-failed like presets/templates: the inline "Add Field" saves the whole schema, and
-          // saving it against a fallback catalog would flatten every field into one section.
+          // Not soft-failed like presets/templates: a field's Section is a section key, so a fallback
+          // catalog would flatten every field on this form into one heading.
           fieldSectionsApi.get(accessToken!),
           salutationsApi.get(accessToken!),
           customPresetsApi.get(accessToken!).catch(() => ({ presets: [] })),
@@ -623,19 +618,19 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
   // Sections come from the admin-managed catalog; nothing about them is hardcoded here. A field whose
   // section is missing or was deleted resolves to the default section (see utils/sections), so every
   // field is always rendered somewhere.
-  const canAddInline = canManageFields && !isEdit
   const sectionGroups = useMemo(
-    // Empty sections are shown only to someone who can add to them — everyone else sees no empty heading.
+    /*
+     * A section with nothing in it is never shown. This form only collects values; defining a field is
+     * Settings > Manage Fields' job, so there is nothing to do under an empty heading here. (It used to
+     * carry an inline "Add Field" button that saved the whole user schema from inside the create-user
+     * wizard — an edit to the form template made while filling the form in, which was far too easy to
+     * trigger by accident. Empty headings existed only as a target for it.)
+     */
     () => groupFieldsBySection(fields, sections, { skipEmpty: false }).filter(
-      (g) => g.fields.length > 0 || g.section.key === SYSTEM_SECTION_KEY || canAddInline,
+      (g) => g.fields.length > 0 || g.section.key === SYSTEM_SECTION_KEY,
     ),
-    [fields, sections, canAddInline],
+    [fields, sections],
   )
-
-  const handleAddFieldToSection = (secName: string) => {
-    setFieldModalInitialSection(secName)
-    setFieldModalOpen(true)
-  }
 
   const renderField = (field: FieldDefinition) => {
     const isPhone = field.template === 'contact-phone' || field.key === 'phoneNumber'
@@ -1101,21 +1096,6 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
     }
   }
 
-  async function handleCreateFieldFromForm(newField: FieldDefinition) {
-    if (!accessToken) return
-    try {
-      const updatedFields = arrangeFields([...fields, hydrateField({ ...newField, order: Number.MAX_SAFE_INTEGER })], sections)
-      const res = await userSchemaApi.update(accessToken, { fields: updatedFields })
-      const sorted = arrangeFields(res.fields.map(hydrateField), sections)
-      setFields(sorted)
-      setFieldValues((prev) => ({ ...prev, [newField.key]: '' }))
-      setFieldModalOpen(false)
-      toast.success(`Field "${newField.label}" added to user fields.`)
-    } catch (err: any) {
-      toast.error(err?.message || 'Could not add field.')
-    }
-  }
-
   if (loading) {
     return (
       <div className={styles.layer}>
@@ -1365,18 +1345,6 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
                   <div key={section.key} className={styles.formCard}>
                     <div className={styles.formCardHeaderRow}>
                       <h4 className={styles.formCardTitle}>{section.label}</h4>
-                      {canAddInline && (
-                        <button
-                          type="button"
-                          className={styles.addFieldBtn}
-                          onClick={() => handleAddFieldToSection(section.key)}
-                          title={`Add a custom field to ${section.label}`}
-                          aria-label={`Add field to ${section.label}`}
-                        >
-                          <Icon.Plus width={12} height={12} />
-                          <span>Add Field</span>
-                        </button>
-                      )}
                     </div>
                     <div className={styles.fieldsGrid}>
                       {section.key === SYSTEM_SECTION_KEY && (
@@ -1394,11 +1362,6 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
                       )}
                       {sectionFields.map(renderField)}
                     </div>
-                    {sectionFields.length === 0 && section.key !== SYSTEM_SECTION_KEY && (
-                      <p className={styles.sectionHint}>
-                        No fields in this section yet. Click &quot;Add Field&quot; to add one.
-                      </p>
-                    )}
                   </div>
                 ))}
 
@@ -2042,19 +2005,6 @@ export function UserFormLayer({ userId }: UserFormLayerProps) {
       )}
 
       <PendingApprovalDialog conflict={approvalConflict} onClose={() => setApprovalConflict(null)} />
-
-      {canManageFields && !isEdit && (
-        <FieldEditorModal
-          open={fieldModalOpen}
-          field={null}
-          existingKeys={fields.map((f) => f.key)}
-          customPresets={customPresets}
-          sections={sections}
-          initialSection={fieldModalInitialSection}
-          onSave={handleCreateFieldFromForm}
-          onClose={() => setFieldModalOpen(false)}
-        />
-      )}
     </div>
   )
 }

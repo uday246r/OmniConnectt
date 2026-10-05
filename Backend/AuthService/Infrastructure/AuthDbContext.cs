@@ -29,6 +29,7 @@ public class AuthDbContext(DbContextOptions<AuthDbContext> options) : DbContext(
     public DbSet<FieldTemplateCatalog> FieldTemplateCatalogs => Set<FieldTemplateCatalog>();
     public DbSet<FieldSectionCatalog> FieldSectionCatalogs => Set<FieldSectionCatalog>();
     public DbSet<PasswordPolicyCatalog> PasswordPolicyCatalogs => Set<PasswordPolicyCatalog>();
+    public DbSet<PasswordPolicyRoleExpiry> PasswordPolicyRoleExpiries => Set<PasswordPolicyRoleExpiry>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -113,6 +114,19 @@ public class AuthDbContext(DbContextOptions<AuthDbContext> options) : DbContext(
         {
             entity.Property(c => c.PolicyJson).HasColumnType("jsonb");
             entity.Property(c => c.Version).IsConcurrencyToken();
+        });
+
+        // The role link is a real foreign key: the database refuses an override for a role that does not
+        // exist, and deleting a role removes its override instead of leaving a dangling id behind.
+        modelBuilder.Entity<PasswordPolicyRoleExpiry>(entity =>
+        {
+            entity.ToTable("PasswordPolicyRoleExpiries", t => t.HasCheckConstraint(
+                "CK_PasswordPolicyRoleExpiries_ExpiryDays", "\"ExpiryDays\" BETWEEN 1 AND 3650"));
+            entity.HasKey(e => e.RoleId);
+            entity.HasOne(e => e.Role)
+                .WithMany()
+                .HasForeignKey(e => e.RoleId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<PermissionFeature>(entity =>

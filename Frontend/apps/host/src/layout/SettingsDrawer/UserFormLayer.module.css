@@ -271,26 +271,6 @@
   gap: 12px;
 }
 
-.addFieldBtn {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  background: #f1f5f9;
-  border: 1px solid #cbd5e1;
-  border-radius: var(--omni-radius-md, 6px);
-  padding: 4px 9px;
-  font-size: 11.5px;
-  font-weight: 600;
-  color: #2563eb;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.addFieldBtn:hover {
-  background: #eff6ff;
-  border-color: #93c5fd;
-}
-
 .fieldsGrid {
   display: grid;
   grid-template-columns: 1fr 1fr;

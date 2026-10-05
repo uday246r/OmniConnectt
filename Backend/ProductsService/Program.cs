@@ -144,15 +144,32 @@ else
 {
     // Migrations default to running on startup but can be turned off so a deployment applies them as a
     // single-writer step. A database that cannot be reached is logged, not fatal — /health reports it.
+    //
+    // Migrating and seeding are two separate try blocks on purpose. They used to share one, so the
+    // first exception skipped everything after it — and the failure this service actually hits is a
+    // migration one (see the baselining note below), which meant NO seeding had run on any startup:
+    // no categories, no product types, no products, and no StatusConfigs, the reference data every
+    // write is validated against. An empty catalogue with a stack trace twelve frames up in the log
+    // is a hard thing to connect back to its cause, so each step now reports its own outcome.
+    using var startupScope = app.Services.CreateScope();
+    var db = startupScope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+    if (builder.Configuration.GetValue("Database:ApplyMigrationsOnStartup", true))
+    {
+        try
+        {
+            await db.Database.MigrateAsync();
+        }
+        catch (Exception ex)
+        {
+            app.Logger.LogError(ex, "Applying migrations on startup failed.");
+            await ReportSchemaStateAsync(db, app.Logger);
+        }
+    }
+
     try
     {
-        var applyMigrations = builder.Configuration.GetValue("Database:ApplyMigrationsOnStartup", true);
-        var runSeed = builder.Configuration.GetValue("Database:RunSeedOnStartup", app.Environment.IsDevelopment());
-
-        using var scope = app.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        if (applyMigrations) await db.Database.MigrateAsync();
-        if (runSeed)
+        if (builder.Configuration.GetValue("Database:RunSeedOnStartup", app.Environment.IsDevelopment()))
         {
             await SeedData.SeedAsync(db);
             await SeedData.SeedDocumentDefinitionsAsync(db);
@@ -164,7 +181,7 @@ else
     }
     catch (Exception ex)
     {
-        app.Logger.LogError(ex, "The database could not be prepared on startup.");
+        app.Logger.LogError(ex, "Seeding the database on startup failed. Reference data may be incomplete.");
     }
 }
 
@@ -237,5 +254,86 @@ app.MapHealthChecks("/health/live", new Microsoft.AspNetCore.Diagnostics.HealthC
 app.MapHub<AuditLogHub>("/hubs/audit-log").RequireAuthorization();
 
 app.Run();
+
+/*
+ * Says, in one line, which of the two very different situations a migration failure is.
+ *
+ * A failed migration against an existing database is almost always one of these, and they are told
+ * apart by the same two facts — what `__EFMigrationsHistory` records, and which tables are actually
+ * there — yet an unaided EF stack trace names neither:
+ *
+ *   - NEEDS BASELINING. Every table the model expects is present, but no migration is recorded, so EF
+ *     believes nothing was ever applied and InitialCreate fails re-creating what exists. A database
+ *     whose schema was first created outside the migration system (an `EnsureCreated` call, a restore,
+ *     a hand-run script) lands here. The cure is to record the migrations the schema already satisfies,
+ *     which is what LeadService did for its own database (see the MigrateAsync note in its Program.cs).
+ *     Not done automatically: writing those rows ASSERTS the live schema matches, and a wrong assertion
+ *     is permanent and silent — EF would skip the migrations the schema is really missing and the next
+ *     symptom would be a missing column at query time instead of a loud failure here.
+ *
+ *   - HALF-CREATED. Some expected tables are missing. InitialCreate got partway and stopped, so the
+ *     conflict and the gap are the same event: the tables it made block the retry, and the tables it
+ *     never reached make every read of them fail. Baselining this would be exactly the wrong move; the
+ *     migrations need to actually run.
+ *
+ * Both are reported, never repaired — each remedy writes to or drops from someone's live database, and
+ * which one applies is a fact about that database rather than about this code.
+ */
+static async Task ReportSchemaStateAsync(AppDbContext db, ILogger logger)
+{
+    try
+    {
+        /*
+         * Which tables exist is asked first and unconditionally. Asking EF what it considers applied is
+         * not a reliable opening question here: this runs on the same DbContext whose MigrateAsync just
+         * failed, and on that context GetAppliedMigrationsAsync answered from migration state rather
+         * than from the (empty) history table — so an early return on it skipped the whole report, which
+         * is how this function first came to print nothing at all about a half-created database.
+         */
+        var present = (await db.Database
+                .SqlQuery<string>($"select table_name as \"Value\" from information_schema.tables where table_schema = 'public'")
+                .ToListAsync())
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var expected = db.Model.GetEntityTypes()
+            .Select(e => e.GetTableName())
+            .Where(name => !string.IsNullOrEmpty(name))
+            .Select(name => name!)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var missing = expected.Where(name => !present.Contains(name)).OrderBy(name => name).ToList();
+        var recorded = present.Contains("__EFMigrationsHistory")
+            ? (await db.Database.SqlQuery<int>(
+                $"select count(*)::int as \"Value\" from \"__EFMigrationsHistory\"").SingleAsync())
+            : 0;
+
+        if (missing.Count == 0)
+        {
+            logger.LogError(
+                "{Recorded} migrations are recorded in __EFMigrationsHistory, yet all {Expected} tables this "
+                + "service expects are present — so migrations look pending and the first one fails re-creating "
+                + "them. The schema needs BASELINING: confirm it matches the migrations under "
+                + "src/ProductMarketplace.Infrastructure/Data/Migrations, then record their MigrationIds in "
+                + "__EFMigrationsHistory. Until then this service runs on whatever schema is already there.",
+                recorded, expected.Count);
+            return;
+        }
+
+        logger.LogError(
+            "This database is HALF-CREATED: {Recorded} migrations recorded, {PresentCount} of {Expected} "
+            + "expected tables exist, and {MissingCount} are missing ({Missing}). InitialCreate stopped "
+            + "partway, so it now fails on the tables it did create while every read of the ones it never "
+            + "reached fails too — which is why this service returns no data. Do NOT baseline this; the "
+            + "migrations have to run. Drop the partial tables (or the schema) so `dotnet ef database update` "
+            + "can apply InitialCreate onwards cleanly, then startup will seed it.",
+            recorded, expected.Count - missing.Count, expected.Count, missing.Count, string.Join(", ", missing));
+    }
+    catch (Exception ex)
+    {
+        // Diagnosing a failure must never become a second failure.
+        logger.LogWarning(ex, "Could not determine the database's schema state.");
+    }
+}
 
 public partial class Program { }
