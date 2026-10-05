@@ -46,7 +46,7 @@ MANIFEST="$STAGING/release-manifest.json"
 RELEASE_ID="$(jq -r .releaseVersion "$MANIFEST")"
 HOST_VERSION="$(jq -r .host.version "$MANIFEST")"
 BRIDGE_VERSION="$(jq -r .host.bridgeVersion "$MANIFEST")"
-REMOTE_KEYS=($(jq -r '.remotes | keys[]' "$MANIFEST"))
+mapfile -t REMOTE_KEYS < <(jq -r '.remotes | keys[]' "$MANIFEST")
 log "Release $RELEASE_ID — host $HOST_VERSION (bridge $BRIDGE_VERSION), remotes: ${REMOTE_KEYS[*]}"
 
 # ── 2. Add version folders (never overwrite) ────────────────────────────────
@@ -124,7 +124,13 @@ undo() {
     fi
   done
 }
-trap 'rc=$?; if [[ $rc -ne 0 && ( ${#PROMOTED[@]} -gt 0 || "$POINTER_MOVED" == true ) ]]; then undo; fi; rm -rf "$STAGING"; exit $rc' EXIT
+on_exit() {
+  local rc=$?
+  if [[ $rc -ne 0 && ( ${#PROMOTED[@]} -gt 0 || "$POINTER_MOVED" == true ) ]]; then undo; fi
+  rm -rf "$STAGING"
+  exit "$rc"
+}
+trap on_exit EXIT
 
 live_version() {   # the version AuthService has live for a key, or empty
   release_api GET "?key=$1" | jq -r '.[] | select(.status == "Live") | .version' | head -1

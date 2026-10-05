@@ -1,0 +1,108 @@
+# Every pull request and every push to main: the same checks a release depends on.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  frontend:
+    name: Frontend — lint, typecheck, test, release build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: Frontend/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -r lint
+      - run: pnpm -r typecheck
+      - run: pnpm -r test
+      # The real release assembly, so every guard runs on every PR: same-origin API URLs, no local env,
+      # relative remote assets, manifest metadata, host base path, host-bridge compatibility.
+      - run: pnpm release -- --skip-checks
+        env:
+          CI: "true"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: frontend-release
+          path: |
+            Frontend/release/*.tar.gz
+            Frontend/release/*.tar.gz.sha256
+          retention-days: 14
+
+  backend:
+    name: Backend — ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [AuthService, LeadService, Customer360Service, ProductsService]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      # Inside the repo on purpose: LicensingRemovedTests walks up from its binary to find Backend/.
+      - run: dotnet test Backend/${{ matrix.service }}.Tests --configuration Release --logger "trx;LogFileName=results.trx"
+
+  images:
+    name: Image — ${{ matrix.image }}
+    runs-on: ubuntu-latest
+    needs: backend
+    strategy:
+      matrix:
+        include:
+          - { image: auth, dockerfile: AuthService/Dockerfile }
+          - { image: lead, dockerfile: LeadService/Dockerfile }
+          - { image: customer360, dockerfile: Customer360Service/Dockerfile }
+          - { image: products, dockerfile: ProductsService/Dockerfile }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: Backend
+          file: Backend/${{ matrix.dockerfile }}
+          push: false
+          tags: omniconnect/${{ matrix.image }}:ci
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}
+
+  deploy-config:
+    name: Deployment config — compose, nginx, scripts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compose file is valid with the example settings
+        working-directory: deploy
+        run: |
+          cp .env.example .env
+          for f in env/*.env.example; do cp "$f" "${f%.example}"; done
+          docker compose -f compose.yml config --quiet
+          docker compose -f compose.yml -f compose.verify.yml config --quiet
+      - name: nginx accepts the configuration
+        run: |
+          docker run --rm \
+            --add-host auth:127.0.0.1 --add-host lead:127.0.0.1 --add-host c360:127.0.0.1 --add-host products:127.0.0.1 \
+            -v "$PWD/deploy/nginx/conf.d:/etc/nginx/conf.d:ro" \
+            -v "$PWD/deploy/nginx/snippets:/etc/nginx/snippets:ro" \
+            nginxinc/nginx-unprivileged:1.27-alpine nginx -t
+      - name: Shell scripts pass shellcheck
+        run: shellcheck -x -S warning deploy/scripts/*.sh
