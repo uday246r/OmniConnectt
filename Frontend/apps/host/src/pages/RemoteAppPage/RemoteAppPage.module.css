@@ -25,3 +25,12 @@
   border-radius: var(--omni-radius-lg);
   padding: var(--omni-space-6);
 }
+
+.bypassBanner {
+  padding: var(--omni-space-3) var(--omni-space-4);
+  border-radius: var(--omni-radius-md);
+  border: 1px solid var(--omni-color-warning);
+  background: var(--omni-color-warning-bg);
+  color: var(--omni-color-warning-text);
+  font-size: 0.875rem;
+}

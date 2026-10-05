@@ -32,6 +32,11 @@ export const TOPICS = {
   systemLogs: 'system-logs',
   /** Dashboard metrics and KPIs. Wire contract with backend PlatformHub. */
   kpis: 'kpis',
+  /**
+   * The navigation tree: a remote released, re-pointed, or put into or out of maintenance. Wire
+   * contract with AuthService's PublishNavigationChangedAsync; handled by re-reading the tree.
+   */
+  navigation: 'navigation',
 } as const
 
 export type InvalidationTopic = (typeof TOPICS)[keyof typeof TOPICS]

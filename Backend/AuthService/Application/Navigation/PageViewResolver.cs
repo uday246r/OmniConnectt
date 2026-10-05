@@ -99,7 +99,9 @@ public static class PageViewResolver
 
             foreach (var child in node.Children)
             {
-                if (Matches(child, normalized))
+                // A deep link inside a remote page (/apps/lead/view-lead/123) is a view of that page;
+                // the full path is kept on the row, attributed to the page the caller is allowed to see.
+                if (Matches(child, normalized) || IsWithin(child, normalized))
                 {
                     return Remote(normalized, node, child);
                 }
@@ -126,6 +128,10 @@ public static class PageViewResolver
 
     private static bool Matches(NavNodeDto node, string normalized) =>
         string.Equals(node.RoutePath.TrimEnd('/') is { Length: > 0 } route ? route : "/", normalized, StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsWithin(NavNodeDto page, string normalized) =>
+        page.Kind == "submodule"
+        && normalized.StartsWith(page.RoutePath.TrimEnd('/') + "/", StringComparison.OrdinalIgnoreCase);
 
     private static ResolvedPage Host(string path, string label, string pageKey) =>
         new(path, HostApplication, label, pageKey, $"Opened {label}.");

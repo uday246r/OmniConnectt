@@ -13,12 +13,20 @@ import type { NavNodeDto, NavSectionDto } from '../../shared/api/navigationApi'
  * gate existed in the sidebar, which is presentation, not enforcement.
  */
 const loadRemoteAppModule = vi.fn()
+const needsReloadForNewVersion = vi.fn(() => false)
+let remoteProps: Record<string, unknown> = {}
 
 vi.mock('../../shared/federation/remoteLoader', () => ({
   loadRemoteAppModule: (...args: unknown[]) => {
     loadRemoteAppModule(...args)
-    return Promise.resolve({ default: () => <div>remote content</div> })
+    return Promise.resolve({
+      default: (props: Record<string, unknown>) => {
+        remoteProps = props
+        return <div>remote content</div>
+      },
+    })
   },
+  needsReloadForNewVersion: (...args: unknown[]) => needsReloadForNewVersion(...(args as [])),
 }))
 
 // Imported after the mock so the page picks up the stub.
@@ -65,6 +73,7 @@ function renderAt(route: string, tree: NavNodeDto[]) {
       <Routes>
         <Route path="/apps/:appKey" element={<RemoteAppPage />} />
         <Route path="/apps/:appKey/:page" element={<RemoteAppPage />} />
+        <Route path="/apps/:appKey/:page/*" element={<RemoteAppPage />} />
       </Routes>
     </MemoryRouter>,
   )
@@ -72,6 +81,9 @@ function renderAt(route: string, tree: NavNodeDto[]) {
 
 beforeEach(() => {
   loadRemoteAppModule.mockClear()
+  needsReloadForNewVersion.mockReset()
+  needsReloadForNewVersion.mockReturnValue(false)
+  remoteProps = {}
   useNavigationStore.setState({ status: 'idle', sections: [], error: null, expanded: new Set() })
 })
 
@@ -131,5 +143,40 @@ describe('while the tree is still loading', () => {
 
     expect(screen.queryByText('404')).not.toBeInTheDocument()
     expect(loadRemoteAppModule).not.toHaveBeenCalled()
+  })
+})
+
+describe('maintenance and releases', () => {
+  it('shows the maintenance notice when the server sent no manifest URL', async () => {
+    // A caller without the bypass capability is not told where an app in maintenance lives.
+    renderAt('/apps/lead/view-lead', [{ ...LEAD, state: 'maintenance', remote: { ...LEAD.remote!, manifestUrl: null } }])
+
+    expect(await screen.findByText(/under maintenance/i)).toBeInTheDocument()
+    expect(loadRemoteAppModule).not.toHaveBeenCalled()
+  })
+
+  it('mounts the app, with a notice, for a caller allowed past maintenance', async () => {
+    renderAt('/apps/lead/view-lead', [{ ...LEAD, state: 'maintenance-bypass', maintenanceMessage: 'Back at 09:00.' }])
+
+    expect(await screen.findByText('remote content')).toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent(/maintenance access/i)
+  })
+
+  it('offers a reload instead of mounting a newer build beside the one this tab already runs', async () => {
+    needsReloadForNewVersion.mockReturnValue(true)
+
+    renderAt('/apps/lead/view-lead', [LEAD])
+
+    expect(await screen.findByRole('button', { name: /reload now/i })).toBeInTheDocument()
+    expect(loadRemoteAppModule).not.toHaveBeenCalled()
+  })
+})
+
+describe('deep links', () => {
+  it('hands the remote whatever follows the page in the URL', async () => {
+    renderAt('/apps/lead/view-lead/42/history', [LEAD])
+
+    expect(await screen.findByText('remote content')).toBeInTheDocument()
+    expect(remoteProps).toMatchObject({ page: 'view-lead', subPath: '42/history' })
   })
 })

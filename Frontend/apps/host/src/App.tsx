@@ -437,6 +437,8 @@ function AppRoutes() {
           */}
           <Route path="apps/:appKey" element={<RemoteAppPage />} />
           <Route path="apps/:appKey/:page" element={<RemoteAppPage />} />
+          {/* Deeper paths (/apps/lead/view-lead/123) reach the same page; the rest is the remote's subPath. */}
+          <Route path="apps/:appKey/:page/*" element={<RemoteAppPage />} />
 
           <Route
             path="system/audit-logs"

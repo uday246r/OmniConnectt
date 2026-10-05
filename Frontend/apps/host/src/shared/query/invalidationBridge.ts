@@ -17,6 +17,9 @@ export const TOPIC_QUERY_PREFIXES: Record<InvalidationTopic, readonly (readonly 
   'audit-logs': [['auditLogs'], ['securityAlerts']],
   'system-logs': [['systemLogs']],
   kpis: [['dashboard']],
+  // The tree lives in navigationStore, not the query cache; the realtime handler re-reads it directly.
+  // The health panel on the Applications page shows app status, so its list is refreshed too.
+  navigation: [['applications']],
 }
 
 /**

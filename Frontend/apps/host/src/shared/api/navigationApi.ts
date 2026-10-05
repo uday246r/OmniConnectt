@@ -26,7 +26,7 @@ export interface NavNodeDto {
    * There is deliberately no "hidden" or "forbidden": a row the caller must not see is absent from
    * the response entirely, because sending it would ship the product's module list to every browser.
    */
-  state: 'visible' | 'maintenance'
+  state: 'visible' | 'maintenance' | 'maintenance-bypass'
   maintenanceMessage: string | null
   remote: RemoteMountDto | null
   /** Always present, never null, so nothing here has to branch on it. */
@@ -35,7 +35,12 @@ export interface NavNodeDto {
 
 export interface RemoteMountDto {
   appKey: string
-  manifestUrl: string
+  /**
+   * Root-relative and versioned in production (/modules/lead/4.7.3/mf-manifest.json). Null while the
+   * app is in maintenance for a caller without the bypass capability: there is nothing for them to
+   * load, so the server does not tell them where it is.
+   */
+  manifestUrl: string | null
   containerName: string | null
   /** Where /apps/{key} should land — the first row the caller can actually see. */
   defaultRoutePath: string | null

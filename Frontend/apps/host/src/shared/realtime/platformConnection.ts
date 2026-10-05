@@ -4,6 +4,7 @@ import { env } from '../../config/env'
 import { useAuthStore } from '../../features/auth/store/authStore'
 import { invalidate, TOPICS, type InvalidationTopic } from '../stores/invalidationStore'
 import { appQueryClient } from '../query/queryClient'
+import { useNavigationStore } from '../stores/navigationStore'
 import type { ApprovalSummaryDto } from '../../features/approvals/api/approvalsApi'
 
 interface RealtimeState {
@@ -46,6 +47,16 @@ function scheduleInvalidate(topic?: InvalidationTopic) {
     if (toFlush.length > 0) {
       invalidate(...toFlush)
     }
+  }, 400)
+}
+
+// A release promotes several remotes in a row; one tree read after the last of them is enough.
+let navigationTimer: ReturnType<typeof setTimeout> | null = null
+function scheduleNavigationRefresh() {
+  if (navigationTimer) clearTimeout(navigationTimer)
+  navigationTimer = setTimeout(() => {
+    navigationTimer = null
+    void useNavigationStore.getState().refresh()
   }, 400)
 }
 
@@ -105,7 +116,12 @@ export async function startPlatformConnection(): Promise<void> {
           )
         }
 
-        // 2. Invalidation routing through 400ms coalescer
+        // 2. The navigation tree is not a query; it is re-read directly, once per burst of changes.
+        if (payload.topic === TOPICS.navigation) {
+          scheduleNavigationRefresh()
+        }
+
+        // 3. Invalidation routing through 400ms coalescer
         const validTopic = (Object.values(TOPICS) as string[]).find((t) => t === payload.topic) as
           | InvalidationTopic
           | undefined
@@ -119,6 +135,7 @@ export async function startPlatformConnection(): Promise<void> {
         useRealtimeStore.getState().setConnected(true)
         // Consistency backstop: invalidate all topics when the missed window is unknown
         invalidate()
+        scheduleNavigationRefresh()
       })
 
       connection.onreconnecting((error) => {

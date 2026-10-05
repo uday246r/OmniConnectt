@@ -6,7 +6,7 @@ import {
   type NavNodeDto,
   type NavSectionDto,
 } from '../api/navigationApi'
-import { registerSessionCleanup } from '../../features/auth/store/authStore'
+import { registerSessionCleanup, useAuthStore } from '../../features/auth/store/authStore'
 
 export type NavigationStatus = 'idle' | 'loading' | 'loaded' | 'error'
 
@@ -24,7 +24,16 @@ interface NavigationState {
    */
   expanded: Set<string>
 
+  /** When the tree was last read successfully (ms since epoch); 0 before the first read. */
+  fetchedAt: number
+
   fetch: (accessToken: string, signal?: AbortSignal) => Promise<void>
+  /**
+   * Re-reads the tree with the current session's token, if there is one. Called when the server says
+   * the tree changed (a release promoted, an app put into maintenance) and when the tab comes back
+   * into view, so a long-open tab does not keep mounting a build that is no longer live.
+   */
+  refresh: () => Promise<void>
   toggleExpanded: (key: string) => void
   setExpanded: (key: string, open: boolean) => void
   findByRoute: (routePath: string) => NavNodeDto | undefined
@@ -57,6 +66,7 @@ export const useNavigationStore = create<NavigationState>((set, get) => ({
   status: 'idle',
   sections: [],
   error: null,
+  fetchedAt: 0,
   expanded: loadExpanded(),
 
   async fetch(accessToken, signal) {
@@ -66,7 +76,7 @@ export const useNavigationStore = create<NavigationState>((set, get) => ({
     if (get().sections.length === 0) set({ status: 'loading', error: null })
     try {
       const tree = await navigationApi.get(accessToken, signal)
-      set({ sections: tree.sections, status: 'loaded', error: null })
+      set({ sections: tree.sections, status: 'loaded', error: null, fetchedAt: Date.now() })
     } catch (err) {
       // Keep whatever was already rendered rather than blanking the sidebar on a transient failure —
       // an empty sidebar reads as "you have lost all your access", which is far more alarming than
@@ -78,6 +88,12 @@ export const useNavigationStore = create<NavigationState>((set, get) => ({
       console.warn('Navigation fetch failed:', err)
       set({ status: 'error', error: 'Could not load navigation. Try refreshing the page.' })
     }
+  },
+
+  async refresh() {
+    const token = useAuthStore.getState().accessToken
+    if (!token || get().status === 'idle') return
+    await get().fetch(token)
   },
 
   toggleExpanded(key) {
@@ -102,8 +118,20 @@ export const useNavigationStore = create<NavigationState>((set, get) => ({
   findByRoute: (routePath) => findNodeByRoute(get().sections, routePath),
   findApp: (appKey) => findAppNode(get().sections, appKey),
 
-  reset: () => set({ status: 'idle', sections: [], error: null }),
+  reset: () => set({ status: 'idle', sections: [], error: null, fetchedAt: 0 }),
 }))
+
+/** A tab returning to view after this long re-reads the tree; the server push covers the common case. */
+const STALE_ON_RETURN_MS = 60_000
+
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => {
+    const { status, fetchedAt, refresh } = useNavigationStore.getState()
+    if (document.visibilityState === 'visible' && status === 'loaded' && Date.now() - fetchedAt > STALE_ON_RETURN_MS) {
+      void refresh()
+    }
+  })
+}
 
 // The tree is filtered per user, so it must not survive into the next session.
 registerSessionCleanup(() => useNavigationStore.getState().reset())

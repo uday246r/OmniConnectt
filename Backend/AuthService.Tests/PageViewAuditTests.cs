@@ -77,6 +77,22 @@ public class PageViewAuditTests : IDisposable
     }
 
     [Fact]
+    public void A_deep_link_inside_a_remote_page_is_recorded_against_that_page_with_its_full_path()
+    {
+        var page = PageViewResolver.Resolve(Tree(), "/apps/lead/create-lead/draft/42", NoPermissions, false);
+
+        Assert.NotNull(page);
+        Assert.Equal("Create Lead", page.Module);
+        Assert.Equal("/apps/lead/create-lead/draft/42", page.Path);
+    }
+
+    [Fact]
+    public void A_path_that_only_shares_a_prefix_with_a_page_is_not_that_page()
+    {
+        Assert.Null(PageViewResolver.Resolve(Tree(), "/apps/lead/create-leadership", NoPermissions, false));
+    }
+
+    [Fact]
     public void A_host_page_from_the_sidebar_is_named_by_its_row()
     {
         var page = PageViewResolver.Resolve(Tree(), "/system/audit-logs/", NoPermissions, false);
