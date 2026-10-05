@@ -23,7 +23,7 @@ export const HomeFinancingFields: React.FC<HomeFinancingFieldsProps> = ({ isEdit
     <div className="form-section">
       <div className="form-section-title">
         <Home size={18} className="form-section-icon" />
-        <span>Home Financing Details</span>
+        <span>Property Details</span>
       </div>
 
       <div className="form-grid-2">

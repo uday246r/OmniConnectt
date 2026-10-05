@@ -1,5 +1,8 @@
 # Phase 1 execution map — ProductsService
 
+> **Historical.** Phase 1 is complete; this describes the service as it was *before* the rebuild. For the
+> current state read [PROGRESS.md](PROGRESS.md).
+
 Companion to [BRIEF.md](BRIEF.md). That file holds the *plan and reasoning*; this one holds the
 **current-state facts** a fresh session would otherwise spend an hour re-discovering. Read BRIEF.md
 first for the "why", then this for the "where".

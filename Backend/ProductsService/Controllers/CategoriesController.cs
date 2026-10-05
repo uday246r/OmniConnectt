@@ -12,11 +12,11 @@ namespace ProductMarketplace.Api.Controllers;
 [Authorize]
 public class CategoriesController(ICategoryService service, ApprovalGate gate) : ControllerBase
 {
-    // Read by the catalogue, the product editor and the Apply form, not only by category managers.
+    // Read by the catalogue and the product editor, not only by category managers.
     [HttpGet]
     [RequiresAnyCapability("categories:View", "products:View")]
-    public async Task<ActionResult<List<CategoryDto>>> GetAll([FromQuery] string? status, CancellationToken ct)
-        => Ok(await service.GetAllAsync(status, ct));
+    public async Task<IActionResult> Search([FromQuery] CategoryQueryDto query, CancellationToken ct)
+        => Ok(await service.SearchAsync(query, ct));
 
     [HttpGet("{id:guid}")]
     [RequiresAnyCapability("categories:View", "products:View")]
@@ -44,7 +44,8 @@ public class CategoriesController(ICategoryService service, ApprovalGate gate) :
         var current = await service.GetByIdAsync(id, ct);
         if (current is null) return NotFound();
 
-        var pending = await gate.TrySubmitAsync(ProductsMutations.CategoryUpdate, id.ToString(), current.Name, dto, ct);
+        var pending = await gate.TrySubmitAsync(ProductsMutations.CategoryUpdate, id.ToString(), current.Name, dto, ct,
+            before: new { name = current.Name, code = current.Code, status = current.Status });
         if (pending is not null) return Accepted(pending);
 
         var updated = await service.UpdateAsync(id, dto, ct);

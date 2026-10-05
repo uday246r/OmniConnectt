@@ -12,17 +12,19 @@ namespace LeadManagement.Api.Services
     /// Lead Management's own "Field Settings" — a separate implementation from Customer360Service's
     /// FieldConfig, deliberately not shared, mirroring its shape (label/visibility/section/order/
     /// sensitive/masking, full-replace-by-ApiField semantics, Maker-Checker gated) but keyed by
-    /// Product (a real DB row here, not a fixed profile-type enum) and extended with two columns
-    /// Customer360's version doesn't have — Required and Editable — both enforced server-side by this
-    /// service, not just cosmetic.
+    /// Marketplace sub-category (a "type" of product — every Home Loan product shares one lead form) and
+    /// extended with two columns Customer360's version doesn't have — Required and Editable — both
+    /// enforced server-side by this service, not just cosmetic.
     ///
     /// This is config over the fields that ALREADY EXIST in code — never a schema/EAV mechanism for
-    /// inventing new data columns. The fixed catalog (seeded by EnsureSeededAsync):
-    ///   Common (every product): customerName, icNumber, phoneNumber, email, state, branch,
+    /// inventing new data columns. The fixed catalog (created on first use of a sub-category by
+    /// EnsureDefaultsAsync):
+    ///   Common (every sub-category): customerName, icNumber, phoneNumber, email, state, branch,
     ///     employerName, appliedAmount, hasPreferredSalesExecutive, preferredSalesExecutive,
     ///     marketingConsent, agreedToPrivacyPolicy.
-    ///   Home Financing only: propertyType, propertyStatus.
-    ///   Micro Finance only: dateOfIncorporation, companyName, entityType.
+    ///   Optional product details, created HIDDEN: propertyType, propertyStatus, dateOfIncorporation,
+    ///     companyName, entityType. An administrator switches on the ones a sub-category's lead form
+    ///     needs in Field Settings — no product name is compared to decide it.
     /// hasPreferredSalesExecutive/preferredSalesExecutive's existing "if checked, the dropdown becomes
     /// mandatory" conditional stays its own hardcoded rule (LeadService.CreateLeadAsync/UpdateLeadAsync
     /// never touch it) — preferredSalesExecutive is seeded Required:false so the two conditionality
@@ -33,18 +35,31 @@ namespace LeadManagement.Api.Services
         private readonly ApplicationDbContext _db;
         private readonly AuthServiceClient _authServiceClient;
         private readonly SelfOptions _selfOptions;
+        private readonly ProductCatalogClient _catalog;
 
-        public LeadFieldConfigService(ApplicationDbContext db, AuthServiceClient authServiceClient, IOptions<SelfOptions> selfOptions)
+        public LeadFieldConfigService(ApplicationDbContext db, AuthServiceClient authServiceClient, IOptions<SelfOptions> selfOptions, ProductCatalogClient catalog)
         {
             _db = db;
             _authServiceClient = authServiceClient;
             _selfOptions = selfOptions.Value;
+            _catalog = catalog;
         }
 
-        public async Task<List<LeadFieldConfig>> GetByProductAsync(Guid productId, CancellationToken ct = default) =>
+        /// <summary>
+        /// The lead form's field settings for one Marketplace sub-category. A sub-category seen for the
+        /// first time gets the default set on the spot, so a category an administrator adds in the
+        /// Marketplace today can take leads today with nothing to configure first.
+        /// </summary>
+        public async Task<List<LeadFieldConfig>> GetBySubCategoryAsync(Guid subCategoryId, CancellationToken ct = default)
+        {
+            await EnsureDefaultsAsync(subCategoryId, ct);
+            return await ReadAsync(subCategoryId, ct);
+        }
+
+        private async Task<List<LeadFieldConfig>> ReadAsync(Guid subCategoryId, CancellationToken ct) =>
             await _db.LeadFieldConfigs
                 .AsNoTracking()
-                .Where(f => f.ProductId == productId)
+                .Where(f => f.CatalogSubCategoryId == subCategoryId)
                 .OrderBy(f => f.DisplayOrder)
                 .ToListAsync(ct);
 
@@ -52,7 +67,7 @@ namespace LeadManagement.Api.Services
         /// TrySubmitForApprovalAsync uses, gated on the separate FieldSettingsModuleKey so Field
         /// Settings can be gated independently of Lead itself.</summary>
         private async Task<ApprovalPendingDto?> TrySubmitForApprovalAsync(
-            Guid productId, string productName, string oldDataJson, object requestBody, Guid? actingUserId, bool bypassApproval, CancellationToken ct)
+            Guid subCategoryId, string subCategoryLabel, string oldDataJson, object requestBody, Guid? actingUserId, bool bypassApproval, CancellationToken ct)
         {
             if (bypassApproval || actingUserId is null)
             {
@@ -66,20 +81,22 @@ namespace LeadManagement.Api.Services
 
             var callbackUrl = $"{_selfOptions.PublicBaseUrl.TrimEnd('/')}/internal/approvals/apply";
             return await _authServiceClient.SubmitApprovalAsync(
-                _selfOptions.FieldSettingsModuleKey, "Update", "LeadFieldConfig", productId.ToString(),
-                $"{productName} Field Settings", oldDataJson, System.Text.Json.JsonSerializer.Serialize(requestBody),
+                _selfOptions.FieldSettingsModuleKey, "Update", "LeadFieldConfig", subCategoryId.ToString(),
+                $"{subCategoryLabel} Field Settings", oldDataJson, System.Text.Json.JsonSerializer.Serialize(requestBody),
                 actingUserId.Value, callbackUrl, Guid.NewGuid().ToString(), ct);
         }
 
         public async Task<MutationResult<List<LeadFieldConfig>>> ReplaceAsync(
-            Guid productId, List<LeadFieldConfig> incoming, Guid? actingUserId, string? actorName = null, bool bypassApproval = false, CancellationToken ct = default,
+            Guid subCategoryId, List<LeadFieldConfig> incoming, Guid? actingUserId, string? actorName = null, bool bypassApproval = false, CancellationToken ct = default,
             string? expectedVersion = null)
         {
-            var product = await _db.Products.AsNoTracking().FirstOrDefaultAsync(p => p.Id == productId, ct)
-                ?? throw new InvalidOperationException($"Product '{productId}' was not found.");
+            var subCategory = (await _catalog.GetSubCategoriesAsync(ct)).FirstOrDefault(s => s.Id == subCategoryId)
+                ?? throw new InvalidOperationException("That sub-category is not in the product catalogue, or is not currently offered.");
+            var label = $"{subCategory.CategoryName} › {subCategory.Name}";
+            await EnsureDefaultsAsync(subCategoryId, ct);
 
             var existing = await _db.LeadFieldConfigs
-                .Where(f => f.ProductId == productId)
+                .Where(f => f.CatalogSubCategoryId == subCategoryId)
                 .ToDictionaryAsync(f => f.ApiField, StringComparer.OrdinalIgnoreCase, ct);
             var oldSnapshot = System.Text.Json.JsonSerializer.Serialize(existing.Values.ToList());
 
@@ -94,7 +111,7 @@ namespace LeadManagement.Api.Services
             // cannot work — and again on replay, since replay comes back through here.
             EnsureRulesWellFormed(incoming);
 
-            var pending = await TrySubmitForApprovalAsync(productId, product.Name, oldSnapshot, incoming, actingUserId, bypassApproval, ct);
+            var pending = await TrySubmitForApprovalAsync(subCategoryId, label, oldSnapshot, incoming, actingUserId, bypassApproval, ct);
             if (pending is not null)
             {
                 return MutationResult<List<LeadFieldConfig>>.PendingApproval(pending);
@@ -129,7 +146,7 @@ namespace LeadManagement.Api.Services
                     _db.LeadFieldConfigs.Add(new LeadFieldConfig
                     {
                         Id = Guid.NewGuid(),
-                        ProductId = productId,
+                        CatalogSubCategoryId = subCategoryId,
                         ApiField = field.ApiField,
                         DisplayLabel = field.DisplayLabel,
                         Section = field.Section,
@@ -148,11 +165,11 @@ namespace LeadManagement.Api.Services
             await _db.SaveChangesAsync(ct);
 
             await _authServiceClient.PushAuditLogAsync(
-                "leadfieldconfig.updated", "LeadFieldConfig", productId.ToString(),
-                $"Updated Lead Management field settings for '{product.Name}'.", actingUserId, actorName, product.Name,
+                "leadfieldconfig.updated", "LeadFieldConfig", subCategoryId.ToString(),
+                $"Updated Lead Management field settings for '{label}'.", actingUserId, actorName, label,
                 module: "Field Settings", page: "field-settings", actionCategory: "Configuration", ct: ct);
 
-            return MutationResult<List<LeadFieldConfig>>.Ok(await GetByProductAsync(productId, ct));
+            return MutationResult<List<LeadFieldConfig>>.Ok(await ReadAsync(subCategoryId, ct));
         }
 
         /// <summary>Thrown when Field Settings are saved against a version someone else has since replaced.</summary>
@@ -172,26 +189,44 @@ namespace LeadManagement.Api.Services
             return Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(canonical)))[..16].ToLowerInvariant();
         }
 
-        /// <summary>Idempotent per ProductId — an existing product's config is never touched, so admin
-        /// edits survive redeploys. Copies Customer360Service's runtime-seeder pattern rather than EF
-        /// `HasData`, which would silently re-clobber intentional edits on every migration.</summary>
-        public async Task EnsureSeededAsync(CancellationToken ct = default)
+        /// <summary>
+        /// Gives a sub-category its default field settings the first time anything asks for them.
+        /// Idempotent — a sub-category that already has rows is never touched, so an administrator's
+        /// edits survive. Two requests racing to create the same defaults is harmless: the unique index on
+        /// (sub-category, field) rejects the second, which then simply reads what the first wrote.
+        /// </summary>
+        public async Task EnsureDefaultsAsync(Guid subCategoryId, CancellationToken ct = default)
         {
-            var products = await _db.Products.AsNoTracking().ToListAsync(ct);
-            foreach (var product in products)
+            if (await _db.LeadFieldConfigs.AnyAsync(f => f.CatalogSubCategoryId == subCategoryId, ct))
             {
-                if (await _db.LeadFieldConfigs.AnyAsync(f => f.ProductId == product.Id, ct))
-                {
-                    continue;
-                }
-
-                _db.LeadFieldConfigs.AddRange(BuildDefaultsFor(product));
+                return;
             }
 
-            await _db.SaveChangesAsync(ct);
+            _db.LeadFieldConfigs.AddRange(BuildDefaultsFor(subCategoryId));
+            try
+            {
+                await _db.SaveChangesAsync(ct);
+            }
+            catch (DbUpdateException)
+            {
+                // Someone else created them between our check and our insert — theirs stand. Anything else
+                // is a real failure and must not be swallowed.
+                _db.ChangeTracker.Clear();
+                if (!await _db.LeadFieldConfigs.AnyAsync(f => f.CatalogSubCategoryId == subCategoryId, ct)) throw;
+            }
         }
 
-        private static List<LeadFieldConfig> BuildDefaultsFor(Product product)
+        /// <summary>The optional per-product details the lead form can carry, created hidden.</summary>
+        public static readonly IReadOnlyList<(string ApiField, string Label)> OptionalDetailFields =
+        [
+            ("propertyType", "Property Type"),
+            ("propertyStatus", "Property Status"),
+            ("dateOfIncorporation", "Date of Incorporation"),
+            ("companyName", "Company Name"),
+            ("entityType", "Entity Type"),
+        ];
+
+        private static List<LeadFieldConfig> BuildDefaultsFor(Guid subCategoryId)
         {
             var rows = new List<(string ApiField, string Label, string Section, bool Required, bool Sensitive)>
             {
@@ -207,31 +242,27 @@ namespace LeadManagement.Api.Services
                 ("preferredSalesExecutive", "Preferred Sales Executive", "Sales Executive Assignment", false, false),
             };
 
-            if (product.Name == "Home Financing")
+            // Present but hidden and optional: an administrator turns on the ones this sub-category's lead
+            // form needs. Nothing here looks at what the product is called.
+            foreach (var (apiField, label) in OptionalDetailFields)
             {
-                rows.Add(("propertyType", "Property Type", "Product Details", true, false));
-                rows.Add(("propertyStatus", "Property Status", "Product Details", true, false));
-            }
-            else if (product.Name == "Micro Finance")
-            {
-                rows.Add(("dateOfIncorporation", "Date of Incorporation", "Product Details", true, false));
-                rows.Add(("companyName", "Company Name", "Product Details", true, false));
-                rows.Add(("entityType", "Entity Type", "Product Details", true, false));
+                rows.Add((apiField, label, "Product Details", false, false));
             }
 
             rows.Add(("marketingConsent", "Marketing Consent", "Declaration & Consent", true, false));
             rows.Add(("agreedToPrivacyPolicy", "Privacy Policy Agreement", "Declaration & Consent", true, false));
 
             var order = 0;
+            var optional = OptionalDetailFields.Select(f => f.ApiField).ToHashSet(StringComparer.Ordinal);
             return rows.Select(r => new LeadFieldConfig
             {
                 Id = Guid.NewGuid(),
-                ProductId = product.Id,
+                CatalogSubCategoryId = subCategoryId,
                 ApiField = r.ApiField,
                 DisplayLabel = r.Label,
                 Section = r.Section,
                 DisplayOrder = ++order,
-                Visible = true,
+                Visible = !optional.Contains(r.ApiField),
                 Required = r.Required,
                 Editable = true,
                 Sensitive = r.Sensitive,

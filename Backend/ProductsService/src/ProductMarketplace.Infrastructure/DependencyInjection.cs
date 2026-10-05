@@ -41,19 +41,18 @@ public static class DependencyInjection
                     npgsql.CommandTimeout(30);
                 }));
 
+        // Read once per request, so a request that filters products and then reports on them asks Setup
+        // which statuses are live a single time — and never serves a stale answer across instances.
+        services.AddScoped<ICatalogStatuses, CatalogStatuses>();
+
         services.AddScoped<ICategoryService, CategoryService>();
-        services.AddScoped<IProductTypeService, ProductTypeService>();
+        services.AddScoped<ISubCategoryService, SubCategoryService>();
         services.AddScoped<IProductService, ProductService>();
-        services.AddScoped<IReviewService, ReviewService>();
-        services.AddScoped<IPromotionService, PromotionService>();
-        services.AddScoped<IApplicationService, ApplicationService>();
+        services.AddScoped<ICatalogLookupService, CatalogLookupService>();
         services.AddScoped<IDashboardService, DashboardService>();
         services.AddScoped<IAuditLogService, AuditLogService>();
         services.AddScoped<IDocumentDefinitionService, DocumentDefinitionService>();
         services.AddScoped<IStatusConfigService, StatusConfigService>();
-        services.AddScoped<IEmploymentTypeService, EmploymentTypeService>();
-        services.AddScoped<IRankingConfigService, RankingConfigService>();
-        services.AddSingleton<IFileStorageService, LocalFileStorageService>();
         services.AddSignalR();
 
         return services;

@@ -1,70 +1,56 @@
-import "./Charts.css";
+import type { StatusTone } from '../../types/domain';
+import styles from './Charts.module.css';
 
-const PALETTE = ["#2563eb", "#10b981", "#f59e0b", "#7c3aed", "#ec4899", "#64748b", "#06b6d4", "#ef4444"];
+export interface DonutSegment {
+  key: string;
+  label: string;
+  value: number;
+  /** Drawn in this tone — a status's own colour from Setup. */
+  tone: StatusTone;
+}
 
-export function DonutChart({
-  segments,
-  total,
-  centerLabel,
-  size = 150,
-}: {
-  segments: { label: string; value: number; percentage: number }[];
-  total: number;
-  centerLabel?: string;
-  size?: number;
-}) {
-  const radius = 42;
-  const circumference = 2 * Math.PI * radius;
+export interface DonutChartProps {
+  segments: DonutSegment[];
+  /** The figure in the middle and what it counts, e.g. 36 / "Products". */
+  centerValue: number;
+  centerLabel: string;
+  ariaLabel: string;
+}
+
+// A circle of radius 15.9155 has a circumference of 100, so a segment's length is simply its percentage.
+const R = 15.9155;
+
+/** A ring of segments, each coloured by its tone, with the total in the middle. */
+export function DonutChart({ segments, centerValue, centerLabel, ariaLabel }: DonutChartProps) {
+  const total = segments.reduce((sum, s) => sum + s.value, 0);
   let offset = 0;
 
   return (
-    <div className="pm-donut-wrap">
-      <svg viewBox="0 0 100 100" width={size} height={size} className="pm-donut">
-        <circle cx="50" cy="50" r={radius} fill="none" stroke="#f1f5f9" strokeWidth="14" />
-        {segments.map((s, i) => {
-          const dash = (s.percentage / 100) * circumference;
+    <svg viewBox="0 0 42 42" className={styles.donut} role="img" aria-label={`${ariaLabel}: ${segments.map((s) => `${s.label} ${s.value}`).join(', ')}`}>
+      <circle cx="21" cy="21" r={R} fill="none" className={styles.track} strokeWidth="5" />
+      {total > 0 &&
+        segments.map((segment) => {
+          const length = (segment.value / total) * 100;
           const circle = (
             <circle
-              key={s.label}
-              cx="50"
-              cy="50"
-              r={radius}
+              key={segment.key}
+              cx="21"
+              cy="21"
+              r={R}
               fill="none"
-              stroke={PALETTE[i % PALETTE.length]}
-              strokeWidth="14"
-              strokeDasharray={`${dash} ${circumference - dash}`}
-              strokeDashoffset={-offset}
-              transform="rotate(-90 50 50)"
-              strokeLinecap={segments.length > 1 ? "butt" : "round"}
-            />
+              strokeWidth="5"
+              className={styles[`tone_${segment.tone}`]}
+              strokeDasharray={`${length} ${100 - length}`}
+              strokeDashoffset={25 - offset}
+            >
+              <title>{`${segment.label}: ${segment.value}`}</title>
+            </circle>
           );
-          offset += dash;
+          offset += length;
           return circle;
         })}
-      </svg>
-      <div className="pm-donut-center">
-        <strong>{total.toLocaleString()}</strong>
-        {centerLabel && <span>{centerLabel}</span>}
-      </div>
-    </div>
+      <text x="21" y="20.5" textAnchor="middle" className={styles.centerValue}>{centerValue}</text>
+      <text x="21" y="26" textAnchor="middle" className={styles.centerLabel}>{centerLabel}</text>
+    </svg>
   );
 }
-
-export function DonutLegend({ segments }: { segments: { label: string; value: number; percentage: number }[] }) {
-  return (
-    <ul className="pm-donut-legend">
-      {segments.map((s, i) => (
-        <li key={s.label}>
-          <div className="pm-donut-legend-left">
-            <span className="pm-donut-legend-dot" style={{ background: PALETTE[i % PALETTE.length] }} />
-            <span className="pm-donut-legend-label">{s.label}</span>
-          </div>
-          <span className="pm-donut-legend-value">
-            {s.value.toLocaleString()} <span className="pm-donut-legend-pct">({s.percentage}%)</span>
-          </span>
-        </li>
-      ))}
-    </ul>
-  );
-}
-

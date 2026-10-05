@@ -1,39 +1,14 @@
-// Status values are no longer a closed set - Setup can add new ones for any entity type (see
-// StatusConfig), so these are plain strings rather than fixed unions. The type aliases are kept so
-// call sites stay self-documenting about which kind of status a value holds.
-export type ProductStatus = string;
-export type CategoryStatus = string;
-export type FieldDataType = "Text" | "Number" | "Currency" | "Percentage" | "Boolean" | "Date" | "Dropdown" | "MultiSelect";
-export type ReviewStatus = string;
-export type PromotionStatus = string;
-export type ApplicationStatus = string;
+/**
+ * The shapes the Products & Marketplace API returns and accepts.
+ *
+ * Statuses are deliberately plain `string`s, never unions: which values exist, what they are called,
+ * what colour they are and whether they make a record live are all decided in Setup, so nothing in this
+ * app may compare a status to a literal. Ask the status store (`useStatusConfigStore`) instead.
+ */
 
-export type SortOption = "recommended" | "trending" | "lowest-rate" | "newly-added" | "top-rated" | "most-applied";
+import type { BadgeTone, DateRangeValue } from '@omniconnect/ui';
 
-export type StatusEntityType = "Product" | "Category" | "Review" | "Promotion" | "Application";
-export type StatusTone = "success" | "warning" | "danger" | "info" | "neutral";
-
-export interface StatusConfig {
-  id: string;
-  entityType: StatusEntityType;
-  value: string;
-  label: string;
-  color: StatusTone;
-  enabled: boolean;
-  sortOrder: number;
-}
-
-export interface StatusConfigInput {
-  label: string;
-  color: StatusTone;
-  enabled: boolean;
-  sortOrder: number;
-}
-
-export interface StatusConfigCreateInput extends StatusConfigInput {
-  entityType: StatusEntityType;
-  value: string;
-}
+export type { DateRangeValue };
 
 export interface PagedResult<T> {
   items: T[];
@@ -43,51 +18,138 @@ export interface PagedResult<T> {
   totalPages: number;
 }
 
-/** How many records hold one status, counted by the server over the whole filtered set. */
 export interface StatusCount {
   status: string;
   count: number;
 }
 
+// ---- Setup → Statuses -----------------------------------------------------------------------------
+
+/** How a status is drawn. One vocabulary, defined by the shared badge, not re-typed here. */
+export type StatusTone = BadgeTone;
+
+/** Which kind of record a status belongs to ("Product", "SubCategory", "Category") — whatever the server groups them under. */
+export type StatusEntityType = string;
+
+export interface StatusConfig {
+  id: string;
+  entityType: StatusEntityType;
+  value: string;
+  label: string;
+  color: StatusTone;
+  enabled: boolean;
+  /** Whether a record holding this status is live in the catalogue. */
+  isLive: boolean;
+  sortOrder: number;
+}
+
+export interface StatusConfigInput {
+  label: string;
+  color: StatusTone;
+  enabled: boolean;
+  isLive: boolean;
+  sortOrder: number;
+}
+
+export interface StatusConfigCreateInput extends StatusConfigInput {
+  entityType: StatusEntityType;
+  value: string;
+}
+
+// ---- Fields (the attributes a sub-category's products carry) --------------------------------------
+
+/** The server's field types. The field editor offers exactly these. */
+export const FIELD_DATA_TYPES = ['Text', 'Number', 'Currency', 'Percentage', 'Boolean', 'Date', 'Dropdown', 'MultiSelect'] as const;
+export type FieldDataType = (typeof FIELD_DATA_TYPES)[number];
+
+export interface FieldRule {
+  type: string;
+  pattern?: string | null;
+  value?: number | null;
+  message: string;
+}
+
 export interface FieldDefinition {
   id: string;
+  subCategoryId: string;
   key: string;
   label: string;
   dataType: FieldDataType;
   unit?: string | null;
   options?: string[] | null;
+  validations: FieldRule[];
   required: boolean;
   filterable: boolean;
-  visibleToCustomer: boolean;
   sortable: boolean;
   displayOnCard: boolean;
   displayOnDetails: boolean;
-  displayInApplication: boolean;
-  isReadOnly?: boolean;
+  isReadOnly: boolean;
   isPrimaryMetric: boolean;
   isSecondaryMetric: boolean;
   sortOrder: number;
 }
 
-export interface FieldDefinitionInput {
-  id?: string;
-  key: string;
-  label: string;
-  dataType: FieldDataType;
-  unit?: string;
-  options?: string[];
-  required: boolean;
-  filterable: boolean;
-  visibleToCustomer: boolean;
-  sortable: boolean;
-  displayOnCard: boolean;
-  displayOnDetails: boolean;
-  displayInApplication: boolean;
-  isReadOnly?: boolean;
-  isPrimaryMetric: boolean;
-  isSecondaryMetric: boolean;
-  sortOrder: number;
+export type FieldDefinitionInput = Omit<FieldDefinition, 'id' | 'subCategoryId' | 'key'> & { key?: string };
+
+// ---- Categories and sub-categories ----------------------------------------------------------------
+
+export interface Category {
+  id: string;
+  name: string;
+  code: string;
+  description: string;
+  iconKey: string;
+  status: string;
+  /** Whether the category's status is live. When it is not, everything beneath it is hidden. */
+  isLive: boolean;
+  displayOrder: number;
+  subCategoryCount: number;
+  /** Products beneath it, whatever their status. */
+  productCount: number;
+  createdAt: string;
 }
+
+export interface CategoryInput {
+  name: string;
+  code: string;
+  description: string;
+  iconKey: string;
+  status: string;
+  displayOrder: number;
+}
+
+export interface SubCategory {
+  id: string;
+  categoryId: string;
+  categoryName: string;
+  categoryCode: string;
+  name: string;
+  code: string;
+  description: string;
+  iconKey: string;
+  status: string;
+  isLive: boolean;
+  displayOrder: number;
+  productCount: number;
+  createdAt: string;
+}
+
+/** A sub-category with the attributes its products carry — what the product form renders from. */
+export interface SubCategoryDetail extends SubCategory {
+  fieldDefinitions: FieldDefinition[];
+}
+
+export interface SubCategoryInput {
+  categoryId: string;
+  name: string;
+  code: string;
+  description: string;
+  iconKey: string;
+  status: string;
+  displayOrder: number;
+}
+
+// ---- Products -------------------------------------------------------------------------------------
 
 export interface ProductFieldValue {
   fieldDefinitionId: string;
@@ -98,118 +160,30 @@ export interface ProductFieldValue {
   value: string;
   displayOnCard: boolean;
   displayOnDetails: boolean;
-  isReadOnly?: boolean;
-  isPrimaryMetric: boolean;
-  isSecondaryMetric: boolean;
 }
 
-export interface EmploymentType {
-  id: string;
-  name: string;
-  active: boolean;
-  sortOrder: number;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface EmploymentTypeInput {
-  name: string;
-  active: boolean;
-  sortOrder: number;
-}
-
-export interface RankingConfig {
-  id: string;
-  trendingViewWeight: number;
-  trendingApplicationWeight: number;
-  recommendedRatingWeight: number;
-  recommendedApplicationWeight: number;
-  recommendedPromotionWeight: number;
-  updatedAt: string;
-}
-
-export interface RankingConfigUpdate {
-  trendingViewWeight: number;
-  trendingApplicationWeight: number;
-  recommendedRatingWeight: number;
-  recommendedApplicationWeight: number;
-  recommendedPromotionWeight: number;
-}
-
-export interface ProductType {
+export interface ProductListItem {
   id: string;
   name: string;
   code: string;
+  shortDescription: string;
   iconKey: string;
-  applyButtonLabel: string;
-  amountFieldLabel: string;
-  shortLabel: string;
-  productCount: number;
-  fieldDefinitions: FieldDefinition[];
-}
-
-export interface ProductTypeInput {
-  name: string;
-  code: string;
-  iconKey: string;
-  applyButtonLabel?: string;
-  amountFieldLabel?: string;
-  shortLabel?: string;
-}
-
-export interface DocumentDefinition {
-  id: string;
-  name: string;
-  documentType: string;
-  required: boolean;
-  sortOrder: number;
-  active: boolean;
-  productTypeId?: string | null;
-  productTypeName?: string | null;
+  status: string;
+  /** The catalogue shows it: its own status, its sub-category's and its category's are all live. */
+  isVisible: boolean;
+  categoryId: string;
+  categoryName: string;
+  subCategoryId: string;
+  subCategoryName: string;
+  subCategoryCode: string;
+  cardFields: ProductFieldValue[];
+  featureTags: string[];
   createdAt: string;
-}
-
-export interface DocumentDefinitionInput {
-  name: string;
-  documentType: string;
-  required: boolean;
-  sortOrder: number;
-  active: boolean;
-  productTypeId?: string | null;
-}
-
-export interface Category {
-  id: string;
-  name: string;
-  slug: string;
-  description: string;
-  iconKey: string;
-  status: CategoryStatus;
-  displayOrder: number;
-  /** Products filed directly against this category. */
-  productCount: number;
-  /** Products against this category or any of its sub-categories - what an admin means by "linked products". */
-  totalProductCount: number;
-  subCategoryCount: number;
-  createdAt: string;
-}
-
-export interface CategoryInput {
-  name: string;
-  description: string;
-  iconKey: string;
-  status: CategoryStatus;
-  displayOrder: number;
+  updatedAt: string;
 }
 
 export interface ProductBenefit {
   id: string;
-  title: string;
-  description: string;
-  iconKey: string;
-}
-
-export interface ProductBenefitInput {
   title: string;
   description: string;
   iconKey: string;
@@ -221,199 +195,76 @@ export interface ProductEligibility {
   description: string;
 }
 
-export interface ProductEligibilityInput {
-  criteria: string;
-  description: string;
-}
-
-export interface Promotion {
-  id: string;
-  productId: string;
-  productName: string;
-  productCategoryName: string;
-  title: string;
-  description: string;
-  badgeText: string;
-  offerDetail: string;
-  termsAndConditions: string;
-  startDate: string;
-  endDate: string;
-  priority: number;
-  status: PromotionStatus;
-}
-
-export interface PromotionInput {
-  productId: string;
-  title: string;
-  description: string;
-  badgeText: string;
-  offerDetail: string;
-  termsAndConditions: string;
-  startDate: string;
-  endDate: string;
-  priority: number;
-  status: PromotionStatus;
-}
-
-export interface Review {
-  id: string;
-  productId: string;
-  productName: string;
-  customerName: string;
-  customerEmail: string;
-  rating: number;
-  comment: string;
-  status: ReviewStatus;
-  createdAt: string;
-}
-
-export interface ProductListItem {
-  id: string;
-  name: string;
-  code: string;
-  shortDescription: string;
-  iconKey: string;
-  status: ProductStatus;
-  categoryId: string;
-  categoryName: string;
-  productTypeId: string;
-  productTypeName: string;
-  productTypeCode: string;
-  productTypeShortLabel: string;
-  applyButtonLabel: string;
-  amountFieldLabel: string;
-  ratingAverage: number;
-  ratingCount: number;
-  applicationCount: number;
-  cardFields: ProductFieldValue[];
-  featureTags: string[];
-  activePromotion: Promotion | null;
-  createdAt: string;
-  updatedAt: string;
-}
-
 export interface ProductDetail extends ProductListItem {
   description: string;
-  viewCount: number;
   detailFields: ProductFieldValue[];
   benefits: ProductBenefit[];
   eligibilityCriteria: ProductEligibility[];
-  recentReviews: Review[];
-  promotions: Promotion[];
-}
-
-export interface ProductFieldValueInput {
-  fieldDefinitionId: string;
-  value: string;
+  viewCount: number;
 }
 
 export interface ProductInput {
+  subCategoryId: string;
   name: string;
   code: string;
   shortDescription: string;
   description: string;
   iconKey: string;
-  categoryId: string;
-  productTypeId: string;
-  status: ProductStatus;
-  fieldValues: ProductFieldValueInput[];
-  benefits: ProductBenefitInput[];
-  eligibilityCriteria: ProductEligibilityInput[];
+  status: string;
+  fieldValues: { fieldDefinitionId: string; value: string }[];
+  benefits: { title: string; description: string; iconKey: string }[];
+  eligibilityCriteria: { criteria: string; description: string }[];
 }
 
-export interface ApplicationFieldValue {
-  fieldKey: string;
-  fieldLabel: string;
-  value: string;
-}
+// ---- Documents ------------------------------------------------------------------------------------
 
-export interface ApplicationFieldValueInput {
-  fieldDefinitionId?: string;
-  fieldKey: string;
-  fieldLabel: string;
-  value: string;
-}
-
-export interface ApplicationDocument {
+export interface DocumentDefinition {
   id: string;
-  documentName: string;
+  name: string;
   documentType: string;
   required: boolean;
-  uploaded: boolean;
-  fileName?: string | null;
-  uploadedAt?: string | null;
-  contentType?: string | null;
-  fileSizeBytes?: number | null;
-}
-
-export interface ApplicationStatusHistoryEntry {
-  status: ApplicationStatus;
-  note: string;
-  changedAt: string;
-}
-
-export interface ApplicationListItem {
-  id: string;
-  applicationNumber: string;
-  customerName: string;
-  productId: string;
-  productName: string;
-  categoryName: string;
-  status: ApplicationStatus;
+  sortOrder: number;
+  active: boolean;
+  /** Null when the document applies to every product. */
+  subCategoryId: string | null;
+  subCategoryName: string | null;
   createdAt: string;
-  submittedAt?: string | null;
-  updatedAt: string;
 }
 
-export interface ApplicationDetail extends ApplicationListItem {
-  customerEmail: string;
-  customerPhone: string;
-  customerDateOfBirth?: string | null;
-  reviewNotes: string;
-  productIconKey: string;
-  fieldValues: ApplicationFieldValue[];
-  documents: ApplicationDocument[];
-  statusHistory: ApplicationStatusHistoryEntry[];
+export interface DocumentDefinitionInput {
+  name: string;
+  documentType: string;
+  required: boolean;
+  sortOrder: number;
+  active: boolean;
+  subCategoryId: string | null;
 }
 
-export interface ApplicationInput {
-  productId: string;
-  customerName: string;
-  customerEmail: string;
-  customerPhone: string;
-  customerDateOfBirth: string;
-  fieldValues: ApplicationFieldValueInput[];
-  requiredDocuments: string[];
-  submit: boolean;
-}
+// ---- Dashboard ------------------------------------------------------------------------------------
 
+/** One headline figure. It carries a key, not a label: naming it is this app's job. */
 export interface Kpi {
-  label: string;
+  key: string;
   value: number;
   changePercent: number;
-  format: "number" | "percent" | "currency";
 }
 
 export interface DashboardSummary {
   totalProducts: Kpi;
-  activeProducts: Kpi;
-  totalApplications: Kpi;
-  totalViews: Kpi;
-  conversionRate: Kpi;
+  liveProducts: Kpi;
+  unpublishedProducts: Kpi;
+  totalCategories: Kpi;
+  totalSubCategories: Kpi;
+  comparedDays: number;
   rangeStart: string;
   rangeEnd: string;
 }
 
-export interface TrendPoint {
-  label: string;
-  date: string;
-  value: number;
-}
-
-export interface CategoryBreakdown {
-  categoryName: string;
+export interface CatalogBreakdown {
+  id: string;
+  name: string;
+  code: string;
   count: number;
-  percentage: number;
 }
 
 export interface StatusDistribution {
@@ -422,39 +273,27 @@ export interface StatusDistribution {
   percentage: number;
 }
 
-export interface TopProduct {
+export interface RecentProduct {
   id: string;
   name: string;
   code: string;
   categoryName: string;
+  subCategoryName: string;
   iconKey: string;
-  applicationCount: number;
-}
-
-export interface RecentProduct {
-  id: string;
-  name: string;
-  categoryName: string;
-  iconKey: string;
-  status: ProductStatus;
+  status: string;
   createdAt: string;
 }
 
-export interface TopSearch {
-  term: string;
-  count: number;
+export interface RecentActivity {
+  id: string;
+  action: string;
+  entityType: string;
+  entityName: string;
+  actorName: string;
+  timestamp: string;
 }
 
-export interface TopPerformer {
-  id: string;
-  name: string;
-  categoryName: string;
-  iconKey: string;
-  applicationCount: number;
-  viewCount: number;
-  ratingAverage: number;
-  ratingCount: number;
-}
+// ---- Audit ----------------------------------------------------------------------------------------
 
 export interface AuditLog {
   id: string;
@@ -477,7 +316,6 @@ export interface AuditActionOption {
   label: string;
 }
 
-/** Headline audit figures computed server-side across the full filtered result set. */
 export interface AuditLogSummary {
   totalCount: number;
   successCount: number;

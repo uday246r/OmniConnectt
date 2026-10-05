@@ -10,7 +10,6 @@ namespace LeadManagement.Api.Data
         {
         }
 
-        public DbSet<Product> Products { get; set; }
         public DbSet<State> States { get; set; }
         public DbSet<Branch> Branches { get; set; }
         public DbSet<SalesExecutive> SalesExecutives { get; set; }
@@ -67,20 +66,19 @@ namespace LeadManagement.Api.Data
             modelBuilder.Entity<AuditLog>()
                 .HasIndex(a => a.EntityId);
 
-            // One config row per (Product, ApiField) — same uniqueness guarantee Customer360Service's
-            // field_configs table has on (ProfileType, ApiField).
+            // One config row per (Marketplace sub-category, ApiField) — same uniqueness guarantee
+            // Customer360Service's field_configs table has on (ProfileType, ApiField). No foreign key: the
+            // sub-category lives in ProductsService's database.
             modelBuilder.Entity<LeadFieldConfig>()
-                .HasIndex(f => new { f.ProductId, f.ApiField })
+                .HasIndex(f => new { f.CatalogSubCategoryId, f.ApiField })
                 .IsUnique();
 
-            // Restrict, not the default Cascade — Products aren't deletable via any current endpoint,
-            // so this never fires in practice, but matches this platform's established defensive-FK
-            // convention for config/audit-shaped rows.
-            modelBuilder.Entity<LeadFieldConfig>()
-                .HasOne(f => f.Product)
-                .WithMany()
-                .HasForeignKey(f => f.ProductId)
-                .OnDelete(DeleteBehavior.Restrict);
+            // The product a lead is for is filtered and grouped by on the list and the dashboard.
+            modelBuilder.Entity<Lead>()
+                .HasIndex(l => l.ProductName);
+
+            modelBuilder.Entity<Lead>()
+                .HasIndex(l => l.CatalogProductId);
 
             // Seed Master Data
             SeedMasterData(modelBuilder);
@@ -88,18 +86,7 @@ namespace LeadManagement.Api.Data
 
         private static void SeedMasterData(ModelBuilder modelBuilder)
         {
-            // Products
-            var products = new List<Product>
-            {
-                new Product { Id = Guid.Parse("11111111-1111-1111-1111-111111111111"), Code = "ASB", Name = "ASB Financing" },
-                new Product { Id = Guid.Parse("22222222-2222-2222-2222-222222222222"), Code = "AUTO", Name = "Automobile Financing" },
-                new Product { Id = Guid.Parse("33333333-3333-3333-3333-333333333333"), Code = "HOME", Name = "Home Financing" },
-                new Product { Id = Guid.Parse("44444444-4444-4444-4444-444444444444"), Code = "MICRO", Name = "Micro Finance" },
-                new Product { Id = Guid.Parse("55555555-5555-5555-5555-555555555555"), Code = "PERSONAL", Name = "Personal Financing" },
-                new Product { Id = Guid.Parse("66666666-6666-6666-6666-666666666666"), Code = "SOLAR", Name = "Solar Panel Financing" },
-                new Product { Id = Guid.Parse("77777777-7777-7777-7777-777777777777"), Code = "TRAVEL", Name = "Umrah/Hajj/Travel Financing" }
-            };
-            modelBuilder.Entity<Product>().HasData(products);
+            // Products are not master data here any more: they come from the Marketplace (ProductsService).
 
             // States
             var stateKlId = Guid.Parse("a0000000-0000-0000-0000-000000000001");

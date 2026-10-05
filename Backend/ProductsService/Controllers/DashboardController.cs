@@ -12,31 +12,33 @@ namespace ProductMarketplace.Api.Controllers;
 [RequiresCapability("dashboard", "View")]
 public class DashboardController(IDashboardService service) : ControllerBase
 {
-    /// <summary>Longest trend window served. A caller could previously ask for any number of days.</summary>
-    public const int MaxTrendDays = 366;
+    /// <summary>The window the "change" on each figure looks back over, when the caller does not say.</summary>
+    public const int DefaultComparedDays = 30;
+
+    /// <summary>The longest window served. A caller could otherwise ask for any number of days.</summary>
+    public const int MaxComparedDays = 366;
 
     [HttpGet("summary")]
-    public async Task<IActionResult> Summary(CancellationToken ct) => Ok(await service.GetSummaryAsync(ct));
+    public async Task<IActionResult> Summary([FromQuery] int days, CancellationToken ct)
+        => Ok(await service.GetSummaryAsync(days <= 0 ? DefaultComparedDays : Math.Min(days, MaxComparedDays), ct));
 
-    [HttpGet("application-trends")]
-    public async Task<IActionResult> ApplicationTrends([FromQuery] int days, CancellationToken ct)
-        => Ok(await service.GetApplicationTrendAsync(days <= 0 ? 7 : Math.Min(days, MaxTrendDays), ct));
-
-    [HttpGet("applications-by-category")]
-    public async Task<IActionResult> ApplicationsByCategory(CancellationToken ct)
-        => Ok(await service.GetApplicationsByCategoryAsync(ct));
+    /// <summary>Products per category; or, with <c>categoryId</c>, per sub-category of that category.</summary>
+    [HttpGet("product-breakdown")]
+    public async Task<IActionResult> ProductBreakdown([FromQuery] Guid? categoryId, CancellationToken ct)
+        => Ok(await service.GetProductBreakdownAsync(categoryId, ct));
 
     [HttpGet("product-status-distribution")]
     public async Task<IActionResult> ProductStatusDistribution(CancellationToken ct)
         => Ok(await service.GetProductStatusDistributionAsync(ct));
 
-    [HttpGet("top-products")]
-    public async Task<IActionResult> TopProducts([FromQuery] int take, CancellationToken ct)
-        => Ok(await service.GetTopProductsAsync(Paging.ClampTake(take, 5), ct));
-
     [HttpGet("recent-products")]
     public async Task<IActionResult> RecentProducts([FromQuery] int take, CancellationToken ct)
         => Ok(await service.GetRecentProductsAsync(Paging.ClampTake(take, 5), ct));
+
+    /// <summary>What people changed lately. Its own endpoint so the dashboard does not need the audit capability.</summary>
+    [HttpGet("recent-activity")]
+    public async Task<IActionResult> RecentActivity([FromQuery] int take, CancellationToken ct)
+        => Ok(await service.GetRecentActivityAsync(Paging.ClampTake(take, 5), ct));
 
     [HttpGet("top-searches")]
     public async Task<IActionResult> TopSearches([FromQuery] int take, CancellationToken ct)

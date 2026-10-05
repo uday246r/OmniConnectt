@@ -1,7 +1,6 @@
 import axios, { AxiosError, type AxiosResponse, type InternalAxiosRequestConfig } from 'axios';
 import { createRequestCache } from '@omniconnect/ui';
 import { ensureFreshAccessToken, getAccessToken, getCurrentUser, isRunningInHost } from '../api/hostBridge';
-import { useDrawerStore } from '../stores/useDrawerStore';
 import { useToastStore } from '../stores/useToastStore';
 
 export const API_BASE_URL: string = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5266/api';
@@ -25,13 +24,9 @@ export const httpClient = axios.create({
  */
 const readCache = createRequestCache({ ttlMs: 30_000 });
 const REFERENCE_DATA_TTL_MS = 5 * 60_000;
-const REFERENCE_DATA = /\/(categories|product-types|document-definitions|employment-types|status-configs)(\?|$)/;
+const REFERENCE_DATA = /\/(categories|document-definitions|status-configs)(\?|$)/;
 const networkAdapter = axios.getAdapter(httpClient.defaults.adapter);
 
-/** Forget every cached read — used when the signed-in user changes. */
-export function clearProductsReadCache(): void {
-  readCache.clear();
-}
 
 httpClient.defaults.adapter = async (config) => {
   const method = (config.method ?? 'get').toLowerCase();
@@ -66,6 +61,28 @@ httpClient.defaults.adapter = async (config) => {
 
   return { ...response, config, data: typeof structuredClone === 'function' ? structuredClone(response.data) : response.data };
 };
+
+/**
+ * A request the server refused, in words a person can act on.
+ *
+ * `fieldErrors` is set when the server says which fields broke which rules (field key → message), so a
+ * form can mark every one of them instead of showing a single line at the top.
+ */
+export class ApiError extends Error {
+  readonly status: number | undefined;
+  readonly fieldErrors: Record<string, string> | undefined;
+
+  constructor(message: string, status?: number, fieldErrors?: Record<string, string>) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.fieldErrors = fieldErrors;
+  }
+}
+
+/** The per-field messages of a refused save, if the server gave any. */
+export const fieldErrorsOf = (error: unknown): Record<string, string> | undefined =>
+  error instanceof ApiError ? error.fieldErrors : undefined;
 
 /** What the server sends back (202) when a change is held for a checker instead of applied. */
 export interface ApprovalPending {
@@ -121,13 +138,12 @@ httpClient.interceptors.response.use(
   (response: AxiosResponse) => {
     if (response.status === 202 && isApprovalPendingBody(response.data)) {
       const error = new ApprovalPendingError(response.data);
-      useDrawerStore.getState().close();
       useToastStore.getState().info('Sent for approval', error.message);
       return Promise.reject(error);
     }
     return response;
   },
-  async (error: AxiosError<{ message?: string; title?: string; detail?: string }>) => {
+  async (error: AxiosError<{ message?: string; title?: string; detail?: string; errors?: Record<string, string> }>) => {
     if (axios.isCancel(error)) return Promise.reject(error);
 
     // An expired token is refreshed once through the host and the request repeated, as the host's own
@@ -152,6 +168,6 @@ httpClient.interceptors.response.use(
         : status === 401
           ? 'Your session has ended. Please sign in again.'
           : body?.message || body?.title || body?.detail || error.message || 'Something went wrong. Please try again.';
-    return Promise.reject(new Error(message));
+    return Promise.reject(new ApiError(message, status, status === 400 ? body?.errors : undefined));
   },
 );

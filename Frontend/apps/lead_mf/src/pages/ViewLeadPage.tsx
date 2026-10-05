@@ -72,7 +72,7 @@ export const ViewLeadPage: React.FC = () => {
     isLoadingLeads,
     searchQuery,
     setSearchQuery,
-    products,
+    productFilterOptions,
     states,
     branches,
     filterRules,
@@ -87,7 +87,7 @@ export const ViewLeadPage: React.FC = () => {
     openDeleteWorkflow,
     commonFieldConfig,
     fetchCommonFieldConfig,
-  } = useLeadStore(useShallow((s) => ({ leads: s.leads, totalRecords: s.totalRecords, totalPages: s.totalPages, currentPage: s.currentPage, pageSize: s.pageSize, isLoadingLeads: s.isLoadingLeads, searchQuery: s.searchQuery, setSearchQuery: s.setSearchQuery, products: s.products, states: s.states, branches: s.branches, filterRules: s.filterRules, setColumnFilter: s.setColumnFilter, clearAllFilters: s.clearAllFilters, setPage: s.setPage, setPageSize: s.setPageSize, fetchLeads: s.fetchLeads, fetchMasterData: s.fetchMasterData, openDetailsDrawer: s.openDetailsDrawer, openEditWorkflow: s.openEditWorkflow, openDeleteWorkflow: s.openDeleteWorkflow, commonFieldConfig: s.commonFieldConfig, fetchCommonFieldConfig: s.fetchCommonFieldConfig })));
+  } = useLeadStore(useShallow((s) => ({ leads: s.leads, totalRecords: s.totalRecords, totalPages: s.totalPages, currentPage: s.currentPage, pageSize: s.pageSize, isLoadingLeads: s.isLoadingLeads, searchQuery: s.searchQuery, setSearchQuery: s.setSearchQuery, productFilterOptions: s.productFilterOptions, states: s.states, branches: s.branches, filterRules: s.filterRules, setColumnFilter: s.setColumnFilter, clearAllFilters: s.clearAllFilters, setPage: s.setPage, setPageSize: s.setPageSize, fetchLeads: s.fetchLeads, fetchMasterData: s.fetchMasterData, openDetailsDrawer: s.openDetailsDrawer, openEditWorkflow: s.openEditWorkflow, openDeleteWorkflow: s.openDeleteWorkflow, commonFieldConfig: s.commonFieldConfig, fetchCommonFieldConfig: s.fetchCommonFieldConfig })));
   const navigate = useHostNavigate();
 
   const [showFilters, setShowFilters] = useState(false);
@@ -98,7 +98,7 @@ export const ViewLeadPage: React.FC = () => {
    * Leads load once on arrival. Filter, search and pagination changes call fetchLeads() themselves.
    *
    * This used to sit in one effect together with the reference-data loads below, and that effect
-   * listed products.length / states.length / commonFieldConfig.length as dependencies. Those lengths
+   * listed states.length / commonFieldConfig.length as dependencies. Those lengths
    * go 0 → N the moment fetchMasterData() resolves, so the effect re-ran and fetched the leads a
    * SECOND time — and because fetchLeads() flips isLoadingLeads on the way in and out, the table
    * visibly went skeleton → rows → skeleton → rows on every refresh.
@@ -113,7 +113,7 @@ export const ViewLeadPage: React.FC = () => {
    * stops the fetch from re-triggering itself as its own result arrives.
    */
   useEffect(() => {
-    if (products.length === 0 || states.length === 0) {
+    if (states.length === 0) {
       fetchMasterData();
     }
     if (commonFieldConfig.length === 0) {
@@ -491,7 +491,7 @@ export const ViewLeadPage: React.FC = () => {
                       label="Product"
                       value={columnValue('product')}
                       onChange={(v) => setColumnFilter('product', v)}
-                      options={toOptions(products)}
+                      options={toOptions(productFilterOptions)}
                       allLabel="All Products"
                       searchable
                     />

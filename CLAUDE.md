@@ -203,6 +203,20 @@ singletons, reads auth state from `window.__omniconnectHost__` (`getAccessToken(
 `hasCapability(featureKey, capability)`, `getUser()`) instead of running its own login, and declares
 its capability set dynamically via `GET /permissions`.
 
+### Product catalogue → Lead Management
+Lead Management owns **no product data**. Products are `Category → SubCategory → Product` in ProductsService, and a
+product is *visible* only while its own, its sub-category's and its category's statuses are all `IsLive` in Setup
+(derived at query time, never written — `CatalogVisibility`; never compare a status to "Active"). LeadService reads
+the catalogue server-to-server (`ProductCatalogClient` → ProductsService `internal/catalog/*`, guarded by the
+**separate** `Internal:CatalogApiKey`, not the approval-replay key) and re-exposes it to `lead_mf` as
+`/api/catalog/*`. Two failure modes on purpose: the pickers' lists are cached 30 s and fall back to the last list
+read; **creating a lead re-confirms the product live and answers 503 if it can't** (`CatalogUnavailableException`).
+A lead stores `CatalogProductId` plus a snapshot (product/sub-category/category names and codes), so renaming or
+withdrawing a product never rewrites history; `CatalogProductId` is null only for leads taken before the link
+existed. `LeadFieldConfig` is keyed by `CatalogSubCategoryId` (one lead form per sub-category), created on first use,
+with the property/business detail fields present but hidden until an administrator switches them on — never decide
+what a lead form shows from a product's name. Full account: `docs/design/products/IMPLEMENTATION-REPORT.md`.
+
 ### CRM proxying (Customer360Service)
 `CrmProxyService.cs` forwards `v1/indprofile`/`v1/corpprofile` etc. verbatim (status code and body) to
 a **real external CRM** at `CrmApi__BaseUrl`. It is not a mock and not a local database — if search

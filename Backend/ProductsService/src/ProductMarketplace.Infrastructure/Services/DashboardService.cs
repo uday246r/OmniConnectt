@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using ProductMarketplace.Application.Common;
 using ProductMarketplace.Application.Dtos;
 using ProductMarketplace.Application.Interfaces;
 using ProductMarketplace.Infrastructure.Data;
@@ -8,7 +9,13 @@ namespace ProductMarketplace.Infrastructure.Services;
 public class DashboardService : IDashboardService
 {
     private readonly AppDbContext _db;
-    public DashboardService(AppDbContext db) => _db = db;
+    private readonly ICatalogStatuses _statuses;
+
+    public DashboardService(AppDbContext db, ICatalogStatuses statuses)
+    {
+        _db = db;
+        _statuses = statuses;
+    }
 
     private static double PercentChange(double now, double then)
     {
@@ -16,116 +23,74 @@ public class DashboardService : IDashboardService
         return Math.Round((now - then) / then * 100, 1);
     }
 
-    private static KpiDto Kpi(string label, double now, double then, string format) => new()
-    {
-        Label = label,
-        Value = now,
-        ChangePercent = PercentChange(now, then),
-        Format = format
-    };
+    private static KpiDto Kpi(string key, double now, double then) => new() { Key = key, Value = now, ChangePercent = PercentChange(now, then) };
 
-    public async Task<DashboardSummaryDto> GetSummaryAsync(CancellationToken ct = default)
+    /// <remarks>
+    /// One grouped query per table — <c>COUNT(*) FILTER (WHERE …)</c> on Postgres — rather than one round
+    /// trip per figure, which took seconds when the database is a few hundred milliseconds away. There is
+    /// no status history, so "then" counts what exists now that was already created by the cutoff.
+    /// </remarks>
+    public async Task<DashboardSummaryDto> GetSummaryAsync(int comparedDays, CancellationToken ct = default)
     {
         var now = DateTime.UtcNow;
-        var cutoff = now.AddDays(-7);
+        var cutoff = now.AddDays(-comparedDays);
+        var live = (await _statuses.LiveValuesAsync(StatusEntityTypes.Product, ct)).ToArray();
 
-        /*
-         * Counted by the database, one query per table.
-         *
-         * These were ten separate COUNT queries run one after another. Each is cheap, but each is a
-         * round trip, and with the database a few hundred milliseconds away the summary took 3–6 s
-         * before the page could show a single number. Grouping every row of a table into one group and
-         * counting with a filter per figure asks for the same numbers in one statement per table
-         * (COUNT(*) FILTER (WHERE …) on Postgres).
-         */
-        string[] approvedStatuses = ["Approved", "Completed"];
-
-        var productCounts = await _db.Products.AsNoTracking()
+        var products = await _db.Products.AsNoTracking()
             .GroupBy(_ => 1)
             .Select(g => new
             {
                 Total = g.Count(),
                 TotalThen = g.Count(p => p.CreatedAt <= cutoff),
-                Active = g.Count(p => p.Status == "Active"),
-                ActiveThen = g.Count(p => p.Status == "Active" && p.CreatedAt <= cutoff),
+                Live = g.Count(p => live.Contains(p.Status)),
+                LiveThen = g.Count(p => live.Contains(p.Status) && p.CreatedAt <= cutoff),
             })
             .FirstOrDefaultAsync(ct);
 
-        var applicationCounts = await _db.Applications.AsNoTracking()
+        var categories = await _db.Categories.AsNoTracking()
             .GroupBy(_ => 1)
-            .Select(g => new
-            {
-                Total = g.Count(),
-                TotalThen = g.Count(a => a.CreatedAt <= cutoff),
-                Approved = g.Count(a => approvedStatuses.Contains(a.Status)),
-                ApprovedThen = g.Count(a => approvedStatuses.Contains(a.Status) && a.CreatedAt <= cutoff),
-            })
+            .Select(g => new { Total = g.Count(), TotalThen = g.Count(c => c.CreatedAt <= cutoff) })
             .FirstOrDefaultAsync(ct);
 
-        var viewCounts = await _db.ProductViewLogs.AsNoTracking()
+        var subCategories = await _db.SubCategories.AsNoTracking()
             .GroupBy(_ => 1)
-            .Select(g => new { Total = g.Count(), TotalThen = g.Count(v => v.ViewedAt <= cutoff) })
+            .Select(g => new { Total = g.Count(), TotalThen = g.Count(s => s.CreatedAt <= cutoff) })
             .FirstOrDefaultAsync(ct);
 
         // An empty table has no group to count, so its figures are zero.
-        var totalProductsNow = productCounts?.Total ?? 0;
-        var totalProductsThen = productCounts?.TotalThen ?? 0;
-        var activeNow = productCounts?.Active ?? 0;
-        var activeThen = productCounts?.ActiveThen ?? 0;
-        var totalAppsNow = applicationCounts?.Total ?? 0;
-        var totalAppsThen = applicationCounts?.TotalThen ?? 0;
-        var approvedNow = applicationCounts?.Approved ?? 0;
-        var approvedThen = applicationCounts?.ApprovedThen ?? 0;
-
-        var conversionNow = totalAppsNow == 0 ? 0 : Math.Round(approvedNow / (double)totalAppsNow * 100, 2);
-        var conversionThen = totalAppsThen == 0 ? 0 : Math.Round(approvedThen / (double)totalAppsThen * 100, 2);
-
-        var viewsNow = viewCounts?.Total ?? 0;
-        var viewsThen = viewCounts?.TotalThen ?? 0;
+        var total = products?.Total ?? 0;
+        var totalThen = products?.TotalThen ?? 0;
+        var liveNow = products?.Live ?? 0;
+        var liveThen = products?.LiveThen ?? 0;
 
         return new DashboardSummaryDto
         {
-            TotalProducts = Kpi("Total Products", totalProductsNow, totalProductsThen, "number"),
-            ActiveProducts = Kpi("Active Products", activeNow, activeThen, "number"),
-            TotalApplications = Kpi("Total Applications", totalAppsNow, totalAppsThen, "number"),
-            TotalViews = Kpi("Total Views", viewsNow, viewsThen, "number"),
-            ConversionRate = Kpi("Conversion Rate", conversionNow, conversionThen, "percent"),
+            TotalProducts = Kpi("totalProducts", total, totalThen),
+            LiveProducts = Kpi("liveProducts", liveNow, liveThen),
+            UnpublishedProducts = Kpi("unpublishedProducts", total - liveNow, totalThen - liveThen),
+            TotalCategories = Kpi("totalCategories", categories?.Total ?? 0, categories?.TotalThen ?? 0),
+            TotalSubCategories = Kpi("totalSubCategories", subCategories?.Total ?? 0, subCategories?.TotalThen ?? 0),
+            ComparedDays = comparedDays,
             RangeStart = cutoff.Date,
             RangeEnd = now.Date
         };
     }
 
-    public async Task<List<TrendPointDto>> GetApplicationTrendAsync(int days, CancellationToken ct = default)
+    public async Task<List<CatalogBreakdownDto>> GetProductBreakdownAsync(Guid? categoryId, CancellationToken ct = default)
     {
-        var start = DateTime.UtcNow.Date.AddDays(-(days - 1));
-        // Grouped per day in the database; only one number per day comes back.
-        var perDay = await _db.Applications.AsNoTracking()
-            .Where(a => a.CreatedAt >= start)
-            .GroupBy(a => a.CreatedAt.Date)
-            .Select(g => new { Day = g.Key, Count = g.Count() })
-            .ToListAsync(ct);
-        var counts = perDay.ToDictionary(d => d.Day, d => d.Count);
-
-        var points = new List<TrendPointDto>();
-        for (var d = start; d <= DateTime.UtcNow.Date; d = d.AddDays(1))
+        if (categoryId.HasValue)
         {
-            points.Add(new TrendPointDto { Label = d.ToString("dd MMM"), Date = d, Value = counts.GetValueOrDefault(d) });
+            return await _db.SubCategories.AsNoTracking()
+                .Where(s => s.CategoryId == categoryId)
+                .OrderBy(s => s.DisplayOrder)
+                .Select(s => new CatalogBreakdownDto { Id = s.Id, Name = s.Name, Code = s.Code, Count = s.Products.Count })
+                .ToListAsync(ct);
         }
-        return points;
-    }
 
-    public async Task<List<CategoryBreakdownDto>> GetApplicationsByCategoryAsync(CancellationToken ct = default)
-    {
-        var data = await _db.Applications.AsNoTracking()
-            .Include(a => a.Product).ThenInclude(p => p.Category)
-            .GroupBy(a => a.Product.Category.Name)
-            .Select(g => new { Category = g.Key, Count = g.Count() })
+        return await _db.Categories.AsNoTracking()
+            .OrderBy(c => c.DisplayOrder)
+            .Select(c => new CatalogBreakdownDto { Id = c.Id, Name = c.Name, Code = c.Code, Count = c.SubCategories.SelectMany(s => s.Products).Count() })
             .ToListAsync(ct);
-
-        var total = data.Sum(d => d.Count);
-        return data.OrderByDescending(d => d.Count)
-            .Select(d => new CategoryBreakdownDto { CategoryName = d.Category, Count = d.Count, Percentage = total == 0 ? 0 : Math.Round(d.Count / (double)total * 100, 1) })
-            .ToList();
     }
 
     public async Task<List<StatusDistributionDto>> GetProductStatusDistributionAsync(CancellationToken ct = default)
@@ -137,30 +102,43 @@ public class DashboardService : IDashboardService
 
         var total = data.Sum(d => d.Count);
         return data.OrderByDescending(d => d.Count)
-            .Select(d => new StatusDistributionDto { Status = d.Status.ToString(), Count = d.Count, Percentage = total == 0 ? 0 : Math.Round(d.Count / (double)total * 100, 1) })
+            .Select(d => new StatusDistributionDto { Status = d.Status, Count = d.Count, Percentage = total == 0 ? 0 : Math.Round(d.Count / (double)total * 100, 1) })
             .ToList();
     }
 
-    public async Task<List<TopProductDto>> GetTopProductsAsync(int take, CancellationToken ct = default)
-    {
-        var products = await _db.Products.AsNoTracking()
-            .Include(p => p.Category)
-            .OrderByDescending(p => p.ApplicationCount)
+    public async Task<List<RecentProductDto>> GetRecentProductsAsync(int take, CancellationToken ct = default) =>
+        await _db.Products.AsNoTracking()
+            .OrderByDescending(p => p.CreatedAt).ThenBy(p => p.Id)
             .Take(take)
-            .Select(p => new TopProductDto { Id = p.Id, Name = p.Name, Code = p.Code, CategoryName = p.Category.Name, IconKey = p.IconKey, ApplicationCount = p.ApplicationCount })
+            .Select(p => new RecentProductDto
+            {
+                Id = p.Id,
+                Name = p.Name,
+                Code = p.Code,
+                CategoryName = p.SubCategory.Category.Name,
+                SubCategoryName = p.SubCategory.Name,
+                IconKey = p.IconKey,
+                Status = p.Status,
+                CreatedAt = p.CreatedAt
+            })
             .ToListAsync(ct);
-        return products;
-    }
 
-    public async Task<List<RecentProductDto>> GetRecentProductsAsync(int take, CancellationToken ct = default)
-    {
-        return await _db.Products.AsNoTracking()
-            .Include(p => p.Category)
-            .OrderByDescending(p => p.CreatedAt)
+    /// <summary>Changes people made — not the searches and product views, which are traffic, not activity.</summary>
+    public async Task<List<RecentActivityDto>> GetRecentActivityAsync(int take, CancellationToken ct = default) =>
+        await _db.AuditLogs.AsNoTracking()
+            .Where(a => a.Action != AuditActions.Search && a.Action != AuditActions.ViewProduct)
+            .OrderByDescending(a => a.Timestamp)
             .Take(take)
-            .Select(p => new RecentProductDto { Id = p.Id, Name = p.Name, CategoryName = p.Category.Name, IconKey = p.IconKey, Status = p.Status.ToString(), CreatedAt = p.CreatedAt })
+            .Select(a => new RecentActivityDto
+            {
+                Id = a.Id,
+                Action = a.Action,
+                EntityType = a.EntityType,
+                EntityName = a.EntityName,
+                ActorName = a.ActorName,
+                Timestamp = a.Timestamp
+            })
             .ToListAsync(ct);
-    }
 
     public async Task<List<KeyValuePair<string, int>>> GetTopSearchesAsync(int take, CancellationToken ct = default)
     {

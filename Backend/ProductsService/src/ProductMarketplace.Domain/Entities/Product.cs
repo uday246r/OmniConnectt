@@ -1,25 +1,33 @@
 namespace ProductMarketplace.Domain.Entities;
 
+/// <summary>
+/// One sellable offering: "Home Loan – Salaried" at a stated rate and amount range.
+/// </summary>
+/// <remarks>
+/// Its category is not stored. It is reached through <see cref="SubCategory"/>, so moving a sub-category
+/// to another category moves every product beneath it and no product can disagree with the hierarchy.
+/// What the product actually offers — rate, fees, tenure — lives in <see cref="FieldValues"/>, shaped by
+/// the sub-category's field definitions rather than by columns here.
+/// </remarks>
 public class Product
 {
     public Guid Id { get; set; } = Guid.NewGuid();
+
+    public Guid SubCategoryId { get; set; }
+    public SubCategory SubCategory { get; set; } = null!;
+
     public string Name { get; set; } = string.Empty;
+
+    /// <summary>Unique across the catalogue (CC_CASH_001). Leads reference a product by id and keep this as a snapshot.</summary>
     public string Code { get; set; } = string.Empty;
+
     public string ShortDescription { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
-    public string IconKey { get; set; } = "package";
+    public string IconKey { get; set; } = string.Empty;
 
-    public Guid CategoryId { get; set; }
-    public Category Category { get; set; } = null!;
+    /// <summary>A value from <see cref="StatusConfig"/> for the Product entity type.</summary>
+    public string Status { get; set; } = string.Empty;
 
-    public Guid ProductTypeId { get; set; }
-    public ProductType ProductType { get; set; } = null!;
-
-    public string Status { get; set; } = "Draft";
-
-    public double RatingAverage { get; set; }
-    public int RatingCount { get; set; }
-    public int ApplicationCount { get; set; }
     public int ViewCount { get; set; }
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
@@ -28,8 +36,4 @@ public class Product
     public ICollection<ProductFieldValue> FieldValues { get; set; } = new List<ProductFieldValue>();
     public ICollection<ProductBenefit> Benefits { get; set; } = new List<ProductBenefit>();
     public ICollection<ProductEligibility> EligibilityCriteria { get; set; } = new List<ProductEligibility>();
-    public ICollection<Review> Reviews { get; set; } = new List<Review>();
-    public ICollection<Promotion> Promotions { get; set; } = new List<Promotion>();
-    public ICollection<Application> Applications { get; set; } = new List<Application>();
-    public ICollection<ProductViewLog> ViewLogs { get; set; } = new List<ProductViewLog>();
 }

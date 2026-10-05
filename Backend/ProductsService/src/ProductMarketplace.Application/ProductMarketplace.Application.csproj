@@ -1,7 +1,9 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
     <ProjectReference Include="..\ProductMarketplace.Domain\ProductMarketplace.Domain.csproj" />
+    <!-- FormatPreset: the admin-defined formats the field-rule engine evaluates. The engine itself has no dependencies. -->
+    <ProjectReference Include="..\..\..\Shared\OmniConnect.Validation\OmniConnect.Validation.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

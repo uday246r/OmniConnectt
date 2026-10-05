@@ -6,8 +6,12 @@ export type EntityType = string;
 export type MarketingConsent = 'CONSENT' | 'DO_NOT_CONSENT' | '';
 
 export interface LeadFormData {
-  // Product Selection
+  // Product Selection — chosen from the Marketplace's catalogue (Category → Product). The id is what is
+  // sent; the name and sub-category are for showing it and for finding this lead's field settings.
   product: string;
+  catalogProductId: string;
+  /** The sub-category the product sits under: one lead form per sub-category. Never sent (the server reads it from the Marketplace). */
+  subCategoryId: string;
 
   // Customer Information (Common)
   customerName: string;
@@ -38,6 +42,13 @@ export interface LeadFormData {
   agreedToPrivacyPolicy: boolean;
 }
 
+/** A product picked from the catalogue: what the form needs to keep about it. */
+export interface SelectedProduct {
+  id: string;
+  name: string;
+  subCategoryId: string;
+}
+
 export type FormValidationErrors = Partial<Record<keyof LeadFormData, string>>;
 
 export interface DropdownOption {
@@ -58,6 +69,10 @@ export interface LeadRecord {
   phone: string;
   email: string;
   product: string;
+  catalogProductId?: string | null;
+  categoryName?: string;
+  subCategoryId?: string | null;
+  subCategoryName?: string;
   state: string;
   branch: string;
   status: LeadStatus;

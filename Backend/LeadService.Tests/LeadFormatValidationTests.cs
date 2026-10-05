@@ -60,7 +60,7 @@ public class LeadFormatValidationTests : IDisposable
         ("email", LeadFieldConfigService.DefaultRules("email")));
 
     private static CreateLeadDto Lead(string ic = "880512-14-5678", string phone = "12-345 6789", string email = "asha@example.com", string code = "+60") =>
-        new() { Product = "Home Financing", IcNumber = ic, PhoneCountryCode = code, PhoneNumber = phone, Email = email };
+        new() { CatalogProductId = FakeMarketplace.HomeLoanSalaried.Id, IcNumber = ic, PhoneCountryCode = code, PhoneNumber = phone, Email = email };
 
     private static IReadOnlyDictionary<string, string> ErrorsFor(List<LeadFieldConfig> config, CreateLeadDto dto, IReadOnlyList<FormatPreset>? presets = null, LeadRecordDto? previous = null)
     {
@@ -170,40 +170,38 @@ public class LeadFormatValidationTests : IDisposable
     [Fact]
     public async Task Saving_Field_Settings_keeps_each_fields_formats_on_update_and_on_insert()
     {
-        var product = new Product { Id = Guid.NewGuid(), Name = "Home Financing" };
-        db.Products.Add(product);
-        db.LeadFieldConfigs.Add(new LeadFieldConfig { ProductId = product.Id, ApiField = "icNumber", DisplayLabel = "IC", Section = "S" });
+        var subCategoryId = FakeMarketplace.HomeLoanId;
+        db.LeadFieldConfigs.Add(new LeadFieldConfig { CatalogSubCategoryId = subCategoryId, ApiField = "icNumber", DisplayLabel = "IC", Section = "S" });
         await db.SaveChangesAsync();
-        var service = new LeadFieldConfigService(db, AuthClient(), MsOptions.Create(new SelfOptions()));
+        var service = new LeadFieldConfigService(db, AuthClient(), MsOptions.Create(new SelfOptions()), new FakeMarketplace().Client());
         var rule = new LeadFieldRule { Type = FieldPresets.DigitsOnly, Message = "Digits only." };
 
-        await service.ReplaceAsync(product.Id,
+        await service.ReplaceAsync(subCategoryId,
         [
             new LeadFieldConfig { ApiField = "icNumber", DisplayLabel = "IC", Section = "S", Validations = [rule] },
             new LeadFieldConfig { ApiField = "employerName", DisplayLabel = "Employer", Section = "S", Validations = [rule] },
         ], actingUserId: null, bypassApproval: true);
 
-        var saved = await db.LeadFieldConfigs.AsNoTracking().Where(f => f.ProductId == product.Id).ToListAsync();
+        var saved = await db.LeadFieldConfigs.AsNoTracking().Where(f => f.CatalogSubCategoryId == subCategoryId && (f.ApiField == "icNumber" || f.ApiField == "employerName")).ToListAsync();
         Assert.All(saved, f => Assert.Equal(FieldPresets.DigitsOnly, Assert.Single(f.Validations).Type));
     }
 
     [Fact]
     public async Task Saving_settings_based_on_an_older_version_is_refused_rather_than_undoing_someone_elses_change()
     {
-        var product = new Product { Id = Guid.NewGuid(), Name = "Micro Finance" };
-        db.Products.Add(product);
-        db.LeadFieldConfigs.Add(new LeadFieldConfig { ProductId = product.Id, ApiField = "companyName", DisplayLabel = "Company", Section = "S" });
+        var subCategoryId = FakeMarketplace.HomeLoanId;
+        db.LeadFieldConfigs.Add(new LeadFieldConfig { CatalogSubCategoryId = subCategoryId, ApiField = "companyName", DisplayLabel = "Company", Section = "S" });
         await db.SaveChangesAsync();
-        var service = new LeadFieldConfigService(db, AuthClient(), MsOptions.Create(new SelfOptions()));
-        var loadedVersion = LeadFieldConfigService.Fingerprint(await service.GetByProductAsync(product.Id));
+        var service = new LeadFieldConfigService(db, AuthClient(), MsOptions.Create(new SelfOptions()), new FakeMarketplace().Client());
+        var loadedVersion = LeadFieldConfigService.Fingerprint(await service.GetBySubCategoryAsync(subCategoryId));
 
-        await service.ReplaceAsync(product.Id, [new LeadFieldConfig { ApiField = "companyName", DisplayLabel = "Company name", Section = "S" }],
+        await service.ReplaceAsync(subCategoryId, [new LeadFieldConfig { ApiField = "companyName", DisplayLabel = "Company name", Section = "S" }],
             actingUserId: null, bypassApproval: true, expectedVersion: loadedVersion);
 
         await Assert.ThrowsAsync<LeadFieldConfigService.StaleSettingsException>(() =>
-            service.ReplaceAsync(product.Id, [new LeadFieldConfig { ApiField = "companyName", DisplayLabel = "Business name", Section = "S" }],
+            service.ReplaceAsync(subCategoryId, [new LeadFieldConfig { ApiField = "companyName", DisplayLabel = "Business name", Section = "S" }],
                 actingUserId: null, bypassApproval: true, expectedVersion: loadedVersion));
-        Assert.Equal("Company name", (await service.GetByProductAsync(product.Id)).Single().DisplayLabel);
+        Assert.Equal("Company name", (await service.GetBySubCategoryAsync(subCategoryId)).Single(f => f.ApiField == "companyName").DisplayLabel);
     }
 
     [Fact]

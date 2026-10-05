@@ -1,8 +1,6 @@
 using System.Text.Json;
 using ProductMarketplace.Application.Dtos;
 using ProductMarketplace.Domain.Entities;
-using ProductMarketplace.Domain.Enums;
-using DomainApplication = ProductMarketplace.Domain.Entities.Application;
 
 namespace ProductMarketplace.Infrastructure.Services;
 
@@ -11,18 +9,18 @@ public static class Mapping
     public static FieldDefinitionDto ToDto(this FieldDefinition f) => new()
     {
         Id = f.Id,
+        SubCategoryId = f.SubCategoryId,
         Key = f.Key,
         Label = f.Label,
         DataType = f.DataType.ToString(),
         Unit = f.Unit,
         Options = string.IsNullOrEmpty(f.OptionsJson) ? null : JsonSerializer.Deserialize<List<string>>(f.OptionsJson),
+        Validations = FieldRuleJson.Parse(f.ValidationsJson),
         Required = f.Required,
         Filterable = f.Filterable,
-        VisibleToCustomer = f.VisibleToCustomer,
         Sortable = f.Sortable,
         DisplayOnCard = f.DisplayOnCard,
         DisplayOnDetails = f.DisplayOnDetails,
-        DisplayInApplication = f.DisplayInApplication,
         IsReadOnly = f.IsReadOnly,
         IsPrimaryMetric = f.IsPrimaryMetric,
         IsSecondaryMetric = f.IsSecondaryMetric,
@@ -48,83 +46,61 @@ public static class Mapping
 
     public static ProductEligibilityDto ToDto(this ProductEligibility e) => new() { Id = e.Id, Criteria = e.Criteria, Description = e.Description };
 
-    public static ReviewDto ToDto(this Review r) => new()
-    {
-        Id = r.Id,
-        ProductId = r.ProductId,
-        ProductName = r.Product?.Name ?? string.Empty,
-        CustomerName = r.CustomerName,
-        CustomerEmail = r.CustomerEmail,
-        Rating = r.Rating,
-        Comment = r.Comment,
-        Status = r.Status.ToString(),
-        CreatedAt = r.CreatedAt
-    };
-
-    public static PromotionDto ToDto(this Promotion p) => new()
-    {
-        Id = p.Id,
-        ProductId = p.ProductId,
-        ProductName = p.Product?.Name ?? string.Empty,
-        ProductCategoryName = p.Product?.Category?.Name ?? string.Empty,
-        Title = p.Title,
-        Description = p.Description,
-        BadgeText = p.BadgeText,
-        OfferDetail = p.OfferDetail,
-        TermsAndConditions = p.TermsAndConditions,
-        StartDate = p.StartDate,
-        EndDate = p.EndDate,
-        Priority = p.Priority,
-        Status = p.Status.ToString()
-    };
-
-    public static CategoryDto ToDto(this Category c) => new()
+    public static CategoryDto ToDto(this Category c, bool isLive, int subCategoryCount, int productCount) => new()
     {
         Id = c.Id,
         Name = c.Name,
-        Slug = c.Slug,
+        Code = c.Code,
         Description = c.Description,
         IconKey = c.IconKey,
-        Status = c.Status.ToString(),
+        Status = c.Status,
+        IsLive = isLive,
         DisplayOrder = c.DisplayOrder,
-        ProductCount = c.Products?.Count ?? 0,
-        SubCategoryCount = c.SubCategories?.Count ?? 0,
+        SubCategoryCount = subCategoryCount,
+        ProductCount = productCount,
         CreatedAt = c.CreatedAt
     };
 
-    public static ProductTypeDto ToDto(this ProductType t) => new()
+    /// <summary>Needs <see cref="SubCategory.Category"/> loaded.</summary>
+    public static SubCategoryDto ToDto(this SubCategory s, bool isLive, int productCount) => new()
     {
-        Id = t.Id,
-        Name = t.Name,
-        Code = t.Code,
-        IconKey = t.IconKey,
-        ApplyButtonLabel = t.ApplyButtonLabel,
-        AmountFieldLabel = t.AmountFieldLabel,
-        ShortLabel = t.ShortLabel,
-        ProductCount = t.Products?.Count ?? 0,
-        FieldDefinitions = t.FieldDefinitions.OrderBy(f => f.SortOrder).Select(f => f.ToDto()).ToList()
+        Id = s.Id,
+        CategoryId = s.CategoryId,
+        CategoryName = s.Category?.Name ?? string.Empty,
+        CategoryCode = s.Category?.Code ?? string.Empty,
+        Name = s.Name,
+        Code = s.Code,
+        Description = s.Description,
+        IconKey = s.IconKey,
+        Status = s.Status,
+        IsLive = isLive,
+        DisplayOrder = s.DisplayOrder,
+        ProductCount = productCount,
+        CreatedAt = s.CreatedAt
     };
 
-    public static EmploymentTypeDto ToDto(this EmploymentType e) => new()
+    /// <summary>Needs <see cref="SubCategory.Category"/> and <see cref="SubCategory.FieldDefinitions"/> loaded.</summary>
+    public static SubCategoryDetailDto ToDetailDto(this SubCategory s, bool isLive, int productCount)
     {
-        Id = e.Id,
-        Name = e.Name,
-        Active = e.Active,
-        SortOrder = e.SortOrder,
-        CreatedAt = e.CreatedAt,
-        UpdatedAt = e.UpdatedAt
-    };
-
-    public static RankingConfigDto ToDto(this RankingConfig r) => new()
-    {
-        Id = r.Id,
-        TrendingViewWeight = r.TrendingViewWeight,
-        TrendingApplicationWeight = r.TrendingApplicationWeight,
-        RecommendedRatingWeight = r.RecommendedRatingWeight,
-        RecommendedApplicationWeight = r.RecommendedApplicationWeight,
-        RecommendedPromotionWeight = r.RecommendedPromotionWeight,
-        UpdatedAt = r.UpdatedAt
-    };
+        var summary = s.ToDto(isLive, productCount);
+        return new SubCategoryDetailDto
+        {
+            Id = summary.Id,
+            CategoryId = summary.CategoryId,
+            CategoryName = summary.CategoryName,
+            CategoryCode = summary.CategoryCode,
+            Name = summary.Name,
+            Code = summary.Code,
+            Description = summary.Description,
+            IconKey = summary.IconKey,
+            Status = summary.Status,
+            IsLive = summary.IsLive,
+            DisplayOrder = summary.DisplayOrder,
+            ProductCount = summary.ProductCount,
+            CreatedAt = summary.CreatedAt,
+            FieldDefinitions = s.FieldDefinitions.OrderBy(f => f.SortOrder).Select(f => f.ToDto()).ToList()
+        };
+    }
 
     public static DocumentDefinitionDto ToDto(this DocumentDefinition d) => new()
     {
@@ -134,8 +110,8 @@ public static class Mapping
         Required = d.Required,
         SortOrder = d.SortOrder,
         Active = d.Active,
-        ProductTypeId = d.ProductTypeId,
-        ProductTypeName = d.ProductType?.Name,
+        SubCategoryId = d.SubCategoryId,
+        SubCategoryName = d.SubCategory?.Name,
         CreatedAt = d.CreatedAt
     };
 
@@ -147,6 +123,7 @@ public static class Mapping
         Label = s.Label,
         Color = s.Color,
         Enabled = s.Enabled,
+        IsLive = s.IsLive,
         SortOrder = s.SortOrder
     };
 
@@ -168,42 +145,30 @@ public static class Mapping
         IpAddress = a.IpAddress
     };
 
-    public static bool IsPromotionActive(this Promotion p, DateTime now) =>
-        p.Status == "Active" && p.StartDate <= now && p.EndDate >= now;
-
-    public static ProductListItemDto ToListItemDto(this Product p, DateTime now)
+    /// <summary>Needs the product's sub-category and that sub-category's category loaded.</summary>
+    internal static ProductListItemDto ToListItemDto(this Product p, CatalogVisibility visibility) => new()
     {
-        var activePromo = p.Promotions?.Where(x => x.IsPromotionActive(now)).OrderByDescending(x => x.Priority).FirstOrDefault();
-        return new ProductListItemDto
-        {
-            Id = p.Id,
-            Name = p.Name,
-            Code = p.Code,
-            ShortDescription = p.ShortDescription,
-            IconKey = p.IconKey,
-            Status = p.Status.ToString(),
-            CategoryId = p.CategoryId,
-            CategoryName = p.Category?.Name ?? string.Empty,
-            ProductTypeId = p.ProductTypeId,
-            ProductTypeName = p.ProductType?.Name ?? string.Empty,
-            ProductTypeCode = p.ProductType?.Code ?? string.Empty,
-            ProductTypeShortLabel = string.IsNullOrEmpty(p.ProductType?.ShortLabel) ? (p.ProductType?.Name ?? string.Empty) : p.ProductType.ShortLabel,
-            ApplyButtonLabel = string.IsNullOrEmpty(p.ProductType?.ApplyButtonLabel) ? "Apply Now" : p.ProductType.ApplyButtonLabel,
-            AmountFieldLabel = string.IsNullOrEmpty(p.ProductType?.AmountFieldLabel) ? "Requested Amount" : p.ProductType.AmountFieldLabel,
-            RatingAverage = p.RatingAverage,
-            RatingCount = p.RatingCount,
-            ApplicationCount = p.ApplicationCount,
-            CardFields = p.FieldValues?.Where(v => v.FieldDefinition != null && v.FieldDefinition.DisplayOnCard).OrderBy(v => v.FieldDefinition?.SortOrder ?? 0).Select(v => v.ToDto()).ToList() ?? new(),
-            FeatureTags = p.Benefits?.OrderBy(b => b.SortOrder).Take(2).Select(b => b.Title).ToList() ?? new(),
-            ActivePromotion = activePromo?.ToDto(),
-            CreatedAt = p.CreatedAt,
-            UpdatedAt = p.UpdatedAt
-        };
-    }
+        Id = p.Id,
+        Name = p.Name,
+        Code = p.Code,
+        ShortDescription = p.ShortDescription,
+        IconKey = p.IconKey,
+        Status = p.Status,
+        IsVisible = visibility.IsVisible(p),
+        CategoryId = p.SubCategory.CategoryId,
+        CategoryName = p.SubCategory.Category.Name,
+        SubCategoryId = p.SubCategoryId,
+        SubCategoryName = p.SubCategory.Name,
+        SubCategoryCode = p.SubCategory.Code,
+        CardFields = p.FieldValues.Where(v => v.FieldDefinition != null && v.FieldDefinition.DisplayOnCard).OrderBy(v => v.FieldDefinition.SortOrder).Select(v => v.ToDto()).ToList(),
+        FeatureTags = p.Benefits.OrderBy(b => b.SortOrder).Select(b => b.Title).ToList(),
+        CreatedAt = p.CreatedAt,
+        UpdatedAt = p.UpdatedAt
+    };
 
-    public static ProductDetailDto ToDetailDto(this Product p, DateTime now)
+    internal static ProductDetailDto ToDetailDto(this Product p, CatalogVisibility visibility)
     {
-        var list = p.ToListItemDto(now);
+        var list = p.ToListItemDto(visibility);
         return new ProductDetailDto
         {
             Id = list.Id,
@@ -212,79 +177,21 @@ public static class Mapping
             ShortDescription = list.ShortDescription,
             IconKey = list.IconKey,
             Status = list.Status,
+            IsVisible = list.IsVisible,
             CategoryId = list.CategoryId,
             CategoryName = list.CategoryName,
-            ProductTypeId = list.ProductTypeId,
-            ProductTypeName = list.ProductTypeName,
-            ProductTypeCode = list.ProductTypeCode,
-            RatingAverage = list.RatingAverage,
-            RatingCount = list.RatingCount,
-            ApplicationCount = list.ApplicationCount,
+            SubCategoryId = list.SubCategoryId,
+            SubCategoryName = list.SubCategoryName,
+            SubCategoryCode = list.SubCategoryCode,
             CardFields = list.CardFields,
             FeatureTags = list.FeatureTags,
-            ActivePromotion = list.ActivePromotion,
             CreatedAt = list.CreatedAt,
             UpdatedAt = list.UpdatedAt,
             Description = p.Description,
             ViewCount = p.ViewCount,
-            DetailFields = p.FieldValues?.Where(v => v.FieldDefinition != null && v.FieldDefinition.DisplayOnDetails).OrderBy(v => v.FieldDefinition?.SortOrder ?? 0).Select(v => v.ToDto()).ToList() ?? new(),
-            Benefits = p.Benefits?.OrderBy(b => b.SortOrder).Select(b => b.ToDto()).ToList() ?? new(),
-            EligibilityCriteria = p.EligibilityCriteria?.OrderBy(e => e.SortOrder).Select(e => e.ToDto()).ToList() ?? new(),
-            RecentReviews = p.Reviews?.Where(r => r.Status == "Published").OrderByDescending(r => r.CreatedAt).Take(5).Select(r => r.ToDto()).ToList() ?? new(),
-            Promotions = p.Promotions?.Where(x => x.Status == "Active" || x.Status == "Scheduled").OrderByDescending(x => x.Priority).Select(x => x.ToDto()).ToList() ?? new()
-        };
-    }
-
-    public static ApplicationListItemDto ToListItemDto(this DomainApplication a) => new()
-    {
-        Id = a.Id,
-        ApplicationNumber = a.ApplicationNumber,
-        CustomerName = a.CustomerName,
-        ProductId = a.ProductId,
-        ProductName = a.Product?.Name ?? string.Empty,
-        CategoryName = a.Product?.Category?.Name ?? string.Empty,
-        Status = a.Status.ToString(),
-        CreatedAt = a.CreatedAt,
-        SubmittedAt = a.SubmittedAt,
-        UpdatedAt = a.UpdatedAt
-    };
-
-    public static ApplicationDocumentDto ToDto(this ApplicationDocument d) => new()
-    {
-        Id = d.Id,
-        DocumentName = d.DocumentName,
-        DocumentType = d.DocumentType,
-        Required = d.Required,
-        Uploaded = d.Uploaded,
-        FileName = d.FileName,
-        UploadedAt = d.UploadedAt,
-        ContentType = d.ContentType,
-        FileSizeBytes = d.FileSizeBytes
-    };
-
-    public static ApplicationDetailDto ToDetailDto(this DomainApplication a)
-    {
-        var list = a.ToListItemDto();
-        return new ApplicationDetailDto
-        {
-            Id = list.Id,
-            ApplicationNumber = list.ApplicationNumber,
-            CustomerName = list.CustomerName,
-            ProductId = list.ProductId,
-            ProductName = list.ProductName,
-            CategoryName = list.CategoryName,
-            Status = list.Status,
-            CreatedAt = list.CreatedAt,
-            SubmittedAt = list.SubmittedAt,
-            UpdatedAt = list.UpdatedAt,
-            CustomerEmail = a.CustomerEmail,
-            CustomerPhone = a.CustomerPhone,
-            CustomerDateOfBirth = a.CustomerDateOfBirth,
-            ReviewNotes = a.ReviewNotes,
-            ProductIconKey = a.Product?.IconKey ?? string.Empty,
-            FieldValues = a.FieldValues?.Select(v => new ApplicationFieldValueDto { FieldKey = v.FieldKey, FieldLabel = v.FieldLabel, Value = v.Value }).ToList() ?? new(),
-            Documents = a.Documents?.Select(d => d.ToDto()).ToList() ?? new(),
-            StatusHistory = a.StatusHistory?.OrderBy(h => h.ChangedAt).Select(h => new ApplicationStatusHistoryDto { Status = h.Status.ToString(), Note = h.Note, ChangedAt = h.ChangedAt }).ToList() ?? new()
+            DetailFields = p.FieldValues.Where(v => v.FieldDefinition != null && v.FieldDefinition.DisplayOnDetails).OrderBy(v => v.FieldDefinition.SortOrder).Select(v => v.ToDto()).ToList(),
+            Benefits = p.Benefits.OrderBy(b => b.SortOrder).Select(b => b.ToDto()).ToList(),
+            EligibilityCriteria = p.EligibilityCriteria.OrderBy(e => e.SortOrder).Select(e => e.ToDto()).ToList()
         };
     }
 }

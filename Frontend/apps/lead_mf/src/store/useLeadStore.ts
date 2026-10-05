@@ -1,7 +1,7 @@
 import type { CustomPreset } from '@omniconnect/ui/validation';
 import { create } from 'zustand';
 import { apiFieldFor, defaultPhoneCountry, formatErrorFor, formatErrorsFor, splitStoredPhone } from '../config/leadFormats';
-import { LeadFormData, FormValidationErrors, NavigationPage, LeadRecord, DropdownOption, AuditRecord } from '../types/lead';
+import { LeadFormData, FormValidationErrors, NavigationPage, LeadRecord, DropdownOption, AuditRecord, SelectedProduct } from '../types/lead';
 import {
   apiClient,
   isApprovalPending,
@@ -11,7 +11,7 @@ import {
   BranchDistribution,
   DashboardFilterParams,
 } from '../api/apiClient';
-import { isFieldRequired, type LeadFieldConfig } from '../config/fieldControlRegistry';
+import { hasVisibleField, isFieldRequired, type LeadFieldConfig } from '../config/fieldControlRegistry';
 import { canSeeDashboardCapability } from '../api/hostBridge';
 import { EMPTY_DATE_RANGE, readStoredPageSize, resolveDateRange, type DateRangeValue } from '@omniconnect/ui';
 
@@ -57,7 +57,8 @@ interface LeadStoreState {
   toggleSidebar: () => void;
 
   // Master Data Options (Dynamic from Backend API)
-  products: DropdownOption[];
+  /** The products leads exist for — what the product filter offers. Products to pick from come from the catalogue (ProductPicker). */
+  productFilterOptions: DropdownOption[];
   states: DropdownOption[];
   branches: DropdownOption[];
   salesExecutives: DropdownOption[];
@@ -73,23 +74,23 @@ interface LeadStoreState {
   // Form State
   formData: LeadFormData;
   setFieldValue: <K extends keyof LeadFormData>(field: K, value: LeadFormData[K]) => void;
-  setProduct: (product: string) => void;
+  /** Choose the product (from the catalogue) the new lead is for; loads that product type's lead form. */
+  setProduct: (product: SelectedProduct) => void;
   resetForm: () => void;
 
   // Field Settings — the selected product's config, driving which sections/fields render, their
-  // label/required/editable state, and (for View/Details) masking. Keyed by product NAME -> Guid id
-  // since LeadFormData.product is a name but the config API is keyed by the real Product id.
-  productIdByName: Record<string, string>;
+  // label/required/editable state, and (for View/Details) masking. One config per Marketplace
+  // sub-category, so it is loaded by the sub-category the chosen product sits under.
   fieldConfig: LeadFieldConfig[];
   isLoadingFieldConfig: boolean;
-  fetchFieldConfigForProduct: (productName: string) => Promise<void>;
+  fetchFieldConfigForSubCategory: (subCategoryId: string | null | undefined) => Promise<void>;
   /** Formats administrators defined in Settings → Manage Formats, which a field's rules may refer to by key. */
   formatPresets: CustomPreset[];
 
   /** The View Leads table shows leads from every product at once, so its columns can't reflect any
    * ONE product's config the way the Create/Edit forms do — they're driven by the common-field
-   * subset of a single deterministic reference product's config instead (the first product returned
-   * by the products endpoint). Kept separate from `fieldConfig` above so navigating Create/Edit
+   * subset of a single deterministic reference sub-category's config instead (the first one the
+   * catalogue returns). Kept separate from `fieldConfig` above so navigating Create/Edit
    * elsewhere never changes what the table displays. */
   commonFieldConfig: LeadFieldConfig[];
   fetchCommonFieldConfig: () => Promise<void>;
@@ -189,6 +190,7 @@ interface LeadStoreState {
   closeEditReasonDrawer: () => void;
   proceedToEditLead: (reason: string) => void;
   setEditFieldValue: <K extends keyof LeadFormData>(field: K, value: LeadFormData[K]) => void;
+  setEditProduct: (product: SelectedProduct) => void;
   validateEditForm: () => boolean;
   submitEditLead: (reason: string) => Promise<boolean>;
   closeEditLeadDrawer: () => void;
@@ -272,6 +274,8 @@ export const getEmptyErrorMessage = (field: string): string => {
 
 const initialFormData: LeadFormData = {
   product: '',
+  catalogProductId: '',
+  subCategoryId: '',
   customerName: '',
   icNumber: '',
   phoneCountryCode: defaultPhoneCountry().dialCode,
@@ -315,13 +319,12 @@ export const useLeadStore = create<LeadStoreState>((set, get) => ({
   toggleSidebar: () => set((state) => ({ isSidebarExpanded: !state.isSidebarExpanded })),
 
   // Field Settings
-  productIdByName: {},
   fieldConfig: [],
   isLoadingFieldConfig: false,
   formatPresets: [],
-  fetchFieldConfigForProduct: async (productName) => {
-    const productId = get().productIdByName[productName];
-    if (!productId) {
+  fetchFieldConfigForSubCategory: async (subCategoryId) => {
+    // A lead taken before the catalogue was connected has no sub-category, and so no configured form.
+    if (!subCategoryId) {
       set({ fieldConfig: [] });
       return;
     }
@@ -329,7 +332,7 @@ export const useLeadStore = create<LeadStoreState>((set, get) => ({
     try {
       // The Manage Formats catalog travels with the config: a field's rule can name one of its formats.
       const [config, formatPresets] = await Promise.all([
-        apiClient.getFieldConfig(productId),
+        apiClient.getFieldConfig(subCategoryId),
         apiClient.getFormatPresets(),
       ]);
       set({ fieldConfig: config, formatPresets, isLoadingFieldConfig: false });
@@ -340,17 +343,17 @@ export const useLeadStore = create<LeadStoreState>((set, get) => ({
 
   commonFieldConfig: [],
   fetchCommonFieldConfig: async () => {
-    const productsWithId = await apiClient.getProductsWithId();
-    if (productsWithId.length === 0) {
+    const subCategories = await apiClient.getCatalogSubCategories();
+    if (subCategories.length === 0) {
       set({ commonFieldConfig: [] });
       return;
     }
-    const config = await apiClient.getFieldConfig(productsWithId[0].id);
+    const config = await apiClient.getFieldConfig(subCategories[0].id);
     set({ commonFieldConfig: config });
   },
 
   // Master Data Options
-  products: [],
+  productFilterOptions: [],
   states: [],
   branches: [],
   salesExecutives: [],
@@ -366,29 +369,28 @@ export const useLeadStore = create<LeadStoreState>((set, get) => ({
     masterDataLoad = (async () => {
     set({ isLoadingMasterData: true });
     try {
-      const [products, states, referenceData, salesExecs, productsWithId] = await Promise.all([
-        apiClient.getProducts(),
+      const [productNames, states, referenceData, salesExecs] = await Promise.all([
+        apiClient.getLeadProductNames(),
         apiClient.getStates(),
         apiClient.getReferenceData(),
         apiClient.getSalesExecutives(),
-        apiClient.getProductsWithId(),
       ]);
 
       set({
-        products,
+        productFilterOptions: productNames.map((name) => ({ value: name, label: name })),
         states,
         propertyTypes: referenceData.propertyTypes,
         propertyStatuses: referenceData.propertyStatuses,
         entityTypes: referenceData.entityTypes,
         salesExecutives: salesExecs,
-        productIdByName: Object.fromEntries(productsWithId.map((p) => [p.name, p.id])),
         isLoadingMasterData: false,
       });
 
       get().fetchBranches();
-      // The getters return [] rather than throwing when a request fails; an empty product list means
-      // the load did not really succeed, so let the next caller try again.
-      if (products.length === 0) masterDataLoad = null;
+      // The getters return [] rather than throwing when a request fails; an empty state list means
+      // the load did not really succeed, so let the next caller try again. (An empty product list is
+      // normal: it is the products leads exist for, and there may be none yet.)
+      if (states.length === 0) masterDataLoad = null;
     } catch (err) {
       console.error('Failed to load master data:', err);
       set({ isLoadingMasterData: false });
@@ -443,7 +445,9 @@ export const useLeadStore = create<LeadStoreState>((set, get) => ({
     set((state) => ({
       formData: {
         ...state.formData,
-        product,
+        product: product.name,
+        catalogProductId: product.id,
+        subCategoryId: product.subCategoryId,
         propertyType: '',
         propertyStatus: '',
         dateOfIncorporation: '',
@@ -452,7 +456,7 @@ export const useLeadStore = create<LeadStoreState>((set, get) => ({
       },
       errors: {},
     }));
-    void get().fetchFieldConfigForProduct(product);
+    void get().fetchFieldConfigForSubCategory(product.subCategoryId);
   },
 
   resetForm: () => set({ formData: initialFormData, errors: {} }),
@@ -554,25 +558,21 @@ export const useLeadStore = create<LeadStoreState>((set, get) => ({
       errors.preferredSalesExecutive = getEmptyErrorMessage('preferredSalesExecutive');
     }
 
-    if (fieldConfig.some((f) => f.apiField === 'propertyType')) {
-      if (isFieldRequired(fieldConfig, 'propertyType') && !formData.propertyType) {
-        errors.propertyType = getEmptyErrorMessage('propertyType');
-      }
-      if (isFieldRequired(fieldConfig, 'propertyStatus') && !formData.propertyStatus) {
-        errors.propertyStatus = getEmptyErrorMessage('propertyStatus');
-      }
+    // Product details: only the fields Field Settings has switched on for this product type apply.
+    if (hasVisibleField(fieldConfig, 'propertyType') && isFieldRequired(fieldConfig, 'propertyType') && !formData.propertyType) {
+      errors.propertyType = getEmptyErrorMessage('propertyType');
     }
-
-    if (fieldConfig.some((f) => f.apiField === 'dateOfIncorporation')) {
-      if (isFieldRequired(fieldConfig, 'dateOfIncorporation') && !formData.dateOfIncorporation) {
-        errors.dateOfIncorporation = getEmptyErrorMessage('dateOfIncorporation');
-      }
-      if (isFieldRequired(fieldConfig, 'companyName') && !formData.companyName.trim()) {
-        errors.companyName = getEmptyErrorMessage('companyName');
-      }
-      if (isFieldRequired(fieldConfig, 'entityType') && !formData.entityType) {
-        errors.entityType = getEmptyErrorMessage('entityType');
-      }
+    if (hasVisibleField(fieldConfig, 'propertyStatus') && isFieldRequired(fieldConfig, 'propertyStatus') && !formData.propertyStatus) {
+      errors.propertyStatus = getEmptyErrorMessage('propertyStatus');
+    }
+    if (hasVisibleField(fieldConfig, 'dateOfIncorporation') && isFieldRequired(fieldConfig, 'dateOfIncorporation') && !formData.dateOfIncorporation) {
+      errors.dateOfIncorporation = getEmptyErrorMessage('dateOfIncorporation');
+    }
+    if (hasVisibleField(fieldConfig, 'companyName') && isFieldRequired(fieldConfig, 'companyName') && !formData.companyName.trim()) {
+      errors.companyName = getEmptyErrorMessage('companyName');
+    }
+    if (hasVisibleField(fieldConfig, 'entityType') && isFieldRequired(fieldConfig, 'entityType') && !formData.entityType) {
+      errors.entityType = getEmptyErrorMessage('entityType');
     }
 
     if (isFieldRequired(fieldConfig, 'marketingConsent') && !formData.marketingConsent) {
@@ -1046,9 +1046,7 @@ export const useLeadStore = create<LeadStoreState>((set, get) => ({
     if (lead?.id) {
       apiClient.logLeadView(lead.id);
     }
-    if (lead?.product) {
-      void get().fetchFieldConfigForProduct(lead.product);
-    }
+    void get().fetchFieldConfigForSubCategory(lead?.subCategoryId);
   },
   closeDetailsDrawer: () => set({ selectedLead: null, isDetailsDrawerOpen: false }),
 
@@ -1067,6 +1065,8 @@ export const useLeadStore = create<LeadStoreState>((set, get) => ({
     const phone = splitStoredPhone(lead.phone);
     const editFormData: LeadFormData = {
         product: lead.product || '',
+        catalogProductId: lead.catalogProductId || '',
+        subCategoryId: lead.subCategoryId || '',
         customerName: lead.name || '',
         icNumber: lead.icNumber || '',
         phoneCountryCode: phone.phoneCountryCode,
@@ -1095,9 +1095,7 @@ export const useLeadStore = create<LeadStoreState>((set, get) => ({
       editFormData,
       editInitialFormData: editFormData,
     });
-    if (lead.product) {
-      void get().fetchFieldConfigForProduct(lead.product);
-    }
+    void get().fetchFieldConfigForSubCategory(lead.subCategoryId);
   },
 
   closeEditReasonDrawer: () => set({ isEditReasonOpen: false, editLeadTarget: null, editReason: '' }),
@@ -1115,16 +1113,31 @@ export const useLeadStore = create<LeadStoreState>((set, get) => ({
         newForm.preferredBranch = '';
         get().fetchBranches(value as string);
       }
-      if (field === 'product') {
-        newForm.propertyType = '';
-        newForm.propertyStatus = '';
-        newForm.dateOfIncorporation = '';
-        newForm.companyName = '';
-        newForm.entityType = '';
-        void get().fetchFieldConfigForProduct(value as string);
-      }
       return { editFormData: newForm, editErrors: newErrors };
     });
+  },
+
+  /** Move the lead being edited to another catalogue product; its product-detail answers belong to the old one, so they are cleared. */
+  setEditProduct: (product) => {
+    set((state) => {
+      const newErrors = { ...state.editErrors };
+      delete newErrors.product;
+      return {
+        editFormData: {
+          ...state.editFormData,
+          product: product.name,
+          catalogProductId: product.id,
+          subCategoryId: product.subCategoryId,
+          propertyType: '',
+          propertyStatus: '',
+          dateOfIncorporation: '',
+          companyName: '',
+          entityType: '',
+        },
+        editErrors: newErrors,
+      };
+    });
+    void get().fetchFieldConfigForSubCategory(product.subCategoryId);
   },
 
   validateEditForm: () => {
@@ -1150,14 +1163,11 @@ export const useLeadStore = create<LeadStoreState>((set, get) => ({
       errors.preferredSalesExecutive = getEmptyErrorMessage('preferredSalesExecutive');
     }
 
-    if (fieldConfig.some((f) => f.apiField === 'propertyType')) {
-      if (isFieldRequired(fieldConfig, 'propertyType') && !editFormData.propertyType) errors.propertyType = getEmptyErrorMessage('propertyType');
-      if (isFieldRequired(fieldConfig, 'propertyStatus') && !editFormData.propertyStatus) errors.propertyStatus = getEmptyErrorMessage('propertyStatus');
-    } else if (fieldConfig.some((f) => f.apiField === 'dateOfIncorporation')) {
-      if (isFieldRequired(fieldConfig, 'dateOfIncorporation') && !editFormData.dateOfIncorporation) errors.dateOfIncorporation = getEmptyErrorMessage('dateOfIncorporation');
-      if (isFieldRequired(fieldConfig, 'companyName') && !editFormData.companyName.trim()) errors.companyName = getEmptyErrorMessage('companyName');
-      if (isFieldRequired(fieldConfig, 'entityType') && !editFormData.entityType) errors.entityType = getEmptyErrorMessage('entityType');
-    }
+    if (hasVisibleField(fieldConfig, 'propertyType') && isFieldRequired(fieldConfig, 'propertyType') && !editFormData.propertyType) errors.propertyType = getEmptyErrorMessage('propertyType');
+    if (hasVisibleField(fieldConfig, 'propertyStatus') && isFieldRequired(fieldConfig, 'propertyStatus') && !editFormData.propertyStatus) errors.propertyStatus = getEmptyErrorMessage('propertyStatus');
+    if (hasVisibleField(fieldConfig, 'dateOfIncorporation') && isFieldRequired(fieldConfig, 'dateOfIncorporation') && !editFormData.dateOfIncorporation) errors.dateOfIncorporation = getEmptyErrorMessage('dateOfIncorporation');
+    if (hasVisibleField(fieldConfig, 'companyName') && isFieldRequired(fieldConfig, 'companyName') && !editFormData.companyName.trim()) errors.companyName = getEmptyErrorMessage('companyName');
+    if (hasVisibleField(fieldConfig, 'entityType') && isFieldRequired(fieldConfig, 'entityType') && !editFormData.entityType) errors.entityType = getEmptyErrorMessage('entityType');
 
     if (isFieldRequired(fieldConfig, 'marketingConsent') && !editFormData.marketingConsent) errors.marketingConsent = getEmptyErrorMessage('marketingConsent');
 

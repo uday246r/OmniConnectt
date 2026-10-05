@@ -60,10 +60,7 @@ public class CentralAuditForwarder(AuthServiceClient authService, IOptions<SelfO
         if (localAction.EndsWith(".export", StringComparison.Ordinal) || localAction.EndsWith(".exported", StringComparison.Ordinal)) return "Export";
         if (localAction.StartsWith("status_config.", StringComparison.Ordinal)
             || localAction.StartsWith("field.", StringComparison.Ordinal)
-            || localAction.StartsWith("product_type.", StringComparison.Ordinal)
-            || localAction.StartsWith("document_definition.", StringComparison.Ordinal)
-            || localAction.StartsWith("employment_type.", StringComparison.Ordinal)
-            || localAction.StartsWith("ranking_config.", StringComparison.Ordinal))
+            || localAction.StartsWith("document_definition.", StringComparison.Ordinal))
         {
             return "Configuration";
         }
@@ -76,9 +73,7 @@ public class CentralAuditForwarder(AuthServiceClient authService, IOptions<SelfO
     {
         AuditEntityTypes.Product => ("Products", "products"),
         AuditEntityTypes.Category => ("Categories", "categories"),
-        AuditEntityTypes.Promotion => ("Promotions", "promotions"),
-        AuditEntityTypes.Review => ("Products", "products"),
-        AuditEntityTypes.Application => ("Applications", "applications"),
+        AuditEntityTypes.SubCategory => ("Sub-categories", "sub-categories"),
         "AuditLog" => ("Audit Logs", "audit-logs"),
         _ => ("Setup", "setup"),
     };

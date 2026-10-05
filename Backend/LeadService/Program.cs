@@ -79,6 +79,8 @@ builder.Services.AddResponseCompression(options => options.EnableForHttps = true
 builder.Services.Configure<CorsOptions>(builder.Configuration.GetSection(CorsOptions.SectionName));
 builder.Services.Configure<JwtValidationOptions>(builder.Configuration.GetSection(JwtValidationOptions.SectionName));
 builder.Services.Configure<AuthIntegrationOptions>(builder.Configuration.GetSection(AuthIntegrationOptions.SectionName));
+// The Marketplace: where every product a lead can be taken for comes from (see ProductCatalogClient).
+builder.Services.Configure<ProductsIntegrationOptions>(builder.Configuration.GetSection(ProductsIntegrationOptions.SectionName));
 // Phase 2 Maker-Checker: Internal guards the inbound internal/approvals/apply endpoint AuthService
 // calls to replay an approved Lead mutation; Self holds this service's own callback base URL and the
 // live module key it was registered under.
@@ -123,6 +125,8 @@ builder.Services.AddHttpClient<AuthServiceClient>(client => client.Timeout = Tim
 builder.Services.AddMemoryCache();
 builder.Services.AddSingleton<ValidationPresetClient.LastKnownGood>();
 builder.Services.AddHttpClient<ValidationPresetClient>(client => client.Timeout = TimeSpan.FromSeconds(5));
+builder.Services.AddSingleton<ProductCatalogClient.LastKnownGood>();
+builder.Services.AddHttpClient<ProductCatalogClient>(client => client.Timeout = TimeSpan.FromSeconds(5));
 builder.Services.AddHttpClient<FineCapabilityClient>(client => client.Timeout = TimeSpan.FromSeconds(10));
 builder.Services.AddScoped<KpiVisibilityService>();
 
@@ -259,9 +263,7 @@ else
         // schema EnsureCreatedAsync had already produced before switching), so MigrateAsync is a
         // no-op here and a real migration path from now on.
         await dbContext.Database.MigrateAsync();
-        await LeadDbSeeder.SeedAsync(dbContext);
-        await scope.ServiceProvider.GetRequiredService<LeadFieldConfigService>().EnsureSeededAsync();
-        app.Logger.LogInformation("Database initialized and seeded successfully.");
+        app.Logger.LogInformation("Database initialized successfully.");
     }
     catch (Exception ex)
     {

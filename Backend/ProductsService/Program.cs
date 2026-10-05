@@ -9,10 +9,10 @@ using ProductMarketplace.Api.Infrastructure.Approvals;
 using ProductMarketplace.Api.Infrastructure.Security;
 using ProductMarketplace.Api.Options;
 using ProductMarketplace.Api.Services;
+using ProductMarketplace.Application.Common;
 using ProductMarketplace.Application.Interfaces;
 using ProductMarketplace.Infrastructure;
 using ProductMarketplace.Infrastructure.Data;
-using ProductMarketplace.Infrastructure.Data.Seed;
 using ProductMarketplace.Infrastructure.Realtime;
 
 // .env is developer-local and gitignored. It is looked for next to the project, and also under
@@ -58,6 +58,10 @@ builder.Services.AddScoped<ApprovalGate>();
 // hang the request for the default 100 seconds.
 builder.Services.AddHttpClient<AuthServiceClient>(client => client.Timeout = TimeSpan.FromSeconds(10));
 builder.Services.AddHttpClient<FineCapabilityClient>(client => client.Timeout = TimeSpan.FromSeconds(10));
+// The formats defined in Manage Formats, for product fields that use one. Bounded like the others: a slow
+// settings service must not hold up saving a product, and an unreachable one is survived (see the class).
+builder.Services.AddSingleton<ValidationPresetSource.LastKnownGood>();
+builder.Services.AddHttpClient<IFormatPresetSource, ValidationPresetSource>(client => client.Timeout = TimeSpan.FromSeconds(5));
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
@@ -145,12 +149,9 @@ else
     // Migrations default to running on startup but can be turned off so a deployment applies them as a
     // single-writer step. A database that cannot be reached is logged, not fatal — /health reports it.
     //
-    // Migrating and seeding are two separate try blocks on purpose. They used to share one, so the
-    // first exception skipped everything after it — and the failure this service actually hits is a
-    // migration one (see the baselining note below), which meant NO seeding had run on any startup:
-    // no categories, no product types, no products, and no StatusConfigs, the reference data every
-    // write is validated against. An empty catalogue with a stack trace twelve frames up in the log
-    // is a hard thing to connect back to its cause, so each step now reports its own outcome.
+    // There is no seed step. The catalogue starts empty and is built through the app; the one thing the
+    // system cannot work without — the statuses every write is validated against — ships inside a
+    // migration, so it exists in every environment and is never re-applied over an administrator's edits.
     using var startupScope = app.Services.CreateScope();
     var db = startupScope.ServiceProvider.GetRequiredService<AppDbContext>();
 
@@ -165,23 +166,6 @@ else
             app.Logger.LogError(ex, "Applying migrations on startup failed.");
             await ReportSchemaStateAsync(db, app.Logger);
         }
-    }
-
-    try
-    {
-        if (builder.Configuration.GetValue("Database:RunSeedOnStartup", app.Environment.IsDevelopment()))
-        {
-            await SeedData.SeedAsync(db);
-            await SeedData.SeedDocumentDefinitionsAsync(db);
-            await SeedData.SeedAnalyticsAndAuditAsync(db);
-        }
-
-        // Status values are reference data every write is validated against, so they exist in every environment.
-        await SeedData.SeedStatusConfigsAsync(db);
-    }
-    catch (Exception ex)
-    {
-        app.Logger.LogError(ex, "Seeding the database on startup failed. Reference data may be incomplete.");
     }
 }
 
@@ -214,6 +198,22 @@ app.UseExceptionHandler(errorApp =>
             await context.Response.WriteAsync(string.IsNullOrWhiteSpace(conflict.ProblemJson)
                 ? System.Text.Json.JsonSerializer.Serialize(new { title = conflict.Message, status = 409 })
                 : conflict.ProblemJson);
+            return;
+        }
+
+        // A product's attribute values broke their sub-category's rules: say which fields, all at once.
+        if (exception is FieldValidationException fieldErrors)
+        {
+            context.Response.ContentType = "application/problem+json";
+            context.Response.StatusCode = StatusCodes.Status400BadRequest;
+            await context.Response.WriteAsJsonAsync(new
+            {
+                title = "Some fields need attention",
+                status = 400,
+                message = fieldErrors.Message,
+                errors = fieldErrors.Errors,
+                traceId
+            });
             return;
         }
 
@@ -326,7 +326,7 @@ static async Task ReportSchemaStateAsync(AppDbContext db, ILogger logger)
             + "partway, so it now fails on the tables it did create while every read of the ones it never "
             + "reached fails too — which is why this service returns no data. Do NOT baseline this; the "
             + "migrations have to run. Drop the partial tables (or the schema) so `dotnet ef database update` "
-            + "can apply InitialCreate onwards cleanly, then startup will seed it.",
+            + "can apply InitialCreate onwards cleanly.",
             recorded, expected.Count - missing.Count, expected.Count, missing.Count, string.Join(", ", missing));
     }
     catch (Exception ex)

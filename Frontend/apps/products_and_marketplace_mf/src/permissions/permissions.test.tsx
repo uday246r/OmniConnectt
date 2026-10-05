@@ -32,7 +32,25 @@ describe('permission keys', () => {
     expect(featureKeyFor('products')).toBe('remote.products.products')
     expect(PERMISSIONS.PRODUCTS_DELETE).toBe('products:Delete')
     expect(PERMISSIONS.AUDIT_LOGS_VIEW).toBe('audit:View')
-    expect(PERMISSIONS.REVIEWS_MANAGE).toBe('reviews:Moderate')
+    expect(PERMISSIONS.SUBCATEGORIES_VIEW).toBe('subcategories:View')
+  })
+
+  /**
+   * A module key is embedded in `remote.{app}.{module}:{Capability}` and parsed by AuthService, and every
+   * module on the platform is one lowercase word — so the module for the "sub-categories" page is
+   * `subcategories`. A hyphenated key here would name a permission the server never grants.
+   */
+  it('use a single lowercase word for every module', () => {
+    for (const permission of Object.values(PERMISSIONS)) {
+      const [module, capability] = permission.split(':')
+      expect(module).toMatch(/^[a-z]+$/)
+      expect(capability).toMatch(/^[A-Z][A-Za-z]+$/)
+    }
+  })
+
+  it('no longer include the modules that were removed', () => {
+    const modules = new Set(Object.values(PERMISSIONS).map((p) => p.split(':')[0]))
+    for (const removed of ['promotions', 'reviews', 'applications']) expect(modules.has(removed)).toBe(false)
   })
 
   it('asks the host with the full feature key', () => {

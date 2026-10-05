@@ -14,8 +14,8 @@ namespace ProductMarketplace.Api.Controllers;
 public class ProductsController(IProductService service, ApprovalGate gate, IAuditLogService audit) : ControllerBase
 {
     /// <summary>
-    /// Every product matching the catalogue filters, as a CSV file. Replaces a browser-built file that held
-    /// only the cards on the current page; the download is recorded in the audit trail.
+    /// Every product matching the catalogue filters, as a CSV file — not just the cards on the current
+    /// page. The download is recorded in the audit trail.
     /// </summary>
     [HttpGet("export")]
     [RequiresCapability("products", "View")]
@@ -35,22 +35,20 @@ public class ProductsController(IProductService service, ApprovalGate gate, IAud
         return File(export.ToBytes(), "text/csv", $"products-{DateTime.UtcNow:yyyyMMdd-HHmmss}.csv");
     }
 
-
+    /// <summary>
+    /// The catalogue. Set <c>visibleOnly</c> to receive only what the catalogue currently shows — what
+    /// anything offering products to a customer, or to another service, should ask for.
+    /// </summary>
     [HttpGet]
     [RequiresCapability("products", "View")]
     public async Task<IActionResult> Search([FromQuery] ProductQueryDto query, CancellationToken ct)
         => Ok(await service.SearchAsync(query, ct));
 
-    /// <summary>Products per status for the catalogue's current filters, in one query — the status tabs' counts.</summary>
+    /// <summary>Products per status for the catalogue's current filters, in one query — the status filter's counts.</summary>
     [HttpGet("status-counts")]
     [RequiresCapability("products", "View")]
     public async Task<IActionResult> StatusCounts([FromQuery] ProductQueryDto query, CancellationToken ct)
         => Ok(await service.StatusCountsAsync(query, ct));
-
-    [HttpGet("top-performers")]
-    [RequiresCapability("products", "View")]
-    public async Task<IActionResult> GetTopPerformers([FromQuery] string? metric, [FromQuery] int take, CancellationToken ct)
-        => Ok(await service.GetTopPerformersAsync(string.IsNullOrWhiteSpace(metric) ? "applied" : metric, Paging.ClampTake(take, 5), ct));
 
     [HttpGet("{id:guid}")]
     [RequiresCapability("products", "View")]
@@ -78,7 +76,8 @@ public class ProductsController(IProductService service, ApprovalGate gate, IAud
         var current = await service.GetByIdAsync(id, false, ct);
         if (current is null) return NotFound();
 
-        var pending = await gate.TrySubmitAsync(ProductsMutations.ProductUpdate, id.ToString(), current.Name, dto, ct);
+        var pending = await gate.TrySubmitAsync(ProductsMutations.ProductUpdate, id.ToString(), current.Name, dto, ct,
+            before: new { name = current.Name, code = current.Code, status = current.Status, subCategoryId = current.SubCategoryId });
         if (pending is not null) return Accepted(pending);
 
         var updated = await service.UpdateAsync(id, dto, ct);

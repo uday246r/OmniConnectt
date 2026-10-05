@@ -15,7 +15,7 @@ import { composePhone, formatErrorFor, formatErrorsFor, splitStoredPhone } from 
  */
 
 const form = (over: Partial<LeadFormData> = {}): LeadFormData => ({
-  product: 'Home Financing', customerName: 'Asha', icNumber: '880512-14-5678', phoneCountryCode: '+60',
+  product: 'Home Loan – Salaried', catalogProductId: 'p1', subCategoryId: 's1', customerName: 'Asha', icNumber: '880512-14-5678', phoneCountryCode: '+60',
   phoneNumber: '12-345 6789', email: 'asha@example.com', state: 'Selangor', preferredBranch: '', employerName: 'Acme',
   appliedAmount: '50000', hasPreferredSalesExecutive: false, preferredSalesExecutive: '', propertyType: '',
   propertyStatus: '', dateOfIncorporation: '', companyName: '', entityType: '', marketingConsent: 'CONSENT',
@@ -23,7 +23,7 @@ const form = (over: Partial<LeadFormData> = {}): LeadFormData => ({
 })
 
 const field = (apiField: string, validations: ValidationRule[]): LeadFieldConfig => ({
-  id: apiField, productId: 'p', apiField, displayLabel: apiField, section: 's', displayOrder: 1, visible: true,
+  id: apiField, catalogSubCategoryId: 's1', apiField, displayLabel: apiField, section: 's', displayOrder: 1, visible: true,
   required: true, editable: true, sensitive: false, maskingRule: 'None', visibleCharCount: 4, validations,
 })
 

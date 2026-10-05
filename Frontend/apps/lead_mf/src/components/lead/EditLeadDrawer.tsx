@@ -1,6 +1,8 @@
 import React, { useMemo } from 'react';
 import { Save, ArrowLeft, CheckCircle2 } from '@omniconnect/ui/icons';
-import { Button, Drawer, EmptyState, Select } from '@omniconnect/ui';
+import { Button, Drawer, EmptyState } from '@omniconnect/ui';
+import { ProductPicker } from './ProductPicker';
+import { hasVisibleField } from '../../config/fieldControlRegistry';
 import { LeadDiffTable } from '../../shared/LeadDiffTable';
 import { useLeadStore } from '../../store/useLeadStore';
 import drawerLayout from '../../shared/drawerLayout.module.css';
@@ -24,16 +26,15 @@ export const EditLeadDrawer: React.FC = () => {
     editReason,
     editFormData,
     editErrors,
-    setEditFieldValue,
+    setEditProduct,
     validateEditForm,
     submitEditLead,
     closeEditLeadDrawer,
     isConfirmingEdit,
     setIsConfirmingEdit,
     isSubmitting,
-    products,
     fieldConfig,
-  } = useLeadStore(useShallow((s) => ({ isEditLeadOpen: s.isEditLeadOpen, editLeadTarget: s.editLeadTarget, editReason: s.editReason, editFormData: s.editFormData, editErrors: s.editErrors, setEditFieldValue: s.setEditFieldValue, validateEditForm: s.validateEditForm, submitEditLead: s.submitEditLead, closeEditLeadDrawer: s.closeEditLeadDrawer, isConfirmingEdit: s.isConfirmingEdit, setIsConfirmingEdit: s.setIsConfirmingEdit, isSubmitting: s.isSubmitting, products: s.products, fieldConfig: s.fieldConfig })));
+  } = useLeadStore(useShallow((s) => ({ isEditLeadOpen: s.isEditLeadOpen, editLeadTarget: s.editLeadTarget, editReason: s.editReason, editFormData: s.editFormData, editErrors: s.editErrors, setEditProduct: s.setEditProduct, validateEditForm: s.validateEditForm, submitEditLead: s.submitEditLead, closeEditLeadDrawer: s.closeEditLeadDrawer, isConfirmingEdit: s.isConfirmingEdit, setIsConfirmingEdit: s.setIsConfirmingEdit, isSubmitting: s.isSubmitting, fieldConfig: s.fieldConfig })));
 
   // Compute diffs between original lead target and current editFormData
   const changedFields = useMemo<FieldDiff[]>(() => {
@@ -70,19 +71,23 @@ export const EditLeadDrawer: React.FC = () => {
     compare('Applied Amount', orig.appliedAmount, form.appliedAmount);
     compare('Preferred Sales Executive', orig.preferredSalesExecutive, form.hasPreferredSalesExecutive ? form.preferredSalesExecutive : 'None');
 
-    if (form.product === 'Home Financing') {
-      compare('Property Type', orig.propertyType, form.propertyType);
-      compare('Property Status', orig.propertyStatus, form.propertyStatus);
-    } else if (form.product === 'Micro Finance') {
-      compare('Date of Incorporation', orig.dateOfIncorporation, form.dateOfIncorporation);
-      compare('Company Name', orig.companyName, form.companyName);
-      compare('Entity Type', orig.entityType, form.entityType);
+    // Product details: compared for the fields Field Settings shows for this lead's product type,
+    // never by looking at what the product is called.
+    const detailFields: [string, string, string | undefined, string][] = [
+      ['propertyType', 'Property Type', orig.propertyType, form.propertyType],
+      ['propertyStatus', 'Property Status', orig.propertyStatus, form.propertyStatus],
+      ['dateOfIncorporation', 'Date of Incorporation', orig.dateOfIncorporation, form.dateOfIncorporation],
+      ['companyName', 'Company Name', orig.companyName, form.companyName],
+      ['entityType', 'Entity Type', orig.entityType, form.entityType],
+    ];
+    for (const [apiField, label, before, after] of detailFields) {
+      if (hasVisibleField(fieldConfig, apiField)) compare(label, before, after);
     }
 
     compare('Marketing Consent', orig.marketingConsent, form.marketingConsent);
 
     return diffs;
-  }, [editLeadTarget, editFormData]);
+  }, [editLeadTarget, editFormData, fieldConfig]);
 
   if (!isEditLeadOpen || !editLeadTarget) return null;
 
@@ -145,20 +150,14 @@ export const EditLeadDrawer: React.FC = () => {
       {!isConfirmingEdit ? (
         /* STEP 1: EDIT FORM */
         <form id={EDIT_FORM_ID} onSubmit={handleSaveClick}>
-              {/* Product Selection */}
+              {/* Product Selection — a lead keeps its product unless a different one is chosen from the catalogue */}
               <div className={form.stackWide}>
-                <label className={`form-label ${form.blockLabel}`} htmlFor="edit-lead-product">
-                  Select Financial Product <span className={form.required}>*</span>
-                </label>
-                <Select
+                <ProductPicker
                   id="edit-lead-product"
-                  size="lg"
-                  value={editFormData.product}
-                  onChange={(e) => setEditFieldValue('product', e.target.value)}
-                  placeholder="Select product"
-                  options={products.map((p) => ({ value: p.label, label: p.label }))}
+                  productName={editFormData.product}
+                  onSelect={setEditProduct}
+                  error={editErrors.product}
                 />
-                {editErrors.product && <div className={form.errorText}>{editErrors.product}</div>}
               </div>
 
               {/* Common Customer Details */}
@@ -171,8 +170,8 @@ export const EditLeadDrawer: React.FC = () => {
 
               {/* Product Specific Fields — config-driven, see LeadFormContainer's identical comment */}
               <div className={form.stack}>
-                {fieldConfig.some((f) => f.apiField === 'propertyType') && <HomeFinancingFields isEdit={true} />}
-                {fieldConfig.some((f) => f.apiField === 'dateOfIncorporation') && <MicrofinanceFields isEdit={true} />}
+                {(hasVisibleField(fieldConfig, 'propertyType') || hasVisibleField(fieldConfig, 'propertyStatus')) && <HomeFinancingFields isEdit={true} />}
+                {(hasVisibleField(fieldConfig, 'dateOfIncorporation') || hasVisibleField(fieldConfig, 'companyName') || hasVisibleField(fieldConfig, 'entityType')) && <MicrofinanceFields isEdit={true} />}
               </div>
 
               {/* Declaration & Consent */}

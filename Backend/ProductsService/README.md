@@ -83,7 +83,6 @@ ConnectionStrings__DefaultConnection=<connection string>
 | --- | --- | --- |
 | `Cors:AllowedOrigins` | `localhost:5173`, `127.0.0.1:5173` | Origins allowed to call the API. |
 | `Database:ApplyMigrationsOnStartup` | `true` | Set `false` to apply migrations as a separate deploy step instead of on boot. |
-| `Database:RunSeedOnStartup` | Development only | Demo/sample data. Status reference data is always provisioned; demo content never seeds itself in a deployed environment. |
 | `Swagger:Enabled` | Development only | Swagger UI is not exposed outside development by default. |
 | `Audit:TrustActorHeaders` | Development only | Whether `X-Actor-*` request headers may name the audit actor. See below. |
 
@@ -105,16 +104,24 @@ and permissions; this service is designed to consume them after integration:
 
 ## Data integrity notes
 
-- **Category display order** is kept unique and contiguous per sibling set by `CategoryService`.
-  Changing one category's order re-inserts it at that position and renumbers the rest (1..N); deleting
-  one closes the gap it left. Migration `NormalizeCategoryDisplayOrder` brings pre-existing rows in
-  line with that invariant.
-- **`Product.ApplicationCount`** is denormalised so the database can sort and rank on it, but it is
-  recomputed from the `Applications` table after every write rather than incremented, so it cannot
-  drift.
-- **Status values** are not a closed enum. `StatusConfig` is the source of truth per entity type;
-  every write validates against it, and a caller that omits a status gets the configured default
-  rather than a hardcoded literal.
+- **The catalogue is three levels**: Category → Sub-category → Product. A product's category is not
+  stored; it is reached through its sub-category, so no product can contradict the hierarchy.
+- **What the catalogue shows is derived, never written.** A product is visible only when its own
+  status, its sub-category's and its category's are all *live*. Marking a category inactive hides
+  everything beneath it without touching those records, so reactivating it restores each one exactly as
+  it was. `CatalogVisibility` is the one place that rule lives.
+- **Status values** are not a closed enum, and neither is what "live" means. `StatusConfig` is the
+  source of truth per entity type: every write validates against it (and stores the value as Setup
+  spells it), a caller that omits a status gets the configured default, and `IsLive` says which
+  statuses make a record visible. Nothing compares a status to a literal such as "Active".
+- **Display order** is kept unique and contiguous (1..N) per sibling set — all categories, or the
+  sub-categories inside one category. Adding, moving or deleting renumbers the rest.
+- **Attributes** are defined per sub-category (`FieldDefinition`) and stored per product
+  (`ProductFieldValue`, with a `NumericValue` projection so they can be sorted and filtered). Values are
+  validated on the server against the field's type, options, `Required` flag and format rules; the rules
+  are evaluated by the shared `OmniConnect.Validation` engine, the same one leads and users use.
+- **There is no seed data.** The catalogue starts empty and is built through the app. The one thing the
+  service cannot work without — the statuses — ships inside the `BootstrapStatuses` migration.
 
 ## Database migrations
 
@@ -126,3 +133,8 @@ dotnet ef migrations add <Name> --project src/ProductMarketplace.Infrastructure
 ```
 
 Applying them needs nothing extra — `dotnet run` migrates on startup.
+
+The schema was rebuilt from scratch (one `InitialCreate` plus `BootstrapStatuses`), so a database
+created by the earlier design cannot be migrated forward: its tables and migration history do not
+match. Point the service at an empty database, or drop the schema first (`DROP SCHEMA public CASCADE;
+CREATE SCHEMA public;`) — that permanently deletes everything in it.

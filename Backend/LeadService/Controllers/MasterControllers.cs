@@ -7,45 +7,6 @@ using LeadManagement.Api.Services;
 namespace LeadManagement.Api.Controllers
 {
     [ApiController]
-    [Route("api/products")]
-    [Route("api/v1/products")]
-    [Route("products")]
-    // [Authorize], not [AllowAnonymous]: the [RequiresCapability] attributes on the actions below
-    // are a hand-written IAsyncAuthorizationFilter, which does NOT honour IAllowAnonymous metadata.
-    // These endpoints have therefore always demanded an authenticated caller holding MasterData:View —
-    // the [AllowAnonymous] simply misdescribed the contract, and every real caller already sends a token.
-    [Authorize]
-    public class ProductsController : ControllerBase
-    {
-        private readonly IMasterDataService _masterDataService;
-
-        public ProductsController(IMasterDataService masterDataService)
-        {
-            _masterDataService = masterDataService;
-        }
-
-        [HttpGet]
-        [RequiresCapability("MasterData", "View")]
-        public async Task<ActionResult<ApiResponseDto<List<DropdownOptionDto>>>> GetProducts()
-        {
-            var data = await _masterDataService.GetProductsAsync();
-            return Ok(new ApiResponseDto<List<DropdownOptionDto>> { Success = true, Data = data });
-        }
-
-        /// <summary>Field Settings' product tabs need the real Product Guid — GetProducts above
-        /// deliberately returns name-only dropdown options, which every existing consumer (lead
-        /// submission, filters) matches by name, not id.</summary>
-        [HttpGet("full")]
-        // The lead forms resolve a product's field configuration by this id too, not only Field Settings.
-        [RequiresAnyCapability("FieldSettings:View", "Lead:View", "Lead:Create", "Lead:Edit")]
-        public async Task<ActionResult<ApiResponseDto<List<ProductWithIdDto>>>> GetProductsWithId()
-        {
-            var data = await _masterDataService.GetProductsWithIdAsync();
-            return Ok(new ApiResponseDto<List<ProductWithIdDto>> { Success = true, Data = data });
-        }
-    }
-
-    [ApiController]
     [Route("api/states")]
     [Route("api/v1/states")]
     [Route("states")]

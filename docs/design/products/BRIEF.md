@@ -1,5 +1,9 @@
 # Design brief — Products & Marketplace rebuild
 
+> **Status:** Phase 1 (the backend) is done. See [PROGRESS.md](PROGRESS.md) for what was built, where it departs from
+> the plan below, and the API the frontend builds against. [PHASE-1-EXECUTION.md](PHASE-1-EXECUTION.md) now describes
+> the service *as it was before* the rebuild.
+
 > This file and the images beside it are the **only** reference an unattended cloud run has.
 > Read this file and all four images before writing any code.
 

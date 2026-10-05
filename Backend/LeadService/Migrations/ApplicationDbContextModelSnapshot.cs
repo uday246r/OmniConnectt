@@ -284,6 +284,25 @@ namespace LeadManagement.Api.Migrations
                     b.Property<Guid?>("BranchId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("CatalogCategoryId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("CatalogProductId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("CatalogSubCategoryId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("CategoryCode")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("CategoryName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -331,8 +350,15 @@ namespace LeadManagement.Api.Migrations
                     b.Property<Guid?>("PreferredSalesExecutiveId")
                         .HasColumnType("uuid");
 
-                    b.Property<Guid>("ProductId")
-                        .HasColumnType("uuid");
+                    b.Property<string>("ProductCode")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("ProductName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
 
                     b.Property<Guid>("StateId")
                         .HasColumnType("uuid");
@@ -342,12 +368,24 @@ namespace LeadManagement.Api.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
 
+                    b.Property<string>("SubCategoryCode")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("SubCategoryName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
 
                     b.HasIndex("BranchId");
+
+                    b.HasIndex("CatalogProductId");
 
                     b.HasIndex("CreatedAt");
 
@@ -357,7 +395,7 @@ namespace LeadManagement.Api.Migrations
 
                     b.HasIndex("PreferredSalesExecutiveId");
 
-                    b.HasIndex("ProductId");
+                    b.HasIndex("ProductName");
 
                     b.HasIndex("StateId");
 
@@ -408,6 +446,9 @@ namespace LeadManagement.Api.Migrations
                         .HasMaxLength(150)
                         .HasColumnType("character varying(150)");
 
+                    b.Property<Guid>("CatalogSubCategoryId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("DisplayLabel")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -423,9 +464,6 @@ namespace LeadManagement.Api.Migrations
                         .IsRequired()
                         .HasMaxLength(40)
                         .HasColumnType("character varying(40)");
-
-                    b.Property<Guid>("ProductId")
-                        .HasColumnType("uuid");
 
                     b.Property<bool>("Required")
                         .HasColumnType("boolean");
@@ -449,7 +487,7 @@ namespace LeadManagement.Api.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ProductId", "ApiField")
+                    b.HasIndex("CatalogSubCategoryId", "ApiField")
                         .IsUnique();
 
                     b.ToTable("LeadFieldConfigs");
@@ -512,81 +550,6 @@ namespace LeadManagement.Api.Migrations
                         .IsUnique();
 
                     b.ToTable("LeadMicrofinanceDetails");
-                });
-
-            modelBuilder.Entity("LeadManagement.Api.Models.Entities.Product", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Code")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(150)
-                        .HasColumnType("character varying(150)");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("Products");
-
-                    b.HasData(
-                        new
-                        {
-                            Id = new Guid("11111111-1111-1111-1111-111111111111"),
-                            Code = "ASB",
-                            IsActive = true,
-                            Name = "ASB Financing"
-                        },
-                        new
-                        {
-                            Id = new Guid("22222222-2222-2222-2222-222222222222"),
-                            Code = "AUTO",
-                            IsActive = true,
-                            Name = "Automobile Financing"
-                        },
-                        new
-                        {
-                            Id = new Guid("33333333-3333-3333-3333-333333333333"),
-                            Code = "HOME",
-                            IsActive = true,
-                            Name = "Home Financing"
-                        },
-                        new
-                        {
-                            Id = new Guid("44444444-4444-4444-4444-444444444444"),
-                            Code = "MICRO",
-                            IsActive = true,
-                            Name = "Micro Finance"
-                        },
-                        new
-                        {
-                            Id = new Guid("55555555-5555-5555-5555-555555555555"),
-                            Code = "PERSONAL",
-                            IsActive = true,
-                            Name = "Personal Financing"
-                        },
-                        new
-                        {
-                            Id = new Guid("66666666-6666-6666-6666-666666666666"),
-                            Code = "SOLAR",
-                            IsActive = true,
-                            Name = "Solar Panel Financing"
-                        },
-                        new
-                        {
-                            Id = new Guid("77777777-7777-7777-7777-777777777777"),
-                            Code = "TRAVEL",
-                            IsActive = true,
-                            Name = "Umrah/Hajj/Travel Financing"
-                        });
                 });
 
             modelBuilder.Entity("LeadManagement.Api.Models.Entities.PropertyStatusLookup", b =>
@@ -840,12 +803,6 @@ namespace LeadManagement.Api.Migrations
                         .WithMany()
                         .HasForeignKey("PreferredSalesExecutiveId");
 
-                    b.HasOne("LeadManagement.Api.Models.Entities.Product", "Product")
-                        .WithMany()
-                        .HasForeignKey("ProductId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
                     b.HasOne("LeadManagement.Api.Models.Entities.State", "State")
                         .WithMany()
                         .HasForeignKey("StateId")
@@ -855,8 +812,6 @@ namespace LeadManagement.Api.Migrations
                     b.Navigation("Branch");
 
                     b.Navigation("PreferredSalesExecutive");
-
-                    b.Navigation("Product");
 
                     b.Navigation("State");
                 });
@@ -870,17 +825,6 @@ namespace LeadManagement.Api.Migrations
                         .IsRequired();
 
                     b.Navigation("Lead");
-                });
-
-            modelBuilder.Entity("LeadManagement.Api.Models.Entities.LeadFieldConfig", b =>
-                {
-                    b.HasOne("LeadManagement.Api.Models.Entities.Product", "Product")
-                        .WithMany()
-                        .HasForeignKey("ProductId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Product");
                 });
 
             modelBuilder.Entity("LeadManagement.Api.Models.Entities.LeadHomeFinancingDetail", b =>

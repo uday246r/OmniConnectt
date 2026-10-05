@@ -10,12 +10,6 @@ namespace ProductMarketplace.Infrastructure.Services;
 
 public partial class StatusConfigService : IStatusConfigService
 {
-    private static readonly HashSet<string> ValidEntityTypes = new()
-    {
-        StatusEntityTypes.Product, StatusEntityTypes.Category, StatusEntityTypes.Review,
-        StatusEntityTypes.Promotion, StatusEntityTypes.Application
-    };
-
     [GeneratedRegex(@"^[A-Za-z][A-Za-z0-9]*$")]
     private static partial Regex ValueRegex();
 
@@ -38,8 +32,8 @@ public partial class StatusConfigService : IStatusConfigService
 
     public async Task<StatusConfigDto> CreateAsync(StatusConfigCreateDto dto, CancellationToken ct = default)
     {
-        if (!ValidEntityTypes.Contains(dto.EntityType))
-            throw new InvalidOperationException($"'{dto.EntityType}' is not a valid entity type.");
+        if (!StatusEntityTypes.All.Contains(dto.EntityType))
+            throw new InvalidOperationException($"'{dto.EntityType}' is not a valid entity type. Choose one of: {string.Join(", ", StatusEntityTypes.All)}.");
 
         var value = dto.Value.Trim();
         if (!ValueRegex().IsMatch(value))
@@ -48,7 +42,10 @@ public partial class StatusConfigService : IStatusConfigService
         if (string.IsNullOrWhiteSpace(dto.Label))
             throw new InvalidOperationException("Label is required.");
 
-        var exists = await _db.StatusConfigs.AnyAsync(s => s.EntityType == dto.EntityType && s.Value == value, ct);
+        if (string.IsNullOrWhiteSpace(dto.Color))
+            throw new InvalidOperationException("Choose a colour for this status.");
+
+        var exists = await _db.StatusConfigs.AnyAsync(s => s.EntityType == dto.EntityType && s.Value.ToLower() == value.ToLower(), ct);
         if (exists)
             throw new InvalidOperationException($"A '{value}' status already exists for {dto.EntityType}.");
 
@@ -57,12 +54,13 @@ public partial class StatusConfigService : IStatusConfigService
             EntityType = dto.EntityType,
             Value = value,
             Label = dto.Label.Trim(),
-            Color = dto.Color,
+            Color = dto.Color.Trim(),
             Enabled = dto.Enabled,
+            IsLive = dto.IsLive,
             SortOrder = dto.SortOrder
         };
         _db.StatusConfigs.Add(config);
-        await _db.SaveChangesAsync(ct);
+        await _db.SaveOrReportDuplicateAsync($"A '{value}' status already exists for {dto.EntityType}.", ct);
 
         await _audit.LogAsync(AuditActions.CreateStatusConfig, AuditEntityTypes.StatusConfig, config.Id, $"{config.EntityType}.{config.Value}",
             $"Created status \"{config.Label}\" ({config.Value}) for {config.EntityType}", ct: ct);
@@ -74,14 +72,25 @@ public partial class StatusConfigService : IStatusConfigService
         var config = await _db.StatusConfigs.FirstOrDefaultAsync(s => s.Id == id, ct);
         if (config is null) return null;
 
-        config.Label = dto.Label;
-        config.Color = dto.Color;
+        if (string.IsNullOrWhiteSpace(dto.Label))
+            throw new InvalidOperationException("Label is required.");
+        if (string.IsNullOrWhiteSpace(dto.Color))
+            throw new InvalidOperationException("Choose a colour for this status.");
+
+        // A status that stops being live, or is switched off, must leave the entity type another live one.
+        var staysLive = dto.IsLive && dto.Enabled;
+        if (config.IsLive && !staysLive)
+            await EnsureAnotherLiveStatusAsync(config, "make this status not live", ct);
+
+        config.Label = dto.Label.Trim();
+        config.Color = dto.Color.Trim();
         config.Enabled = dto.Enabled;
+        config.IsLive = dto.IsLive;
         config.SortOrder = dto.SortOrder;
         await _db.SaveChangesAsync(ct);
 
         await _audit.LogAsync(AuditActions.UpdateStatusConfig, AuditEntityTypes.StatusConfig, config.Id, $"{config.EntityType}.{config.Value}",
-            $"Updated status display for {config.EntityType} \"{config.Value}\" (label: \"{config.Label}\", enabled: {config.Enabled})", ct: ct);
+            $"Updated status {config.EntityType} \"{config.Value}\" (label: \"{config.Label}\", enabled: {config.Enabled}, live: {config.IsLive})", ct: ct);
         return config.ToDto();
     }
 
@@ -90,11 +99,36 @@ public partial class StatusConfigService : IStatusConfigService
         var config = await _db.StatusConfigs.FirstOrDefaultAsync(s => s.Id == id, ct);
         if (config is null) return false;
 
+        // Records keep the status they hold; deleting its definition would leave them with a value Setup no
+        // longer knows, which they could not be saved out of.
+        var inUse = config.EntityType switch
+        {
+            StatusEntityTypes.Product => await _db.Products.CountAsync(p => p.Status == config.Value, ct),
+            StatusEntityTypes.SubCategory => await _db.SubCategories.CountAsync(s => s.Status == config.Value, ct),
+            StatusEntityTypes.Category => await _db.Categories.CountAsync(c => c.Status == config.Value, ct),
+            _ => 0
+        };
+        if (inUse > 0)
+            throw new InvalidOperationException($"Cannot delete the status \"{config.Label}\": {inUse} {config.EntityType.ToLowerInvariant()} record{(inUse == 1 ? " has" : "s have")} it. Move them to another status first, or disable it instead.");
+
+        if (config.IsLive) await EnsureAnotherLiveStatusAsync(config, "delete this status", ct);
+
         _db.StatusConfigs.Remove(config);
         await _db.SaveChangesAsync(ct);
 
         await _audit.LogAsync(AuditActions.DeleteStatusConfig, AuditEntityTypes.StatusConfig, config.Id, $"{config.EntityType}.{config.Value}",
             $"Deleted status \"{config.Label}\" ({config.Value}) from {config.EntityType}", ct: ct);
         return true;
+    }
+
+    /// <summary>
+    /// Without a live status for an entity type, nothing of that type could be shown — the whole catalogue
+    /// would disappear on one click in Setup.
+    /// </summary>
+    private async Task EnsureAnotherLiveStatusAsync(StatusConfig changing, string action, CancellationToken ct)
+    {
+        var another = await _db.StatusConfigs.AnyAsync(s => s.Id != changing.Id && s.EntityType == changing.EntityType && s.IsLive && s.Enabled, ct);
+        if (!another)
+            throw new InvalidOperationException($"Cannot {action}: it is the only live status for {changing.EntityType}, and without one nothing would be shown in the catalogue. Make another status live first.");
     }
 }

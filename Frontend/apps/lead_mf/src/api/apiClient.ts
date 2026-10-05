@@ -43,13 +43,53 @@ export interface ReferenceData {
   entityTypes: DropdownOption[];
 }
 
+/** A category of the product catalogue that has at least one product a lead can be taken for. */
+export interface CatalogCategory {
+  id: string;
+  name: string;
+  code: string;
+  iconKey: string;
+  productCount: number;
+}
+
+/** A product as the Marketplace offers it — Lead Management holds no product data of its own. */
+export interface CatalogProduct {
+  id: string;
+  name: string;
+  code: string;
+  shortDescription: string;
+  iconKey: string;
+  subCategoryId: string;
+  subCategoryName: string;
+  subCategoryCode: string;
+  categoryId: string;
+  categoryName: string;
+  categoryCode: string;
+}
+
+/** What Field Settings is organised by: one lead form per sub-category. */
+export interface CatalogSubCategory {
+  id: string;
+  name: string;
+  code: string;
+  categoryId: string;
+  categoryName: string;
+  categoryCode: string;
+}
+
 export interface LeadRecord {
   id: string;
   name: string;
   icNumber: string;
   phone: string;
   email: string;
+  /** The product's name as it was when the lead was taken. */
   product: string;
+  /** Null for a lead taken before the catalogue was connected. */
+  catalogProductId?: string | null;
+  categoryName?: string;
+  subCategoryId?: string | null;
+  subCategoryName?: string;
   state: string;
   branch: string;
   status: string;
@@ -176,13 +216,25 @@ async function getAuthHeaders(): Promise<Record<string, string>> {
  */
 const readCache = createRequestCache({ ttlMs: 30_000 });
 const REFERENCE_DATA_TTL_MS = 5 * 60_000;
-const REFERENCE_DATA = /\/api\/(products(\/full)?|states|branches|sales-executives|reference-data|lead-field-config\/formats)(\?|$)/;
+// The product catalogue is deliberately not here: what the Marketplace offers changes when an administrator
+// switches a category off, and the lead form should notice within seconds, not minutes.
+const REFERENCE_DATA = /\/api\/(states|branches|sales-executives|reference-data|lead-field-config\/formats)(\?|$)/;
 
 interface ResponseSnapshot {
   status: number;
   statusText: string;
   headers: [string, string][];
   body: string;
+}
+
+/**
+ * What the server is sent for a lead. The product travels as its Marketplace id only; the server looks the
+ * name up itself. An empty id (a lead taken before the catalogue was connected has none) is left out
+ * entirely — an empty string is not a valid Guid and would be refused before the server could answer.
+ */
+export function toLeadPayload(form: Record<string, any>): Record<string, unknown> {
+  const { catalogProductId, subCategoryId: _subCategoryId, ...rest } = form;
+  return catalogProductId ? { ...rest, catalogProductId } : rest;
 }
 
 /** Forget every cached read — after a write, and when the signed-in user changes. */
@@ -233,18 +285,47 @@ async function fetchWithAuth(url: string, options: RequestInit = {}): Promise<Re
 }
 
 export const apiClient = {
-  // Master Data APIs
-  getProducts: async (): Promise<DropdownOption[]> => {
+  // Product catalogue — read from the Marketplace by LeadService. Uncached here (see REFERENCE_DATA).
+  // These throw on failure instead of returning []: an empty list would read as "nothing to sell".
+  getCatalogCategories: async (): Promise<CatalogCategory[]> => {
+    const res = await fetchWithAuth(`${API_BASE_URL}/api/catalog/categories`, { cache: 'no-store' });
+    if (!res.ok) throw new Error('The product catalogue could not be loaded.');
+    const json: ApiResponse<CatalogCategory[]> = await res.json();
+    return json.success ? json.data : [];
+  },
+
+  getCatalogProducts: async (categoryId: string): Promise<CatalogProduct[]> => {
+    const res = await fetchWithAuth(`${API_BASE_URL}/api/catalog/categories/${categoryId}/products`, { cache: 'no-store' });
+    if (!res.ok) throw new Error('The products in this category could not be loaded.');
+    const json: ApiResponse<CatalogProduct[]> = await res.json();
+    return json.success ? json.data : [];
+  },
+
+  getCatalogSubCategories: async (): Promise<CatalogSubCategory[]> => {
     try {
-      const res = await fetchWithAuth(`${API_BASE_URL}/api/products`);
+      const res = await fetchWithAuth(`${API_BASE_URL}/api/catalog/sub-categories`, { cache: 'no-store' });
       if (!res.ok) return [];
-      const json: ApiResponse<DropdownOption[]> = await res.json();
+      const json: ApiResponse<CatalogSubCategory[]> = await res.json();
       return json.success ? json.data : [];
-    } catch (e) {
-      console.warn('Failed to load products:', e);
+    } catch {
       return [];
     }
   },
+
+  /** The products leads have been taken for — what the product filter offers. */
+  getLeadProductNames: async (): Promise<string[]> => {
+    try {
+      const res = await fetchWithAuth(`${API_BASE_URL}/api/leads/product-names`);
+      if (!res.ok) return [];
+      const json: ApiResponse<string[]> = await res.json();
+      return json.success ? json.data : [];
+    } catch (e) {
+      console.warn('Failed to load lead products:', e);
+      return [];
+    }
+  },
+
+  // Master Data APIs
 
   getStates: async (): Promise<DropdownOption[]> => {
     try {
@@ -365,7 +446,7 @@ export const apiClient = {
   createLead: async (formData: any): Promise<ApiResponse<LeadRecord | ApprovalPendingDto>> => {
     const res = await fetchWithAuth(`${API_BASE_URL}/api/leads`, {
       method: 'POST',
-      body: JSON.stringify(formData),
+      body: JSON.stringify(toLeadPayload(formData)),
     });
     return await res.json();
   },
@@ -373,7 +454,7 @@ export const apiClient = {
   updateLead: async (id: string, updateData: any): Promise<ApiResponse<LeadRecord | ApprovalPendingDto>> => {
     const res = await fetchWithAuth(`${API_BASE_URL}/api/leads/${id}`, {
       method: 'PUT',
-      body: JSON.stringify(updateData),
+      body: JSON.stringify(toLeadPayload(updateData)),
     });
     return await res.json();
   },
@@ -394,24 +475,11 @@ export const apiClient = {
     }
   },
 
-  // Field Settings — Lead Management's own implementation, separate from Customer 360's.
-  // getProducts() above deliberately returns {value:Name, label:Name} with no id (every existing
-  // consumer matches by name) — Field Settings needs the real Guid to call
-  // GET/PUT /api/lead-field-config/{productId}, hence this separate endpoint.
-  getProductsWithId: async (): Promise<{ id: string; name: string }[]> => {
+  // Field Settings — Lead Management's own implementation, separate from Customer 360's. One lead form
+  // per Marketplace sub-category, so it is read and saved by sub-category id.
+  getFieldConfig: async (subCategoryId: string): Promise<LeadFieldConfig[]> => {
     try {
-      const res = await fetchWithAuth(`${API_BASE_URL}/api/products/full`);
-      if (!res.ok) return [];
-      const json: ApiResponse<{ id: string; name: string }[]> = await res.json();
-      return json.success ? json.data : [];
-    } catch {
-      return [];
-    }
-  },
-
-  getFieldConfig: async (productId: string): Promise<LeadFieldConfig[]> => {
-    try {
-      const res = await fetchWithAuth(`${API_BASE_URL}/api/lead-field-config/${productId}`);
+      const res = await fetchWithAuth(`${API_BASE_URL}/api/lead-field-config/${subCategoryId}`);
       if (!res.ok) return [];
       const json: ApiResponse<LeadFieldConfig[]> = await res.json();
       return json.success ? json.data : [];
@@ -440,20 +508,20 @@ export const apiClient = {
    * Field Settings' own read: the rows plus the version they were read at, so a save can be refused if
    * someone else saved in between rather than silently replacing their work.
    */
-  getFieldConfigForEditing: async (productId: string): Promise<{ fields: LeadFieldConfig[]; version: string | null }> => {
-    const res = await fetchWithAuth(`${API_BASE_URL}/api/lead-field-config/${productId}`, { cache: 'no-store' });
-    if (!res.ok) throw new Error('Could not load field settings for this product.');
+  getFieldConfigForEditing: async (subCategoryId: string): Promise<{ fields: LeadFieldConfig[]; version: string | null }> => {
+    const res = await fetchWithAuth(`${API_BASE_URL}/api/lead-field-config/${subCategoryId}`, { cache: 'no-store' });
+    if (!res.ok) throw new Error('Could not load field settings for this product type.');
     const json: ApiResponse<LeadFieldConfig[]> = await res.json();
     return { fields: json.success ? json.data : [], version: res.headers.get('ETag') };
   },
 
   /** Saves against `version` (the ETag read with the rows); a 409 means someone else saved first. */
   updateFieldConfig: async (
-    productId: string,
+    subCategoryId: string,
     fields: LeadFieldConfig[],
     version?: string | null,
   ): Promise<ApiResponse<LeadFieldConfig[] | ApprovalPendingDto> & { version?: string | null }> => {
-    const res = await fetchWithAuth(`${API_BASE_URL}/api/lead-field-config/${productId}`, {
+    const res = await fetchWithAuth(`${API_BASE_URL}/api/lead-field-config/${subCategoryId}`, {
       method: 'PUT',
       body: JSON.stringify(fields),
       headers: version ? { 'If-Match': version } : undefined,

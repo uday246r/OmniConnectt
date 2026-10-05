@@ -42,21 +42,11 @@ const TABS: { id: FilterCriterion; label: string; icon: React.ReactNode }[] = [
   { id: 'status', label: 'Status', icon: <Flag size={16} /> },
 ];
 
-// Fallback shown only for the brief window before the real product list has loaded from the API.
-// This used to list 8 products, 5 of which don't exist in LeadService's product catalog at all
-// (Backend/LeadService/Data/ApplicationDbContext.cs only seeds ASB Financing, Home Financing, and
-// Micro Finance) — trimmed to match what the backend actually has.
-const DEFAULT_PRODUCTS = [
-  'Home Financing',
-  'ASB Financing',
-  'Micro Finance',
-];
-
 const STATUSES = ['New', 'Contacted', 'In Progress', 'Qualified', 'Converted', 'Closed'];
 
 export const LeadFilterPopover: React.FC<LeadFilterPopoverProps> = ({ isOpen, onClose, anchorRef }) => {
   const {
-    products,
+    productFilterOptions,
     branches,
     leads,
     commonFieldConfig,
@@ -65,7 +55,7 @@ export const LeadFilterPopover: React.FC<LeadFilterPopoverProps> = ({ isOpen, on
     removeFilterRule,
     clearAllFilters,
     fetchLeads,
-  } = useLeadStore(useShallow((s) => ({ products: s.products, branches: s.branches, leads: s.leads, commonFieldConfig: s.commonFieldConfig, filterRules: s.filterRules, updateFilterRule: s.updateFilterRule, removeFilterRule: s.removeFilterRule, clearAllFilters: s.clearAllFilters, fetchLeads: s.fetchLeads })));
+  } = useLeadStore(useShallow((s) => ({ productFilterOptions: s.productFilterOptions, branches: s.branches, leads: s.leads, commonFieldConfig: s.commonFieldConfig, filterRules: s.filterRules, updateFilterRule: s.updateFilterRule, removeFilterRule: s.removeFilterRule, clearAllFilters: s.clearAllFilters, fetchLeads: s.fetchLeads })));
 
   const [activeTab, setActiveTab] = useState<FilterCriterion>('product');
   const [searchQueries, setSearchQueries] = useState<Record<string, string>>({});
@@ -232,8 +222,8 @@ export const LeadFilterPopover: React.FC<LeadFilterPopoverProps> = ({ isOpen, on
     return q ? list.filter((item) => item.toLowerCase().includes(q)) : list;
   };
 
-  // Get master product list
-  const allProducts = products.length > 0 ? products.map((p) => p.label) : DEFAULT_PRODUCTS;
+  // The products leads exist for (read from the leads themselves — see LeadService.GetProductNamesAsync)
+  const allProducts = productFilterOptions.map((p) => p.label);
   const filteredProducts = narrow(allProducts);
 
   // Get master branch list

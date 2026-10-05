@@ -71,11 +71,11 @@ describe('Lead API read cache', () => {
   it('does not reuse an error response', async () => {
     fetchMock
       .mockResolvedValueOnce(new Response('{}', { status: 500 }))
-      .mockResolvedValueOnce(ok({ success: true, data: [{ value: 'Home', label: 'Home' }] }))
+      .mockResolvedValueOnce(ok({ success: true, data: [{ value: 'Selangor', label: 'Selangor' }] }))
     const api = await client()
 
-    await expect(api.getProducts()).resolves.toEqual([])
-    await expect(api.getProducts()).resolves.toEqual([{ value: 'Home', label: 'Home' }])
+    await expect(api.getStates()).resolves.toEqual([])
+    await expect(api.getStates()).resolves.toEqual([{ value: 'Selangor', label: 'Selangor' }])
     expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 
@@ -99,5 +99,51 @@ describe('Lead API read cache', () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(2)
     expect(editing.version).toBe('"v1"')
+  })
+})
+
+describe('Product catalogue reads', () => {
+  const category = { id: 'c1', name: 'Loans', code: 'LN', iconKey: '', productCount: 2 }
+
+  it('is never served from the cache, so a category switched off in the Marketplace disappears at once', async () => {
+    fetchMock.mockImplementation(() => Promise.resolve(ok({ success: true, data: [category] })))
+    const api = await client()
+
+    await api.getCatalogCategories()
+    await api.getCatalogCategories()
+
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('says so when the catalogue cannot be read, rather than returning an empty list that reads as "nothing on offer"', async () => {
+    fetchMock.mockResolvedValue(new Response('{}', { status: 503 }))
+    const api = await client()
+
+    await expect(api.getCatalogCategories()).rejects.toThrow(/could not be loaded/)
+    await expect(api.getCatalogProducts('c1')).rejects.toThrow(/could not be loaded/)
+  })
+
+  it('asks for the products of one category', async () => {
+    fetchMock.mockResolvedValue(ok({ success: true, data: [] }))
+    const api = await client()
+
+    await api.getCatalogProducts('c1')
+
+    expect(String(fetchMock.mock.calls[0][0])).toContain('/api/catalog/categories/c1/products')
+  })
+})
+
+describe('What a lead sends for its product', () => {
+  it('sends the catalogue id and never the sub-category', async () => {
+    const { toLeadPayload } = await import('./apiClient')
+
+    expect(toLeadPayload({ product: 'Home Loan', catalogProductId: 'p1', subCategoryId: 's1', email: 'a@b.c' }))
+      .toEqual({ product: 'Home Loan', catalogProductId: 'p1', email: 'a@b.c' })
+  })
+
+  it('leaves the id out for a lead taken before the catalogue existed, since an empty string is not a valid id', async () => {
+    const { toLeadPayload } = await import('./apiClient')
+
+    expect(toLeadPayload({ product: 'ASB Financing', catalogProductId: '', subCategoryId: '' })).toEqual({ product: 'ASB Financing' })
   })
 })
