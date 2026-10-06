@@ -30,11 +30,25 @@ services:
       context: .
       dockerfile_inline: |
         FROM docker:27-cli
-        RUN apk add --no-cache bash jq curl coreutils tar findutils util-linux
+        RUN apk add --no-cache bash jq curl coreutils tar findutils util-linux openssl
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - releases:/srv/omniconnect
+      - backups:/srv/omniconnect-backups
+    # On the private network, so smoke.sh can reach nginx as http://web:8080 when nginx itself is only
+    # published on the host's loopback (EDGE_PROXY=local-proxy, as on Windows Server).
+    networks: [omni]
     extra_hosts: ["host.docker.internal:host-gateway"]
+
+  # Stands in for Caddy on Windows Server: a TLS proxy in front of nginx that sets X-Forwarded-For.
+  # Self-signed ("internal") certificate, so browsers and curl need -k. Profile edge-test.
+  edge:
+    image: caddy:2.10.2-alpine
+    profiles: [edge-test]
+    networks: [omni]
+    ports: ["127.0.0.1:8443:443"]
+    command: ["caddy", "reverse-proxy", "--from", "localhost:443", "--to", "web:8080", "--internal-certs"]
 
 volumes:
   releases:
+  backups:

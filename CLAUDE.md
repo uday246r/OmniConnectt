@@ -33,7 +33,9 @@ Backend/Shared/OmniConnect.Validation  the server field-format engine, reference
 Backend/Shared/OmniConnect.Hosting     every service's proxy edge (forwarded headers, Hosting:PathBase),
                                        --healthcheck and --migrate-only modes
 deploy/                              production: nginx (only public port), compose, release scripts —
-                                       docs/RUNBOOK-RELEASE.md
+                                       docs/RUNBOOK-RELEASE.md; Windows Server 2022 install (WSL2 + Caddy
+                                       edge, deploy/windows/*.ps1 — ASCII only, PS 5.1):
+                                       docs/DEPLOY-WINDOWS-SERVER-2022.md
 ```
 
 Each service has its **own** internal API key (`Internal__Services__<Service>__ApiKey` in AuthService's

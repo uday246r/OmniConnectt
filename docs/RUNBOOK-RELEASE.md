@@ -2,6 +2,8 @@
 
 How OmniConnect is built, released, promoted, rolled back and put into maintenance in production.
 The design and why it is this way: [adr/0001-release-by-pointer.md](adr/0001-release-by-pointer.md).
+**Installing on Windows Server 2022** (WSL2 + Docker, Caddy for HTTPS, PostgreSQL on the same machine),
+step by step for someone new to deployment: [DEPLOY-WINDOWS-SERVER-2022.md](DEPLOY-WINDOWS-SERVER-2022.md).
 
 ## The model in five lines
 
@@ -173,7 +175,9 @@ It keeps everything that is:
 - a `deployer` container with bash, jq and the docker CLI.
 
 **Settings:** create `deploy/.env` and `deploy/env/*.env` from the examples with throwaway secrets, `PUBLIC_PORT=8088`,
-`COMPOSE_EXTRA_FILE=compose.verify.yml`, `SMOKE_BASE_URL=http://host.docker.internal:8088`.
+`COMPOSE_EXTRA_FILE=compose.verify.yml`, `SMOKE_BASE_URL=http://web:8080` (the deployer is on the
+private network). `scripts/init-env.sh --domain x.test --mode windows --yes` writes the rest, and the
+`edge-test` profile adds a Caddy container in front of nginx, the stand-in for Windows' Caddy.
 
 **On Docker Desktop for Windows**, mount the repository at the path the daemon knows it by:
 

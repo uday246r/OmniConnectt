@@ -38,11 +38,14 @@ services:
     image: nginxinc/nginx-unprivileged:1.27-alpine
     # nginx-unprivileged runs as uid 101 and binds 8080, so it needs no capabilities.
     ports:
-      - "${PUBLIC_PORT:-80}:8080"
+      # PUBLIC_BIND=127.0.0.1 when a TLS proxy on the same machine is the public edge (Windows Server:
+      # Caddy), so nothing else can reach nginx directly — see nginx/edge/local-proxy.conf.
+      - "${PUBLIC_BIND:-0.0.0.0}:${PUBLIC_PORT:-80}:8080"
       # - "${PUBLIC_HTTPS_PORT:-443}:8443"     # with nginx/optional/tls.conf.example
     volumes:
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
       - ./nginx/snippets:/etc/nginx/snippets:ro
+      - ./nginx/edge/${EDGE_PROXY:-none}.conf:/etc/nginx/edge/edge.conf:ro
       - ${RELEASE_ROOT:-/srv/omniconnect}:/srv/omniconnect:ro
       # - ./certs:/etc/nginx/certs:ro
     networks:
@@ -120,19 +123,34 @@ services:
     environment:
       RELEASE_AGENT_KEY: ${RELEASE_AGENT_KEY:-}
 
-  # A throwaway PostgreSQL for verifying a release on a workstation. Production uses a managed database.
+  # PostgreSQL on the same machine — enabled with COMPOSE_PROFILES=localdb in deploy/.env. Never
+  # published: only the services on the private network can reach it. Its data lives in the `pgdata`
+  # volume, which survives container recreation, `down` and image upgrades (only `down -v` removes it).
+  # Back it up with scripts/backup-db.sh. With a managed database instead, leave the profile off and put
+  # its connection strings in env/*.env.
   db:
     image: postgres:17-alpine
     profiles: [localdb]
+    restart: unless-stopped
     networks: [omni]
+    security_opt: ["no-new-privileges:true"]
     environment:
-      POSTGRES_PASSWORD: ${LOCAL_DB_PASSWORD:-omniconnect-local}
+      # Read once, when the volume is first initialised; changing it later does not change the password.
+      POSTGRES_PASSWORD: ${LOCAL_DB_PASSWORD:-}
     volumes:
+      - pgdata:/var/lib/postgresql/data
       - ./localdb/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    shm_size: 256mb
     healthcheck:
       test: ["CMD", "pg_isready", "-U", "postgres"]
       interval: 5s
-      retries: 10
+      retries: 20
+    logging:
+      driver: json-file
+      options: { max-size: "20m", max-file: "5" }
+
+volumes:
+  pgdata:
 
 networks:
   omni:

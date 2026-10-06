@@ -97,12 +97,26 @@ jobs:
           for f in env/*.env.example; do cp "$f" "${f%.example}"; done
           docker compose -f compose.yml config --quiet
           docker compose -f compose.yml -f compose.verify.yml config --quiet
-      - name: nginx accepts the configuration
+      - name: nginx accepts the configuration (both edge modes)
         run: |
-          docker run --rm \
-            --add-host auth:127.0.0.1 --add-host lead:127.0.0.1 --add-host c360:127.0.0.1 --add-host products:127.0.0.1 \
-            -v "$PWD/deploy/nginx/conf.d:/etc/nginx/conf.d:ro" \
-            -v "$PWD/deploy/nginx/snippets:/etc/nginx/snippets:ro" \
-            nginxinc/nginx-unprivileged:1.27-alpine nginx -t
+          for mode in none local-proxy; do
+            docker run --rm \
+              --add-host auth:127.0.0.1 --add-host lead:127.0.0.1 --add-host c360:127.0.0.1 --add-host products:127.0.0.1 \
+              -v "$PWD/deploy/nginx/conf.d:/etc/nginx/conf.d:ro" \
+              -v "$PWD/deploy/nginx/snippets:/etc/nginx/snippets:ro" \
+              -v "$PWD/deploy/nginx/edge/$mode.conf:/etc/nginx/edge/edge.conf:ro" \
+              nginxinc/nginx-unprivileged:1.27-alpine nginx -t
+          done
+      - name: Windows scripts parse, and are plain ASCII
+        shell: pwsh
+        run: |
+          $bad = 0
+          foreach ($f in Get-ChildItem deploy/windows -Filter *.ps1) {
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile($f.FullName, [ref]$null, [ref]$errors) | Out-Null
+            if ($errors) { $bad++; $errors | ForEach-Object { Write-Host "$($f.Name): $($_.Message)" } }
+            if ([IO.File]::ReadAllBytes($f.FullName) | Where-Object { $_ -gt 127 }) { $bad++; Write-Host "$($f.Name): non-ASCII characters (Windows PowerShell 5.1 misreads them)" }
+          }
+          if ($bad) { exit 1 }
       - name: Shell scripts pass shellcheck
         run: shellcheck -x -S warning deploy/scripts/*.sh

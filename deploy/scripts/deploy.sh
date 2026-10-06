@@ -78,7 +78,13 @@ cp "$RELEASE_ROOT/host/$HOST_VERSION/index.html" "$RELEASE_DIR/index.html"
 # ── 3. Backend ───────────────────────────────────────────────────────────────
 if [[ "$FRONTEND_ONLY" == false ]]; then
   log "Backend: pulling images"
-  "${COMPOSE[@]}" pull --quiet auth lead c360 products || warn "Pull failed — using local images (fine for a workstation verification)."
+  "${COMPOSE[@]}" pull --quiet auth lead c360 products || warn "Pull failed — using local images (built on this host)."
+
+  # PostgreSQL on this machine (COMPOSE_PROFILES=localdb): it must be up before anything migrates.
+  if [[ ",${COMPOSE_PROFILES:-}," == *",localdb,"* ]]; then
+    log "Database: starting the local PostgreSQL"
+    "${COMPOSE[@]}" up -d --wait --wait-timeout 120 db || die "The local PostgreSQL did not become healthy."
+  fi
 
   for svc in auth lead c360 products; do
     log "Migrating $svc (single writer)"

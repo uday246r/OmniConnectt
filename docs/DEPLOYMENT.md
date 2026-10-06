@@ -7,6 +7,10 @@ releasing, promoting, rolling back, maintenance and troubleshooting.
 
 **Local development:** [SETUP.md](../SETUP.md).
 
+**Windows Server 2022, step by step:** [DEPLOY-WINDOWS-SERVER-2022.md](DEPLOY-WINDOWS-SERVER-2022.md).
+That setup puts Caddy on Windows in front of nginx as the HTTPS edge (`EDGE_PROXY=local-proxy`), and
+runs PostgreSQL on the same machine (`COMPOSE_PROFILES=localdb`).
+
 ## Topology
 
 One host, one public port, everything else private. The building blocks:
