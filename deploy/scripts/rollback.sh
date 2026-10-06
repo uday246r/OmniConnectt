@@ -11,7 +11,7 @@
 # call endpoints that no longer exist, so stepping back past it is refused unless forced.
 #
 # This moves FRONTEND pointers only. Backend images are rolled back by setting the previous tags in
-# deploy/.env and running `docker compose up -d` — and never past a migration that changed the schema.
+# deploy/.env and running `podman compose up -d` (or docker compose) — and never past a migration that changed the schema.
 set -euo pipefail
 source "$(dirname "$0")/lib.sh"
 

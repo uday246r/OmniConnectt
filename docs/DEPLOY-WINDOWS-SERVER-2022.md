@@ -1,7 +1,7 @@
 # Deploying OmniConnect on Windows Server 2022: step by step
 
 This guide takes you from "I have VPN and Remote Desktop access" to "the platform is live at
-`https://<your domain>`". Follow it top to bottom. You don't need to know Docker, Linux or nginx: every
+`https://<your domain>`". Follow it top to bottom. You don't need to know Podman, Linux or nginx: every
 command is given in full, and every step tells you how to check it worked.
 
 **How long:** about 2–3 hours of your time. Most of it is waiting for downloads and builds. Allow a day
@@ -12,24 +12,27 @@ for your manager/IT to complete their part (Part 3).
 ```
  Internet ──HTTPS──► Windows Server 2022
                       ├─ Caddy (Windows service)  ← HTTPS certificate from Let's Encrypt, renews by itself
-                      └─ Ubuntu (WSL2)            ← Linux built into Windows
-                          └─ Docker
+                      └─ Ubuntu 24.04 (WSL2)      ← Linux built into Windows
+                          └─ Podman (rootful)      ← runs the containers; starts them again at boot
                               ├─ nginx            ← serves the app, only reachable through Caddy
                               ├─ AuthService, LeadService, Customer360Service, ProductsService
                               └─ PostgreSQL       ← the 4 databases, data kept on this server
 ```
 
 **Why Linux inside Windows?** The platform's services run in Linux containers. Windows Server 2022 runs
-those through **WSL2**, a Linux layer built into Windows. Docker runs inside it, the free Docker Engine
-rather than the paid Docker Desktop. **Caddy** is a small Windows program. It holds the HTTPS
+those through **WSL2**, a Linux layer built into Windows. Inside it, **Podman** runs the containers. Podman
+is a daemonless container engine that reads the same images and `compose.yml` as Docker. It runs
+**rootful** (as root): that is what lets it start the platform again after a reboot and keep each
+visitor's address. The release scripts ask for your Ubuntu password (`sudo`) when they need it.
+**Caddy** is a small Windows program. It holds the HTTPS
 certificate and passes each visitor's real address on to the platform, which the login protection and
 the audit log depend on.
 
 > **Two kinds of window.** Every command says where to paste it:
 > - **PowerShell (Admin)**: on the server, right-click **Start** → **Windows PowerShell (Admin)** (or
 >   **Terminal (Admin)**). Its title bar says *Administrator*.
-> - **Ubuntu**: the Linux terminal. Open it from **Start** → **Ubuntu 22.04**, or type
->   `wsl -d Ubuntu-22.04` in PowerShell. Its prompt looks like `you@SERVER:~$`.
+> - **Ubuntu**: the Linux terminal. Open it from **Start** → **Ubuntu 24.04**, or type
+>   `wsl -d Ubuntu-24.04` in PowerShell. Its prompt looks like `you@SERVER:~$`.
 >
 > To paste in either window, **right-click**.
 
@@ -111,7 +114,7 @@ Copy this message, fill in the `<…>`, and send it to your manager/IT:
 > 2. **Inbound firewall/NAT:** allow TCP **80** and **443** from the internet to this server. Port 80 is
 >    needed for the free HTTPS certificate (Let's Encrypt) and redirects to 443.
 > 3. **Outbound internet** from the server over HTTPS: github.com, mcr.microsoft.com, Docker Hub,
->    registry.npmjs.org, deb.nodesource.com, download.docker.com, acme-v02.api.letsencrypt.org.
+>    registry.npmjs.org, deb.nodesource.com, archive.ubuntu.com, acme-v02.api.letsencrypt.org.
 > 4. **If the server is a virtual machine:** enable **nested virtualization** for it (Hyper-V:
 >    `Set-VMProcessor -VMName <vm> -ExposeVirtualizationExtensions $true` with the VM off; VMware:
 >    *Expose hardware assisted virtualization to the guest OS*). WSL2 needs it.
@@ -135,7 +138,7 @@ In **PowerShell (Admin)**:
 
 ```powershell
 wsl --update --web-download
-wsl --install -d Ubuntu-22.04 --web-download
+wsl --install -d Ubuntu-24.04 --web-download
 ```
 
 When it says a restart is required:
@@ -147,7 +150,7 @@ Restart-Computer
 Wait about 2 minutes, then reconnect with Remote Desktop (VPN still on).
 
 ### 4.2 Finish Ubuntu's setup
-After the reboot an **Ubuntu** window usually opens by itself. If it doesn't, open **Start → Ubuntu 22.04**.
+After the reboot an **Ubuntu** window usually opens by itself. If it doesn't, open **Start → Ubuntu 24.04**.
 It asks for:
 
 - **a new UNIX username**: for example `omni` (lowercase, no spaces);
@@ -159,13 +162,13 @@ It asks for:
 wsl -l -v
 ```
 
-You should see `Ubuntu-22.04   Running   2`. The **2** is what matters.
+You should see `Ubuntu-24.04   Running   2`. The **2** is what matters.
 
 | Problem | Fix |
 |---|---|
 | Error **0x80370102**, or "virtualization is not enabled" | Nested virtualization is off. Part 3, item 4 (IT). After IT enables it: `Restart-Computer`, then run 4.1 again. |
 | "The Windows Subsystem for Linux optional component is not enabled" | `dism.exe /online /enable-feature /featurename:Microsoft-Windows-Subsystem-Linux /all /norestart`, then `dism.exe /online /enable-feature /featurename:VirtualMachinePlatform /all /norestart`, then `Restart-Computer` and run 4.1 again. |
-| VERSION shows **1** | `wsl --set-version Ubuntu-22.04 2` |
+| VERSION shows **1** | `wsl --set-version Ubuntu-24.04 2` |
 
 ### 4.3 Give Linux enough memory
 By default WSL2 uses half of the server's RAM. To give it more, run this in **PowerShell (Admin)**:
@@ -187,7 +190,7 @@ This leaves 2 GB for Windows.
 Everything in this part is pasted into the **Ubuntu** window. A command starting with `sudo` asks for
 the Ubuntu password from 4.2. As you type it, nothing appears on screen; that is normal.
 
-### 5.1 Let Ubuntu start services (Docker) by itself
+### 5.1 Let Ubuntu start services (Podman's) by itself
 
 ```bash
 printf '[boot]\nsystemd=true\n' | sudo tee /etc/wsl.conf
@@ -199,7 +202,7 @@ Then in **PowerShell (Admin)**:
 wsl --shutdown
 ```
 
-Reopen **Ubuntu** (Start → Ubuntu 22.04).
+Reopen **Ubuntu** (Start → Ubuntu 24.04).
 
 **Check** (in Ubuntu): `systemctl is-system-running` prints `running` or `degraded`. Both are fine.
 
@@ -210,28 +213,33 @@ sudo apt-get update && sudo apt-get -y upgrade
 sudo apt-get install -y ca-certificates curl git jq openssl gnupg
 ```
 
-### 5.3 Docker Engine
-These are Docker's official installation steps for Ubuntu:
+### 5.3 Podman
+Podman and the Compose tool it drives come from Ubuntu's own packages. Ubuntu 24.04 ships Podman 4.9:
 
 ```bash
-sudo install -m 0755 -d /etc/apt/keyrings
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-sudo chmod a+r /etc/apt/keyrings/docker.gpg
-echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-sudo apt-get update
-sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-sudo systemctl enable --now docker
-sudo usermod -aG docker "$USER"
+sudo apt-get install -y podman docker-compose-v2
+sudo ln -sf /usr/libexec/docker/cli-plugins/docker-compose /usr/local/bin/docker-compose
+sudo systemctl enable --now podman.socket podman-restart.service
 ```
 
-Close the Ubuntu window and open it again, so the `docker` group takes effect. Then:
+- `podman.socket` lets the Compose tool talk to Podman.
+- `podman-restart.service` starts the platform's containers again after every reboot.
+
+**Check:**
 
 ```bash
-docker run --rm hello-world
-docker compose version
+sudo podman run --rm docker.io/library/hello-world
+sudo podman compose version
+systemctl is-enabled podman-restart.service
 ```
 
-**Check:** "Hello from Docker!" appears, and the compose version is 2.x or newer.
+You should see:
+- "Hello from Docker!" from the test image;
+- a compose version (`2.x`), possibly after a line starting `>>>> Executing external compose provider`, which is normal;
+- `enabled`.
+
+> Always use **`sudo podman …`**, never plain `podman`, for the platform. Plain `podman` is a separate
+> per-user ("rootless") store in which the platform does not exist.
 
 ### 5.4 Node.js 24 and pnpm (to build the frontend)
 
@@ -315,10 +323,12 @@ wherever your manager said secrets are kept (Part 3, item 7), then delete it fro
 
 ```bash
 cd ~/OmniConnectt/deploy
-docker compose build
+scripts/build-images.sh
 ```
 
-**Check:** it ends with four `Built` lines (auth, lead, customer360, products).
+It asks for your Ubuntu password, then builds with Podman's own builder.
+
+**Check:** it ends with four `✔ localhost/omniconnect/…` lines (auth, lead, customer360, products).
 
 ### 7.2 Frontend release
 
@@ -340,7 +350,7 @@ cd ~/OmniConnectt/deploy
 scripts/deploy.sh ../Frontend/release/*.tar.gz
 ```
 
-What happens:
+It asks for your Ubuntu password (Podman runs as root). What happens:
 1. The database starts.
 2. Each service creates its tables.
 3. Everything starts.
@@ -352,7 +362,7 @@ What happens:
 Now get the **one-time administrator password**. It is printed once, on this first start only:
 
 ```bash
-docker compose logs auth | grep -A2 "Seeded the bootstrap"
+sudo podman compose logs auth | grep -A2 "Seeded the bootstrap"
 ```
 
 It shows `Email: superadmin@omniconnect.com` and `Password: …`. You will change it at first sign-in
@@ -405,10 +415,16 @@ On **your laptop** (VPN not needed if the domain is public), open `https://omnic
    **Sub-categories → Add**, then **Products → Add Product**.
 5. **Create a lead against it:** **Lead Management → Create Lead**. Your new category and product are in
    the picker. Create a test lead, and it appears under **View Leads**.
+6. **Check visitors' real addresses come through.** Open **Audit Logs**. Your sign-in row's address must be
+   **your laptop's public IP**, not `127.0.0.1` or `172.30.0.x`. If it shows one of those, see
+   *"Every user shows the same IP"* in Part 12. The login protection and the audit trail depend on this.
 
 ### Reboot test (do it once)
 In **PowerShell (Admin)**: `Restart-Computer`. **Don't reconnect.** Wait 3 minutes, then open the site
 from your laptop. It should load. Then reconnect and run `status.ps1`; every line should be **[ OK ]**.
+
+If the site is down after the reboot, look at `sudo systemctl status podman-restart.service` in Ubuntu.
+It must be *active (exited)*, and `sudo podman ps` must list the containers.
 
 **🎉 The platform is live.**
 
@@ -422,13 +438,13 @@ All commands in this part run in **Ubuntu**, from `~/OmniConnectt/deploy`, unles
 In **PowerShell (Admin)**: `powershell -ExecutionPolicy Bypass -File C:\OmniConnect\scripts\status.ps1 -Domain omniconnect.company.com`
 
 In **Ubuntu**:
-- `docker compose ps` shows every service as *healthy*.
-- `docker compose logs --tail 100 auth` shows a service's recent log (`auth`, `lead`, `c360`, `products`, `web`, `db`).
+- `sudo podman compose ps` shows every service as *healthy*.
+- `sudo podman compose logs --tail 100 auth` shows a service's recent log (`auth`, `lead`, `c360`, `products`, `web`, `db`).
 
 ### Backups
 - **Automatic:** every night at 02:00, into `/srv/omniconnect-backups/<date-time>/`, kept for 14 days.
 - **By hand:** `scripts/backup-db.sh`.
-- **From Windows Explorer:** `\\wsl.localhost\Ubuntu-22.04\srv\omniconnect-backups`.
+- **From Windows Explorer:** `\\wsl.localhost\Ubuntu-24.04\srv\omniconnect-backups`.
 - **Copy them off the server regularly** (Part 3, item 7). A backup on the same machine doesn't survive
   losing the machine.
 - **Restore one database:** `scripts/restore-db.sh /srv/omniconnect-backups/<date-time>/<db>.dump <db>`,
@@ -437,7 +453,7 @@ In **Ubuntu**:
 
 ### Releasing a new version
 1. **Get the new code:** `cd ~/OmniConnectt && git pull`.
-2. **If backend code changed:** `cd deploy && docker compose build`.
+2. **If backend code changed:** `cd deploy && scripts/build-images.sh`.
 3. **Build the frontend release.** Every frontend app you changed must have a higher `version` in its
    `package.json`; the build tells you if you forgot. Then:
 
@@ -472,9 +488,9 @@ the change:
 
 | What | File | Settings | Apply with |
 |---|---|---|---|
-| Customer 360 CRM | `nano env/customer360.env` | `CrmApi__*` | `docker compose up -d c360` |
-| Email | `nano env/auth.env` | `Smtp__*` | `docker compose up -d auth` |
-| Google sign-in | `nano env/auth.env` | `Google__ClientId`, `Google__AllowedDomains` | `docker compose up -d auth` |
+| Customer 360 CRM | `nano env/customer360.env` | `CrmApi__*` | `sudo podman compose up -d c360` |
+| Email | `nano env/auth.env` | `Smtp__*` | `sudo podman compose up -d auth` |
+| Google sign-in | `nano env/auth.env` | `Google__ClientId`, `Google__AllowedDomains` | `sudo podman compose up -d auth` |
 
 For Google sign-in, also add `https://<domain>` as an Authorized JavaScript origin in Google Cloud.
 
@@ -489,14 +505,17 @@ Caddy renews it by itself about 30 days before expiry, and `status.ps1` shows th
 |---|---|
 | Site doesn't load at all from outside | **DNS:** `Resolve-DnsName omniconnect.company.com` (PowerShell) must show the server's public IP. **Ports:** IT must forward 80/443. **Caddy:** `status.ps1`. |
 | Browser shows a certificate warning | Caddy could not get the certificate yet, usually because DNS or port 80 isn't ready. Caddy retries by itself. To see why, open PowerShell (Admin) and run `Stop-Service OmniConnectCaddy; C:\OmniConnect\caddy\caddy.exe run --config C:\OmniConnect\caddy\Caddyfile`, read the error, then press **Ctrl+C** and run `Start-Service OmniConnectCaddy`. |
-| "502 Bad Gateway" | Caddy works, but the platform inside Ubuntu isn't answering. In Ubuntu: `cd ~/OmniConnectt/deploy && docker compose ps`, then `docker compose up -d`. |
+| "502 Bad Gateway" | Caddy works, but the platform inside Ubuntu isn't answering. In Ubuntu: `cd ~/OmniConnectt/deploy && sudo podman compose ps`, then `sudo podman compose up -d`. |
 | After a reboot, nothing works until someone logs in | The keep-alive task didn't start. In Task Scheduler, open **OmniConnect - keep platform running**: it must be *Running*, with "Run whether user is logged on or not". Run `setup-windows.ps1` again. Ask IT whether a policy blocks "log on as a batch job" for your account. |
-| White page in the browser | Press **Ctrl+Shift+R**. If it persists, the browser console (F12) names the failing file; `docker compose logs web`. |
+| White page in the browser | Press **Ctrl+Shift+R**. If it persists, the browser console (F12) names the failing file; `sudo podman compose logs web`. |
 | `deploy.sh`: "already published with different content" | Code changed but the app's `version` wasn't bumped. Bump it in the app's `package.json` and run `pnpm release` again. |
-| `deploy.sh`: "Migrations for … failed" | Nothing was switched, so users are unaffected. `docker compose logs <service>` shows why. Usually the database isn't running: `docker compose up -d db`. |
-| A service keeps restarting | `docker compose logs --tail 200 <service>`. A missing or wrong value in `env/<service>.env` is named at the top. |
-| Ubuntu says "Cannot connect to the Docker daemon" | `sudo systemctl start docker`. If systemd isn't running, redo 5.1. |
-| Disk is filling up | `docker system df`. Old build caches: `docker builder prune -f`. Old frontend versions: `scripts/gc.sh`, then `scripts/gc.sh --apply`. |
+| `deploy.sh`: "Migrations for … failed" | Nothing was switched, so users are unaffected. `sudo podman compose logs <service>` shows why. Usually the database isn't running: `sudo podman compose up -d db`. |
+| A service keeps restarting | `sudo podman compose logs --tail 200 <service>`. A missing or wrong value in `env/<service>.env` is named at the top. |
+| "Cannot connect to the Docker daemon at unix:///run/podman/podman.sock" | Podman's socket is off: `sudo systemctl enable --now podman.socket`. If systemd isn't running, redo 5.1. |
+| `podman compose`: "looking up compose provider failed" | `sudo apt-get install -y docker-compose-v2 && sudo ln -sf /usr/libexec/docker/cli-plugins/docker-compose /usr/local/bin/docker-compose` |
+| A service stays "starting" and never becomes healthy | Podman runs health checks through systemd timers. Check `systemctl is-system-running` (5.1), then `sudo podman healthcheck run omniconnect-auth-1` (or `-lead-1` and so on). |
+| Every user shows the same IP (`127.0.0.1` or `172.30.0.x`) in Audit Logs | Check `deploy/.env` has `EDGE_PROXY=local-proxy` and `PUBLIC_BIND=127.0.0.1`, then `sudo podman compose up -d web`. If it persists, send `sudo podman compose logs --tail 50 web` to the developers: the address nginx sees must be added to `deploy/nginx/edge/local-proxy.conf`. |
+| Disk is filling up | `sudo podman system df`. Unused images: `sudo podman image prune -f`. Old frontend versions: `scripts/gc.sh`, then `scripts/gc.sh --apply`. |
 
 **What this setup does and does not cover:**
 - It is **one server**. If the server fails, the site is down until it is restored, so keep the off-server

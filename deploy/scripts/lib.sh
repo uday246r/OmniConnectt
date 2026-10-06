@@ -1,10 +1,15 @@
 #!/usr/bin/env bash
 # Shared helpers for the OmniConnect deployment scripts. Sourced, never run.
 #
-# Requirements on the server: bash, docker (with compose v2), tar, sha256sum, jq, curl.
+# Requirements on the server: bash, tar, sha256sum, jq, curl, and a container engine: rootful Podman
+# with `podman compose` (docker-compose as its provider, podman.socket enabled) — the production setup —
+# or Docker with compose v2. CONTAINER_ENGINE=podman|docker in deploy/.env chooses; unset, Podman is
+# used when installed.
 
 set -euo pipefail
 
+ORIG_PWD="$PWD"
+CALLER="$(cd "$(dirname "${BASH_SOURCE[1]:-$0}")" && pwd)/$(basename "${BASH_SOURCE[1]:-$0}")"
 DEPLOY_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$DEPLOY_DIR"
 
@@ -19,7 +24,19 @@ set +a
 : "${RELEASE_ACTOR:=${GITHUB_RUN_ID:+github-actions run $GITHUB_RUN_ID}}"
 : "${RELEASE_ACTOR:=$(whoami)@$(hostname)}"
 
-COMPOSE=(docker compose --env-file "$DEPLOY_DIR/.env" -f "$DEPLOY_DIR/compose.yml")
+if [[ -z "${CONTAINER_ENGINE:-}" ]]; then
+  if command -v podman >/dev/null; then CONTAINER_ENGINE=podman; else CONTAINER_ENGINE=docker; fi
+fi
+
+# The platform runs under ROOTFUL Podman: its containers start at boot (podman-restart.service) and its
+# port forwarding keeps the client address the nginx edge relies on. A rootless `podman` would quietly
+# look at a different, empty container store, so re-run this script as root instead.
+if [[ "$CONTAINER_ENGINE" == podman && "$EUID" -ne 0 ]]; then
+  cd "$ORIG_PWD"
+  exec sudo --preserve-env=RELEASE_ACTOR,GITHUB_RUN_ID,SMOKE_BASE_URL,BACKUP_ROOT,KEEP_DAYS,KEEP_RELEASES bash "$CALLER" "$@"
+fi
+
+COMPOSE=("$CONTAINER_ENGINE" compose --env-file "$DEPLOY_DIR/.env" -f "$DEPLOY_DIR/compose.yml")
 # An extra compose file layered on top, e.g. compose.verify.yml for a workstation rehearsal.
 if [[ -n "${COMPOSE_EXTRA_FILE:-}" ]]; then COMPOSE+=(-f "$DEPLOY_DIR/$COMPOSE_EXTRA_FILE"); fi
 
@@ -28,9 +45,10 @@ ok()   { printf '\033[1;32m✔\033[0m %s\n' "$*"; }
 warn() { printf '\033[1;33m⚠\033[0m %s\n' "$*" >&2; }
 die()  { printf '\033[1;31m✖\033[0m %s\n' "$*" >&2; exit 1; }
 
-for tool in docker tar sha256sum jq curl; do
+for tool in "$CONTAINER_ENGINE" tar sha256sum jq curl; do
   command -v "$tool" >/dev/null || die "$tool is required on the deployment host."
 done
+"${COMPOSE[@]}" version >/dev/null 2>&1   || die "'$CONTAINER_ENGINE compose' does not work. Podman: install docker-compose and run 'systemctl enable --now podman.socket' (docs/DEPLOY-WINDOWS-SERVER-2022.md, Part 5)."
 
 # Where each remote's capability endpoint is, inside the compose network — used only when an app is
 # installed for the first time. Must match RemoteApps__BuiltIn__* in compose.yml.

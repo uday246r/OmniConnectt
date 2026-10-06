@@ -1,6 +1,15 @@
 # OmniConnect production stack — one host, one public port.
 #
-#   docker compose --env-file .env up -d          (deploy/scripts/deploy.sh does this for you)
+#   podman compose --env-file .env up -d          (deploy/scripts/deploy.sh does this for you)
+#
+# Engine-neutral: runs under rootful Podman (`podman compose`, with docker-compose as its provider —
+# the production setup, docs/DEPLOY-WINDOWS-SERVER-2022.md) or Docker (`docker compose`). Three rules
+# keep it that way:
+#   - every service's health check is declared HERE, not only in its Dockerfile: Podman builds OCI
+#     images by default, which drop a Dockerfile HEALTHCHECK, and depends_on / `up --wait` need it;
+#   - restart policy is `always`: Podman has no daemon, and at boot podman-restart.service starts only
+#     containers whose policy is exactly `always` (`unless-stopped` would stay down after a reboot);
+#   - image names are fully qualified (docker.io/...): Podman does not guess a registry for short names.
 #
 # Only `web` (nginx) publishes a port. The four services are reachable solely on the private `omni`
 # network, which is also why they may believe nginx's X-Forwarded-For (ForwardedHeaders__KnownNetworks).
@@ -11,7 +20,7 @@
 name: omniconnect
 
 x-service: &service
-  restart: unless-stopped
+  restart: always
   networks: [omni]
   security_opt: ["no-new-privileges:true"]
   cap_drop: [ALL]
@@ -35,7 +44,7 @@ x-service-env: &service-env
 services:
   web:
     <<: *service
-    image: nginxinc/nginx-unprivileged:1.27-alpine
+    image: docker.io/nginxinc/nginx-unprivileged:1.27-alpine
     # nginx-unprivileged runs as uid 101 and binds 8080, so it needs no capabilities.
     ports:
       # PUBLIC_BIND=127.0.0.1 when a TLS proxy on the same machine is the public edge (Windows Server:
@@ -61,8 +70,15 @@ services:
 
   auth:
     <<: *service
-    image: ${IMAGE_REGISTRY:-omniconnect}/auth:${AUTH_TAG:-local}
+    image: ${IMAGE_REGISTRY:-localhost/omniconnect}/auth:${AUTH_TAG:-local}
     build: { context: ../Backend, dockerfile: AuthService/Dockerfile }
+    healthcheck:
+      # The service's own binary is the probe (OmniConnect.Hosting.ContainerHealthProbe); liveness only.
+      test: ["CMD", "dotnet", "AuthService.dll", "--healthcheck", "http://127.0.0.1:8080/health/live"]
+      interval: 30s
+      timeout: 8s
+      start_period: 40s
+      retries: 3
     env_file: [env/auth.env]
     environment:
       <<: *service-env
@@ -78,8 +94,15 @@ services:
 
   lead:
     <<: *service
-    image: ${IMAGE_REGISTRY:-omniconnect}/lead:${LEAD_TAG:-local}
+    image: ${IMAGE_REGISTRY:-localhost/omniconnect}/lead:${LEAD_TAG:-local}
     build: { context: ../Backend, dockerfile: LeadService/Dockerfile }
+    healthcheck:
+      # The service's own binary is the probe (OmniConnect.Hosting.ContainerHealthProbe); liveness only.
+      test: ["CMD", "dotnet", "LeadManagement.Api.dll", "--healthcheck", "http://127.0.0.1:8080/health/live"]
+      interval: 30s
+      timeout: 8s
+      start_period: 40s
+      retries: 3
     env_file: [env/lead.env]
     environment:
       <<: *service-env
@@ -91,8 +114,15 @@ services:
 
   c360:
     <<: *service
-    image: ${IMAGE_REGISTRY:-omniconnect}/customer360:${C360_TAG:-local}
+    image: ${IMAGE_REGISTRY:-localhost/omniconnect}/customer360:${C360_TAG:-local}
     build: { context: ../Backend, dockerfile: Customer360Service/Dockerfile }
+    healthcheck:
+      # The service's own binary is the probe (OmniConnect.Hosting.ContainerHealthProbe); liveness only.
+      test: ["CMD", "dotnet", "backend.dll", "--healthcheck", "http://127.0.0.1:8080/health/live"]
+      interval: 30s
+      timeout: 8s
+      start_period: 40s
+      retries: 3
     env_file: [env/customer360.env]
     environment:
       <<: *service-env
@@ -103,8 +133,15 @@ services:
 
   products:
     <<: *service
-    image: ${IMAGE_REGISTRY:-omniconnect}/products:${PRODUCTS_TAG:-local}
+    image: ${IMAGE_REGISTRY:-localhost/omniconnect}/products:${PRODUCTS_TAG:-local}
     build: { context: ../Backend, dockerfile: ProductsService/Dockerfile }
+    healthcheck:
+      # The service's own binary is the probe (OmniConnect.Hosting.ContainerHealthProbe); liveness only.
+      test: ["CMD", "dotnet", "ProductMarketplace.Api.dll", "--healthcheck", "http://127.0.0.1:8080/health/live"]
+      interval: 30s
+      timeout: 8s
+      start_period: 40s
+      retries: 3
     env_file: [env/products.env]
     environment:
       <<: *service-env
@@ -117,7 +154,7 @@ services:
 
   # The release pipeline's client for AuthService's /internal/releases API, inside the private network.
   release-agent:
-    image: curlimages/curl:8.11.1
+    image: docker.io/curlimages/curl:8.11.1
     profiles: [tools]
     networks: [omni]
     environment:
@@ -129,9 +166,9 @@ services:
   # Back it up with scripts/backup-db.sh. With a managed database instead, leave the profile off and put
   # its connection strings in env/*.env.
   db:
-    image: postgres:17-alpine
+    image: docker.io/library/postgres:17-alpine
     profiles: [localdb]
-    restart: unless-stopped
+    restart: always
     networks: [omni]
     security_opt: ["no-new-privileges:true"]
     environment:

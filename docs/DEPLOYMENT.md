@@ -8,8 +8,9 @@ releasing, promoting, rolling back, maintenance and troubleshooting.
 **Local development:** [SETUP.md](../SETUP.md).
 
 **Windows Server 2022, step by step:** [DEPLOY-WINDOWS-SERVER-2022.md](DEPLOY-WINDOWS-SERVER-2022.md).
-That setup puts Caddy on Windows in front of nginx as the HTTPS edge (`EDGE_PROXY=local-proxy`), and
-runs PostgreSQL on the same machine (`COMPOSE_PROFILES=localdb`).
+That setup puts Caddy on Windows in front of nginx as the HTTPS edge (`EDGE_PROXY=local-proxy`), runs
+the containers under rootful **Podman** (`CONTAINER_ENGINE=podman`, `podman compose`), and PostgreSQL on
+the same machine (`COMPOSE_PROFILES=localdb`). `compose.yml` and the scripts work unchanged under Docker.
 
 ## Topology
 

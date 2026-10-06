@@ -5,7 +5,7 @@
 #>
 param(
     [Parameter(Mandatory = $true)][string]$Domain,
-    [string]$Distro = 'Ubuntu-22.04',
+    [string]$Distro = 'Ubuntu-24.04',
     [string]$RepoPath = ''
 )
 function Line([bool]$good, [string]$what, [string]$detail) {
@@ -31,7 +31,8 @@ Line ([bool]($caddy -and $caddy.Status -eq 'Running')) 'Service: Caddy (HTTPS)' 
 
 $linuxUser = ((wsl.exe -d $Distro -- whoami 2>$null) -replace "`0", '').Trim()
 if (-not $RepoPath) { $RepoPath = "/home/$linuxUser/OmniConnectt" }
-$ps = (wsl.exe -d $Distro -- bash -lc "cd $RepoPath/deploy && docker compose ps --format '{{.Service}} {{.Status}}'" 2>$null) -replace "`0", ''
+# As root: the platform runs under rootful Podman (a plain user would see an empty, rootless store).
+$ps = (wsl.exe -d $Distro -u root -- bash -lc "cd $RepoPath/deploy && podman compose ps --format '{{.Service}} {{.Status}}'" 2>$null) -replace "`0", ''
 foreach ($svc in 'web', 'auth', 'lead', 'c360', 'products', 'db') {
     $row = $ps | Where-Object { $_ -match "^$svc " } | Select-Object -First 1
     if ($svc -eq 'db' -and -not $row) { continue }

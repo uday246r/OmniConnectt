@@ -24,7 +24,7 @@ chmod 700 "$BACKUP_ROOT"
 
 for db in auth_service lead_service customer360_service products_service; do
   "${COMPOSE[@]}" exec -T db pg_dump -U postgres -Fc "$db" > "$TARGET/$db.dump" \
-    || die "Backing up $db failed (is the db container running? docker compose ps)."
+    || die "Backing up $db failed (is the db container running? sudo podman compose ps)."
   [[ -s "$TARGET/$db.dump" ]] || die "$db produced an empty dump."
   ok "$db → $TARGET/$db.dump ($(du -h "$TARGET/$db.dump" | cut -f1))"
 done

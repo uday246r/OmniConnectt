@@ -13,7 +13,7 @@
     4. Installs Caddy as a Windows service that starts with the server.
     5. Opens ports 80 and 443 in Windows Firewall.
     6. Registers two scheduled tasks under YOUR Windows account (WSL belongs to the account that
-       installed it): one keeps Ubuntu - and with it Docker and the platform - running from boot, without
+       installed it): one keeps Ubuntu - and with it Podman and the platform - running from boot, without
        anyone logged in; one makes the nightly database backup.
        Windows asks for YOUR password once for this; type it into the Windows prompt, nowhere else.
 #>
@@ -21,7 +21,7 @@
 param(
     [Parameter(Mandatory = $true)][string]$Domain,
     [Parameter(Mandatory = $true)][string]$Email,
-    [string]$Distro = 'Ubuntu-22.04',
+    [string]$Distro = 'Ubuntu-24.04',
     [string]$RepoPath = '',
     [string]$CaddyVersion = '2.10.2',
     [string]$BackupTime = '02:00'
@@ -139,8 +139,8 @@ Write-Host "    Windows will ask for the password of $account, so the tasks can 
 $cred = Get-Credential -UserName $account -Message "Password of $account (used only by Windows Task Scheduler)"
 $plain = $cred.GetNetworkCredential().Password
 
-# Keep-alive: starting the distribution boots systemd, which starts Docker, which restarts every
-# container (restart: unless-stopped). The task's process is what keeps the distribution running.
+# Keep-alive: starting the distribution boots systemd, whose podman-restart.service starts every
+# container with restart policy "always" (all of ours). The task's process keeps the distribution running.
 $keepAction = New-ScheduledTaskAction -Execute 'wsl.exe' -Argument "-d $Distro --exec /bin/sleep infinity"
 $keepTrigger = New-ScheduledTaskTrigger -AtStartup
 $keepSettings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit ([TimeSpan]::Zero) -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1) -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -MultipleInstances IgnoreNew -StartWhenAvailable
@@ -149,7 +149,8 @@ Start-ScheduledTask -TaskName 'OmniConnect - keep platform running'
 Ok 'OmniConnect - keep platform running (at startup, no time limit, restarts if it stops)'
 
 $backupCmd = "cd $RepoPath/deploy && scripts/backup-db.sh >> /srv/omniconnect-backups/backup.log 2>&1"
-$backupAction = New-ScheduledTaskAction -Execute 'wsl.exe' -Argument "-d $Distro -- bash -lc `"$backupCmd`""
+# As root: the platform runs under rootful Podman.
+$backupAction = New-ScheduledTaskAction -Execute 'wsl.exe' -Argument "-d $Distro -u root -- bash -lc `"$backupCmd`""
 $backupTrigger = New-ScheduledTaskTrigger -Daily -At $BackupTime
 $backupSettings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit (New-TimeSpan -Hours 2) -StartWhenAvailable -AllowStartIfOnBatteries
 Register-ScheduledTask -TaskName 'OmniConnect - nightly database backup' -Action $backupAction -Trigger $backupTrigger -Settings $backupSettings -User $account -Password $plain -RunLevel Highest -Force | Out-Null

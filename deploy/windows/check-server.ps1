@@ -103,9 +103,9 @@ $wsl = Get-Command wsl.exe -ErrorAction SilentlyContinue
 if ($wsl) {
     $distros = (wsl.exe -l -q 2>$null) -replace "`0", '' | Where-Object { $_ -and $_.Trim() }
     if ($distros -match 'Ubuntu') { Report PASS 'WSL with Ubuntu is installed' ($distros -join ', ') '' }
-    else { Report WARN 'WSL is present but Ubuntu is not installed yet' '' 'Continue with the guide: wsl --install -d Ubuntu-22.04 --web-download' }
+    else { Report WARN 'WSL is present but Ubuntu is not installed yet' '' 'Continue with the guide: wsl --install -d Ubuntu-24.04 --web-download' }
 } else {
-    Report WARN 'WSL is not installed yet' '' 'Continue with the guide: wsl --install -d Ubuntu-22.04 --web-download'
+    Report WARN 'WSL is not installed yet' '' 'Continue with the guide: wsl --install -d Ubuntu-24.04 --web-download'
 }
 
 Write-Host ""
