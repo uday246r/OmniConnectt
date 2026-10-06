@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { useAuthStore } from '../../auth/store/authStore'
-import { Badge, Button, CsvExportError, DataTable, DateRangeColumnFilter, DateRangeFilterButton, EMPTY_DATE_RANGE, EMPTY_VALUE, PageHeader, Pagination, ResponsiveRows, RowAction, RowsPerPage, describeDateRange, describeTruncation, isDateRangeActive, readStoredPageSize, resolveDateRange, sanitizeFilterInput, filterTypeBlockedMessage, useCommittedFilter, type BadgeTone, type CommittedFilter, type DateRangeValue } from '@omniconnect/ui'
+import { Badge, Button, CsvExportError, DataTable, Drawer, DateRangeColumnFilter, DateRangeFilterButton, EMPTY_DATE_RANGE, EMPTY_VALUE, PageHeader, Pagination, ResponsiveRows, RowAction, RowsPerPage, describeDateRange, describeTruncation, isDateRangeActive, readStoredPageSize, resolveDateRange, sanitizeFilterInput, filterTypeBlockedMessage, useCommittedFilter, type BadgeTone, type CommittedFilter, type DateRangeValue } from '@omniconnect/ui'
 import { PermissionGate } from '../../../shared/components/PermissionGate/PermissionGate'
 import { SkeletonBlock } from '../../../shared/components/Skeleton'
 import { ApiError } from '../../../shared/api/httpClient'
@@ -18,7 +19,6 @@ import { useApprovalRequests } from '../hooks/useApprovalRequests'
 import { Icon } from '../../../shared/components/Icon/Icon'
 // Same drawer shell Audit Logs / Settings use — the whole point of "keep the design language" is
 // not building a fourth right-side-panel implementation.
-import drawerStyles from '../../../layout/SettingsDrawer/SettingsDrawer.module.css'
 import styles from './ApprovalCenterPage.module.css'
 import { TOPICS, invalidate } from '../../../shared/stores/invalidationStore'
 import { useLiveRefetchInterval } from '../../../shared/query/invalidationBridge'
@@ -255,20 +255,24 @@ function getFieldIconMeta(label: string) {
  * and unstructured next to the rest of the app's card-based presentation. Card visual language
  * (border/radius/background/hover) copied verbatim from ProfilePage.module.css's
  * .capabilitiesGrid/.capItem, the app's own existing 2-per-row bordered-card convention. */
-function renderFieldCardGrid(rows: { label: string; value: unknown }[]) {
+function renderFieldCardGrid(rows: { label: string; value: unknown }[], changed?: ReadonlySet<string>) {
   if (rows.length === 0) return null
   return (
     <dl className={styles.fieldCardGrid}>
       {rows.map(({ label, value }) => {
         const isEmpty = value === null || value === undefined || value === ''
         const { Icon: FieldIcon, bg, color } = getFieldIconMeta(label)
+        const changeClass = !changed ? '' : changed.has(label) ? styles.fieldCardChanged : styles.fieldCardUnchanged
         return (
-          <div key={label} className={styles.fieldCard}>
+          <div key={label} className={`${styles.fieldCard} ${changeClass}`}>
             <span className={styles.fieldCardIcon} style={{ '--icon-bg': bg, '--icon-color': color } as React.CSSProperties}>
               <FieldIcon width={15} height={15} />
             </span>
             <div className={styles.fieldCardBody}>
-              <dt className={styles.fieldCardLabel}>{label}</dt>
+              <dt className={styles.fieldCardLabel}>
+                {label}
+                {changed?.has(label) && <span className={styles.changedTag}>Changed</span>}
+              </dt>
               <dd className={`${styles.fieldCardValue} ${isEmpty ? styles.emptyValue : ''}`}>
                 {renderValue(value)}
               </dd>
@@ -313,7 +317,32 @@ function renderArrayItem(item: unknown, index: number) {
  * array yields its indices, and a raw object stringifies to that exact text). Each element now renders
  * as its own labeled mini-card instead.
  */
-function renderDataFields(json: string | null, emptyLabel: string) {
+/**
+ * Labels of the top-level fields whose value differs between two snapshots — null when either side
+ * is missing or not a plain object (a Create has no "before", an array snapshot has no field names),
+ * in which case nothing is marked rather than marking everything.
+ */
+export function changedFieldLabels(beforeJson: string | null, afterJson: string | null): Set<string> | null {
+  if (!beforeJson || !afterJson) return null
+  try {
+    const before = JSON.parse(beforeJson) as unknown
+    const after = JSON.parse(afterJson) as unknown
+    if (!isPlainObject(before) || !isPlainObject(after)) return null
+    const beforeRows = new Map(objectToRows(before).map((r) => [r.label, JSON.stringify(r.value ?? null)]))
+    const changed = new Set<string>()
+    for (const { label, value } of objectToRows(after)) {
+      // A blank and an absent value are the same thing to a reader ("—" on both sides).
+      const was = beforeRows.get(label) ?? 'null'
+      const now = JSON.stringify(value ?? null)
+      if (was !== now && !(was === '""' && now === 'null') && !(was === 'null' && now === '""')) changed.add(label)
+    }
+    return changed
+  } catch {
+    return null
+  }
+}
+
+function renderDataFields(json: string | null, emptyLabel: string, changed?: ReadonlySet<string> | null) {
   if (!json) return <p className={styles.mutedText}>{emptyLabel}</p>
   try {
     const parsed = JSON.parse(json) as unknown
@@ -329,7 +358,7 @@ function renderDataFields(json: string | null, emptyLabel: string) {
 
     const rows = isPlainObject(parsed) ? objectToRows(parsed) : []
     if (rows.length === 0) return <p className={styles.mutedText}>{emptyLabel}</p>
-    return renderFieldCardGrid(rows)
+    return renderFieldCardGrid(rows, changed ?? undefined)
   } catch {
     return <p className={styles.wrapText}>{json}</p>
   }
@@ -767,6 +796,73 @@ export function ApprovalCenterPage() {
     module || actionFilter || makerFilter.applied || recordFilter.applied || checkerFilter.applied || assignedToMeOnly ||
     isDateRangeActive(requestedRange) || isDateRangeActive(decidedRange) || statusFilter
   )
+
+
+  /*
+   * Sticky decision row, handed to the Drawer's footer so Approve/Reject stay visible at the bottom
+   * of the drawer regardless of scroll position. The two decisions fill the row edge-to-edge as
+   * equal, deliberate targets — this is the one thing a checker is here to do. Row-level check
+   * (isMyDecisionToMake) instead of PermissionGate — an admin who isn't the specific assigned checker
+   * must not see actionable buttons on someone else's request.
+   */
+  const decisionFooter = isMyDecisionToMake && detail ? (
+    !rejecting ? (
+      <div className={styles.footerBtns}>
+        <button
+          type="button"
+          className={styles.rejectBtn}
+          onClick={() => setRejecting(true)}
+          disabled={deciding}
+        >
+          <Icon.X width={15} height={15} />
+          <span>Reject</span>
+        </button>
+        <button
+          type="button"
+          className={styles.approveBtn}
+          onClick={() => void handleApprove()}
+          disabled={deciding}
+        >
+          <Icon.CheckCircle width={15} height={15} />
+          <span>{deciding ? 'Approving…' : 'Approve'}</span>
+        </button>
+      </div>
+    ) : (
+      <div className={styles.rejectFormFooter}>
+        <label className={styles.label} htmlFor="approval-reject-reason">Rejection reason</label>
+        <textarea
+          id="approval-reject-reason"
+          className={styles.rejectTextarea}
+          rows={3}
+          value={rejectReason}
+          onChange={(e) => setRejectReason(e.target.value)}
+          placeholder="Explain why this request is being rejected..."
+          autoFocus
+        />
+        <div className={styles.footerBtns}>
+          <button
+            type="button"
+            className={styles.cancelRejectBtn}
+            onClick={() => setRejecting(false)}
+            disabled={deciding}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            className={styles.rejectBtn}
+            onClick={() => void handleReject()}
+            disabled={deciding || !rejectReason.trim()}
+          >
+            {deciding ? 'Rejecting…' : 'Confirm Reject'}
+          </button>
+        </div>
+      </div>
+    )
+  ) : undefined
+
+  // On an Update, which fields the request actually changes — the checker's whole question.
+  const changedFields = detail && detail.action === 'Update' ? changedFieldLabels(detail.oldDataJson, detail.newDataJson) : null
 
   return (
     <div className={styles.page}>
@@ -1465,27 +1561,19 @@ export function ApprovalCenterPage() {
       </DataTable>
 
       {/* Detail drawer */}
-      {viewingId && (
-        <div className={drawerStyles.overlayRoot}>
-          <div className={drawerStyles.backdrop} onClick={handleCloseDetail} />
-          <div className={drawerStyles.drawerContainer}>
-            <div className={drawerStyles.rootPanel}>
-              <div className={drawerStyles.header}>
-                <div className={drawerStyles.headerLeft}>
-                  <div className={drawerStyles.headerIcon}>
-                    <Icon.UserCheck width={20} height={20} />
-                  </div>
-                  <div>
-                    <h2 className={drawerStyles.title}>Approval Request</h2>
-                    <p className={drawerStyles.subtitle}>Full details of this request</p>
-                  </div>
-                </div>
-                <button type="button" className={drawerStyles.closeBtn} onClick={handleCloseDetail} aria-label="Close details">
-                  <Icon.X width={20} height={20} />
-                </button>
-              </div>
-
-              <div className={drawerStyles.tabBody}>
+      {/* Built on the shared Drawer (it used to borrow the Settings drawer's stylesheet, whose
+          header/body classes were later removed, leaving this a squashed column) and portalled to
+          <body> so the page's entrance animation can never clip the overlay to the page. */}
+      {viewingId && createPortal(
+        <Drawer
+          open
+          onClose={handleCloseDetail}
+          closeLabel="Close details"
+          title="Approval request"
+          subtitle={detail ? `${ACTION_LABELS[detail.action] ?? detail.action} ${formatModuleName(detail.module).toLowerCase()}${detail.entityLabel ? `: ${detail.entityLabel}` : ''}` : 'Full details of this request'}
+          icon={<Icon.UserCheck width={20} height={20} />}
+          footer={decisionFooter}
+        >
                 {detailLoading ? (
                   <div className={styles.drawerSections}>
                     <SkeletonBlock height={120} radius="10px" />
@@ -1581,7 +1669,14 @@ export function ApprovalCenterPage() {
                         <Icon.FileText width={12} height={12} />
                         Requested Change
                       </h3>
-                      {renderDataFields(detail.newDataJson, requestedChangeEmptyMessage(detail.action))}
+                      {changedFields && (
+                        <p className={styles.changeSummary}>
+                          {changedFields.size === 0
+                            ? 'No field values change in this request.'
+                            : <>Changes <strong>{changedFields.size}</strong> {changedFields.size === 1 ? 'field' : 'fields'}: {[...changedFields].join(', ')}.</>}
+                        </p>
+                      )}
+                      {renderDataFields(detail.newDataJson, requestedChangeEmptyMessage(detail.action), changedFields)}
                     </section>
 
                     {(() => {
@@ -1630,77 +1725,8 @@ export function ApprovalCenterPage() {
                     {detailError && <div className={styles.errorBanner}>{detailError}</div>}
                   </div>
                 ) : null}
-              </div>
-
-              {/*
-                Sticky action footer — outside the scrollable tabBody so Approve/Reject are
-                always visible at the bottom of the drawer regardless of scroll position. The two
-                decisions fill the row edge-to-edge as equal, deliberate targets — this is the one
-                thing a checker is here to do, not a toolbar sharing space with an unrelated action.
-                ("Edit" previously sat here as an inert label with no handler — a maker-checker
-                approval is reviewed and decided, not edited from inside the review itself.)
-                Row-level check (isMyDecisionToMake) instead of PermissionGate — an admin who isn't
-                the specific assigned checker must not see actionable buttons on someone else's request.
-              */}
-              {isMyDecisionToMake && detail && (
-                <div className={styles.detailFooter}>
-                  {!rejecting ? (
-                    <div className={styles.footerBtns}>
-                      <button
-                        type="button"
-                        className={styles.rejectBtn}
-                        onClick={() => setRejecting(true)}
-                        disabled={deciding}
-                      >
-                        <Icon.X width={15} height={15} />
-                        <span>Reject</span>
-                      </button>
-                      <button
-                        type="button"
-                        className={styles.approveBtn}
-                        onClick={() => void handleApprove()}
-                        disabled={deciding}
-                      >
-                        <Icon.CheckCircle width={15} height={15} />
-                        <span>{deciding ? 'Approving…' : 'Approve'}</span>
-                      </button>
-                    </div>
-                  ) : (
-                    <div className={styles.rejectFormFooter}>
-                      <label className={styles.label}>Rejection reason</label>
-                      <textarea
-                        className={styles.rejectTextarea}
-                        rows={3}
-                        value={rejectReason}
-                        onChange={(e) => setRejectReason(e.target.value)}
-                        placeholder="Explain why this request is being rejected..."
-                        autoFocus
-                      />
-                      <div className={styles.footerBtns}>
-                        <button
-                          type="button"
-                          className={styles.cancelRejectBtn}
-                          onClick={() => setRejecting(false)}
-                          disabled={deciding}
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          type="button"
-                          className={styles.rejectBtn}
-                          onClick={() => void handleReject()}
-                          disabled={deciding || !rejectReason.trim()}
-                        >
-                          {deciding ? 'Rejecting…' : 'Confirm Reject'}
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
+        </Drawer>,
+        document.body,
       )}
     </div>
   )

@@ -45,6 +45,8 @@ describe('ApplicationsPage', () => {
     useSettingsDrawerStore.getState().close()
     useAuthStore.setState({
       accessToken: 'test-token',
+      // Without an expiry the token counts as expired, and the capability load signs the user out mid-test.
+      accessTokenExpiresAt: Date.now() + 3600_000,
       user: {
         id: 'admin-1',
         name: 'Admin User',

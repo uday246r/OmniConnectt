@@ -1,13 +1,21 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Badge, Button, DetailField, DetailGrid, DetailSection, formatAuditTimestamp, type BadgeTone } from '@omniconnect/ui'
+import { createPortal } from 'react-dom'
+import {
+  Badge,
+  Button,
+  DetailField,
+  DetailGrid,
+  DetailSection,
+  DetailSections,
+  Drawer,
+  formatAuditTimestamp,
+  type BadgeTone,
+} from '@omniconnect/ui'
 import { Icon } from '../../../../shared/components/Icon/Icon'
 import { permissionsApi } from '../../../../shared/api/permissionsApi'
 import { auditLogsApi, type AuditLogDto } from '../../api/auditLogsApi'
 import { formatActionLabel, formatIpv4 } from '../../utils/auditLogFormatting'
 import { buildPermissionLabels, describePermission, parseAuditDetails } from '../../utils/auditDetails'
-// The same right-side drawer shell Settings and the System Audit Trail deep-link use — this component
-// only fills the panel body, so wherever it is rendered the drawer looks identical to the rest of the host.
-import drawerStyles from '../../../../layout/SettingsDrawer/SettingsDrawer.module.css'
 import styles from './AuditLogDetailDrawer.module.css'
 
 const SERVICE_TONES: Record<string, BadgeTone> = {
@@ -74,8 +82,12 @@ export interface AuditLogDetailDrawerProps {
 
 /**
  * The one audit-record detail view used everywhere in the host — the System Audit Trail page and a
- * user's own Audit Log tab both render this, so enhancing either enhances both. Previously these had
- * diverged (a rich version here, a thinner one on the user page); this is the richer one, generalised.
+ * user's own Audit Log tab both render this, so enhancing either enhances both.
+ *
+ * Built on the shared `Drawer` from @omniconnect/ui. It used to borrow the Settings drawer's
+ * stylesheet for its chrome; when that stylesheet was redesigned the header, subtitle and body
+ * classes it relied on disappeared, and the drawer rendered as a squashed, unreadable column. The
+ * shared Drawer is the platform's contract for that chrome, so it cannot drift out from under us again.
  *
  * Correlation ID is never shown as a raw GUID (see AuditLogAppService.ResolveCorrelationId on the
  * backend for how it's actually populated now) — instead, when more than one row shares it, this shows
@@ -103,14 +115,6 @@ export function AuditLogDetailDrawer({ log, accessToken, onClose, onViewRelated 
     }
   }, [hasAccessToken, log.correlationId])
 
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [onClose])
-
   const parsedAgent = parseUserAgent(log.userAgent)
   const hasRelated = relatedCount !== null && relatedCount > 1
   const parsedDetails = useMemo(() => parseAuditDetails(log.details), [log.details])
@@ -132,241 +136,152 @@ export function AuditLogDetailDrawer({ log, accessToken, onClose, onViewRelated 
     }
   }, [hasAccessToken, parsedDetails.hasPermissionChanges])
 
-  return (
-    <div className={drawerStyles.overlayRoot}>
-      <div className={drawerStyles.backdrop} onClick={onClose} />
-      <div className={drawerStyles.drawerContainer}>
-        <div className={drawerStyles.rootPanel}>
-          <div className={drawerStyles.header}>
-            <div className={drawerStyles.headerLeft}>
-              <div className={drawerStyles.headerIcon}>
-                <Icon.Shield width={20} height={20} />
-              </div>
-              <div>
-                <h2 className={drawerStyles.title}>Activity Details</h2>
-                <p className={drawerStyles.subtitle}>What happened, who did it, and when</p>
-              </div>
-            </div>
-            <button type="button" className={drawerStyles.closeBtn} onClick={onClose} aria-label="Close details">
-              <Icon.X width={20} height={20} />
-            </button>
+  const succeeded = log.result === 'Success'
+  const application = log.sourceApplication || log.serviceName
+  const recordName = log.entityLabel || (log.module && log.page ? `${log.module}, ${log.page}` : log.page)
+  const actionLabel = formatActionLabel(log.action)
+  // The sentence a reader came for. The recorded detail line usually reads as one already ("Created
+  // jane@corp.com"); a row without one falls back to the action in words and what it touched.
+  const statement = parsedDetails.headline || (recordName ? `${actionLabel}: ${recordName}` : actionLabel)
+
+  // Portalled to <body>: the pages that open this (a user's Audit Log tab, the audit trail) play an
+  // entrance animation with a transform, and a transformed ancestor becomes the containing block of
+  // every position:fixed descendant, which clipped the overlay to the tab instead of the viewport.
+  // Safe in the host, whose styles are not scoped under a wrapper id the way the remotes' are (see the
+  // note on Drawer in @omniconnect/ui).
+  return createPortal(
+    <Drawer
+      open
+      onClose={onClose}
+      closeLabel="Close details"
+      title="Activity details"
+      subtitle="What happened, who did it, and when"
+      icon={<Icon.Shield width={20} height={20} />}
+    >
+      <DetailSections>
+        {/* The answer first: what happened and whether it worked. Everything below is supporting
+            evidence, so none of it repeats what this block already says. */}
+        <section
+          className={`${styles.verdict} ${succeeded ? styles.verdictSuccess : styles.verdictFailure}`}
+          aria-label="Summary"
+        >
+          <div className={styles.verdictMeta}>
+            <Badge tone={succeeded ? 'success' : 'danger'} dot>
+              {succeeded ? 'Succeeded' : 'Failed'}
+            </Badge>
+            <span className={styles.verdictAction}>{actionLabel}</span>
           </div>
+          <p className={styles.verdictStatement}>{statement}</p>
+          <p className={styles.verdictWhen}>
+            <Icon.Clock width={13} height={13} />
+            <time dateTime={log.occurredAt}>{formatAuditTimestamp(log.occurredAt)}</time>
+          </p>
+          {log.failureReason && (
+            <p className={styles.failureReason} role="note">
+              <Icon.AlertTriangle width={14} height={14} />
+              <span>
+                <strong>Why it failed:</strong> {log.failureReason}
+              </span>
+            </p>
+          )}
+        </section>
 
-          <div className={drawerStyles.tabBody}>
-            <div className={styles.drawerSections}>
-              {/* Summary & Timeline */}
-              <section className={styles.drawerSection}>
-                <div className={styles.overviewTimelineGrid}>
-                  <div>
-                    <h3 className={styles.drawerSectionTitle}>
-                      <Icon.Grid width={12} height={12} />
-                      Summary
-                    </h3>
-                    <dl className={styles.detailList}>
-                      <div className={styles.detailRow}>
-                        <span className={styles.detailIcon}>
-                          <Icon.Layers width={15} height={15} />
-                        </span>
-                        <div className={styles.detailRowBody}>
-                          <dt className={styles.detailRowLabel}>Application</dt>
-                          <dd className={styles.detailRowValue}>
-                            <Badge tone={serviceTone(log.sourceApplication || log.serviceName)}>{log.sourceApplication || log.serviceName}</Badge>
-                          </dd>
-                        </div>
-                      </div>
+        {/*
+          Every field below is omitted when the record carries no value for it — DetailField returns
+          null rather than printing "Not recorded" or an em dash. "Actor ID" and raw "Entity ID" are
+          never shown: a database GUID means nothing to the person reading an audit trail, so the
+          name carries the same meaning in a form a human can act on.
+        */}
+        <DetailSection title="Who and where" icon={<Icon.User width={12} height={12} />}>
+          <DetailGrid>
+            <DetailField label="Performed by" icon={<Icon.User width={15} height={15} />}>
+              {log.actorName ?? 'System'}
+            </DetailField>
+            <DetailField label="Sign-in method" icon={<Icon.Shield width={15} height={15} />}>
+              {log.authMethod}
+            </DetailField>
+            <DetailField label="IP address" icon={<Icon.Globe width={15} height={15} />}>
+              {log.sourceIp ? <span className={styles.ip}>{formatIpv4(log.sourceIp)}</span> : null}
+            </DetailField>
+            <DetailField label="Browser" icon={<Icon.Globe width={15} height={15} />}>
+              {parsedAgent?.browser}
+            </DetailField>
+            <DetailField label="Operating system" icon={<Icon.Box width={15} height={15} />}>
+              {parsedAgent?.os}
+            </DetailField>
+          </DetailGrid>
+        </DetailSection>
 
-                      {log.module && (
-                        <div className={styles.detailRow}>
-                          <span className={styles.detailIcon}>
-                            <Icon.Box width={15} height={15} />
-                          </span>
-                          <div className={styles.detailRowBody}>
-                            <dt className={styles.detailRowLabel}>Module</dt>
-                            <dd className={styles.detailRowValue}>
-                              <span>{log.module}</span>
-                            </dd>
-                          </div>
-                        </div>
-                      )}
+        <DetailSection title="Affected record" icon={<Icon.Box width={12} height={12} />}>
+          <DetailGrid>
+            <DetailField label="Application" icon={<Icon.Layers width={15} height={15} />}>
+              <Badge tone={serviceTone(application)}>{application}</Badge>
+            </DetailField>
+            <DetailField label="Module" icon={<Icon.Grid width={15} height={15} />}>
+              {log.module}
+            </DetailField>
+            <DetailField label="Record type" icon={<Icon.Layers width={15} height={15} />}>
+              {log.entityType || (log.actionCategory === 'Navigation' ? 'Page' : null)}
+            </DetailField>
+            <DetailField label="Record" icon={<Icon.FileText width={15} height={15} />}>
+              {recordName}
+            </DetailField>
+          </DetailGrid>
+        </DetailSection>
 
-                      <div className={styles.detailRow}>
-                        <span className={`${styles.detailIcon} ${styles.detailIconNeutral}`}>
-                          <Icon.Activity width={15} height={15} />
-                        </span>
-                        <div className={styles.detailRowBody}>
-                          <dt className={styles.detailRowLabel}>What Happened</dt>
-                          <dd className={styles.detailRowValue}>
-                            <span>{formatActionLabel(log.action)}</span>
-                          </dd>
-                        </div>
-                      </div>
+        {/* Correlation ID's actual payoff: instead of a raw GUID, a way to see the rest of the one
+            operation this row belongs to (the approval that led to it, or the effect it caused) —
+            hidden entirely when this row is the only event with its id. */}
+        {hasRelated && onViewRelated && (
+          <DetailSection title="Related activity" icon={<Icon.Layers width={12} height={12} />}>
+            <div className={styles.relatedRow}>
+              <span className={styles.relatedText}>
+                One of <strong>{relatedCount}</strong> events recorded for the same operation.
+              </span>
+              <Button
+                variant="secondary"
+                size="sm"
+                leadingIcon={<Icon.ArrowRight width={14} height={14} />}
+                onClick={() => onViewRelated(log.correlationId)}
+              >
+                View related events
+              </Button>
+            </div>
+          </DetailSection>
+        )}
 
-                      <div className={styles.detailRow}>
-                        <span className={`${styles.detailIcon} ${log.result === 'Success' ? styles.detailIconSuccess : styles.detailIconDanger}`}>
-                          {log.result === 'Success' ? <Icon.CheckCircle width={15} height={15} /> : <Icon.AlertTriangle width={15} height={15} />}
-                        </span>
-                        <div className={styles.detailRowBody}>
-                          <dt className={styles.detailRowLabel}>Outcome</dt>
-                          <dd className={styles.detailRowValue}>
-                            <Badge tone={log.result === 'Success' ? 'success' : 'danger'} dot>
-                              {log.result}
-                            </Badge>
-                          </dd>
-                        </div>
-                      </div>
-
-                      <div className={styles.detailRow}>
-                        <span className={`${styles.detailIcon} ${styles.detailIconPurple}`}>
-                          <Icon.Clock width={15} height={15} />
-                        </span>
-                        <div className={styles.detailRowBody}>
-                          <dt className={styles.detailRowLabel}>Date &amp; Time</dt>
-                          <dd className={styles.detailRowValue}>{formatAuditTimestamp(log.occurredAt)}</dd>
-                        </div>
-                      </div>
-                    </dl>
-                  </div>
-
-                  <div className={styles.overviewTimelineColDivider}>
-                    <h3 className={styles.drawerSectionTitle}>
-                      <Icon.Clock width={12} height={12} />
-                      Timeline
-                    </h3>
-                    <div className={styles.timeline}>
-                      <div className={styles.timelineStep}>
-                        <span className={styles.timelineDot} />
-                        <div className={styles.timelineStepCard}>
-                          <span className={styles.timelineLabel}>
-                            {log.actorName ? `Started by ${log.actorName}` : 'Activity recorded'}
-                          </span>
-                          <span className={styles.timelineTime}>
-                            <Icon.Clock width={12} height={12} />
-                            {formatAuditTimestamp(log.occurredAt)}
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className={styles.timelineStep}>
-                        <span className={`${styles.timelineDot} ${log.result === 'Success' ? styles.timelineDotSuccess : styles.timelineDotDanger}`} />
-                        <div className={styles.timelineStepCard}>
-                          <span className={styles.timelineLabel}>{log.result === 'Success' ? 'Finished successfully' : 'Did not complete'}</span>
-                          <span className={styles.timelineTime}>
-                            <Icon.ShieldCheck width={12} height={12} />
-                            {log.sourceApplication || log.serviceName}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {log.failureReason && (
-                      <div className={styles.failureAlert}>
-                        <Icon.AlertTriangle className={styles.failureAlertIcon} width={15} height={15} />
-                        <div>
-                          <strong>Why it failed:</strong> {log.failureReason}
-                        </div>
-                      </div>
-                    )}
-                  </div>
+        {parsedDetails.hasPermissionChanges && (
+          <DetailSection title="Permission changes" icon={<Icon.FileText width={12} height={12} />}>
+            <div className={styles.permissionChanges}>
+              {parsedDetails.added.length > 0 && (
+                <div>
+                  <h4 className={styles.permissionChangesTitle}>Granted</h4>
+                  <ul className={styles.permissionList}>
+                    {parsedDetails.added.map((p) => (
+                      <li key={p} className={styles.permissionAdded}>
+                        {describePermission(p, permissionLabels)}
+                      </li>
+                    ))}
+                  </ul>
                 </div>
-              </section>
-
-              {/*
-                Every field below is omitted when the record carries no value for it — DetailField
-                returns null rather than printing "Not recorded" or an em dash. "Actor ID" and raw
-                "Entity ID" are never shown at all: a database GUID means nothing to the person
-                reading an audit trail and can't be acted on, so the name carries the same meaning
-                in a form a human can actually use.
-              */}
-              <DetailSection title="Who Did This" icon={<Icon.User width={12} height={12} />}>
-                <DetailGrid>
-                  <DetailField label="Performed By" icon={<Icon.User width={15} height={15} />}>
-                    {log.actorName ?? 'System'}
-                  </DetailField>
-                  <DetailField label="Sign-in Method" icon={<Icon.Shield width={15} height={15} />}>
-                    {log.authMethod ? <span className={styles.authPill}>{log.authMethod}</span> : null}
-                  </DetailField>
-                  <DetailField label="IP Address" icon={<Icon.Globe width={15} height={15} />}>
-                    {log.sourceIp ? (
-                      <span className={styles.ipBadge}>
-                        <span className={styles.ipDot} />
-                        {formatIpv4(log.sourceIp)}
-                      </span>
-                    ) : null}
-                  </DetailField>
-                </DetailGrid>
-              </DetailSection>
-
-              <DetailSection title="Device Used" icon={<Icon.Globe width={12} height={12} />} hidden={!parsedAgent}>
-                <DetailGrid>
-                  <DetailField label="Browser" icon={<Icon.Globe width={15} height={15} />}>
-                    {parsedAgent ? <span className={styles.browserPill}>{parsedAgent.browser}</span> : null}
-                  </DetailField>
-                  <DetailField label="Operating System" icon={<Icon.Box width={15} height={15} />}>
-                    {parsedAgent ? <span className={styles.osPill}>{parsedAgent.os}</span> : null}
-                  </DetailField>
-                </DetailGrid>
-              </DetailSection>
-
-              <DetailSection title="Affected Record" icon={<Icon.Box width={12} height={12} />} hidden={!log.entityType && !log.entityLabel && !log.page}>
-                <DetailGrid>
-                  <DetailField label="Record Type" icon={<Icon.Layers width={15} height={15} />}>
-                    <Badge tone="neutral">{log.entityType || (log.actionCategory === 'Navigation' ? 'Page' : 'Record')}</Badge>
-                  </DetailField>
-                  <DetailField label="Record Name" icon={<Icon.FileText width={15} height={15} />}>
-                    {log.entityLabel || (log.module && log.page ? `${log.module} — ${log.page}` : log.page || '—')}
-                  </DetailField>
-                </DetailGrid>
-              </DetailSection>
-
-              {/* Correlation ID's actual payoff: instead of a raw GUID, a way to see the rest of the
-                  one operation this row belongs to (e.g. the approval that led to it, or the effect
-                  it caused) — hidden entirely when this row is the only event with its id. */}
-              {hasRelated && onViewRelated && (
-                <DetailSection title="Related Activity" icon={<Icon.Layers width={12} height={12} />}>
-                  <div className={styles.relatedActivityRow}>
-                    <span className={styles.relatedActivityText}>
-                      Part of an operation with <strong>{relatedCount}</strong> events.
-                    </span>
-                    <Button variant="secondary" size="sm" leadingIcon={<Icon.ArrowRight width={14} height={14} />} onClick={() => onViewRelated(log.correlationId)}>
-                      View related events
-                    </Button>
-                  </div>
-                </DetailSection>
               )}
-
-              {log.details && (
-                <DetailSection title="Details" icon={<Icon.FileText width={12} height={12} />}>
-                  {parsedDetails.headline && <p className={styles.detailsText}>{parsedDetails.headline}</p>}
-                  {parsedDetails.hasPermissionChanges && (
-                    <div className={styles.permissionChanges}>
-                      {parsedDetails.added.length > 0 && (
-                        <div>
-                          <h4 className={styles.permissionChangesTitle}>Added</h4>
-                          <ul className={styles.permissionList}>
-                            {parsedDetails.added.map((p) => (
-                              <li key={p} className={styles.permissionAdded}>{describePermission(p, permissionLabels)}</li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-                      {parsedDetails.removed.length > 0 && (
-                        <div>
-                          <h4 className={styles.permissionChangesTitle}>Removed</h4>
-                          <ul className={styles.permissionList}>
-                            {parsedDetails.removed.map((p) => (
-                              <li key={p} className={styles.permissionRemoved}>{describePermission(p, permissionLabels)}</li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </DetailSection>
+              {parsedDetails.removed.length > 0 && (
+                <div>
+                  <h4 className={styles.permissionChangesTitle}>Revoked</h4>
+                  <ul className={styles.permissionList}>
+                    {parsedDetails.removed.map((p) => (
+                      <li key={p} className={styles.permissionRemoved}>
+                        {describePermission(p, permissionLabels)}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               )}
             </div>
-          </div>
-        </div>
-      </div>
-    </div>
+          </DetailSection>
+        )}
+      </DetailSections>
+    </Drawer>,
+    document.body,
   )
 }

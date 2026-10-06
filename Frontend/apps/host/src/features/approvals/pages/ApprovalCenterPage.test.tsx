@@ -222,3 +222,25 @@ describe('coming back to the queue', () => {
     expect(api.facets.mock.calls.length).toBe(calls.facets)
   })
 })
+
+/**
+ * On an Update the checker's whole question is "what changes?". The Requested Change grid marks the
+ * fields whose value differs from Before; blank and absent are the same to a reader, and a Create (no
+ * Before) marks nothing rather than everything.
+ */
+describe('what a request changes', () => {
+  it('names only the fields whose value differs', async () => {
+    const { changedFieldLabels } = await import('./ApprovalCenterPage')
+    const before = JSON.stringify({ Name: 'Asha Rao', Email: 'asha@corp.com', PhoneNumber: '', RoleId: 'r1', RoleName: 'Agent' })
+    const after = JSON.stringify({ Name: 'Asha Rao', Email: 'asha.rao@corp.com', PhoneNumber: null, RoleId: 'r2', RoleName: 'Manager' })
+
+    expect([...(changedFieldLabels(before, after) ?? [])].sort()).toEqual(['Email', 'Role'])
+  })
+
+  it('marks nothing when there is no before to compare with', async () => {
+    const { changedFieldLabels } = await import('./ApprovalCenterPage')
+
+    expect(changedFieldLabels(null, JSON.stringify({ Name: 'New' }))).toBeNull()
+    expect(changedFieldLabels('[1]', '[2]')).toBeNull()
+  })
+})

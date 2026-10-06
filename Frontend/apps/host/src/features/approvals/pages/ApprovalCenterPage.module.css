@@ -18,7 +18,7 @@
 
 @keyframes pageFadeIn {
   from { opacity: 0; transform: translateY(4px); }
-  to   { opacity: 1; transform: translateY(0); }
+  to   { opacity: 1; transform: none; }
 }
 
 /* ════════════════════════════════════════════════════
@@ -37,7 +37,7 @@
 }
 
 @keyframes pulseDot {
-  0%, 100% { transform: scale(1); opacity: 1; }
+  0%, 100% { transform: none; opacity: 1; }
   50% { transform: scale(1.35); opacity: 0.75; }
 }
 
@@ -389,7 +389,7 @@
 
 @keyframes customInputFadeIn {
   from { opacity: 0; transform: translateX(-4px); }
-  to   { opacity: 1; transform: translateX(0); }
+  to   { opacity: 1; transform: none; }
 }
 
 .refreshBtn,
@@ -550,7 +550,7 @@
 
 @keyframes popoverFadeIn {
   from { opacity: 0; transform: translateY(-6px); }
-  to { opacity: 1; transform: translateY(0); }
+  to { opacity: 1; transform: none; }
 }
 
 .popoverHeader {
@@ -1478,4 +1478,145 @@
   border-radius: var(--omni-radius-md);
   font-size: var(--omni-font-size-xs);
   color: var(--omni-color-warning-800, #92400e);
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   Classes the page already used but this stylesheet never defined —
+   each rendered as unstyled markup until now.
+   ══════════════════════════════════════════════════════════════════ */
+
+/* The checker wears the brand blue so a row's maker (violet) and checker read as two people. */
+.checkerAvatar,
+.checkerAvatarSmall {
+  background: linear-gradient(135deg, var(--omni-color-primary-50) 0%, var(--omni-color-primary-100) 100%);
+  color: var(--omni-color-primary-700);
+}
+
+.unassignedChip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 9px;
+  border: 1px dashed var(--omni-color-border-strong);
+  border-radius: var(--omni-radius-pill);
+  color: var(--omni-color-text-muted);
+  font-size: var(--omni-font-size-xs-minus);
+  font-weight: var(--omni-font-weight-semibold);
+  white-space: nowrap;
+}
+
+.overviewTimelineCol {
+  min-width: 0;
+}
+
+.permissionDiffCardMod {
+  background: var(--omni-color-warning-50);
+  border: 1.5px solid var(--omni-color-warning-200);
+}
+
+.permissionDiffBadgeMod {
+  display: inline-flex;
+  padding: 3px 8px;
+  background: var(--omni-color-warning-600);
+  color: var(--omni-color-surface);
+  border-radius: var(--omni-radius-sm);
+  font-size: var(--omni-font-size-xs-minus);
+  font-weight: var(--omni-font-weight-bold);
+}
+
+/* Nested snapshot values (an object or a list of objects inside one field). */
+.nestedRows {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.nestedRow {
+  padding: 6px 8px;
+  background: var(--omni-color-surface-alt);
+  border: 1px solid var(--omni-color-border);
+  border-radius: var(--omni-radius-md);
+}
+
+.dataFieldList {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+}
+
+.dataFieldRow {
+  display: grid;
+  grid-template-columns: minmax(96px, 38%) 1fr;
+  gap: 10px;
+  align-items: baseline;
+  font-size: var(--omni-font-size-xs);
+}
+
+.dataFieldRow dt {
+  color: var(--omni-color-text-muted);
+  font-weight: var(--omni-font-weight-semibold);
+}
+
+.dataFieldRow dd {
+  margin: 0;
+  color: var(--omni-color-text-primary);
+  overflow-wrap: anywhere;
+}
+
+.emptyValue {
+  color: var(--omni-color-text-muted);
+  font-weight: var(--omni-font-weight-regular);
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   What actually changes — the one thing a checker is reading for.
+   On an Update, the fields whose value differs carry a rule and a label;
+   the ones that stay the same step back so the eye lands on the change.
+   ══════════════════════════════════════════════════════════════════ */
+.changeSummary {
+  margin: 0 0 10px;
+  font-size: var(--omni-font-size-sm-minus);
+  color: var(--omni-color-text-secondary);
+  line-height: 1.5;
+}
+
+.changeSummary strong {
+  color: var(--omni-color-text-primary);
+}
+
+.fieldCardChanged {
+  border-color: var(--omni-color-warning-300);
+  background: var(--omni-color-warning-50);
+}
+
+.fieldCardChanged::after {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: var(--omni-color-warning-500);
+}
+
+.fieldCardUnchanged {
+  opacity: 0.62;
+}
+
+.changedTag {
+  margin-left: 6px;
+  padding: 0 6px;
+  border-radius: var(--omni-radius-pill);
+  background: var(--omni-color-warning-100);
+  color: var(--omni-color-warning-800);
+  font-size: var(--omni-font-size-3xs);
+  font-weight: var(--omni-font-weight-bold);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+/* The sticky decision row, now inside the shared Drawer's footer: the two buttons fill it. */
+.footerBtns {
+  flex: 1;
+}
+
+.rejectFormFooter {
+  flex: 1;
 }

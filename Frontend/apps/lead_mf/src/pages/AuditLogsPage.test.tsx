@@ -47,9 +47,13 @@ const row = (over: Record<string, unknown> = {}) => ({
 /** The params object from the most recent list request. */
 const lastListParams = () => getAuditLogs.mock.calls.at(-1)?.[0] as Record<string, unknown>
 
-/** The query string of the most recent export request, as a plain object. */
+/**
+ * The query string of the most recent export request, as a plain object. Resolved against a base
+ * because the request URL is same-origin (relative) whenever VITE_API_BASE_URL is empty — the
+ * documented default — and `new URL` refuses a relative URL on its own.
+ */
 const lastExportQuery = () => {
-  const url = new URL(remoteDownloadCsv.mock.calls.at(-1)?.[0] as string)
+  const url = new URL(remoteDownloadCsv.mock.calls.at(-1)?.[0] as string, 'http://localhost')
   return Object.fromEntries(url.searchParams.entries())
 }
 

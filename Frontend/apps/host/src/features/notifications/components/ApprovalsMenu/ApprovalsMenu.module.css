@@ -47,7 +47,7 @@
 
 @keyframes badgePop {
   from { transform: scale(0.4); opacity: 0; }
-  to   { transform: scale(1);   opacity: 1; }
+  to   { transform: none;   opacity: 1; }
 }
 
 .menu {
@@ -70,7 +70,7 @@
 
 @keyframes menuSlideIn {
   from { opacity: 0; transform: translateY(-10px) scale(0.96); }
-  to   { opacity: 1; transform: translateY(0)    scale(1); }
+  to   { opacity: 1; transform: none; }
 }
 
 .menuHeader {

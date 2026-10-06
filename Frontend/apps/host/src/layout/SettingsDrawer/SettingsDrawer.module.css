@@ -41,7 +41,7 @@
 
 @keyframes slideIn {
   from { transform: translateX(100%); }
-  to   { transform: translateX(0); }
+  to   { transform: none; }
 }
 
 .rootPanel,
@@ -60,7 +60,7 @@
 
 @keyframes layerSlideIn {
   from { transform: translateX(50px); opacity: 0.7; }
-  to   { transform: translateX(0);    opacity: 1;   }
+  to   { transform: none;    opacity: 1;   }
 }
 
 /* ── Menu Pane (Dark navigation matching screenshot) ─────── */

@@ -18,7 +18,7 @@
 
 @keyframes pageFadeIn {
   from { opacity: 0; transform: translateY(4px); }
-  to   { opacity: 1; transform: translateY(0); }
+  to   { opacity: 1; transform: none; }
 }
 
 /* ════════════════════════════════════════════════════
@@ -37,7 +37,7 @@
 }
 
 @keyframes pulseDot {
-  0%, 100% { transform: scale(1); opacity: 1; }
+  0%, 100% { transform: none; opacity: 1; }
   50% { transform: scale(1.35); opacity: 0.75; }
 }
 
@@ -328,7 +328,7 @@
 
 @keyframes customInputFadeIn {
   from { opacity: 0; transform: translateX(-4px); }
-  to   { opacity: 1; transform: translateX(0); }
+  to   { opacity: 1; transform: none; }
 }
 
 /* Action buttons */
@@ -532,7 +532,7 @@
 
 @keyframes popoverFadeIn {
   from { opacity: 0; transform: translateY(-6px); }
-  to { opacity: 1; transform: translateY(0); }
+  to { opacity: 1; transform: none; }
 }
 
 .popoverHeader {

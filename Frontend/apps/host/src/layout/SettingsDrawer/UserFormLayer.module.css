@@ -1693,3 +1693,20 @@
 .ufl23 {
   margin-top: 10px;
 }
+
+/* Role picker pieces the form already rendered but this file never styled. */
+.triggerPlaceholder {
+  color: var(--omni-color-text-muted);
+  font-size: var(--omni-font-size-sm-minus);
+}
+
+.dropdownName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dropdownCheckIcon {
+  flex-shrink: 0;
+  color: var(--omni-color-primary-600);
+}

@@ -11,7 +11,7 @@
 
 @keyframes pageFadeIn {
   from { opacity: 0; transform: translateY(4px); }
-  to   { opacity: 1; transform: translateY(0); }
+  to   { opacity: 1; transform: none; }
 }
 
 /* ── Summary KPI cards (matches Roles, Users & Approval Center) ───── */
@@ -688,7 +688,7 @@
 
 @keyframes slideUp {
   from { opacity: 0; transform: translateY(12px); }
-  to   { opacity: 1; transform: translateY(0); }
+  to   { opacity: 1; transform: none; }
 }
 
 .saveBarInfo {

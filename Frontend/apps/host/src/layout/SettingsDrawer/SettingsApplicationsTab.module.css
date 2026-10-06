@@ -293,7 +293,7 @@
 
 @keyframes dropUp {
   from { opacity: 0; transform: translateY(8px) scale(0.96); }
-  to   { opacity: 1; transform: translateY(0) scale(1); }
+  to   { opacity: 1; transform: none; }
 }
 
 /* If the card is near the top of the list, open downward instead.
@@ -310,7 +310,7 @@
 
 @keyframes dropIn {
   from { opacity: 0; transform: translateY(-6px) scale(0.96); }
-  to   { opacity: 1; transform: translateY(0) scale(1); }
+  to   { opacity: 1; transform: none; }
 }
 
 
@@ -443,7 +443,7 @@
 
 @keyframes modalIn {
   from { transform: scale(0.94); opacity: 0; }
-  to   { transform: scale(1);    opacity: 1; }
+  to   { transform: none;    opacity: 1; }
 }
 
 .statusModalHeader {

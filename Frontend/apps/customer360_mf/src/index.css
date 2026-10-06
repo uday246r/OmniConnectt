@@ -761,7 +761,7 @@
 
 @keyframes c360-drawer-slide-in {
   from { transform: translateX(100%); }
-  to { transform: translateX(0); }
+  to { transform: none; }
 }
 
 /* Decorative circles, matching the host header's exact treatment. */

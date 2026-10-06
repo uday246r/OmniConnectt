@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useState, type ReactNode } from 'react'
+import { Fragment, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { SkeletonBlock } from '../../feedback/Skeleton/Skeleton'
 import { classNames } from '../../utils/classNames'
 import styles from './DataTable.module.css'
@@ -97,8 +97,31 @@ export function ResponsiveRows<Row>({
 }: ResponsiveRowsProps<Row>) {
   const width = useViewportWidth()
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set())
+  const headRef = useRef<HTMLTableSectionElement>(null)
 
-  const isVisible = (c: ResponsiveColumn<Row>) => width >= HIDE_BELOW[c.priority ?? 'always']
+  /*
+   * The viewport breakpoints alone cannot keep the promise above: a table inside a page with a
+   * sidebar and padding has far less room than the window, and at a common 1366–1440px laptop width
+   * the user Audit Log table overflowed by ~90px — with its Details action in the part scrolled out
+   * of view. So, after the breakpoints, the table also checks the room it actually has: if it still
+   * overflows, it drops the 'low' columns into the expander, then the 'high' ones. Measured before
+   * paint, so there is no visible reflow; reset whenever the window or the rows change.
+   */
+  const [squeeze, setSqueeze] = useState(0)
+  useLayoutEffect(() => {
+    setSqueeze(0)
+  }, [width, rows, loading])
+  useLayoutEffect(() => {
+    const area = headRef.current?.closest('table')?.parentElement
+    if (area && squeeze < 2 && area.scrollWidth > area.clientWidth + 1) setSqueeze((s) => s + 1)
+  })
+
+  const fits = (priority: ColumnPriority) =>
+    squeeze === 0 || priority === 'always' || (squeeze === 1 && priority === 'high')
+  const isVisible = (c: ResponsiveColumn<Row>) => {
+    const priority = c.priority ?? 'always'
+    return width >= HIDE_BELOW[priority] && fits(priority)
+  }
   const visible = columns.filter(isVisible)
   const hidden = columns.filter((c) => !isVisible(c))
   const canExpand = hidden.length > 0
@@ -121,7 +144,7 @@ export function ResponsiveRows<Row>({
 
   return (
     <>
-      <thead>
+      <thead ref={headRef}>
         <tr>
           {canExpand && <th className={styles.expanderHead} aria-label="Expand row" />}
           {visible.map((c) =>

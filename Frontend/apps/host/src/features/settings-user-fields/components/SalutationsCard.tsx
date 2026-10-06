@@ -152,13 +152,10 @@ export function SalutationsCard({ canEdit, onCountChange }: SalutationsCardProps
           <span className={styles.headIcon}>
             <Icon.Users width={15} height={15} />
           </span>
-          <div>
-            <h3 className={styles.headTitle}>
-              Salutations
-              <span className={styles.headCount}>{entries.length}</span>
-            </h3>
-            <p className={styles.headDesc}>Title options shown on user profiles (Mr., Ms., Dr., etc.).</p>
-          </div>
+          <h3 className={styles.headTitle}>
+            Salutations
+            <span className={styles.headCount}>{entries.length}</span>
+          </h3>
         </div>
         {canEdit && (
           <Button variant="primary" size="sm" loading={saving} disabled={!dirty || editing !== null} onClick={requestSave}>

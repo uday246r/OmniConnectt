@@ -41,8 +41,10 @@ const row = (over: Record<string, unknown> = {}) => ({
 })
 
 const lastListParams = () => getAuditLogs.mock.calls.at(-1)?.[0] as Record<string, unknown>
+// Resolved against a base: with VITE_*_URL empty (the documented same-origin default) the export URL
+// is relative, which `new URL` refuses on its own.
 const lastExportQuery = () =>
-  Object.fromEntries(new URL(remoteDownloadCsv.mock.calls.at(-1)?.[0] as string).searchParams.entries())
+  Object.fromEntries(new URL(remoteDownloadCsv.mock.calls.at(-1)?.[0] as string, 'http://localhost').searchParams.entries())
 
 beforeEach(() => {
   vi.clearAllMocks()

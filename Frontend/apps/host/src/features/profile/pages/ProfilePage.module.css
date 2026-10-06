@@ -31,7 +31,7 @@
 
 @keyframes fadeSlideIn {
   from { opacity: 0; transform: translateY(-8px); }
-  to   { opacity: 1; transform: translateY(0); }
+  to   { opacity: 1; transform: none; }
 }
 
 /* ── Page Header — gradient hero ─────────────────────────── */
@@ -578,7 +578,7 @@
 
 @keyframes slideFromRight {
   from { transform: translateX(100%); }
-  to   { transform: translateX(0); }
+  to   { transform: none; }
 }
 
 /* Drawer Header — gradient */
@@ -809,3 +809,18 @@
 }
 
 .eyeToggle:hover { color: var(--omni-color-text-primary); }
+
+/* Shown beside the name for an administrator account; same pill shape as .roleChip, in the gold the
+   crown already implies so it is not mistaken for an ordinary role. */
+.superAdminChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--omni-color-warning-50);
+  color: var(--omni-color-warning-800);
+  border: 1px solid var(--omni-color-warning-200);
+  border-radius: var(--omni-radius-pill);
+  padding: 3px 10px 3px 8px;
+  font-size: var(--omni-font-size-xs-minus);
+  font-weight: var(--omni-font-weight-semibold);
+}
