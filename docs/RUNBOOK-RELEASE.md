@@ -71,10 +71,18 @@ To release by hand from a workstation:
 
 ```bash
 cd Frontend && pnpm release                       # all checks, then build + assemble
-pnpm release -- --only lead --reuse release/<previous-id>   # just Lead; reuse the others' builds
+pnpm release -- --since v2026.10.01 --reuse release/<previous-id>.tar.gz   # only what changed since that tag
+pnpm release -- --only lead --reuse release/<previous-id>.tar.gz           # just Lead
 scp release/<id>.tar.gz* server:/opt/omniconnect/releases-incoming/
 ssh server /opt/omniconnect/deploy/scripts/deploy.sh /opt/omniconnect/releases-incoming/<id>.tar.gz
 ```
+
+**Incremental releases.** CI does this automatically: it finds the previous `v*` tag, downloads that
+release's artifact and rebuilds only the apps whose files changed since. A change to anything all apps
+are built from (`packages/`, the lockfile, workspace or TypeScript config, the release script) rebuilds
+all of them. Builds are byte-for-byte reproducible, so an unchanged app taken from the previous release
+is identical to a rebuild — and an app whose code changed while its `version` did not fails the build
+with "Bump "version" in its package.json", before it can reach a server.
 
 **What `deploy.sh` does:**
 1. Verifies the checksum.

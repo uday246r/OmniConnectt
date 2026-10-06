@@ -65,6 +65,8 @@ jobs:
       archive: ${{ steps.release.outputs.archive }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0          # full history and tags: change detection diffs against the last release
       - uses: pnpm/action-setup@v4
         with:
           version: 9.15.0
@@ -73,16 +75,34 @@ jobs:
           node-version: 24
           cache: pnpm
           cache-dependency-path: Frontend/pnpm-lock.yaml
+      # Rebuild only the apps that changed since the previous release; every other app's build is taken
+      # byte-for-byte from that release's artifact. Builds are reproducible, so this is the same output a
+      # full rebuild would give — faster, and it proves unchanged apps really are unchanged (an app whose
+      # code changed without a version bump fails the build). No previous release → a full build.
+      - name: Find the previous release
+        id: previous
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          prev="$(git describe --tags --abbrev=0 --match 'v*' "$(git rev-parse HEAD)^" 2>/dev/null || true)"
+          if [ -n "$prev" ] && gh release download "$prev" --pattern '*.tar.gz*' --dir ../prev-release 2>/dev/null; then
+            echo "tag=$prev" >> "$GITHUB_OUTPUT"
+            echo "archive=$(ls ../prev-release/*.tar.gz)" >> "$GITHUB_OUTPUT"
+            echo "Incremental release since $prev"
+          else
+            echo "No previous release artifact found — building every app."
+          fi
       - id: release
         env:
           CI: "true"
           ROLL_FORWARD_ONLY: ${{ inputs.roll_forward_only }}
+          PREV_TAG: ${{ steps.previous.outputs.tag }}
+          PREV_ARCHIVE: ${{ steps.previous.outputs.archive }}
         run: |
-          if [ -n "$ROLL_FORWARD_ONLY" ]; then
-            pnpm release -- --roll-forward-only "$ROLL_FORWARD_ONLY"
-          else
-            pnpm release
-          fi
+          args=()
+          if [ -n "$PREV_TAG" ]; then args+=(--since "$PREV_TAG" --reuse "$PREV_ARCHIVE"); fi
+          if [ -n "$ROLL_FORWARD_ONLY" ]; then args+=(--roll-forward-only "$ROLL_FORWARD_ONLY"); fi
+          pnpm release -- "${args[@]}"
           echo "archive=$(basename "$(ls release/*.tar.gz)")" >> "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@v4
         with:

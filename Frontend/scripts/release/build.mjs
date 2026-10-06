@@ -5,7 +5,8 @@
  *
  *   pnpm release                         # checks, builds, assembles, archives
  *   pnpm release -- --skip-checks        # skip lint/typecheck/test (CI runs them as separate jobs)
- *   pnpm release -- --only lead          # rebuild just these apps; reuse the rest from --reuse
+ *   pnpm release -- --only lead --reuse release/<previous>.tar.gz   # rebuild just Lead, reuse the rest
+ *   pnpm release -- --since v2026.10.01 --reuse prev.tar.gz      # rebuild only what changed since a tag
  *   pnpm release -- --roll-forward-only "LeadService migration drops the Products table"
  *
  * Output (Frontend/release/):
@@ -45,8 +46,9 @@ const option = (name) => {
 }
 
 const skipChecks = flag('--skip-checks')
-const only = option('--only')?.split(',').map((s) => s.trim()).filter(Boolean)
-const reuseDir = option('--reuse')
+let only = option('--only')?.split(',').map((s) => s.trim()).filter(Boolean)
+const since = option('--since')
+const reuseSource = option('--reuse')
 const rollForwardOnly = option('--roll-forward-only')
 const outRoot = path.resolve(frontend, option('--out') ?? 'release')
 const isCi = process.env.CI === 'true'
@@ -134,6 +136,17 @@ function assertRelativeAssets(dir, label) {
   }
 }
 
+/**
+ * A rebuilt app whose version is unchanged from the reused release must be byte-identical to it —
+ * builds are reproducible, so a different hash under the same version means its code changed without a
+ * version bump. Caught here, with the fix named, instead of as a refused deploy.
+ */
+function assertVersionBumped(label, version, sha256, previous) {
+  if (previous && previous.version === version && previous.sha256 !== sha256) {
+    throw new Error(`${label} changed but is still version ${version} (the previous release has different content under that version). Bump "version" in its package.json.`)
+  }
+}
+
 // Same-origin API URLs and no stray value from a developer's shell.
 const RELEASE_ENV = {
   VITE_API_BASE_URL: '',
@@ -156,6 +169,53 @@ rmSync(releaseDir, { recursive: true, force: true })
 mkdirSync(releaseDir, { recursive: true })
 
 console.log(`Release ${releaseId} → ${path.relative(frontend, releaseDir)}`)
+
+// ── What to rebuild ───────────────────────────────────────────────────────────
+
+/**
+ * Apps whose sources changed since a git ref. Anything every app is built from — the shared packages,
+ * the lockfile, the workspace and TypeScript config, this script — counts as a change to all of them.
+ */
+function appsChangedSince(ref) {
+  const changed = git('diff', '--name-only', `${ref}...HEAD`, '--', '.')
+  if (changed === null) throw new Error(`--since ${ref}: git could not compare against it (is it fetched?).`)
+  const files = changed.split('\n').filter(Boolean).map((f) => f.replace(/^Frontend\//, ''))
+
+  const shared = ['packages/', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', 'package.json', 'tsconfig.base.json', 'release.config.json', 'scripts/release/']
+  if (files.some((f) => shared.some((prefix) => f === prefix || f.startsWith(prefix)))) {
+    return ['host', ...config.remotes.map((r) => r.key)]
+  }
+
+  const apps = [{ key: 'host', dir: config.host.dir }, ...config.remotes]
+  return apps.filter((app) => files.some((f) => f.startsWith(`${app.dir}/`))).map((app) => app.key)
+}
+
+if (since) {
+  if (only) throw new Error('Use --since or --only, not both.')
+  only = appsChangedSince(since)
+  console.log(`Changed since ${since}: ${only.length ? only.join(', ') : 'nothing'}`)
+}
+
+/** --reuse takes a previous release's folder or its .tar.gz (extracted next to this release). */
+let reuseDir = reuseSource
+if (reuseSource?.endsWith('.tar.gz')) {
+  const shaFile = `${reuseSource}.sha256`
+  if (existsSync(shaFile)) {
+    const expected = readFileSync(shaFile, 'utf8').trim().split(/\s+/)[0]
+    const actual = createHash('sha256').update(readFileSync(reuseSource)).digest('hex')
+    if (expected !== actual) throw new Error(`${reuseSource} does not match its .sha256 — refusing to reuse it.`)
+  }
+  reuseDir = path.join(outRoot, `.reuse-${releaseId}`)
+  rmSync(reuseDir, { recursive: true, force: true })
+  mkdirSync(reuseDir, { recursive: true })
+  // Relative, forward-slash path from the extraction folder: GNU tar (Git for Windows) reads "C:\…" as host:path.
+  const archiveFromHere = path.relative(reuseDir, path.resolve(reuseSource)).split(path.sep).join('/')
+  run('tar', ['-xzf', archiveFromHere], { cwd: reuseDir })
+}
+if (only && !reuseDir) {
+  console.warn('\n⚠ No --reuse given, so every app is built (nothing to reuse unchanged builds from).')
+  only = undefined
+}
 
 // ── Checks ────────────────────────────────────────────────────────────────────
 
@@ -191,6 +251,7 @@ if (wants('host') || !reused) {
   const target = path.join(releaseDir, 'host', hostPkg.version)
   cpSync(path.join(hostDir, 'dist'), target, { recursive: true })
   host = { version: hostPkg.version, bridgeVersion, path: base, sha256: folderChecksum(target) }
+  assertVersionBumped('The host', host.version, host.sha256, reused?.host)
 } else {
   host = reused.host
   cpSync(path.join(reuseDir, 'host', host.version), path.join(releaseDir, 'host', host.version), { recursive: true })
@@ -240,6 +301,7 @@ for (const remote of config.remotes) {
     sidebarOrder: remote.sidebarOrder,
     sha256: folderChecksum(target),
   }
+  assertVersionBumped(remote.key, pkg.version, remotes[remote.key].sha256, reused?.remotes?.[remote.key])
 }
 
 // ── Compatibility, before anything ships ──────────────────────────────────────
@@ -271,7 +333,11 @@ run('tar', ['-czf', path.basename(archive), '-C', releaseId, '.'], { cwd: outRoo
 const archiveSha = createHash('sha256').update(readFileSync(archive)).digest('hex')
 writeFileSync(`${archive}.sha256`, `${archiveSha}  ${path.basename(archive)}\n`)
 
+if (reuseSource?.endsWith('.tar.gz')) rmSync(reuseDir, { recursive: true, force: true })
+
+const rebuilt = only ?? ['host', ...config.remotes.map((r) => r.key)]
 console.log(`\n✔ Release ${releaseId}`)
+console.log(`  rebuilt      ${rebuilt.length ? rebuilt.join(', ') : 'nothing (all reused)'}`)
 console.log(`  host         ${host.version} (bridge ${bridgeVersion})`)
 for (const [key, r] of Object.entries(remotes)) console.log(`  ${key.padEnd(12)} ${r.version} (needs ${r.requiredHostBridge})`)
 console.log(`  archive      ${path.relative(frontend, archive)}`)
