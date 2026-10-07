@@ -1,8 +1,8 @@
 import React from 'react';
 import { Building2 } from '@omniconnect/ui/icons';
+import { Combobox, FormField, FormGrid, FormSection, Input } from '@omniconnect/ui';
 import { useLeadStore } from '../../../store/useLeadStore';
 import { DatePicker } from '../../common/DatePicker';
-import { SearchableDropdown } from '../../common/SearchableDropdown';
 import { isFieldVisible, isFieldRequired, isFieldEditable, getFieldLabel } from '../../../config/fieldControlRegistry';
 import { useShallow } from 'zustand/react/shallow';
 
@@ -10,6 +10,12 @@ interface MicrofinanceFieldsProps {
   isEdit?: boolean;
 }
 
+/**
+ * The business a microfinance lead is about.
+ *
+ * Shown only when Field Settings has switched one of these fields on for the chosen product — never
+ * decided from the product's name (see `LeadFormContainer`).
+ */
 export const MicrofinanceFields: React.FC<MicrofinanceFieldsProps> = ({ isEdit = false }) => {
   const store = useLeadStore(useShallow((s) => ({ editFormData: s.editFormData, formData: s.formData, editErrors: s.editErrors, errors: s.errors, setEditFieldValue: s.setEditFieldValue, setFieldValue: s.setFieldValue, entityTypes: s.entityTypes, validateField: s.validateField, fieldConfig: s.fieldConfig })));
   const formData = isEdit ? store.editFormData : store.formData;
@@ -20,63 +26,69 @@ export const MicrofinanceFields: React.FC<MicrofinanceFieldsProps> = ({ isEdit =
   const config = store.fieldConfig;
 
   return (
-    <div className="form-section">
-      <div className="form-section-title">
-        <Building2 size={18} className="form-section-icon" />
-        <span>Business Details</span>
-      </div>
-
-      <div className="form-grid-1">
-        {/* Date of Incorporation */}
+    <FormSection title="Business Details" icon={<Building2 size={15} />}>
+      <FormGrid>
         {isFieldVisible(config, 'dateOfIncorporation') && (
-          <DatePicker
-            id="date-of-incorporation-picker"
+          <FormField
             label={getFieldLabel(config, 'dateOfIncorporation', 'Date of Incorporation')}
-            placeholder="DD/MM/YYYY"
-            value={formData.dateOfIncorporation}
-            disabled={isEdit && !isFieldEditable(config, 'dateOfIncorporation')}
-            onChange={(val) => setFieldValue('dateOfIncorporation', val)}
             required={isFieldRequired(config, 'dateOfIncorporation')}
             error={errors.dateOfIncorporation}
-          />
-        )}
-
-        {/* Company Name */}
-        {isFieldVisible(config, 'companyName') && (
-          <div className="form-field-group">
-            <label className="form-label">
-              {getFieldLabel(config, 'companyName', 'Company Name')}{' '}
-              {isFieldRequired(config, 'companyName') && <span className="required-asterisk">*</span>}
-            </label>
-            <input
-              type="text"
-              className={`form-input ${errors.companyName ? 'has-error' : ''}`}
-              value={formData.companyName}
-              disabled={isEdit && !isFieldEditable(config, 'companyName')}
-              onChange={(e) => setFieldValue('companyName', e.target.value)}
-              onBlur={() => validateField('companyName')}
-            />
-            {errors.companyName && (
-              <div className="field-error-message">{errors.companyName}</div>
+          >
+            {(control) => (
+              <DatePicker
+                id={control.id}
+                describedBy={control.describedBy}
+                invalid={control.invalid}
+                placeholder="DD/MM/YYYY"
+                value={formData.dateOfIncorporation}
+                disabled={isEdit && !isFieldEditable(config, 'dateOfIncorporation')}
+                onChange={(val) => setFieldValue('dateOfIncorporation', val)}
+              />
             )}
-          </div>
+          </FormField>
         )}
 
-        {/* Entity Type */}
+        {isFieldVisible(config, 'companyName') && (
+          <FormField
+            label={getFieldLabel(config, 'companyName', 'Company Name')}
+            required={isFieldRequired(config, 'companyName')}
+            error={errors.companyName}
+          >
+            {(control) => (
+              <Input
+                {...control.aria}
+                type="text"
+                value={formData.companyName}
+                disabled={isEdit && !isFieldEditable(config, 'companyName')}
+                onChange={(e) => setFieldValue('companyName', e.target.value)}
+                onBlur={() => validateField('companyName')}
+              />
+            )}
+          </FormField>
+        )}
+
         {isFieldVisible(config, 'entityType') && (
-          <SearchableDropdown
+          <FormField
             label={getFieldLabel(config, 'entityType', 'Entity Type')}
-            placeholder="Select Entity Type"
-            options={entityTypes}
-            value={formData.entityType}
-            disabled={isEdit && !isFieldEditable(config, 'entityType')}
-            onChange={(val) => setFieldValue('entityType', val)}
-            onBlur={() => validateField('entityType')}
             required={isFieldRequired(config, 'entityType')}
             error={errors.entityType}
-          />
+          >
+            {(control) => (
+              <Combobox
+                id={control.id}
+                aria-describedby={control.describedBy}
+                invalid={control.invalid}
+                options={entityTypes}
+                value={formData.entityType}
+                disabled={isEdit && !isFieldEditable(config, 'entityType')}
+                placeholder="Select Entity Type"
+                onChange={(val) => setFieldValue('entityType', val)}
+                onBlur={() => validateField('entityType')}
+              />
+            )}
+          </FormField>
         )}
-      </div>
-    </div>
+      </FormGrid>
+    </FormSection>
   );
 };

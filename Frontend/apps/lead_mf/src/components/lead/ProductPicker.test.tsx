@@ -4,11 +4,14 @@ import userEvent from '@testing-library/user-event';
 import { ProductPicker } from './ProductPicker';
 
 /**
- * The lead form's first step: Category → Product, both from the Marketplace's catalogue.
+ * The lead form's first step: category → sub-category → product, all from the Marketplace's catalogue.
  *
- * What matters is that nothing here knows a product or category by name — the lists are whatever the
- * catalogue returns, an empty or unreachable catalogue is said out loud (never shown as an empty form),
- * and choosing hands back the ids the rest of the form is built from.
+ * It was a grid of cards you clicked through; it is now three dropdowns you can type into, which is
+ * the only way it works against a real catalogue. These hold what did not change with the markup:
+ * nothing here knows a product or category by name, the three lists cascade (and a choice made under
+ * a category is dropped when the category changes), sub-category is derived rather than fetched, an
+ * empty or unreachable catalogue is said out loud instead of shown as an empty form, and choosing
+ * hands back the ids the rest of the form is built from.
  */
 
 const getCatalogCategories = vi.fn();
@@ -23,52 +26,147 @@ vi.mock('../../api/apiClient', () => ({
 
 const loans = { id: 'c1', name: 'Loans', code: 'LN', iconKey: '', productCount: 2 };
 const cards = { id: 'c2', name: 'Credit Cards', code: 'CC', iconKey: '', productCount: 1 };
+
 const homeLoan = {
   id: 'p1', name: 'Home Loan – Salaried', code: 'HL_001', shortDescription: 'For salaried applicants', iconKey: '',
   subCategoryId: 's1', subCategoryName: 'Home Loan', subCategoryCode: 'LN-HM',
   categoryId: 'c1', categoryName: 'Loans', categoryCode: 'LN',
 };
+const businessLoan = {
+  id: 'p2', name: 'Business Term Loan', code: 'BL_001', shortDescription: 'For registered businesses', iconKey: '',
+  subCategoryId: 's2', subCategoryName: 'Business Loan', subCategoryCode: 'LN-BZ',
+  categoryId: 'c1', categoryName: 'Loans', categoryCode: 'LN',
+};
+
+/** Opens a combobox by its accessible name and returns the option rows now on offer. */
+async function open(user: ReturnType<typeof userEvent.setup>, name: RegExp | string) {
+  await user.click(screen.getByRole('combobox', { name }));
+  return screen.getAllByRole('option');
+}
 
 beforeEach(() => {
   getCatalogCategories.mockReset().mockResolvedValue([loans, cards]);
-  getCatalogProducts.mockReset().mockResolvedValue([homeLoan]);
+  getCatalogProducts.mockReset().mockResolvedValue([homeLoan, businessLoan]);
 });
 
 describe('ProductPicker', () => {
   it('offers the categories the catalogue returns, with how many products each has', async () => {
+    const user = userEvent.setup();
     render(<ProductPicker onSelect={vi.fn()} />);
+    await waitFor(() => expect(getCatalogCategories).toHaveBeenCalled());
 
-    expect(await screen.findByRole('button', { name: /Loans/ })).toHaveTextContent('2 products');
-    expect(screen.getByRole('button', { name: /Credit Cards/ })).toHaveTextContent('1 product');
+    const options = await open(user, /Category/);
+
+    expect(options.map((o) => o.textContent)).toEqual([
+      expect.stringContaining('Loans'),
+      expect.stringContaining('Credit Cards'),
+    ]);
+    expect(options[0]).toHaveTextContent('2 products');
+    expect(options[1]).toHaveTextContent('1 product');
   });
 
-  it('shows the products of the chosen category and hands back the chosen one with its sub-category', async () => {
+  it('can be searched by typing any part of a name, which a grid of cards could not', async () => {
+    const user = userEvent.setup();
+    render(<ProductPicker onSelect={vi.fn()} />);
+    await waitFor(() => expect(getCatalogCategories).toHaveBeenCalled());
+
+    await user.click(screen.getByRole('combobox', { name: /Category/ }));
+    await user.type(screen.getByRole('combobox', { name: /Category/ }), 'card');
+
+    const options = screen.getAllByRole('option');
+    expect(options).toHaveLength(1);
+    expect(options[0]).toHaveTextContent('Credit Cards');
+  });
+
+  it('reads the chosen category products, and hands back the product with its sub-category', async () => {
     const onSelect = vi.fn();
     const user = userEvent.setup();
     render(<ProductPicker onSelect={onSelect} />);
+    await waitFor(() => expect(getCatalogCategories).toHaveBeenCalled());
 
-    await user.click(await screen.findByRole('button', { name: /Loans/ }));
-    expect(getCatalogProducts).toHaveBeenCalledWith('c1');
-    await user.click(await screen.findByRole('button', { name: /Home Loan – Salaried/ }));
+    await user.click(screen.getByRole('combobox', { name: /Category/ }));
+    await user.click(screen.getByRole('option', { name: /Loans/ }));
+    await waitFor(() => expect(getCatalogProducts).toHaveBeenCalledWith('c1'));
+
+    await user.click(screen.getByRole('combobox', { name: /^Product/ }));
+    await user.click(screen.getByRole('option', { name: /Home Loan – Salaried/ }));
 
     expect(onSelect).toHaveBeenCalledWith({ id: 'p1', name: 'Home Loan – Salaried', subCategoryId: 's1' });
   });
 
-  it('lets the person go back to the categories from a category', async () => {
+  it('derives the sub-categories from the products it already has, with no request of its own', async () => {
     const user = userEvent.setup();
     render(<ProductPicker onSelect={vi.fn()} />);
+    await waitFor(() => expect(getCatalogCategories).toHaveBeenCalled());
 
-    await user.click(await screen.findByRole('button', { name: /Loans/ }));
-    await user.click(await screen.findByRole('button', { name: /All categories/ }));
+    await user.click(screen.getByRole('combobox', { name: /Category/ }));
+    await user.click(screen.getByRole('option', { name: /Loans/ }));
+    await waitFor(() => expect(getCatalogProducts).toHaveBeenCalledTimes(1));
 
-    expect(await screen.findByRole('button', { name: /Credit Cards/ })).toBeInTheDocument();
+    const options = await open(user, /Sub-category/);
+
+    expect(options.map((o) => o.textContent)).toEqual([
+      expect.stringContaining('Business Loan'),
+      expect.stringContaining('Home Loan'),
+    ]);
+    // One call for the products, and nothing else: there is no sub-category endpoint behind this.
+    expect(getCatalogProducts).toHaveBeenCalledTimes(1);
   });
 
-  it('says there is nothing to take a lead for when the catalogue has no categories, instead of showing nothing', async () => {
+  it('narrows the products to the chosen sub-category', async () => {
+    const user = userEvent.setup();
+    render(<ProductPicker onSelect={vi.fn()} />);
+    await waitFor(() => expect(getCatalogCategories).toHaveBeenCalled());
+
+    await user.click(screen.getByRole('combobox', { name: /Category/ }));
+    await user.click(screen.getByRole('option', { name: /Loans/ }));
+    await waitFor(() => expect(getCatalogProducts).toHaveBeenCalled());
+
+    await user.click(screen.getByRole('combobox', { name: /Sub-category/ }));
+    await user.click(screen.getByRole('option', { name: /Business Loan/ }));
+
+    const options = await open(user, /^Product/);
+    expect(options).toHaveLength(1);
+    expect(options[0]).toHaveTextContent('Business Term Loan');
+  });
+
+  it('cannot leave a product selected under a category it does not belong to', async () => {
+    const user = userEvent.setup();
+    render(<ProductPicker onSelect={vi.fn()} />);
+    await waitFor(() => expect(getCatalogCategories).toHaveBeenCalled());
+
+    await user.click(screen.getByRole('combobox', { name: /Category/ }));
+    await user.click(screen.getByRole('option', { name: /Loans/ }));
+    await waitFor(() => expect(getCatalogProducts).toHaveBeenCalled());
+    await user.click(screen.getByRole('combobox', { name: /^Product/ }));
+    await user.click(screen.getByRole('option', { name: /Home Loan – Salaried/ }));
+
+    getCatalogProducts.mockResolvedValue([]);
+    await user.click(screen.getByRole('combobox', { name: /Category/ }));
+    await user.click(screen.getByRole('option', { name: /Credit Cards/ }));
+
+    await waitFor(() => expect(screen.getByRole('combobox', { name: /^Product/ })).toBeDisabled());
+    expect(screen.getByRole('combobox', { name: /^Product/ })).not.toHaveValue('Home Loan – Salaried');
+  });
+
+  it('says there is nothing to take a lead for when the catalogue has no categories', async () => {
     getCatalogCategories.mockResolvedValue([]);
     render(<ProductPicker onSelect={vi.fn()} />);
 
     expect(await screen.findByText(/no products to take a lead for yet/i)).toBeInTheDocument();
+  });
+
+  it('says a category with no products has none, which is not the same as an error', async () => {
+    getCatalogProducts.mockResolvedValue([]);
+    const user = userEvent.setup();
+    render(<ProductPicker onSelect={vi.fn()} />);
+    await waitFor(() => expect(getCatalogCategories).toHaveBeenCalled());
+
+    await user.click(screen.getByRole('combobox', { name: /Category/ }));
+    await user.click(screen.getByRole('option', { name: /Loans/ }));
+
+    expect(await screen.findByText(/no products on offer right now/i)).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
   it('says the catalogue could not be loaded and offers to try again', async () => {
@@ -79,37 +177,30 @@ describe('ProductPicker', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('could not be loaded');
     await user.click(screen.getByRole('button', { name: 'Try again' }));
 
-    expect(await screen.findByRole('button', { name: /Loans/ })).toBeInTheDocument();
+    await user.click(await screen.findByRole('combobox', { name: /Category/ }));
+    expect(screen.getByRole('option', { name: /Loans/ })).toBeInTheDocument();
   });
 
-  it('shows an already-chosen product as a summary, and reads the catalogue afresh when it is changed', async () => {
+  it('clears its choices and re-reads the catalogue once the form has been submitted', async () => {
     const user = userEvent.setup();
-    render(<ProductPicker productName="Home Loan – Salaried" onSelect={vi.fn()} />);
-
-    expect(screen.getByText('Home Loan – Salaried')).toBeInTheDocument();
-    expect(getCatalogCategories).not.toHaveBeenCalled();
-
-    await user.click(screen.getByRole('button', { name: 'Change product' }));
-
+    const { rerender } = render(<ProductPicker productName="Home Loan – Salaried" onSelect={vi.fn()} />);
     await waitFor(() => expect(getCatalogCategories).toHaveBeenCalledTimes(1));
-    expect(await screen.findByRole('button', { name: /Credit Cards/ })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('combobox', { name: /Category/ }));
+    await user.click(screen.getByRole('option', { name: /Loans/ }));
+    await waitFor(() => expect(getCatalogProducts).toHaveBeenCalled());
+
+    // The store cleared the product, which is how a submitted form reports itself reset.
+    rerender(<ProductPicker productName="" onSelect={vi.fn()} />);
+
+    await waitFor(() => expect(getCatalogCategories).toHaveBeenCalledTimes(2));
+    expect(screen.getByRole('combobox', { name: /Sub-category/ })).toBeDisabled();
   });
 
-  it('lets someone who started changing a product keep the one they had', async () => {
-    const onSelect = vi.fn();
-    const user = userEvent.setup();
-    render(<ProductPicker productName="Home Loan – Salaried" onSelect={onSelect} />);
-
-    await user.click(screen.getByRole('button', { name: 'Change product' }));
-    await user.click(await screen.findByRole('button', { name: /Keep Home Loan – Salaried/ }));
-
-    expect(screen.getByRole('button', { name: 'Change product' })).toBeInTheDocument();
-    expect(onSelect).not.toHaveBeenCalled();
-  });
-
-  it('shows the validation message it is given', async () => {
+  it('shows the validation message it is given against the product field', async () => {
     render(<ProductPicker onSelect={vi.fn()} error="Please enter the Product" />);
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Please enter the Product');
+    expect(screen.getByRole('combobox', { name: /^Product/ })).toHaveAttribute('aria-invalid', 'true');
   });
 });

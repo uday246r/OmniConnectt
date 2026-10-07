@@ -1,0 +1,40 @@
+/* The little that the lead form's sections still need beyond the shared form layer: a phone row that
+   puts the country picker next to the number, and a consent row that puts a checkbox beside its text.
+   Everything else — the card, the title, the grid, the labels, the error lines — comes from
+   FormSection / FormGrid / FormField. */
+
+.phoneRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+}
+
+/* The country picker keeps its own width; the number takes what is left. */
+.phoneNumber {
+  flex: 1;
+  min-width: 0;
+}
+
+.consent {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.consentText {
+  font-size: var(--omni-font-size-xs-plus);
+  line-height: var(--omni-line-height-relaxed);
+  color: var(--omni-color-text-secondary);
+}
+
+.consentText strong {
+  color: var(--omni-color-text-primary);
+  font-weight: var(--omni-font-weight-semibold);
+}
+
+.consentError {
+  font-size: var(--omni-font-size-xs);
+  color: var(--omni-color-danger-600);
+}

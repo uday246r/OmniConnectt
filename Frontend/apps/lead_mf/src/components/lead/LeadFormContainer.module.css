@@ -2,11 +2,22 @@
  * Styles extracted from this component's former inline blocks.
  */
 
+/* The gap between the shared FormSections. The cards own their own chrome but deliberately not the
+   space above them, so one can be placed anywhere. */
+.sections {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
 .stepSpacer {
-  margin-bottom: 8px;
+  margin-bottom: 12px;
 }
 
 .formFade {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
   animation: fadeInForm 0.25s ease-out;
 }
 
@@ -40,4 +51,11 @@
  */
 .submit {
   margin-top: var(--omni-space-6, 24px);
+}
+
+/* Replaces the clipboard emoji that stood in for an icon here — the only emoji glyph used as UI on the
+   platform, and the one thing on this screen that did not scale with the text size. */
+.emptyGlyph {
+  color: var(--omni-color-text-muted);
+  margin-bottom: 10px;
 }

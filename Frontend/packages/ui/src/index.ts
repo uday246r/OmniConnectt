@@ -38,6 +38,9 @@ export type { BadgeProps, BadgeTone } from './primitives/Badge/Badge'
 export { Input } from './primitives/Input/Input'
 export type { InputProps } from './primitives/Input/Input'
 
+export { TextArea } from './primitives/TextArea/TextArea'
+export type { TextAreaProps } from './primitives/TextArea/TextArea'
+
 export { Select } from './primitives/Select/Select'
 export type { SelectProps, SelectOption, SelectChangeEvent } from './primitives/Select/Select'
 
@@ -67,6 +70,19 @@ export type { IconProps } from './primitives/Icon/Icon'
 export { resolveIcon } from './primitives/Icon/resolveIcon'
 export type { IconComponent } from './primitives/Icon/resolveIcon'
 
+// ── Forms ─────────────────────────────────────
+// The field layer the package was missing. `Input` carries its own label and nothing covered the
+// controls that do not, so the host, lead management and the marketplace each grew their own form
+// system — the main reason one form looked like three products. See FormField's doc comment.
+export { FormSection } from './form/FormSection/FormSection'
+export type { FormSectionProps } from './form/FormSection/FormSection'
+
+export { FormGrid } from './form/FormGrid/FormGrid'
+export type { FormGridProps } from './form/FormGrid/FormGrid'
+
+export { FormField } from './form/FormField/FormField'
+export type { FormFieldProps, FormFieldControl } from './form/FormField/FormField'
+
 // ── Data display ─────────────────────────────────────────────
 export { DataTable, DataTableEmpty, dataTableStyles } from './data/DataTable/DataTable'
 export { ResponsiveRows } from './data/DataTable/ResponsiveRows'
@@ -78,6 +94,9 @@ export { RowsPerPage } from './data/RowsPerPage/RowsPerPage'
 export { readStoredPageSize } from './data/RowsPerPage/RowsPerPage'
 export type { RowsPerPageProps } from './data/RowsPerPage/RowsPerPage'
 export type { PaginationProps } from './data/Pagination/Pagination'
+
+export { StatTile } from './data/StatTile/StatTile'
+export type { StatTileProps, StatTileAccent } from './data/StatTile/StatTile'
 
 export { EmptyState } from './data/EmptyState/EmptyState'
 
@@ -111,6 +130,9 @@ export type { DrawerProps } from './overlay/Drawer/Drawer'
 
 export { Modal } from './overlay/Modal/Modal'
 export type { ModalProps } from './overlay/Modal/Modal'
+
+export { ConfirmDialog } from './overlay/ConfirmDialog/ConfirmDialog'
+export type { ConfirmDialogProps } from './overlay/ConfirmDialog/ConfirmDialog'
 
 // ── Feedback ─────────────────────────────────────────────────
 export { SkeletonBlock, SkeletonText, SkeletonAvatar, SkeletonTable, TableSkeleton } from './feedback/Skeleton/Skeleton'

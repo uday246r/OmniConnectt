@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Trash2, ArrowLeft } from '@omniconnect/ui/icons';
-import { Button, Drawer } from '@omniconnect/ui';
+import { Button, Drawer, FormField, TextArea } from '@omniconnect/ui';
 import { useLeadStore } from '../../store/useLeadStore';
 import drawerLayout from '../../shared/drawerLayout.module.css';
 import form from '../../shared/formField.module.css';
@@ -89,26 +89,20 @@ export const DeleteLeadDrawer: React.FC = () => {
         <form id={REASON_FORM_ID} onSubmit={handleProceed}>
 
 
-              <div className={`form-group ${form.group}`}>
-                <label className={`form-label ${form.label}`}>
-                  Enter reason for deleting this lead <span className={form.required}>*</span>
-                </label>
-                <textarea
-                  rows={4}
-                  placeholder="Enter reason for deleting this lead..."
-                  value={inputReason}
-                  onChange={(e) => {
-                    setInputReason(e.target.value);
-                    setError('');
-                  }}
-                  className={`${form.control} ${form.controlTall}${error ? ` ${form.controlError}` : ''}`}
-                />
-                {error && (
-                  <div className={form.errorText}>
-                    {error}
-                  </div>
+              <FormField label="Enter reason for deleting this lead" required error={error || undefined}>
+                {(control) => (
+                  <TextArea
+                    {...control.aria}
+                    rows={4}
+                    placeholder="Enter reason for deleting this lead..."
+                    value={inputReason}
+                    onChange={(e) => {
+                      setInputReason(e.target.value);
+                      setError('');
+                    }}
+                  />
                 )}
-              </div>
+              </FormField>
         </form>
       ) : (
         /* STEP 2: CONFIRMATION STEP WITH LEAD IDENTITY DETAILS */

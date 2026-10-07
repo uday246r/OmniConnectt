@@ -1,120 +1,30 @@
-/* Category → product picker. Design tokens only; no colours of its own. */
+/* The picker is three shared comboboxes in a shared FormGrid, so nearly everything this file used to
+   hold — the category/product card grid, the chosen-product summary, the "All categories" back link,
+   its own label and spinner — went with the markup that needed it. What is left is the notice a
+   failed or empty catalogue shows, which has no shared equivalent. */
 
 .wrap {
-  margin-bottom: var(--omni-space-6);
   display: flex;
   flex-direction: column;
-  gap: var(--omni-space-3);
-}
-
-.label {
-  font-weight: var(--omni-font-weight-semibold);
-  color: var(--omni-color-text-primary);
-}
-
-.grid {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: var(--omni-space-3);
-}
-
-.card {
+  gap: 10px;
   width: 100%;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: var(--omni-space-1);
-  text-align: left;
-  padding: var(--omni-space-3) var(--omni-space-4);
-  cursor: pointer;
-  font: inherit;
-  color: var(--omni-color-text-primary);
-  background: var(--omni-color-surface);
-  border: 1px solid var(--omni-color-border);
-  border-radius: var(--omni-radius-md);
-  transition: border-color var(--omni-transition-fast), box-shadow var(--omni-transition-fast);
-}
-
-.card:hover,
-.card:focus-visible {
-  border-color: var(--omni-color-primary-500);
-  box-shadow: var(--omni-shadow-sm);
-  outline: none;
-}
-
-.cardTitle {
-  font-weight: var(--omni-font-weight-semibold);
-}
-
-.cardMeta,
-.cardText {
-  font-size: var(--omni-font-size-sm);
-  color: var(--omni-color-text-muted);
-}
-
-.summary {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--omni-space-3);
-  padding: var(--omni-space-3) var(--omni-space-4);
-  background: var(--omni-color-surface);
-  border: 1px solid var(--omni-color-border);
-  border-radius: var(--omni-radius-md);
-}
-
-.summaryName {
-  font-weight: var(--omni-font-weight-semibold);
-  color: var(--omni-color-text-primary);
-}
-
-.summaryMeta {
-  font-size: var(--omni-font-size-sm);
-  color: var(--omni-color-text-muted);
-}
-
-.back {
-  align-self: flex-start;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--omni-space-2);
-  padding: 0;
-  border: 0;
-  background: none;
-  cursor: pointer;
-  font: inherit;
-  font-size: var(--omni-font-size-sm);
-  color: var(--omni-color-primary-600);
 }
 
 .notice {
-  padding: var(--omni-space-3) var(--omni-space-4);
-  border: 1px dashed var(--omni-color-border-strong);
-  border-radius: var(--omni-radius-md);
-  color: var(--omni-color-text-muted);
-}
-
-.error {
-  color: var(--omni-color-danger);
-  font-size: var(--omni-font-size-sm);
-}
-
-.loading {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: var(--omni-space-2);
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  background: var(--omni-color-warning-50);
+  border: 1px solid var(--omni-color-warning-200);
+  border-radius: var(--omni-radius-md);
+  font-size: var(--omni-font-size-xs);
+  color: var(--omni-color-warning-800);
+}
+
+.hint {
+  margin: 0;
+  font-size: var(--omni-font-size-xs);
   color: var(--omni-color-text-muted);
-}
-
-.spin {
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
 }

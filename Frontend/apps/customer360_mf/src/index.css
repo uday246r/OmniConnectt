@@ -1150,7 +1150,7 @@
 .audit-detail-row {
   display: flex;
   align-items: center;
-  /* Matched to the host'"'"'s .detailRow: gap 10px, padding 9px 12px. lead used 12px/9px 13px and
+  /* Matched to the host's .detailRow: gap 10px, padding 9px 12px. lead used 12px/9px 13px and
      customer360 12px/8px 12px, so the same row sat at three different sizes across the apps.
      min-width: 0 was also missing in customer360, without which a long value cannot shrink. */
   gap: 10px;

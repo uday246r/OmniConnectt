@@ -1,0 +1,68 @@
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  width: 100%;
+}
+
+.label {
+  font-size: var(--omni-font-size-xs-minus);
+  font-weight: var(--omni-font-weight-semibold);
+  color: #334155; /* host raw, matching FormField's label */
+  letter-spacing: -0.01em;
+}
+
+.required {
+  color: var(--omni-color-danger-600);
+  font-weight: var(--omni-font-weight-bold);
+}
+
+.control {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 9px 12px;
+  background: var(--omni-color-surface);
+  /* 1.5px, matching the host's inputs — a 1px textarea beside them reads as a different control. */
+  border: 1.5px solid #cbd5e1; /* host raw */
+  border-radius: var(--omni-radius-md);
+  color: var(--omni-color-text-primary);
+  font: inherit;
+  font-size: var(--omni-font-size-sm);
+  line-height: var(--omni-line-height-normal);
+  resize: vertical;
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.control::placeholder {
+  color: var(--omni-color-text-muted);
+}
+
+.control:focus {
+  outline: none;
+  border-color: var(--omni-color-primary-500);
+  box-shadow: 0 0 0 3px var(--omni-color-primary-100);
+}
+
+.control:disabled {
+  background: var(--omni-color-surface-alt);
+  color: var(--omni-color-text-muted);
+  cursor: not-allowed;
+}
+
+.invalid {
+  border-color: var(--omni-color-danger-500);
+}
+
+.invalid:focus {
+  box-shadow: 0 0 0 3px var(--omni-color-danger-100);
+}
+
+.helper {
+  font-size: var(--omni-font-size-xs);
+  color: var(--omni-color-text-muted);
+}
+
+.error {
+  font-size: var(--omni-font-size-xs);
+  color: var(--omni-color-danger-600);
+}

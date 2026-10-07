@@ -41,3 +41,11 @@
   color: var(--omni-color-text-primary);
   cursor: pointer;
 }
+
+/* Replaces the inline style that used to grey out the trigger. The package forbids inline style and
+   it could not express a cursor on the disabled state without one. */
+.disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+  background: var(--omni-color-surface-alt);
+}

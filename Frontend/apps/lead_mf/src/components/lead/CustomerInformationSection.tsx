@@ -1,21 +1,25 @@
 import React from 'react';
 import { User } from '@omniconnect/ui/icons';
+import { Combobox, FormField, FormGrid, FormSection, Input } from '@omniconnect/ui';
 import { useLeadStore } from '../../store/useLeadStore';
-import { SearchableDropdown } from '../common/SearchableDropdown';
 import { PhoneCountryPicker } from './PhoneCountryPicker';
 import { isFieldVisible, isFieldRequired, isFieldEditable, getFieldLabel } from '../../config/fieldControlRegistry';
 import { useShallow } from 'zustand/react/shallow';
+import styles from './leadFormSection.module.css';
 
 interface CustomerInformationSectionProps {
   isEdit?: boolean;
 }
 
-/** Renders a `*` only when Field Settings marks the field Required for the currently selected
- * product — never hardcoded. */
-function RequiredAsterisk({ show }: { show: boolean }) {
-  return show ? <span className="required-asterisk">*</span> : null;
-}
-
+/**
+ * Who the lead is for.
+ *
+ * Every field here is behind its own `isFieldVisible` guard and takes its label, its required marker
+ * and (in the edit drawer) its editability from Field Settings for the chosen product — never from
+ * anything hardcoded. That is why the fields are written out one by one rather than looped: each is a
+ * different control over a different part of the form state, and the config only decides whether and
+ * how it appears.
+ */
 export const CustomerInformationSection: React.FC<CustomerInformationSectionProps> = ({ isEdit = false }) => {
   const store = useLeadStore(useShallow((s) => ({ editFormData: s.editFormData, formData: s.formData, editErrors: s.editErrors, errors: s.errors, setEditFieldValue: s.setEditFieldValue, setFieldValue: s.setFieldValue, states: s.states, branches: s.branches, validateField: s.validateField, fieldConfig: s.fieldConfig })));
   const formData = isEdit ? store.editFormData : store.formData;
@@ -26,172 +30,181 @@ export const CustomerInformationSection: React.FC<CustomerInformationSectionProp
   const validateField = isEdit ? () => {} : store.validateField;
   const config = store.fieldConfig;
 
+  /** The edit drawer honours Field Settings' "editable"; the create form always lets you type. */
+  const locked = (apiField: string) => isEdit && !isFieldEditable(config, apiField);
+
   return (
-    <div className="form-section">
-      <div className="form-section-title">
-        <User size={18} className="form-section-icon" />
-        <span>Customer Information</span>
-      </div>
-
-      <div className="form-grid-1">
-        {/* Customer Name */}
+    <FormSection title="Customer Information" icon={<User size={15} />}>
+      <FormGrid>
         {isFieldVisible(config, 'customerName') && (
-          <div className="form-field-group">
-            <label className="form-label">
-              {getFieldLabel(config, 'customerName', 'Customer Name')} <RequiredAsterisk show={isFieldRequired(config, 'customerName')} />
-            </label>
-            <input
-              type="text"
-              className={`form-input ${errors.customerName ? 'has-error' : ''}`}
-              value={formData.customerName}
-              disabled={isEdit && !isFieldEditable(config, 'customerName')}
-              onChange={(e) => setFieldValue('customerName', e.target.value)}
-              onBlur={() => validateField('customerName')}
-            />
-            {errors.customerName && (
-              <div className="field-error-message">{errors.customerName}</div>
+          <FormField
+            label={getFieldLabel(config, 'customerName', 'Customer Name')}
+            required={isFieldRequired(config, 'customerName')}
+            error={errors.customerName}
+          >
+            {(control) => (
+              <Input
+                {...control.aria}
+                type="text"
+                value={formData.customerName}
+                disabled={locked('customerName')}
+                onChange={(e) => setFieldValue('customerName', e.target.value)}
+                onBlur={() => validateField('customerName')}
+              />
             )}
-          </div>
+          </FormField>
         )}
 
-        {/* IC Number */}
         {isFieldVisible(config, 'icNumber') && (
-          <div className="form-field-group">
-            <label className="form-label">
-              {getFieldLabel(config, 'icNumber', 'IC Number')} <RequiredAsterisk show={isFieldRequired(config, 'icNumber')} />
-            </label>
-            <input
-              type="text"
-              className={`form-input ${errors.icNumber ? 'has-error' : ''}`}
-              value={formData.icNumber}
-              disabled={isEdit && !isFieldEditable(config, 'icNumber')}
-              onChange={(e) => setFieldValue('icNumber', e.target.value)}
-              onBlur={() => validateField('icNumber')}
-            />
-            {/* The message comes from the field's own format rule in Field Settings, so it already
-                says what shape the number takes — no fixed format hint here to contradict it. */}
-            {errors.icNumber && (
-              <div className="field-error-message">{errors.icNumber}</div>
+          <FormField
+            label={getFieldLabel(config, 'icNumber', 'IC Number')}
+            required={isFieldRequired(config, 'icNumber')}
+            // The message comes from the field's own format rule in Field Settings, so it already says
+            // what shape the number takes — no fixed format hint here to contradict it.
+            error={errors.icNumber}
+          >
+            {(control) => (
+              <Input
+                {...control.aria}
+                type="text"
+                value={formData.icNumber}
+                disabled={locked('icNumber')}
+                onChange={(e) => setFieldValue('icNumber', e.target.value)}
+                onBlur={() => validateField('icNumber')}
+              />
             )}
-          </div>
+          </FormField>
         )}
 
-        {/* Phone */}
         {isFieldVisible(config, 'phoneNumber') && (
-          <div className="form-field-group">
-            <label className="form-label">
-              {getFieldLabel(config, 'phoneNumber', 'Phone')} <RequiredAsterisk show={isFieldRequired(config, 'phoneNumber')} />
-            </label>
-            <div className={`phone-input-container ${errors.phoneNumber ? 'has-error' : ''}`}>
+          <FormField
+            label={getFieldLabel(config, 'phoneNumber', 'Phone')}
+            required={isFieldRequired(config, 'phoneNumber')}
+            error={errors.phoneNumber}
+          >
+            {/* Two controls under one name, so the field names a group rather than a single input. */}
+            <div className={styles.phoneRow}>
               <PhoneCountryPicker
                 value={formData.phoneCountryCode}
-                disabled={isEdit && !isFieldEditable(config, 'phoneNumber')}
+                disabled={locked('phoneNumber')}
                 onChange={(dialCode) => setFieldValue('phoneCountryCode', dialCode)}
               />
-              <input
+              <Input
                 type="tel"
-                className="form-input phone-input-field"
+                aria-label={getFieldLabel(config, 'phoneNumber', 'Phone')}
+                aria-invalid={errors.phoneNumber ? true : undefined}
+                className={styles.phoneNumber}
                 value={formData.phoneNumber}
-                disabled={isEdit && !isFieldEditable(config, 'phoneNumber')}
+                disabled={locked('phoneNumber')}
                 onChange={(e) => setFieldValue('phoneNumber', e.target.value)}
                 onBlur={() => validateField('phoneNumber')}
               />
             </div>
-            {errors.phoneNumber && (
-              <div className="field-error-message">{errors.phoneNumber}</div>
-            )}
-          </div>
+          </FormField>
         )}
 
-        {/* Email */}
         {isFieldVisible(config, 'email') && (
-          <div className="form-field-group">
-            <label className="form-label">
-              {getFieldLabel(config, 'email', 'Email')} <RequiredAsterisk show={isFieldRequired(config, 'email')} />
-            </label>
-            <input
-              type="email"
-              className={`form-input ${errors.email ? 'has-error' : ''}`}
-              value={formData.email}
-              disabled={isEdit && !isFieldEditable(config, 'email')}
-              onChange={(e) => setFieldValue('email', e.target.value)}
-              onBlur={() => validateField('email')}
-            />
-            {errors.email && (
-              <div className="field-error-message">{errors.email}</div>
+          <FormField
+            label={getFieldLabel(config, 'email', 'Email')}
+            required={isFieldRequired(config, 'email')}
+            error={errors.email}
+          >
+            {(control) => (
+              <Input
+                {...control.aria}
+                type="email"
+                value={formData.email}
+                disabled={locked('email')}
+                onChange={(e) => setFieldValue('email', e.target.value)}
+                onBlur={() => validateField('email')}
+              />
             )}
-          </div>
+          </FormField>
         )}
 
-        {/* State */}
         {isFieldVisible(config, 'state') && (
-          <SearchableDropdown
+          <FormField
             label={getFieldLabel(config, 'state', 'State')}
-            placeholder="Select state"
-            options={states}
-            value={formData.state}
-            disabled={isEdit && !isFieldEditable(config, 'state')}
-            onChange={(val) => setFieldValue('state', val)}
-            onBlur={() => validateField('state')}
             required={isFieldRequired(config, 'state')}
             error={errors.state}
-          />
+          >
+            {(control) => (
+              <Combobox
+                id={control.id}
+                aria-describedby={control.describedBy}
+                invalid={control.invalid}
+                options={states}
+                value={formData.state}
+                disabled={locked('state')}
+                placeholder="Select state"
+                onChange={(val) => setFieldValue('state', val)}
+                onBlur={() => validateField('state')}
+              />
+            )}
+          </FormField>
         )}
 
-        {/* Preferred Servicing Branch */}
         {isFieldVisible(config, 'branch') && (
-          <SearchableDropdown
+          <FormField
             label={getFieldLabel(config, 'branch', 'Preferred Servicing Branch')}
-            placeholder="Select servicing branch"
-            options={branches}
-            value={formData.preferredBranch}
-            disabled={isEdit && !isFieldEditable(config, 'branch')}
-            onChange={(val) => setFieldValue('preferredBranch', val)}
             required={isFieldRequired(config, 'branch')}
-            emptyMessage="No branch options currently available"
-          />
+            error={errors.preferredBranch}
+          >
+            {(control) => (
+              <Combobox
+                id={control.id}
+                aria-describedby={control.describedBy}
+                invalid={control.invalid}
+                options={branches}
+                value={formData.preferredBranch}
+                disabled={locked('branch')}
+                placeholder="Select servicing branch"
+                emptyMessage="No branch options currently available"
+                onChange={(val) => setFieldValue('preferredBranch', val)}
+              />
+            )}
+          </FormField>
         )}
 
-        {/* Employer Name */}
         {isFieldVisible(config, 'employerName') && (
-          <div className="form-field-group">
-            <label className="form-label">
-              {getFieldLabel(config, 'employerName', 'Employer Name')} <RequiredAsterisk show={isFieldRequired(config, 'employerName')} />
-            </label>
-            <input
-              type="text"
-              className={`form-input ${errors.employerName ? 'has-error' : ''}`}
-              value={formData.employerName}
-              disabled={isEdit && !isFieldEditable(config, 'employerName')}
-              onChange={(e) => setFieldValue('employerName', e.target.value)}
-              onBlur={() => validateField('employerName')}
-            />
-            {errors.employerName && (
-              <div className="field-error-message">{errors.employerName}</div>
+          <FormField
+            label={getFieldLabel(config, 'employerName', 'Employer Name')}
+            required={isFieldRequired(config, 'employerName')}
+            error={errors.employerName}
+          >
+            {(control) => (
+              <Input
+                {...control.aria}
+                type="text"
+                value={formData.employerName}
+                disabled={locked('employerName')}
+                onChange={(e) => setFieldValue('employerName', e.target.value)}
+                onBlur={() => validateField('employerName')}
+              />
             )}
-          </div>
+          </FormField>
         )}
 
-        {/* Applied Amount */}
         {isFieldVisible(config, 'appliedAmount') && (
-          <div className="form-field-group">
-            <label className="form-label">
-              {getFieldLabel(config, 'appliedAmount', 'Applied Amount')} <RequiredAsterisk show={isFieldRequired(config, 'appliedAmount')} />
-            </label>
-            <input
-              type="text"
-              className={`form-input ${errors.appliedAmount ? 'has-error' : ''}`}
-              value={formData.appliedAmount}
-              disabled={isEdit && !isFieldEditable(config, 'appliedAmount')}
-              onChange={(e) => setFieldValue('appliedAmount', e.target.value)}
-              onBlur={() => validateField('appliedAmount')}
-            />
-            {errors.appliedAmount && (
-              <div className="field-error-message">{errors.appliedAmount}</div>
+          <FormField
+            label={getFieldLabel(config, 'appliedAmount', 'Applied Amount')}
+            required={isFieldRequired(config, 'appliedAmount')}
+            error={errors.appliedAmount}
+          >
+            {(control) => (
+              <Input
+                {...control.aria}
+                type="text"
+                inputMode="decimal"
+                value={formData.appliedAmount}
+                disabled={locked('appliedAmount')}
+                onChange={(e) => setFieldValue('appliedAmount', e.target.value)}
+                onBlur={() => validateField('appliedAmount')}
+              />
             )}
-          </div>
+          </FormField>
         )}
-      </div>
-    </div>
+      </FormGrid>
+    </FormSection>
   );
 };

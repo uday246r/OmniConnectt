@@ -1,0 +1,33 @@
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px; /* host: UserFormLayer .inputGroup */
+  min-width: 0;
+  width: 100%;
+}
+
+.full {
+  grid-column: 1 / -1;
+}
+
+.label {
+  font-size: var(--omni-font-size-xs-minus);
+  font-weight: var(--omni-font-weight-semibold);
+  color: #334155; /* host raw: between --omni-color-text-primary and -secondary */
+  letter-spacing: -0.01em;
+}
+
+.required {
+  color: var(--omni-color-danger-600);
+  font-weight: var(--omni-font-weight-bold);
+}
+
+.helper {
+  font-size: var(--omni-font-size-xs);
+  color: var(--omni-color-text-muted);
+}
+
+.error {
+  font-size: var(--omni-font-size-xs);
+  color: var(--omni-color-danger-600);
+}

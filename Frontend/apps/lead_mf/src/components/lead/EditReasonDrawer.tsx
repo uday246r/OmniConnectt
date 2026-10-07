@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { AlertCircle } from '@omniconnect/ui/icons';
-import { Button, Drawer, Select } from '@omniconnect/ui';
+import { Button, Drawer, FormField, Select, TextArea } from '@omniconnect/ui';
 import form from '../../shared/formField.module.css';
 import { useLeadStore } from '../../store/useLeadStore';
 import { useShallow } from 'zustand/react/shallow';
@@ -61,38 +61,39 @@ export const EditReasonDrawer: React.FC = () => {
       }
     >
       <form id={FORM_ID} onSubmit={handleProceed}>
-            <div className={`form-group ${form.group}`}>
-              <label className={`form-label ${form.label}`} htmlFor="edit-reason">
-                Select Edit Reason <span className={form.required}>*</span>
-              </label>
-              <Select
-                id="edit-reason"
-                value={selectedReason}
-                onChange={(e) => {
-                  setSelectedReason(e.target.value);
-                  setError('');
-                }}
-                placeholder="Choose a reason"
-                options={PREDEFINED_REASONS.map((r) => ({ value: r, label: r }))}
-              />
-            </div>
-
-            {(selectedReason === 'Other' || selectedReason === '') && (
-              <div className={`form-group ${form.group}`}>
-                <label className={`form-label ${form.label}`}>
-                  {selectedReason === 'Other' ? 'Enter Custom Edit Reason *' : 'Or Type Custom Edit Reason'}
-                </label>
-                <textarea
-                  rows={3}
-                  placeholder="Describe the reason for updating this customer's details..."
-                  value={customReason}
+            <FormField label="Select Edit Reason" required>
+              {(control) => (
+                <Select
+                  id={control.id}
+                  value={selectedReason}
                   onChange={(e) => {
-                    setCustomReason(e.target.value);
+                    setSelectedReason(e.target.value);
                     setError('');
                   }}
-                  className={`${form.control} ${form.controlTall}${error ? ` ${form.controlError}` : ''}`}
+                  placeholder="Choose a reason"
+                  options={PREDEFINED_REASONS.map((r) => ({ value: r, label: r }))}
                 />
-              </div>
+              )}
+            </FormField>
+
+            {(selectedReason === 'Other' || selectedReason === '') && (
+              <FormField
+                label={selectedReason === 'Other' ? 'Enter Custom Edit Reason' : 'Or Type Custom Edit Reason'}
+                required={selectedReason === 'Other'}
+              >
+                {(control) => (
+                  <TextArea
+                    {...control.aria}
+                    rows={3}
+                    placeholder="Describe the reason for updating this customer's details..."
+                    value={customReason}
+                    onChange={(e) => {
+                      setCustomReason(e.target.value);
+                      setError('');
+                    }}
+                  />
+                )}
+              </FormField>
             )}
 
             {error && (

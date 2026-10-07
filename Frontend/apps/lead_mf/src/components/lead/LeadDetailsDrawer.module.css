@@ -122,7 +122,7 @@
 
 /*
  * One monospace face for the whole platform. This file previously carried two different stacks
- * (.leadId used the host'"'"'s, .monoId used a lead-only one) and the IC number set a third inline, so
+ * (.leadId used the host's, .monoId used a lead-only one) and the IC number set a third inline, so
  * the same kind of value rendered in three different faces.
  */
 .monoValue {

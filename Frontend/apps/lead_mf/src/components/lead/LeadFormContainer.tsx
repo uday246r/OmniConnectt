@@ -7,9 +7,9 @@ import { MicrofinanceFields } from './ProductSpecificFields/MicrofinanceFields';
 import { DeclarationConsentSection } from './DeclarationConsentSection';
 import { useLeadStore } from '../../store/useLeadStore';
 import { hasVisibleField } from '../../config/fieldControlRegistry';
-import { Loader2, CheckCircle2 } from '@omniconnect/ui/icons';
+import { CheckCircle2, Package } from '@omniconnect/ui/icons';
 import styles from './LeadFormContainer.module.css';
-import { Button } from '@omniconnect/ui';
+import { Button, FormSection } from '@omniconnect/ui';
 import { useShallow } from 'zustand/react/shallow';
 
 interface LeadFormContainerProps {
@@ -39,13 +39,16 @@ export const LeadFormContainer: React.FC<LeadFormContainerProps> = ({
 
   const formContent = (
     <form onSubmit={handleSubmit} noValidate>
-      {/* Step 1: Product Selection — Category → Product, from the Marketplace's catalogue */}
+      {/* Step 1: category → sub-category → product, from the Marketplace's catalogue. Which product
+          is chosen decides which of the fields below exist at all, so it is its own section first. */}
       <div className={styles.stepSpacer}>
-        <ProductPicker
-          productName={formData.product}
-          onSelect={setProduct}
-          error={errors.product}
-        />
+        <FormSection title="Product" icon={<Package size={15} />}>
+          <ProductPicker
+            productName={formData.product}
+            onSelect={setProduct}
+            error={errors.product}
+          />
+        </FormSection>
       </div>
 
       {/* Display form only when a product is selected */}
@@ -73,14 +76,13 @@ export const LeadFormContainer: React.FC<LeadFormContainerProps> = ({
           )}
         </div>
       ) : (
-        <div
-          className={styles.emptyIcon}
-        >
-          <div className={styles.emptyTitle}>📋</div>
-          <div className={styles.emptyText}>
-            Select a Product
+        <div className={styles.emptyIcon}>
+          <Package size={28} className={styles.emptyGlyph} />
+          <div className={styles.emptyText}>Select a product</div>
+          <div>
+            Which fields this form asks for is configured per product, so choose a category and product
+            above to see them.
           </div>
-          <div>Choose a category and product above to display the lead application form fields.</div>
         </div>
       )}
     </form>

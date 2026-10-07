@@ -1,0 +1,17 @@
+.grid {
+  display: grid;
+  gap: 12px;
+}
+
+.cols1 { grid-template-columns: 1fr; }
+.cols2 { grid-template-columns: 1fr 1fr; }
+.cols3 { grid-template-columns: 1fr 1fr 1fr; }
+
+/* One column from the tablet breakpoint down. Two short fields side by side are already cramped at
+   768px, and a drawer is narrower than the viewport it sits in. */
+@media (max-width: 768px) {
+  .cols2,
+  .cols3 {
+    grid-template-columns: 1fr;
+  }
+}

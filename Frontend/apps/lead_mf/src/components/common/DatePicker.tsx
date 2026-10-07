@@ -3,15 +3,25 @@ import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, X } from '@omnicon
 import styles from './DatePicker.module.css';
 
 interface DatePickerProps {
+  /** The id of the trigger, so a FormField's label names it. */
   id?: string;
-  label?: string;
   value: string; // DD/MM/YYYY format
   onChange: (value: string) => void;
-  required?: boolean;
-  error?: string;
+  /** True while the field has an error — drawn as the invalid border. */
+  invalid?: boolean;
+  /** The id of the field's message line, from FormField. */
+  describedBy?: string;
   placeholder?: string;
   disabled?: boolean;
 }
+
+/**
+ * The calendar control, and nothing around it.
+ *
+ * It used to render its own label, its own required marker and its own error line, in a third set of
+ * form classes. Those now come from the shared `FormField` it is placed inside, which also hands it
+ * the id and the message to point at, so the label genuinely names the trigger.
+ */
 
 const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -22,11 +32,10 @@ const DAYS_HEADER = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
 
 export const DatePicker: React.FC<DatePickerProps> = ({
   id,
-  label,
   value,
   onChange,
-  required = false,
-  error,
+  invalid = false,
+  describedBy,
   placeholder = 'DD/MM/YYYY',
   disabled = false,
 }) => {
@@ -98,22 +107,27 @@ export const DatePicker: React.FC<DatePickerProps> = ({
   const years = Array.from({ length: 60 }, (_, i) => currentYear - 45 + i);
 
   return (
-    <div className="form-field-group" ref={containerRef} id={id}>
-      {label && (
-        <label className="form-label">
-          {label} {required && <span className="required-asterisk">*</span>}
-        </label>
-      )}
-
+    <div ref={containerRef} className={styles.container}>
       <div className={styles.container}>
         <div
-          className={`dropdown-trigger ${isOpen ? 'open' : ''} ${error ? 'has-error' : ''} ${
+          id={id}
+          className={`dropdown-trigger ${isOpen ? 'open' : ''} ${invalid ? 'has-error' : ''} ${
             !value ? 'placeholder-text' : ''
-          }`}
+          } ${disabled ? styles.disabled : ''}`}
           onClick={() => !disabled && setIsOpen(!isOpen)}
-          role="button"
+          onKeyDown={(e) => {
+            if (disabled) return;
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              setIsOpen(!isOpen);
+            }
+          }}
+          role="combobox"
+          aria-expanded={isOpen}
+          aria-haspopup="dialog"
+          aria-invalid={invalid || undefined}
+          aria-describedby={describedBy}
           tabIndex={disabled ? -1 : 0}
-          style={disabled ? { cursor: 'not-allowed', opacity: 0.6, background: '#f1f5f9' } : undefined}
         >
           <span>{value || placeholder}</span>
           <div className={styles.triggerRow}>
@@ -218,8 +232,6 @@ export const DatePicker: React.FC<DatePickerProps> = ({
           </div>
         )}
       </div>
-
-      {error && <div className="field-error-message">{error}</div>}
     </div>
   );
 };
