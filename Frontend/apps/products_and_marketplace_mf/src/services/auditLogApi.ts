@@ -11,9 +11,15 @@ export interface AuditLogQuery {
   pageSize?: number;
 }
 
+/** Options every read here accepts. `fresh` bypasses the read cache — the Refresh button sets it. */
+export interface AuditLogReadOptions {
+  signal?: AbortSignal;
+  fresh?: boolean;
+}
+
 export const auditLogApi = {
-  async search(query: AuditLogQuery, signal?: AbortSignal): Promise<PagedResult<AuditLog>> {
-    const { data } = await httpClient.get("/audit-logs", { params: query, signal });
+  async search(query: AuditLogQuery, options: AuditLogReadOptions = {}): Promise<PagedResult<AuditLog>> {
+    const { data } = await httpClient.get("/audit-logs", { params: query, ...options });
     return data;
   },
   async getById(id: string, signal?: AbortSignal): Promise<AuditLog> {
@@ -25,8 +31,8 @@ export const auditLogApi = {
     return data;
   },
   /** Aggregates over every row matching the filters, not just the page on screen. */
-  async getSummary(query: AuditLogQuery, signal?: AbortSignal): Promise<AuditLogSummary> {
-    const { data } = await httpClient.get("/audit-logs/summary", { params: query, signal });
+  async getSummary(query: AuditLogQuery, options: AuditLogReadOptions = {}): Promise<AuditLogSummary> {
+    const { data } = await httpClient.get("/audit-logs/summary", { params: query, ...options });
     return data;
   },
   async getEntityTypes(signal?: AbortSignal): Promise<string[]> {

@@ -90,6 +90,14 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
   const key = `${getCurrentUser()?.id ?? 'anonymous'} GET ${endpoint}`;
   const value = await readCache.get(key, () => send<T>(endpoint, options), {
     ttlMs: REUSABLE.test(endpoint) ? undefined : 0,
+    /*
+     * `cache: 'no-store'` means "this caller wants the server's answer, now" — the idiom a Refresh
+     * button uses, and the same one lead_mf's fetchWithAuth reads. Without it a Refresh that re-sends
+     * an identical URL inside the 30s window was answered from memory and sent no request at all,
+     * so the button spun and re-rendered the same rows. `force` (rather than skipping the cache)
+     * means the fresh answer also replaces what was stored, so the next reader sees it too.
+     */
+    force: options.cache === 'no-store',
   });
   // Each caller gets its own copy, so a page that mutates what it received cannot change another's.
   return typeof structuredClone === 'function' ? structuredClone(value) : value;
@@ -193,9 +201,19 @@ export const api = {
   getCustomerInteractions: (
     id: string,
     page = 1,
-    size = 10
+    size = 10,
+    /**
+     * Bypass the read cache. /v1/interactions is not in REUSABLE, so it already gets ttlMs 0 and a
+     * refetch reaches the server anyway — but that is a property of a regex this endpoint is merely
+     * absent from, not a decision. Saying it here means the Refresh button keeps working if the
+     * endpoint is ever added to REUSABLE.
+     */
+    fresh = false,
   ): Promise<PaginatedEnvelope<Interaction>> =>
-    request(`/v1/interactions/${encodeURIComponent(id)}?pageNumber=${page}&pageSize=${size}`),
+    request(
+      `/v1/interactions/${encodeURIComponent(id)}?pageNumber=${page}&pageSize=${size}`,
+      fresh ? { cache: 'no-store' } : {},
+    ),
 
   // Product deep-dives.
   //
@@ -239,6 +257,8 @@ export const api = {
     /** Stored actor text or actor id, case-insensitive. */ actor?: string;
     /** Customer name or id, case-insensitive substring. */ customer?: string;
     description?: string;
+    /** Bypass the read cache. Set by the Refresh button. */
+    fresh?: boolean;
   } = {}): Promise<PaginatedEnvelope<AuditLog>> => {
     const query = new URLSearchParams();
     if (params.search) query.append('search', params.search);
@@ -253,7 +273,7 @@ export const api = {
     // column stopped being local-wall-clock text — see Models/AuditLog.Timestamp on the server.
     if (params.from) query.append('from', params.from);
     if (params.to) query.append('to', params.to);
-    return request(`/v1/audit?${query.toString()}`);
+    return request(`/v1/audit?${query.toString()}`, params.fresh ? { cache: 'no-store' } : {});
   },
 
   /*

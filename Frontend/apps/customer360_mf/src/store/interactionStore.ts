@@ -37,7 +37,8 @@ interface InteractionStoreState {
   setPageSize: (size: number) => void;
   openCaseModal: (caseDetail: Interaction) => void;
   closeCaseModal: () => void;
-  loadInteractions: (customerId: string) => Promise<void>;
+  /** `fresh` bypasses the read cache — the Refresh button passes it. */
+  loadInteractions: (customerId: string, options?: { fresh?: boolean }) => Promise<void>;
 }
 
 export const useInteractionStore = create<InteractionStoreState>((set, get) => ({
@@ -68,7 +69,7 @@ export const useInteractionStore = create<InteractionStoreState>((set, get) => (
   openCaseModal: (caseDetail) => set({ selectedCase: caseDetail, modalOpen: true }),
   closeCaseModal: () => set({ selectedCase: null, modalOpen: false }),
 
-  loadInteractions: async (customerId) => {
+  loadInteractions: async (customerId, options) => {
     if (!customerId) return;
     const version = ++_interactionsVersion;
     set({ loading: true, error: null, errorStatus: null });
@@ -77,7 +78,7 @@ export const useInteractionStore = create<InteractionStoreState>((set, get) => (
       const { pageNumber, pageSize } = get();
       // `getInteractions` never existed on `api` (the real name is `getCustomerInteractions`) — this
       // threw on every single case load, meaning the Interactions tab has never once shown real data.
-      const res = await api.getCustomerInteractions(customerId, pageNumber, pageSize);
+      const res = await api.getCustomerInteractions(customerId, pageNumber, pageSize, options?.fresh);
 
       // Discard if a newer load was started while this one was in-flight
       if (version !== _interactionsVersion) return;

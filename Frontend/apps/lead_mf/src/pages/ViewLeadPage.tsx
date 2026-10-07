@@ -362,7 +362,8 @@ export const ViewLeadPage: React.FC = () => {
               type="button"
               variant="secondary"
               size="sm"
-              onClick={() => fetchLeads()}
+              onClick={() => fetchLeads({ fresh: true })}
+              disabled={isLoadingLeads}
               leadingIcon={<RefreshCw size={15} className={isLoadingLeads ? 'animate-spin' : ''} />}
             >
               Refresh

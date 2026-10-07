@@ -400,8 +400,14 @@ export const apiClient = {
     icNumber?: string;
     phone?: string;
     status?: string;
+    /**
+     * Bypass the read cache. Set by the Refresh button: without it an identical query
+     * within the cache's 30s window is answered from memory and no request is sent, so
+     * the button appears to do nothing.
+     */
+    fresh?: boolean;
   }): Promise<PagedResult<LeadRecord>> => {
-    try {
+    {
       const query = new URLSearchParams();
       if (params.page) query.append('page', params.page.toString());
       if (params.pageSize) query.append('pageSize', params.pageSize.toString());
@@ -419,15 +425,17 @@ export const apiClient = {
       if (params.phone) query.append('phone', params.phone);
       if (params.status) query.append('status', params.status);
 
-      const res = await fetchWithAuth(`${API_BASE_URL}/api/leads?${query.toString()}`);
-      if (!res.ok) {
-        return { items: [], totalRecords: 0, page: 1, pageSize: params.pageSize || 10, totalPages: 1 };
-      }
+      // Throws rather than answering with an empty page: "no leads match" and "the
+      // server could not be reached" are different answers, and returning [] for both
+      // made a failed refresh look like an emptied table.
+      const res = await fetchWithAuth(
+        `${API_BASE_URL}/api/leads?${query.toString()}`,
+        params.fresh ? { cache: 'no-store' } : {},
+      );
+      if (!res.ok) throw new Error('Leads could not be loaded.');
       const json: ApiResponse<PagedResult<LeadRecord>> = await res.json();
-      return json.success ? json.data : { items: [], totalRecords: 0, page: 1, pageSize: 10, totalPages: 1 };
-    } catch (e) {
-      console.warn('Failed to load leads:', e);
-      return { items: [], totalRecords: 0, page: 1, pageSize: 10, totalPages: 1 };
+      if (!json.success) throw new Error('Leads could not be loaded.');
+      return json.data;
     }
   },
 
@@ -549,8 +557,10 @@ export const apiClient = {
     actor?: string;
     /** 'SUCCESS' or 'FAILED'. */
     status?: string;
+    /** Bypass the read cache — see the same flag on getLeads. */
+    fresh?: boolean;
   }): Promise<PagedResult<any>> => {
-    try {
+    {
       const query = new URLSearchParams();
       if (params.page) query.append('page', params.page.toString());
       if (params.pageSize !== undefined) query.append('pageSize', params.pageSize.toString());
@@ -562,17 +572,14 @@ export const apiClient = {
       if (params.actor) query.append('actor', params.actor);
       if (params.status) query.append('status', params.status);
 
-      const res = await fetchWithAuth(`${API_BASE_URL}/api/auditlogs?${query.toString()}`);
-      if (!res.ok) {
-        return { items: [], totalRecords: 0, page: 1, pageSize: 10, totalPages: 1 };
-      }
+      const res = await fetchWithAuth(
+        `${API_BASE_URL}/api/auditlogs?${query.toString()}`,
+        params.fresh ? { cache: 'no-store' } : {},
+      );
+      if (!res.ok) throw new Error('The audit log could not be loaded.');
       const json: ApiResponse<PagedResult<any>> = await res.json();
-      return json.success
-        ? json.data
-        : { items: [], totalRecords: 0, page: 1, pageSize: 10, totalPages: 1 };
-    } catch (e) {
-      console.warn('Failed to load audit logs:', e);
-      return { items: [], totalRecords: 0, page: 1, pageSize: 10, totalPages: 1 };
+      if (!json.success) throw new Error('The audit log could not be loaded.');
+      return json.data;
     }
   },
 

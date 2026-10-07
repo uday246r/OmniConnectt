@@ -310,7 +310,8 @@ const getActionBadge = (action: string) => {
             type="button"
             variant="secondary"
             size="sm"
-            onClick={() => fetchAuditLogs()}
+            onClick={() => fetchAuditLogs({ fresh: true })}
+            disabled={isLoadingAuditLogs}
             leadingIcon={<RefreshCw size={15} className={isLoadingAuditLogs ? 'animate-spin' : ''} />}
           >
             Refresh

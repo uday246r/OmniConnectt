@@ -25,6 +25,18 @@ export const httpClient = axios.create({
  * reject in the underlying adapter and are therefore never cached. Each caller gets its own copy of the
  * data, so a store that mutates what it received cannot change another caller's result.
  */
+declare module 'axios' {
+  interface AxiosRequestConfig {
+    /**
+     * Bypass the read cache for this one GET: the server is asked and its answer replaces whatever
+     * was stored. This is what a Refresh button needs — without it an identical request inside the
+     * 30s window is answered from memory and never leaves the browser, so the button spins and
+     * re-renders the same rows. Ignored on anything other than a GET, which is never cached.
+     */
+    fresh?: boolean;
+  }
+}
+
 const readCache = createRequestCache({ ttlMs: 30_000 });
 const REFERENCE_DATA_TTL_MS = 5 * 60_000;
 const REFERENCE_DATA = /\/(categories|document-definitions|status-configs)(\?|$)/;
@@ -49,6 +61,7 @@ httpClient.defaults.adapter = async (config) => {
   // The shared request must not carry one caller's abort signal, or cancelling one would cancel all.
   const shared = readCache.get(key, () => networkAdapter({ ...config, signal: undefined }), {
     ttlMs: REFERENCE_DATA.test(url) ? REFERENCE_DATA_TTL_MS : undefined,
+    force: config.fresh === true,
   });
 
   const response = await (signal

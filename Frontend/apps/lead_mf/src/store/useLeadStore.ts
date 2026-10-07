@@ -140,7 +140,8 @@ interface LeadStoreState {
   setPage: (page: number) => void;
   setPageSize: (size: number) => void;
   clearFilters: () => void;
-  fetchLeads: () => Promise<void>;
+  /** `fresh` bypasses the read cache — the Refresh button passes it. */
+  fetchLeads: (options?: { fresh?: boolean }) => Promise<void>;
 
   // Dashboard State (Dynamic Analytics from Backend API)
   dashboardDatePreset: string;
@@ -234,7 +235,8 @@ interface LeadStoreState {
   selectedAuditLog: AuditRecord | null;
   isAuditDetailsOpen: boolean;
 
-  fetchAuditLogs: () => Promise<void>;
+  /** `fresh` bypasses the read cache — the Refresh button passes it. */
+  fetchAuditLogs: (options?: { fresh?: boolean }) => Promise<void>;
   openAuditDetails: (log: AuditRecord) => void;
   closeAuditDetails: () => void;
   setAuditPage: (page: number) => void;
@@ -762,7 +764,7 @@ export const useLeadStore = create<LeadStoreState>((set, get) => ({
     get().clearAllFilters();
   },
 
-  fetchLeads: async () => {
+  fetchLeads: async (options) => {
     set({ isLoadingLeads: true });
     try {
       const state = get();
@@ -838,6 +840,7 @@ export const useLeadStore = create<LeadStoreState>((set, get) => ({
         icNumber,
         phone,
         status,
+        fresh: options?.fresh,
       });
 
       set({
@@ -847,9 +850,14 @@ export const useLeadStore = create<LeadStoreState>((set, get) => ({
         currentPage: pagedResult.page,
         isLoadingLeads: false,
       });
-    } catch (err) {
-      console.error('Failed to fetch leads:', err);
-      set({ leads: [], totalRecords: 0, totalPages: 1, isLoadingLeads: false });
+    } catch (err: any) {
+      // Keep whatever is on screen; see the note in fetchAuditLogs.
+      set({ isLoadingLeads: false });
+      get().showToast({
+        type: 'error',
+        title: 'Could not load leads',
+        message: err?.message || 'Could not connect to backend server.',
+      });
     }
   },
 
@@ -1352,7 +1360,7 @@ export const useLeadStore = create<LeadStoreState>((set, get) => ({
   selectedAuditLog: null,
   isAuditDetailsOpen: false,
 
-  fetchAuditLogs: async () => {
+  fetchAuditLogs: async (options) => {
     set({ isLoadingAuditLogs: true });
     try {
       const state = get();
@@ -1365,6 +1373,7 @@ export const useLeadStore = create<LeadStoreState>((set, get) => ({
         status: state.auditStatusFilter,
         // Resolved at the point of use, never stored.
         ...resolveDateRange(state.auditDateRange),
+        fresh: options?.fresh,
       });
 
       set({
@@ -1372,9 +1381,15 @@ export const useLeadStore = create<LeadStoreState>((set, get) => ({
         totalAuditRecords: pagedResult.totalRecords,
         isLoadingAuditLogs: false,
       });
-    } catch (err) {
-      console.error('Failed to fetch audit logs:', err);
-      set({ auditLogs: [], totalAuditRecords: 0, isLoadingAuditLogs: false });
+    } catch (err: any) {
+      // The rows already on screen are kept: emptying the table on a failed read says
+      // "there is nothing here", which is a different and wrong answer.
+      set({ isLoadingAuditLogs: false });
+      get().showToast({
+        type: 'error',
+        title: 'Could not refresh the audit log',
+        message: err?.message || 'Could not connect to backend server.',
+      });
     }
   },
 

@@ -122,7 +122,7 @@ export function AuditLogsPage() {
       </ListToolbar>
 
       {s.liveCount > 0 && (
-        <button type="button" className={styles.liveBanner} onClick={() => { a.setPage(1); void a.fetchAuditLogs(); }}>
+        <button type="button" className={styles.liveBanner} onClick={() => { a.setPage(1); void a.fetchAuditLogs({ fresh: true }); }}>
           <Icon.ChevronUp /> {s.liveCount} new event{s.liveCount === 1 ? '' : 's'} — show them
         </button>
       )}
@@ -130,7 +130,7 @@ export function AuditLogsPage() {
       {s.error && (
         <div role="alert" className={styles.error}>
           <span>{s.error}</span>
-          <Button variant="secondary" size="sm" onClick={() => void a.fetchAuditLogs()}>Try again</Button>
+          <Button variant="secondary" size="sm" onClick={() => void a.fetchAuditLogs({ fresh: true })}>Try again</Button>
         </div>
       )}
 

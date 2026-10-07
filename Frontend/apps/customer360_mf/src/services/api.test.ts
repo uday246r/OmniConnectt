@@ -68,6 +68,33 @@ describe('Customer 360 read cache', () => {
     expect(fetchMock).toHaveBeenCalledTimes(3)
   })
 
+  it('sends a second request when the audit log is refreshed', async () => {
+    // The bug this covers: /v1/audit is one of the endpoints whose result is reused for 30s, and
+    // request() had no way for a caller to ask past it — so Refresh re-sent the same URL, got the
+    // stored promise back and never reached the server.
+    const client = await api()
+
+    await client.getAuditLogs({ pageNumber: 1, pageSize: 10 })
+    await client.getAuditLogs({ pageNumber: 1, pageSize: 10 })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+
+    await client.getAuditLogs({ pageNumber: 1, pageSize: 10, fresh: true })
+
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('leaves the refreshed answer in the cache for the next reader', async () => {
+    // force replaces the stored result rather than stepping around it, so a component that reads the
+    // same query straight after a refresh sees the new rows instead of the ones Refresh replaced.
+    const client = await api()
+
+    await client.getAuditLogs({ pageNumber: 1, pageSize: 10 })
+    await client.getAuditLogs({ pageNumber: 1, pageSize: 10, fresh: true })
+    await client.getAuditLogs({ pageNumber: 1, pageSize: 10 })
+
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
   it('gives each caller its own copy of the data', async () => {
     fetchMock.mockImplementation(() => ok({ status: 200, data: [{ fieldKey: 'name', visible: true }] }))
     const client = await api()

@@ -66,6 +66,48 @@ describe('Lead API read cache', () => {
     expect(fetchMock).toHaveBeenCalledTimes(3)
   })
 
+  it('sends a second request when Refresh asks for a fresh read', async () => {
+    // The bug this covers: Refresh re-sent an identical URL, the 30s cache answered it from memory,
+    // and no request left the browser — so the button spun and re-rendered the same rows.
+    fetchMock.mockImplementation(() =>
+      Promise.resolve(ok({ success: true, data: { items: [], totalRecords: 0, page: 1, pageSize: 10, totalPages: 0 } })),
+    )
+    const api = await client()
+
+    await api.getLeads({ page: 1, pageSize: 10 })
+    await api.getLeads({ page: 1, pageSize: 10 })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+
+    await api.getLeads({ page: 1, pageSize: 10, fresh: true })
+
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('sends a second request when the audit log is refreshed', async () => {
+    fetchMock.mockImplementation(() =>
+      Promise.resolve(ok({ success: true, data: { items: [], totalRecords: 0, page: 1, pageSize: 10, totalPages: 0 } })),
+    )
+    const api = await client()
+
+    await api.getAuditLogs({ page: 1, pageSize: 10 })
+    await api.getAuditLogs({ page: 1, pageSize: 10 })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+
+    await api.getAuditLogs({ page: 1, pageSize: 10, fresh: true })
+
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('reports a failed read instead of answering with an empty page', async () => {
+    // An empty list and an unreachable server are different answers. Returning [] for both made a
+    // failed refresh look exactly like a table that had been emptied.
+    fetchMock.mockImplementation(() => Promise.resolve(new Response('{}', { status: 500 })))
+    const api = await client()
+
+    await expect(api.getAuditLogs({ page: 1, pageSize: 10 })).rejects.toThrow(/could not be loaded/i)
+    await expect(api.getLeads({ page: 1, pageSize: 10 })).rejects.toThrow(/could not be loaded/i)
+  })
+
   it('does not reuse an error response', async () => {
     fetchMock
       .mockResolvedValueOnce(new Response('{}', { status: 500 }))

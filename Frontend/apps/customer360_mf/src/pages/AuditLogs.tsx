@@ -231,11 +231,15 @@ export default function AuditLogs() {
     };
   }, [detailsOpen]);
 
-  const fetchLogs = async () => {
+  /**
+   * `fresh` is what the Refresh button passes. Reads of /v1/audit are reusable for 30s, so an
+   * unforced refetch with unchanged filters never left the browser.
+   */
+  const fetchLogs = async (options?: { fresh?: boolean }) => {
     setLoading(true);
     setError(null);
     try {
-      const res = await api.getAuditLogs({ ...filterQuery(), pageNumber, pageSize });
+      const res = await api.getAuditLogs({ ...filterQuery(), pageNumber, pageSize, fresh: options?.fresh });
       setLogs(res.data || []);
       setTotalCount(res.totalCount || 0);
       setTotalPages(res.totalPages || 1);
@@ -389,7 +393,7 @@ export default function AuditLogs() {
           <Button
             variant="secondary"
             size="sm"
-            onClick={fetchLogs}
+            onClick={() => void fetchLogs({ fresh: true })}
             disabled={loading}
             leadingIcon={<RefreshCw size={14} className={loading ? 'animate-spin' : ''} />}
           >

@@ -29,7 +29,8 @@ interface AuditLogState {
   currentFilters: () => AuditLogQuery;
   setPage: (page: number) => void;
   setPageSize: (pageSize: number) => void;
-  fetchAuditLogs: () => Promise<void>;
+  /** `fresh` bypasses the read cache — the Refresh button passes it. */
+  fetchAuditLogs: (options?: { fresh?: boolean }) => Promise<void>;
   fetchActionOptions: () => Promise<void>;
   fetchEntityTypes: () => Promise<void>;
   ingestLiveEntry: (entry: AuditLog) => void;
@@ -70,16 +71,17 @@ export const useAuditLogStore = create<AuditLogState>((set, get) => ({
   setPage: (page) => set({ page }),
   setPageSize: (pageSize) => set({ pageSize, page: 1 }),
 
-  fetchAuditLogs: async () => {
+  fetchAuditLogs: async (options) => {
     const { page, pageSize } = get();
     set({ loading: true, error: null });
     const filters = get().currentFilters();
+    const fresh = options?.fresh;
     try {
       // The page of rows and the headline figures are fetched with the same filters, so the KPIs
       // describe the whole matching result set rather than just the rows currently rendered.
       const [result, summary] = await Promise.all([
-        auditLogApi.search({ ...filters, page, pageSize }),
-        auditLogApi.getSummary(filters),
+        auditLogApi.search({ ...filters, page, pageSize }, { fresh }),
+        auditLogApi.getSummary(filters, { fresh }),
       ]);
       set({
         items: result.items,

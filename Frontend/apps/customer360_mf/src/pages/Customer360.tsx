@@ -1292,7 +1292,7 @@ export default function Customer360() {
                       <Button
                         variant="secondary"
                         size="sm"
-                        onClick={() => individualProfile.nationalId && loadInteractions(individualProfile.nationalId as string)}
+                        onClick={() => individualProfile.nationalId && loadInteractions(individualProfile.nationalId as string, { fresh: true })}
                         disabled={loadingInteractions}
                         leadingIcon={<RefreshCw size={14} className={loadingInteractions ? 'animate-spin' : ''} />}
                       >
