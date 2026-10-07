@@ -3,7 +3,7 @@ import {
   User, MapPin, Phone, Mail, Calendar, Globe, Shield, BookOpen, DollarSign, AlertTriangle,
   Hash, CreditCard, Building2, CheckSquare, TrendingUp, FileText, Briefcase, Eye, EyeOff,
 } from '@omniconnect/ui/icons';
-import { DetailField, DetailGrid, DetailSection, isEmptyDetailValue } from '@omniconnect/ui';
+import { DetailField, DetailGrid, DetailSection } from '@omniconnect/ui';
 import type { ContactDetail, CustomerProfile, FieldConfig } from '../types/api';
 import { applyMaskingRule, formatFieldValue, hasRevealableValue } from '../utils/fieldMasking';
 import styles from './DynamicProfileSection.module.css';
@@ -133,14 +133,12 @@ export default function DynamicProfileSection({
               ? formatFieldValue(raw)
               : applyMaskingRule(rawStr, config.maskingRule, config.visibleCharCount);
           } else {
-            displayValue = formatFieldValue(raw);
+            const valueToFormat =
+              config.apiField === 'gender' && typeof raw === 'string'
+                ? ({ M: 'Male', F: 'Female' }[raw.trim().toUpperCase()] ?? raw)
+                : raw;
+            displayValue = formatFieldValue(valueToFormat);
           }
-
-          // A masked/sensitive field with nothing behind it, or any field the CRM simply never
-          // populated, is skipped outright rather than rendered as an empty card — DetailField would
-          // do this itself for a plain string, but a sensitive field's children is a <span>+button
-          // element, which DetailField's own emptiness check can't see through.
-          if (isEmptyDetailValue(displayValue)) return null;
 
           // Any non-sensitive field whose value happens to be a URL renders as a real link — a
           // generic behavior, not special-cased to one field name (the old inline JSX only did this

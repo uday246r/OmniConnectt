@@ -12,8 +12,6 @@ import {
   Select,
   StatTile,
   StatTileSkeleton,
-  TabPanel,
-  Tabs,
   describeTruncation,
   type ActiveFilter,
 } from '@omniconnect/ui';
@@ -113,8 +111,10 @@ export function ProductsPage() {
 
   const tabs = useMemo(() => {
     const all = categories.reduce((sum, c) => sum + c.productCount, 0);
-    const count = (n: number) => <span className={styles.count}>{n}</span>;
-    return [{ key: ALL, label: 'All products', suffix: count(all) }, ...categories.map((c) => ({ key: c.id, label: c.name, suffix: count(c.productCount) }))];
+    return [
+      { key: ALL, label: 'All products', count: all },
+      ...categories.map((c) => ({ key: c.id, label: c.name, count: c.productCount })),
+    ];
   }, [categories]);
   const activeTab = query.categoryId || ALL;
 
@@ -211,34 +211,52 @@ export function ProductsPage() {
             value={summary.totalProducts.value}
             icon={<Icon.Package />}
             accent="primary"
-            changePercent={summary.totalProducts.changePercent}
-            changeLabel={`vs previous ${summary.comparedDays} days`}
           />
           <StatTile
             label="Live"
             value={summary.liveProducts.value}
             icon={<Icon.CheckCircle />}
             accent="success"
-            changePercent={summary.liveProducts.changePercent}
-            changeLabel={`vs previous ${summary.comparedDays} days`}
           />
           <StatTile
             label="Not published"
             value={summary.unpublishedProducts.value}
             icon={<Icon.Eye />}
             accent="warning"
-            caption="Not on the catalogue"
           />
           <StatTile label="Categories" value={summary.totalCategories.value} icon={<Icon.Layers />} accent="violet" />
         </div>
       ) : summaryLoading ? (
         <div className={page.kpis} aria-hidden="true">
-          <StatTileSkeleton foot />
-          <StatTileSkeleton foot />
-          <StatTileSkeleton foot />
+          <StatTileSkeleton />
+          <StatTileSkeleton />
+          <StatTileSkeleton />
           <StatTileSkeleton />
         </div>
       ) : null}
+
+      {/* Category tabs styled like the host's Approval Center */}
+      <div className={styles.navBar}>
+        <div className={styles.tabsList} role="tablist" aria-label="Product categories">
+          {tabs.map((tab) => {
+            const isSelected = activeTab === tab.key;
+            return (
+              <button
+                key={tab.key}
+                type="button"
+                role="tab"
+                id={`${TABS_ID}-tab-${tab.key}`}
+                aria-selected={isSelected}
+                className={`${styles.tabBtn} ${isSelected ? styles.tabActive : ''}`}
+                onClick={() => setQuery({ categoryId: tab.key === ALL ? '' : tab.key, subCategoryId: '' })}
+              >
+                <span>{tab.label}</span>
+                <span className={`${styles.count} ${isSelected ? styles.countActive : ''}`}>{tab.count}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
 
       <FilterBar filters={activeFilters} onClearAll={resetQuery} />
 
@@ -250,18 +268,8 @@ export function ProductsPage() {
       )}
 
       {/* One card holds the toolbar, the grid and the pager — the frame every other list on the
-          platform uses. The pager used to sit in a card of its own below the grid: a card whose only
-          content was a footer with a border-top and no body. */}
+          platform uses. */}
       <div className={page.card} aria-busy={loading}>
-        {/* The category tabs head the card they filter, instead of floating on the page above it. */}
-        <div className={styles.tabs}>
-          <Tabs
-            id={TABS_ID}
-            tabs={tabs}
-            activeKey={activeTab}
-            onChange={(key) => setQuery({ categoryId: key === ALL ? '' : key, subCategoryId: '' })}
-          />
-        </div>
         <div className={page.toolbar}>
           <ListToolbar
             searchLabel="Search products"
@@ -302,7 +310,7 @@ export function ProductsPage() {
           </ListToolbar>
         </div>
 
-        <TabPanel id={TABS_ID} tabId={activeTab} active>
+        <div role="tabpanel" id={`${TABS_ID}-panel-${activeTab}`} aria-labelledby={`${TABS_ID}-tab-${activeTab}`}>
           <div className={page.cardBody}>
             {!loaded && loading ? (
               <div className={styles.grid}>
@@ -323,7 +331,7 @@ export function ProductsPage() {
               </div>
             )}
           </div>
-        </TabPanel>
+        </div>
 
         <div className={page.footer}>
           <Pagination

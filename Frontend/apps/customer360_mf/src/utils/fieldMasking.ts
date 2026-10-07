@@ -41,13 +41,12 @@ export function applyMaskingRule(raw: string, rule: MaskingRule, visibleCharCoun
   }
 }
 
-/** Renders '-' for empty/null/"null"/"undefined" the same way every existing formatValue() in this
- * app already does, before either showing the raw value or masking it. */
+/** Renders '_' for empty/null/"null"/"undefined" profile fields before display or masking. */
 export function formatFieldValue(val: unknown): string {
-  if (val === null || val === undefined) return '-';
+  if (val === null || val === undefined) return '_';
   const s = String(val).trim();
   if (s === '' || s.toLowerCase() === 'null' || s.toLowerCase() === 'undefined') {
-    return '-';
+    return '_';
   }
   return s;
 }

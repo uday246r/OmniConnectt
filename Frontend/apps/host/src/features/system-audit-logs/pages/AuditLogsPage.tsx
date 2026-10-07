@@ -4,7 +4,7 @@ import { useSearchParams } from 'react-router-dom'
 import { useAuthStore } from '../../auth/store/authStore'
 import { queryKeys } from '../../../shared/query/queryKeys'
 import { useLiveRefetchInterval } from '../../../shared/query/invalidationBridge'
-import { ActorCell, Badge, CsvExportError, DataTable, DateRangeColumnFilter, DateRangeFilterButton, EMPTY_DATE_RANGE, EMPTY_VALUE, FilterBar, PageHeader, Pagination, ResponsiveRows, RowAction, RowsPerPage, describeDateRange, describeTruncation, formatAuditTimestamp, isDateRangeActive, readStoredPageSize, resolveDateRange, sanitizeFilterInput, filterTypeBlockedMessage, useCommittedFilter, type ActiveFilter, type CommittedFilter, type DateRangeValue } from '@omniconnect/ui'
+import { ActorCell, Badge, CsvExportError, DataTable, DateRangeColumnFilter, DateRangeFilterButton, EMPTY_DATE_RANGE, EMPTY_VALUE, FilterBar, PageHeader, Pagination, ResponsiveRows, RowAction, RowsPerPage, StatTile, StatTileSkeleton, describeDateRange, describeTruncation, formatAuditTimestamp, isDateRangeActive, readStoredPageSize, resolveDateRange, sanitizeFilterInput, filterTypeBlockedMessage, useCommittedFilter, type ActiveFilter, type CommittedFilter, type DateRangeValue } from '@omniconnect/ui'
 import { PermissionGate } from '../../../shared/components/PermissionGate/PermissionGate'
 import { ApiError } from '../../../shared/api/httpClient'
 import { useDebouncedValue } from '../../../shared/hooks/useDebouncedValue'
@@ -496,45 +496,21 @@ export function AuditLogsPage() {
 
       {/* 4 Summary Stat Cards */}
       <div className={styles.summaryGrid}>
-        <div className={styles.summaryCard}>
-          <div className={`${styles.summaryIcon} ${styles.iconGreen}`}>
-            <Icon.CheckCircle width={20} height={20} />
-          </div>
-          <div className={styles.summaryContent}>
-            <span className={styles.summaryLabel}>Login Successes</span>
-            <span className={styles.summaryValue}>{summary?.loginSuccesses ?? '0'}</span>
-          </div>
-        </div>
-
-        <div className={styles.summaryCard}>
-          <div className={`${styles.summaryIcon} ${styles.iconRed}`}>
-            <Icon.AlertCircle width={20} height={20} />
-          </div>
-          <div className={styles.summaryContent}>
-            <span className={styles.summaryLabel}>Login Errors</span>
-            <span className={styles.summaryValue}>{summary?.loginErrors ?? '0'}</span>
-          </div>
-        </div>
-
-        <div className={styles.summaryCard}>
-          <div className={`${styles.summaryIcon} ${styles.iconBlue}`}>
-            <Icon.FileText width={20} height={20} />
-          </div>
-          <div className={styles.summaryContent}>
-            <span className={styles.summaryLabel}>Audit Events</span>
-            <span className={styles.summaryValue}>{summary?.totalAuditEvents ?? '0'}</span>
-          </div>
-        </div>
-
-        <div className={styles.summaryCard}>
-          <div className={`${styles.summaryIcon} ${styles.iconPurple}`}>
-            <Icon.Users width={20} height={20} />
-          </div>
-          <div className={styles.summaryContent}>
-            <span className={styles.summaryLabel}>Active Users</span>
-            <span className={styles.summaryValue}>{summary?.activeUsers ?? '0'}</span>
-          </div>
-        </div>
+        {summaryQuery.isLoading && !summary ? (
+          <>
+            <StatTileSkeleton />
+            <StatTileSkeleton />
+            <StatTileSkeleton />
+            <StatTileSkeleton />
+          </>
+        ) : (
+          <>
+            <StatTile label="Login Successes" value={summary?.loginSuccesses ?? 0} accent="success" icon={<Icon.CheckCircle width={20} height={20} />} />
+            <StatTile label="Login Errors" value={summary?.loginErrors ?? 0} accent="danger" icon={<Icon.AlertCircle width={20} height={20} />} />
+            <StatTile label="Audit Events" value={summary?.totalAuditEvents ?? 0} accent="primary" icon={<Icon.FileText width={20} height={20} />} />
+            <StatTile label="Active Users" value={summary?.activeUsers ?? 0} accent="violet" icon={<Icon.Users width={20} height={20} />} />
+          </>
+        )}
       </div>
 
       {/* Tabs & Filter Bar */}

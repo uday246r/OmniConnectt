@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Icon, PageHeader, Tabs } from '@omniconnect/ui';
+import { Icon, PageHeader } from '@omniconnect/ui';
 import { DocumentsSetup } from './DocumentsSetup';
 import { FieldsSetup } from './FieldsSetup';
 import { StatusesSetup } from './StatusesSetup';
@@ -8,10 +8,17 @@ import styles from './setup.module.css';
 
 const TABS_ID = 'setup';
 
-const TABS = [
-  { key: 'fields', label: 'Fields', hint: 'The attributes each kind of product carries' },
-  { key: 'documents', label: 'Documents', hint: 'What a customer is asked to provide' },
-  { key: 'statuses', label: 'Statuses', hint: 'What a record can be, and which of them are live' },
+interface SetupTabDef {
+  key: string;
+  label: string;
+  icon: typeof Icon.Grid;
+  hint: string;
+}
+
+const TABS: SetupTabDef[] = [
+  { key: 'fields', label: 'Fields', icon: Icon.Grid, hint: 'The attributes each kind of product carries' },
+  { key: 'documents', label: 'Documents', icon: Icon.FileText, hint: 'What a customer is asked to provide' },
+  { key: 'statuses', label: 'Statuses', icon: Icon.Activity, hint: 'What a record can be, and which of them are live' },
 ];
 
 /**
@@ -19,10 +26,8 @@ const TABS = [
  * for, and the statuses records can hold. Each tab is its own screen; only the active one is mounted, so
  * opening Setup reads nothing the visible tab does not need.
  *
- * The three views are equally-weighted, top-level parts of one page, so they are a segmented control
- * in a bar of its own — the treatment the host gives the same situation on its user-detail and
- * approval screens — rather than an underlined strip sitting bare on the page background, which is
- * the lighter treatment the platform keeps for a minor sub-navigation.
+ * Tab bar is styled identically to the host's Approval Center (navBar with accent top border,
+ * clean segmented tab buttons, active pill highlight, and status hint).
  */
 export function SetupPage() {
   const [active, setActive] = useState(TABS[0].key);
@@ -33,8 +38,31 @@ export function SetupPage() {
       <PageHeader icon={<Icon.Settings />} title="Setup" subtitle="Configure fields, required documents and statuses" />
 
       <div className={styles.navBar}>
-        <Tabs id={TABS_ID} variant="pill" tabs={TABS} activeKey={active} onChange={setActive} />
-        <span className={styles.navHint}>{current.hint}</span>
+        <div className={styles.tabsList} role="tablist" aria-label="Setup configuration views">
+          {TABS.map((tab) => {
+            const TabIcon = tab.icon;
+            const isSelected = active === tab.key;
+            return (
+              <button
+                key={tab.key}
+                type="button"
+                role="tab"
+                id={`${TABS_ID}-tab-${tab.key}`}
+                aria-selected={isSelected}
+                aria-controls={`${TABS_ID}-panel-${tab.key}`}
+                className={`${styles.tabBtn} ${isSelected ? styles.tabActive : ''}`}
+                onClick={() => setActive(tab.key)}
+              >
+                <TabIcon width={16} height={16} />
+                <span>{tab.label}</span>
+              </button>
+            );
+          })}
+        </div>
+        <div className={styles.navHint}>
+          <Icon.Info width={14} height={14} />
+          <span>{current.hint}</span>
+        </div>
       </div>
 
       {/* The panel is written out rather than using TabPanel: that one adds its own top padding for

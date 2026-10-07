@@ -13,7 +13,7 @@ import ProductDetailsModal from '../components/ProductDetailsModal';
 import DynamicProfileSection, { groupBySection } from '../components/DynamicProfileSection';
 import { useFieldReveal } from '../hooks/useFieldReveal';
 import { useRecentLookups } from '../hooks/useRecentLookups';
-import { Eye, EyeOff, ChevronRight, ChevronDown, SlidersHorizontal, Building2, Layers, User, Briefcase, Globe, Shield, FileText, Calendar, DollarSign, MapPin, Mail, Phone, TrendingUp, Search, RotateCcw, RefreshCw, AlertCircle, Loader2 } from '@omniconnect/ui/icons';
+import { Eye, EyeOff, ChevronRight, ChevronDown, SlidersHorizontal, Building2, Layers, User, Briefcase, Globe, Shield, FileText, Calendar, DollarSign, MapPin, Mail, Phone, TrendingUp, Search, RotateCcw, RefreshCw, AlertCircle, Loader2, Sparkles } from '@omniconnect/ui/icons';
 import { useHostNavigate } from '../navigation/HostNavigation';
 import type {
   IndividualProfile,
@@ -234,7 +234,7 @@ export default function Customer360() {
     idType: string,
     typed: string,
   ) => {
-    const scoped = entries.filter((e) => e.idType === idType);
+    const scoped = idType ? entries.filter((e) => e.idType === idType) : entries;
     const q = typed.trim().toLowerCase();
     if (!q) return scoped;
     return scoped.filter((e) => e.value.toLowerCase().includes(q) || e.label.toLowerCase().includes(q));
@@ -804,114 +804,122 @@ export default function Customer360() {
 
       <div className={`c360-search-panel ${styles.spacer7}`}>
       <form onSubmit={(e) => { e.preventDefault(); handleSearch(); }}>
-        <div className="c360-search-form-row">
-          {/* ID Type Select */}
-          <div className="c360-form-group">
-            <label className="c360-label">
-              Search By <span className="c360-required">*</span>
-            </label>
-            <Select
-              size="lg"
-              value={searchIdType}
-              onChange={(e) => {
-                setSearchIdType(e.target.value);
-                setSearchSubtype('');
-                setSearchVal('');
-                setSearchError('');
-              }}
-              placeholder="Select ID Type"
-              options={dropdownOptions.idTypes}
-            />
-          </div>
-
-          {/* Secondary ID Type Select */}
-          {searchIdType === 'SecondaryID' ? (
-            <div className="c360-form-group">
+        <div className={styles.searchBarRow}>
+          <div className={styles.searchControlsGroup}>
+            {/* ID Type Select */}
+            <div className={styles.selectGroup}>
               <label className="c360-label">
-                Document Type <span className="c360-required">*</span>
+                Search By <span className="c360-required">*</span>
               </label>
               <Select
                 size="lg"
-                value={searchSubtype}
+                value={searchIdType}
                 onChange={(e) => {
-                  setSearchSubtype(e.target.value);
+                  setSearchIdType(e.target.value);
+                  setSearchSubtype('');
                   setSearchVal('');
                   setSearchError('');
                 }}
-                placeholder="Select Document"
-                options={dropdownOptions.secondaryIdTypes}
+                placeholder="Select ID Type"
+                options={dropdownOptions.idTypes}
               />
             </div>
-          ) : (
-            <div className={styles.rule} />
-          )}
 
-          {/* Search Input — only once the operator has actually chosen what they're searching by.
-              Showing an empty "Identity Number" box before any ID Type is selected (previously
-              unconditional) told the operator nothing about what format to enter and read as
-              confusing/broken; for Secondary ID specifically, the document type must be picked too,
-              since the placeholder/label below depends on it. */}
-          {searchIdType && (searchIdType !== 'SecondaryID' || searchSubtype) && (
-            <Input
-              className={searchIdType === 'SecondaryID' ? styles.searchSpanNarrow : styles.searchSpan}
-              label={
-                searchIdType === 'Phone' ? 'Phone Number' :
-                searchIdType === 'Name' ? 'Full Name' :
-                searchIdType === 'NRIC' ? 'National ID (NRIC)' :
-                (dropdownOptions.secondaryIdTypes.find((opt) => opt.value === searchSubtype)?.label || 'Identity Number')
-              }
-              required
-              leading={<Search size={16} />}
-              type="text"
-              placeholder={
-                searchIdType === 'Phone' ? 'e.g. +60123456789 or 0123456789' :
-                searchIdType === 'Name' ? 'e.g. Ahmad bin Razak' :
-                searchIdType === 'NRIC' ? 'e.g. 900101-14-5566 or 900101145566' :
-                searchSubtype === 'PASSPORT' ? 'e.g. A12345678' : 'Enter identity number'
-              }
-              value={searchVal}
-              onChange={(e) => {
-                // Restrict keystrokes to what the chosen ID type can actually hold — NRIC and
-                // Phone are digits-only, Name is letters-only. Secondary ID formats vary by
-                // subtype (passport numbers mix letters and digits), so it stays unrestricted.
-                const filterType: FilterInputType =
-                  searchIdType === 'Phone' || searchIdType === 'NRIC' ? 'numeric' :
-                  searchIdType === 'Name' ? 'alpha' : 'text';
-                setSearchVal(sanitizeFilterInput(e.target.value, filterType));
-                setSearchError('');
-              }}
-              autoFocus
-            />
-          )}
+            {/* Secondary ID Type Select */}
+            {searchIdType === 'SecondaryID' && (
+              <div className={styles.selectGroup}>
+                <label className="c360-label">
+                  Document Type <span className="c360-required">*</span>
+                </label>
+                <Select
+                  size="lg"
+                  value={searchSubtype}
+                  onChange={(e) => {
+                    setSearchSubtype(e.target.value);
+                    setSearchVal('');
+                    setSearchError('');
+                  }}
+                  placeholder="Select Document"
+                  options={dropdownOptions.secondaryIdTypes}
+                />
+              </div>
+            )}
 
-          {searchIdType && individualSuggestions.length > 0 && (
-            <div className={styles.recentWrap}>
-              <span className={styles.recentLabel}>Recent lookups</span>
-              <div className={styles.recentList}>
-                {individualSuggestions.map((r) => (
+            {/* Search Input — compact & elegant size */}
+            {searchIdType && (searchIdType !== 'SecondaryID' || searchSubtype) && (
+              <div className={styles.inputGroup}>
+                <Input
+                  label={
+                    searchIdType === 'Phone' ? 'Phone Number' :
+                    searchIdType === 'Name' ? 'Full Name' :
+                    searchIdType === 'NRIC' ? 'National ID (NRIC)' :
+                    (dropdownOptions.secondaryIdTypes.find((opt) => opt.value === searchSubtype)?.label || 'Identity Number')
+                  }
+                  required
+                  leading={<Search size={16} />}
+                  type="text"
+                  placeholder={
+                    searchIdType === 'Phone' ? 'e.g. +60123456789 or 0123456789' :
+                    searchIdType === 'Name' ? 'e.g. Ahmad bin Razak' :
+                    searchIdType === 'NRIC' ? 'e.g. 900101-14-5566 or 900101145566' :
+                    searchSubtype === 'PASSPORT' ? 'e.g. A12345678' : 'Enter identity number'
+                  }
+                  value={searchVal}
+                  onChange={(e) => {
+                    const filterType: FilterInputType =
+                      searchIdType === 'Phone' || searchIdType === 'NRIC' ? 'numeric' :
+                      searchIdType === 'Name' ? 'alpha' : 'text';
+                    setSearchVal(sanitizeFilterInput(e.target.value, filterType));
+                    setSearchError('');
+                  }}
+                  autoFocus
+                />
+              </div>
+            )}
+
+            {/* Action Button */}
+            <div className={styles.actionBtnGroup}>
+              <Button
+                type="submit"
+                loading={loadingSearch}
+                disabled={!searchIdType || !searchVal}
+                leadingIcon={<Search size={15} />}
+              >
+                {loadingSearch ? 'Searching...' : 'Search Profile'}
+              </Button>
+            </div>
+          </div>
+
+          {/* Along the search bar: Recent Lookups */}
+          {individualSuggestions.length > 0 && (
+            <div className={styles.recentAlongBar}>
+              <div className={styles.recentHeader}>
+                <RotateCcw size={13} className={styles.recentIcon} />
+                <span>Recent:</span>
+              </div>
+              <div className={styles.recentChipsList}>
+                {individualSuggestions.slice(0, 3).map((r) => (
                   <button
                     key={`${r.idType}:${r.value}`}
                     type="button"
-                    className={styles.recentItem}
-                    onClick={() => { setSearchVal(r.value); setSearchError(''); }}
+                    className={styles.recentChip}
+                    onClick={() => {
+                      setSearchIdType(r.idType);
+                      setSearchVal(r.value);
+                      setSearchError('');
+                    }}
+                    title={`Click to fill ${r.label} (${r.value})`}
                   >
-                    <span className={styles.recentName}>{r.label}</span>
-                    <span className={styles.recentValue}>{r.value}</span>
+                    <span className={styles.recentChipAvatar}>
+                      {getInitials(r.label) || 'ID'}
+                    </span>
+                    <span className={styles.recentChipName}>{r.label}</span>
+                    <span className={styles.recentChipValue}>{r.value}</span>
                   </button>
                 ))}
               </div>
             </div>
           )}
-
-          {/* Action Buttons */}
-          <Button
-            type="submit"
-            loading={loadingSearch}
-            disabled={!searchIdType || !searchVal}
-            leadingIcon={<Search size={15} />}
-          >
-            {loadingSearch ? 'Searching...' : 'Search Profile'}
-          </Button>
         </div>
 
         {searchError && (
@@ -947,82 +955,96 @@ export default function Customer360() {
 
       <div className={`c360-search-panel ${styles.spacer7}`}>
       <form onSubmit={(e) => { e.preventDefault(); handleCorpSearch(); }}>
-        <div className="c360-search-form-row">
-          {/* Search Type Select */}
-          <div className="c360-form-group">
-            <label className="c360-label">
-              Search Type <span className="c360-required">*</span>
-            </label>
-            <Select
-              size="lg"
-              value={corpSearchType}
-              onChange={(e) => {
-                setCorpSearchType(e.target.value);
-                setCorpSearchVal('');
-                setCorpSearchError('');
-              }}
-              placeholder="Select Search Type"
-              options={dropdownOptions.corpSearchTypes}
-            />
+        <div className={styles.searchBarRow}>
+          <div className={styles.searchControlsGroup}>
+            {/* Search Type Select */}
+            <div className={styles.selectGroup}>
+              <label className="c360-label">
+                Search Type <span className="c360-required">*</span>
+              </label>
+              <Select
+                size="lg"
+                value={corpSearchType}
+                onChange={(e) => {
+                  setCorpSearchType(e.target.value);
+                  setCorpSearchVal('');
+                  setCorpSearchError('');
+                }}
+                placeholder="Select Search Type"
+                options={dropdownOptions.corpSearchTypes}
+              />
+            </div>
+
+            {/* Search Input — compact & elegant size */}
+            {corpSearchType && (
+              <div className={styles.inputGroup}>
+                <Input
+                  label={
+                    corpSearchType === 'BRN' ? 'BRN (Business Registration)' :
+                    corpSearchType === 'OLDBRN' ? 'Old Registration Number' :
+                    'Company / Organization Name'
+                  }
+                  required
+                  leading={<Search size={16} />}
+                  type="text"
+                  placeholder={
+                    corpSearchType === 'BRN' ? 'e.g. 202003150001' :
+                    corpSearchType === 'OLDBRN' ? 'e.g. 202003151A' :
+                    'e.g. Omni Global Trading Sdn Bhd'
+                  }
+                  value={corpSearchVal}
+                  onChange={(e) => {
+                    setCorpSearchVal(e.target.value);
+                    setCorpSearchError('');
+                  }}
+                  autoFocus
+                />
+              </div>
+            )}
+
+            {/* Action Buttons */}
+            <div className={styles.actionBtnGroup}>
+              <Button
+                type="submit"
+                loading={loadingCorpSearch}
+                disabled={!corpSearchType || !corpSearchVal}
+                leadingIcon={<Search size={15} />}
+              >
+                {loadingCorpSearch ? 'Searching...' : 'Search Company'}
+              </Button>
+            </div>
           </div>
 
-          {/* Search Input — only once a search type is actually chosen. Previously unconditional,
-              which meant it fell through to the "Company / Organization Name" branch (the ternary's
-              else case) even with nothing selected — indistinguishable from genuinely having chosen
-              Company Name search. */}
-          {corpSearchType && (
-            <Input
-              className={styles.rule2}
-              label={
-                corpSearchType === 'BRN' ? 'BRN (Business Registration Number)' :
-                corpSearchType === 'OLDBRN' ? 'Old Registration Number' :
-                'Company / Organization Name'
-              }
-              required
-              leading={<Search size={16} />}
-              type="text"
-              placeholder={
-                corpSearchType === 'BRN' ? 'e.g. 202003150001' :
-                corpSearchType === 'OLDBRN' ? 'e.g. 202003151A' :
-                'e.g. Omni Global Trading Sdn Bhd'
-              }
-              value={corpSearchVal}
-              onChange={(e) => {
-                setCorpSearchVal(e.target.value);
-                setCorpSearchError('');
-              }}
-              autoFocus
-            />
-          )}
-
-          {corpSearchType && corporateSuggestions.length > 0 && (
-            <div className={styles.recentWrap}>
-              <span className={styles.recentLabel}>Recent lookups</span>
-              <div className={styles.recentList}>
-                {corporateSuggestions.map((r) => (
+          {/* Along the search bar: Recent Lookups */}
+          {corporateSuggestions.length > 0 && (
+            <div className={styles.recentAlongBar}>
+              <div className={styles.recentHeader}>
+                <RotateCcw size={13} className={styles.recentIcon} />
+                <span>Recent:</span>
+              </div>
+              <div className={styles.recentChipsList}>
+                {corporateSuggestions.slice(0, 3).map((r) => (
                   <button
                     key={`${r.idType}:${r.value}`}
                     type="button"
-                    className={styles.recentItem}
-                    onClick={() => { setCorpSearchVal(r.value); setCorpSearchError(''); }}
+                    className={styles.recentChip}
+                    onClick={() => {
+                      setCorpSearchType(r.idType);
+                      setCorpSearchVal(r.value);
+                      setCorpSearchError('');
+                    }}
+                    title={`Click to fill ${r.label} (${r.value})`}
                   >
-                    <span className={styles.recentName}>{r.label}</span>
-                    <span className={styles.recentValue}>{r.value}</span>
+                    <span className={styles.recentChipAvatar}>
+                      {getInitials(r.label) || 'CO'}
+                    </span>
+                    <span className={styles.recentChipName}>{r.label}</span>
+                    <span className={styles.recentChipValue}>{r.value}</span>
                   </button>
                 ))}
               </div>
             </div>
           )}
-
-          {/* Action Buttons */}
-          <Button
-            type="submit"
-            loading={loadingCorpSearch}
-            disabled={!corpSearchType || !corpSearchVal}
-            leadingIcon={<Search size={15} />}
-          >
-            {loadingCorpSearch ? 'Searching...' : 'Search Company'}
-          </Button>
         </div>
 
         {corpSearchError && (
@@ -1340,7 +1362,7 @@ export default function Customer360() {
                         rows={paginatedInteractions}
                         loading={loadingInteractions}
                         loadingRows={intPageSize}
-                        rowKey={(item) => String(item.caseId)}
+                        rowKey={(item, index) => String(item.caseId || `case-${index}`) + `-${index}`}
                         empty={
                           intSearchQuery || intStatusFilter
                             ? 'No interactions match the selected filters. Try adjusting your search query or filters.'
@@ -1428,24 +1450,53 @@ export default function Customer360() {
               {/* PRODUCTS TAB */}
               {activeTab === 'products' && (
                 <div>
-                  {/* Tabbed layout for Products Held / Interested Products */}
-                  <div className={styles.row10}>
-                    <span
-                      className={`${styles.subTab}${productsTab === 'held' ? ` ${styles.subTabActive}` : ''}`}
-                      onClick={() => setProductsTab('held')}
-                    >
-                      Product Held
-                    </span>
-                    <span
-                      className={`${styles.subTab}${productsTab === 'interested' ? ` ${styles.subTabActive}` : ''}`}
-                      onClick={() => setProductsTab('interested')}
-                    >
-                      Interested Products
+                  {/* Approval-style Subtab Navigation */}
+                  <div className={styles.subNavBar}>
+                    <div className={styles.subTabsList}>
+                      <button
+                        type="button"
+                        className={`${styles.subTabBtn} ${productsTab === 'held' ? styles.subTabBtnActive : ''}`}
+                        onClick={() => setProductsTab('held')}
+                      >
+                        <Layers size={16} />
+                        <span>Product Held</span>
+                        <span className={styles.subTabPill}>{totalCount || indData.filtered.length}</span>
+                      </button>
+                      <button
+                        type="button"
+                        className={`${styles.subTabBtn} ${productsTab === 'interested' ? styles.subTabBtnActive : ''}`}
+                        onClick={() => setProductsTab('interested')}
+                      >
+                        <Sparkles size={16} />
+                        <span>Interested Products</span>
+                        {(profile.interestedProductName || profile.interestedProductCategory) && (
+                          <span className={styles.subTabPill}>1</span>
+                        )}
+                      </button>
+                    </div>
+                    <span className={styles.subTabHint}>
+                      {productsTab === 'held'
+                        ? 'Active customer portfolio, accounts, and financing facilities.'
+                        : 'Propensity model insights and campaign-eligible recommendations.'}
                     </span>
                   </div>
 
                   {productsTab === 'held' && (
                     <div className={cc.card}>
+                      {/* Summary Bar */}
+                      <div className={styles.tableSummaryBar}>
+                        <div className={styles.summaryBadgeGroup}>
+                          <span className={`${styles.summaryPill} ${styles.summaryPillPrimary}`}>
+                            <Layers size={13} />
+                            {totalCount || indData.filtered.length} Holdings
+                          </span>
+                          {indData.uniqueTypes.length > 0 && (
+                            <span className={styles.summaryPill}>
+                              {indData.uniqueTypes.length} Product {indData.uniqueTypes.length === 1 ? 'Type' : 'Types'}
+                            </span>
+                          )}
+                        </div>
+                      </div>
                       {/* Controls Toolbar */}
                       <div className={cc.toolbar}>
                         <div className={cc.toolbarSearch}>
@@ -1520,8 +1571,13 @@ export default function Customer360() {
                             rows={indData.filtered}
                             loading={loadingProducts}
                             loadingRows={pageSize}
-                            rowKey={(item) =>
-                              String(item.accountNumber || getLegacyProductField(item, 'accountNo'))
+                            rowKey={(item, index) =>
+                              String(
+                                item.accountNumber ||
+                                getLegacyProductField(item, 'accountNo') ||
+                                item.phprId ||
+                                `ind-prod-${index}`
+                              ) + `-${index}`
                             }
                             empty={
                               indSearchQuery || indTypeFilter || indStatusFilter
@@ -1681,48 +1737,92 @@ export default function Customer360() {
                   )}
 
                   {productsTab === 'interested' && (
-                    <div className={cc.card}>
-                      <DataTable bare minWidth={600}>
-                        <ResponsiveRows
-                          rows={
-                            profile.interestedProductName || profile.interestedProductCategory
-                              ? [profile]
-                              : []
-                          }
-                          rowKey={() => 'interested-product'}
-                          empty="No interested products found."
-                          columns={[
-                            {
-                              key: 'name',
-                              label: 'Product Name',
-                              priority: 'always',
-                              render: (row) => (
-                                <span className={styles.strong4}>
-                                  {formatValue(row.interestedProductName)}
-                                </span>
-                              ),
-                            },
-                            {
-                              key: 'category',
-                              label: 'Product Category',
-                              priority: 'always',
-                              render: (row) => formatValue(row.interestedProductCategory),
-                            },
-                            {
-                              key: 'engagement',
-                              label: 'Engagement Count',
-                              priority: 'low',
-                              render: (row) => formatValue(row.engagementCount),
-                            },
-                            {
-                              key: 'eligibility',
-                              label: 'Eligibility Score',
-                              priority: 'low',
-                              render: (row) => formatValue(row.eligibilityScore),
-                            },
-                          ]}
-                        />
-                      </DataTable>
+                    <div>
+                      {(profile.interestedProductName || profile.interestedProductCategory) && (
+                        <div className={styles.interestedCard}>
+                          <div className={styles.interestedHeader}>
+                            <div className={styles.interestedIconBadge}>
+                              <Sparkles size={22} />
+                            </div>
+                            <div>
+                              <h3 className={styles.interestedTitle}>Interested Products & Recommendations</h3>
+                              <p className={styles.interestedHint}>
+                                Propensity model insights and tailored campaign recommendations for this customer.
+                              </p>
+                            </div>
+                          </div>
+                          <div className={styles.interestedGrid}>
+                            <div className={styles.interestedItem}>
+                              <span className={styles.interestedLabel}>Product Name</span>
+                              <span className={styles.interestedValue}>
+                                {formatValue(profile.interestedProductName)}
+                              </span>
+                            </div>
+                            <div className={styles.interestedItem}>
+                              <span className={styles.interestedLabel}>Category</span>
+                              <span className={styles.interestedValue}>
+                                {formatValue(profile.interestedProductCategory)}
+                              </span>
+                            </div>
+                            <div className={styles.interestedItem}>
+                              <span className={styles.interestedLabel}>Engagement Count</span>
+                              <span className={styles.interestedValue}>
+                                {formatValue(profile.engagementCount)}
+                              </span>
+                            </div>
+                            <div className={styles.interestedItem}>
+                              <span className={styles.interestedLabel}>Eligibility Score</span>
+                              <span className={styles.interestedValue}>
+                                {formatValue(profile.eligibilityScore)}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className={cc.card}>
+                        <DataTable bare minWidth={600}>
+                          <ResponsiveRows
+                            rows={
+                              profile.interestedProductName || profile.interestedProductCategory
+                                ? [profile]
+                                : []
+                            }
+                            rowKey={(_row, index) => `interested-product-${index}`}
+                            empty="No interested products found."
+                            columns={[
+                              {
+                                key: 'name',
+                                label: 'Product Name',
+                                priority: 'always',
+                                render: (row) => (
+                                  <span className={styles.strong4}>
+                                    {formatValue(row.interestedProductName)}
+                                  </span>
+                                ),
+                              },
+                              {
+                                key: 'category',
+                                label: 'Product Category',
+                                priority: 'always',
+                                render: (row) => formatValue(row.interestedProductCategory),
+                              },
+                              {
+                                key: 'engagement',
+                                label: 'Engagement Count',
+                                priority: 'low',
+                                render: (row) => formatValue(row.engagementCount),
+                              },
+                              {
+                                key: 'eligibility',
+                                label: 'Eligibility Score',
+                                priority: 'low',
+                                render: (row) => formatValue(row.eligibilityScore),
+                              },
+                            ]}
+                          />
+                        </DataTable>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -1734,7 +1834,7 @@ export default function Customer360() {
                   <DataTable bare minWidth={600}>
                     <ResponsiveRows
                       rows={profile.rmName || profile.rmId ? [profile] : []}
-                      rowKey={() => 'relationship-manager'}
+                      rowKey={(_row, index) => `relationship-manager-${index}`}
                       empty="No Relationship Manager details found."
                       columns={[
                         {
@@ -1927,24 +2027,53 @@ export default function Customer360() {
               {/* PRODUCTS & SIGNATORIES TAB */}
               {activeTab === 'products_signatories' && (
                 <div>
-                  {/* Subtab Navigation side-by-side at the top */}
-                  <div className={styles.row10}>
-                    <span
-                      className={`${styles.subTab}${corpSubTab === 'products' ? ` ${styles.subTabActive}` : ''}`}
-                      onClick={() => setCorpSubTab('products')}
-                    >
-                      Products Held
-                    </span>
-                    <span
-                      className={`${styles.subTab}${corpSubTab === 'signatories' ? ` ${styles.subTabActive}` : ''}`}
-                      onClick={() => setCorpSubTab('signatories')}
-                    >
-                      Signatories
+                  {/* Approval-style Subtab Navigation */}
+                  <div className={styles.subNavBar}>
+                    <div className={styles.subTabsList}>
+                      <button
+                        type="button"
+                        className={`${styles.subTabBtn} ${corpSubTab === 'products' ? styles.subTabBtnActive : ''}`}
+                        onClick={() => setCorpSubTab('products')}
+                      >
+                        <Layers size={16} />
+                        <span>Products Held</span>
+                        <span className={styles.subTabPill}>{totalCount || corpData.filtered.length}</span>
+                      </button>
+                      <button
+                        type="button"
+                        className={`${styles.subTabBtn} ${corpSubTab === 'signatories' ? styles.subTabBtnActive : ''}`}
+                        onClick={() => setCorpSubTab('signatories')}
+                      >
+                        <Shield size={16} />
+                        <span>Signatories</span>
+                        <span className={styles.subTabPill}>
+                          {corporateProfile.signatoryName ? '1' : '0'}
+                        </span>
+                      </button>
+                    </div>
+                    <span className={styles.subTabHint}>
+                      {corpSubTab === 'products'
+                        ? 'Corporate treasury facilities, commercial loans, and operational accounts.'
+                        : 'Board-authorized signatories and mandated representatives.'}
                     </span>
                   </div>
 
                   {corpSubTab === 'products' ? (
                     <div className={cc.card}>
+                      {/* Summary Bar */}
+                      <div className={styles.tableSummaryBar}>
+                        <div className={styles.summaryBadgeGroup}>
+                          <span className={`${styles.summaryPill} ${styles.summaryPillPrimary}`}>
+                            <Layers size={13} />
+                            {totalCount || corpData.filtered.length} Corporate Facilities
+                          </span>
+                          {corpData.uniqueTypes.length > 0 && (
+                            <span className={styles.summaryPill}>
+                              {corpData.uniqueTypes.length} Product {corpData.uniqueTypes.length === 1 ? 'Type' : 'Types'}
+                            </span>
+                          )}
+                        </div>
+                      </div>
                       {/* Search & filters */}
                       <div className={cc.toolbar}>
                         <div className={cc.toolbarSearch}>
@@ -2019,7 +2148,14 @@ export default function Customer360() {
                             rows={corpData.filtered}
                             loading={loadingProducts}
                             loadingRows={pageSize}
-                            rowKey={(item) => String(item.accountNumber)}
+                            rowKey={(item, index) =>
+                              String(
+                                item.accountNumber ||
+                                getLegacyProductField(item, 'accountNo') ||
+                                item.phprId ||
+                                `corp-prod-${index}`
+                              ) + `-${index}`
+                            }
                             empty={
                               corpSearchQuery || corpTypeFilter || corpStatusFilter
                                 ? 'No products match the selected filters. Try adjusting your search query or filters.'
@@ -2167,100 +2303,198 @@ export default function Customer360() {
                       )}
                     </div>
                   ) : (
-                    <div className={cc.card}>
-                      <DataTable bare minWidth={700}>
-                        <ResponsiveRows
-                          rows={[corporateProfile]}
-                          rowKey={() => 'signatory'}
-                          empty="No authorized signatories found."
-                          columns={[
-                            {
-                              key: 'name',
-                              label: 'Signatory Name',
-                              priority: 'always',
-                              render: (row) => (
-                                <span className={styles.strong4}>
-                                  {formatValue(formatCustomerName(row.signatorySalutation || row.salutation, row.signatoryName))}
+                    <div>
+                      {corporateProfile.signatoryName && (
+                        <div className={styles.signatoryCard}>
+                          <div className={styles.signatoryCardHeader}>
+                            <div className={styles.signatoryAvatar}>
+                              {getInitials(corporateProfile.signatoryName) || 'SG'}
+                            </div>
+                            <div className={styles.signatoryInfo}>
+                              <div className={styles.signatoryNameRow}>
+                                <h3 className={styles.signatoryName}>
+                                  {formatValue(formatCustomerName(corporateProfile.signatorySalutation || corporateProfile.salutation, corporateProfile.signatoryName))}
+                                </h3>
+                                <span className={styles.signatoryBadge}>
+                                  <Shield size={12} />
+                                  Primary Signatory
                                 </span>
-                              ),
-                            },
-                            {
-                              key: 'dob',
-                              label: 'Date of Birth',
-                              priority: 'low',
-                              render: (row) => formatValue(row.signatoryDateOfBirth),
-                            },
-                            {
-                              key: 'id',
-                              label: 'ID Number',
-                              priority: 'always',
-                              render: (row) => (
-                                <div className={styles.spread2}>
-                                  <span className={cc.monoValue}>
-                                    {revealed['sigId']
-                                      ? formatValue(row.signatoryIdNumber)
-                                      : maskNRIC(row.signatoryIdNumber)}
+                              </div>
+                              <div className={styles.signatoryPosition}>
+                                {formatValue(corporateProfile.signatoryPosition || 'Authorized Officer / Director')}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className={styles.signatoryGrid}>
+                            <div className={styles.signatoryField}>
+                              <span className={styles.signatoryFieldLabel}>Signatory ID</span>
+                              <div className={styles.signatoryFieldValue}>
+                                <span className={cc.monoValue}>
+                                  {revealed['sigId']
+                                    ? formatValue(corporateProfile.signatoryIdNumber)
+                                    : maskNRIC(corporateProfile.signatoryIdNumber)}
+                                </span>
+                                {corporateProfile.signatoryIdNumber &&
+                                  corporateProfile.signatoryIdNumber.trim() !== '' &&
+                                  corporateProfile.signatoryIdNumber.toLowerCase() !== 'null' && (
+                                    <button
+                                      onClick={() =>
+                                        handleToggleReveal(
+                                          'sigId',
+                                          'Signatory ID Number',
+                                          corporateProfile.signatoryIdNumber!
+                                        )
+                                      }
+                                      className={styles.row12}
+                                      title={revealed['sigId'] ? 'Hide details' : 'Reveal details'}
+                                    >
+                                      {revealed['sigId'] ? <EyeOff size={14} /> : <Eye size={14} />}
+                                    </button>
+                                  )}
+                              </div>
+                            </div>
+
+                            <div className={styles.signatoryField}>
+                              <span className={styles.signatoryFieldLabel}>Contact Phone</span>
+                              <div className={styles.signatoryFieldValue}>
+                                <span className={cc.monoValue}>
+                                  {revealed['sigPhone']
+                                    ? formatValue(corporateProfile.signatoryPhoneNumber)
+                                    : maskPhone(corporateProfile.signatoryPhoneNumber)}
+                                </span>
+                                {corporateProfile.signatoryPhoneNumber &&
+                                  corporateProfile.signatoryPhoneNumber.trim() !== '' &&
+                                  corporateProfile.signatoryPhoneNumber.toLowerCase() !== 'null' && (
+                                    <button
+                                      onClick={() =>
+                                        handleToggleReveal(
+                                          'sigPhone',
+                                          'Signatory Phone Number',
+                                          corporateProfile.signatoryPhoneNumber!
+                                        )
+                                      }
+                                      className={styles.row12}
+                                      title={revealed['sigPhone'] ? 'Hide details' : 'Reveal details'}
+                                    >
+                                      {revealed['sigPhone'] ? <EyeOff size={14} /> : <Eye size={14} />}
+                                    </button>
+                                  )}
+                              </div>
+                            </div>
+
+                            <div className={styles.signatoryField}>
+                              <span className={styles.signatoryFieldLabel}>Date of Birth</span>
+                              <span className={styles.signatoryFieldValue}>
+                                {formatValue(corporateProfile.signatoryDateOfBirth)}
+                              </span>
+                            </div>
+
+                            <div className={styles.signatoryField}>
+                              <span className={styles.signatoryFieldLabel}>Mandate Authority</span>
+                              <span className={styles.signatoryFieldValue}>
+                                Authorized Representative
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className={cc.card}>
+                        <DataTable bare minWidth={700}>
+                          <ResponsiveRows
+                            rows={[corporateProfile]}
+                            rowKey={(_row, index) => `signatory-${index}`}
+                            empty="No authorized signatories found."
+                            columns={[
+                              {
+                                key: 'name',
+                                label: 'Signatory Name',
+                                priority: 'always',
+                                render: (row) => (
+                                  <span className={styles.strong4}>
+                                    {formatValue(formatCustomerName(row.signatorySalutation || row.salutation, row.signatoryName))}
                                   </span>
-                                  {row.signatoryIdNumber &&
-                                    row.signatoryIdNumber.trim() !== '' &&
-                                    row.signatoryIdNumber.toLowerCase() !== 'null' && (
-                                      <button
-                                        onClick={() =>
-                                          handleToggleReveal(
-                                            'sigId',
-                                            'Signatory ID Number',
-                                            row.signatoryIdNumber!
-                                          )
-                                        }
-                                        className={styles.row12}
-                                        title={revealed['sigId'] ? 'Hide details' : 'Reveal details'}
-                                      >
-                                        {revealed['sigId'] ? <EyeOff size={14} /> : <Eye size={14} />}
-                                      </button>
-                                    )}
-                                </div>
-                              ),
-                            },
-                            {
-                              key: 'phone',
-                              label: 'Phone Number',
-                              priority: 'high',
-                              render: (row) => (
-                                <div className={styles.spread2}>
-                                  <span className={cc.monoValue}>
-                                    {revealed['sigPhone']
-                                      ? formatValue(row.signatoryPhoneNumber)
-                                      : maskPhone(row.signatoryPhoneNumber)}
-                                  </span>
-                                  {row.signatoryPhoneNumber &&
-                                    row.signatoryPhoneNumber.trim() !== '' &&
-                                    row.signatoryPhoneNumber.toLowerCase() !== 'null' && (
-                                      <button
-                                        onClick={() =>
-                                          handleToggleReveal(
-                                            'sigPhone',
-                                            'Signatory Phone Number',
-                                            row.signatoryPhoneNumber!
-                                          )
-                                        }
-                                        className={styles.row12}
-                                        title={revealed['sigPhone'] ? 'Hide details' : 'Reveal details'}
-                                      >
-                                        {revealed['sigPhone'] ? <EyeOff size={14} /> : <Eye size={14} />}
-                                      </button>
-                                    )}
-                                </div>
-                              ),
-                            },
-                            {
-                              key: 'position',
-                              label: 'Position',
-                              priority: 'low',
-                              render: (row) => formatValue(row.signatoryPosition),
-                            },
-                          ]}
-                        />
-                      </DataTable>
+                                ),
+                              },
+                              {
+                                key: 'dob',
+                                label: 'Date of Birth',
+                                priority: 'low',
+                                render: (row) => formatValue(row.signatoryDateOfBirth),
+                              },
+                              {
+                                key: 'id',
+                                label: 'ID Number',
+                                priority: 'always',
+                                render: (row) => (
+                                  <div className={styles.spread2}>
+                                    <span className={cc.monoValue}>
+                                      {revealed['sigId']
+                                        ? formatValue(row.signatoryIdNumber)
+                                        : maskNRIC(row.signatoryIdNumber)}
+                                    </span>
+                                    {row.signatoryIdNumber &&
+                                      row.signatoryIdNumber.trim() !== '' &&
+                                      row.signatoryIdNumber.toLowerCase() !== 'null' && (
+                                        <button
+                                          onClick={() =>
+                                            handleToggleReveal(
+                                              'sigId',
+                                              'Signatory ID Number',
+                                              row.signatoryIdNumber!
+                                            )
+                                          }
+                                          className={styles.row12}
+                                          title={revealed['sigId'] ? 'Hide details' : 'Reveal details'}
+                                        >
+                                          {revealed['sigId'] ? <EyeOff size={14} /> : <Eye size={14} />}
+                                        </button>
+                                      )}
+                                  </div>
+                                ),
+                              },
+                              {
+                                key: 'phone',
+                                label: 'Phone Number',
+                                priority: 'high',
+                                render: (row) => (
+                                  <div className={styles.spread2}>
+                                    <span className={cc.monoValue}>
+                                      {revealed['sigPhone']
+                                        ? formatValue(row.signatoryPhoneNumber)
+                                        : maskPhone(row.signatoryPhoneNumber)}
+                                    </span>
+                                    {row.signatoryPhoneNumber &&
+                                      row.signatoryPhoneNumber.trim() !== '' &&
+                                      row.signatoryPhoneNumber.toLowerCase() !== 'null' && (
+                                        <button
+                                          onClick={() =>
+                                            handleToggleReveal(
+                                              'sigPhone',
+                                              'Signatory Phone Number',
+                                              row.signatoryPhoneNumber!
+                                            )
+                                          }
+                                          className={styles.row12}
+                                          title={revealed['sigPhone'] ? 'Hide details' : 'Reveal details'}
+                                        >
+                                          {revealed['sigPhone'] ? <EyeOff size={14} /> : <Eye size={14} />}
+                                        </button>
+                                      )}
+                                  </div>
+                                ),
+                              },
+                              {
+                                key: 'position',
+                                label: 'Position',
+                                priority: 'low',
+                                render: (row) => formatValue(row.signatoryPosition),
+                              },
+                            ]}
+                          />
+                        </DataTable>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -2276,7 +2510,7 @@ export default function Customer360() {
                           ? [profile]
                           : []
                       }
-                      rowKey={() => 'interested-product-corporate'}
+                      rowKey={(_row, index) => `interested-product-corporate-${index}`}
                       empty="No interested products found."
                       columns={[
                         {

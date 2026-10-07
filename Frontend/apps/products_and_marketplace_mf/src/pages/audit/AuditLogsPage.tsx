@@ -16,6 +16,7 @@ import {
   RowsPerPage,
   Select,
   StatTile,
+  StatTileSkeleton,
   describeDateRange,
   describeTruncation,
   formatAuditTimestamp,
@@ -189,11 +190,19 @@ export function AuditLogsPage() {
         }
       />
 
-      <div className={styles.kpis}>
-        <StatTile label="Total events" value={total} accent="primary" icon={<Icon.ShieldCheck />} caption="Everything recorded" />
-        <StatTile label="Successful" value={s.summary?.successCount ?? 0} accent="success" icon={<Icon.CheckCircle />} caption={`of ${total}`} />
-        <StatTile label="Action types" value={s.summary?.actionTypeCount ?? s.actionOptions.length} accent="info" icon={<Icon.Activity />} caption="Kinds of change tracked" />
-      </div>
+      {s.summary || !s.loading ? (
+        <div className={styles.kpis}>
+          <StatTile label="Total events" value={total} accent="primary" icon={<Icon.ShieldCheck />} />
+          <StatTile label="Successful" value={s.summary?.successCount ?? 0} accent="success" icon={<Icon.CheckCircle />} />
+          <StatTile label="Action types" value={s.summary?.actionTypeCount ?? s.actionOptions.length} accent="info" icon={<Icon.Activity />} />
+        </div>
+      ) : (
+        <div className={styles.kpis} aria-hidden="true">
+          <StatTileSkeleton />
+          <StatTileSkeleton />
+          <StatTileSkeleton />
+        </div>
+      )}
 
       <FilterBar filters={activeFilters} onClearAll={reset} />
 

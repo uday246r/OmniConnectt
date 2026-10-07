@@ -585,11 +585,410 @@
   grid-column: span 1;
 }
 
-/* ── Recent identity lookups ──────────────────────────────────────────────────────────────────
- * These panels have no table behind them to recommend from, so the recommendation is the
- * operator's own successful lookups (see useRecentLookups). Full-row, because the panel is a grid
- * and these chips read as one list rather than as another field.
- */
+/* ── Search Bar & Recent Lookups Layout ──────────────────────── */
+.searchBarRow {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.searchControlsGroup {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.selectGroup {
+  width: 190px;
+  flex-shrink: 0;
+}
+
+.inputGroup {
+  width: 270px;
+  max-width: 100%;
+  flex-shrink: 0;
+}
+
+.actionBtnGroup {
+  display: flex;
+  align-items: flex-end;
+}
+
+/* Recent lookups alongside the search bar */
+.recentAlongBar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 14px;
+  background: var(--omni-color-surface-alt, #f8fafc);
+  border: 1px solid var(--omni-color-border, #e2e8f0);
+  border-radius: var(--omni-radius-xl, 12px);
+  margin-left: auto;
+  align-self: flex-end;
+  min-height: 44px;
+}
+
+.recentHeader {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--omni-font-size-xs, 12px);
+  font-weight: var(--omni-font-weight-semibold, 600);
+  color: var(--omni-color-text-secondary, #64748b);
+  white-space: nowrap;
+}
+
+.recentIcon {
+  color: var(--omni-color-primary-600, #2563eb);
+}
+
+.recentChipsList {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.recentChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px 4px 6px;
+  background: var(--omni-color-surface, #ffffff);
+  border: 1px solid var(--omni-color-border, #e2e8f0);
+  border-radius: 9999px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s ease;
+  outline: none;
+}
+
+.recentChip:hover {
+  background: #eff6ff;
+  border-color: #3b82f6;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(37, 99, 235, 0.12);
+}
+
+.recentChipAvatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.recentChipName {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--omni-color-text-primary, #1e293b);
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recentChipValue {
+  font-size: 11px;
+  color: var(--omni-color-text-muted, #64748b);
+  font-family: var(--omni-font-mono, monospace);
+  font-weight: 500;
+}
+
+/* ── Approval-style Segmented Sub-Navbar ────────────────────────── */
+.subNavBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 8px 12px;
+  background: var(--omni-color-surface-alt, #f8fafc);
+  border: 1px solid var(--omni-color-border, #e2e8f0);
+  border-radius: var(--omni-radius-xl, 12px);
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.subTabsList {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--omni-color-surface, #ffffff);
+  padding: 4px;
+  border-radius: var(--omni-radius-lg, 10px);
+  border: 1px solid var(--omni-color-border, #e2e8f0);
+}
+
+.subTabBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 14px;
+  font-size: var(--omni-font-size-sm, 13px);
+  font-weight: var(--omni-font-weight-medium, 500);
+  color: var(--omni-color-text-secondary, #64748b);
+  background: transparent;
+  border: none;
+  border-radius: var(--omni-radius-md, 8px);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-family: inherit;
+}
+
+.subTabBtn:hover {
+  color: var(--omni-color-text-primary, #1e293b);
+  background: var(--omni-color-surface-alt, #f1f5f9);
+}
+
+.subTabBtnActive {
+  background: #eff6ff !important;
+  color: #1d4ed8 !important;
+  font-weight: var(--omni-font-weight-semibold, 600) !important;
+  box-shadow: 0 1px 2px rgba(29, 78, 216, 0.08);
+}
+
+.subTabPill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1px 7px;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 9999px;
+  background: rgba(100, 116, 139, 0.12);
+  color: inherit;
+}
+
+.subTabBtnActive .subTabPill {
+  background: #bfdbfe;
+  color: #1e40af;
+}
+
+.subTabHint {
+  font-size: var(--omni-font-size-xs, 12px);
+  color: var(--omni-color-text-muted, #64748b);
+  font-weight: var(--omni-font-weight-medium, 500);
+}
+
+/* ── Table Summary Bar ─────────────────────────────────────────── */
+.tableSummaryBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  background: linear-gradient(180deg, #f8fafc 0%, #ffffff 100%);
+  border-bottom: 1px solid var(--omni-color-border, #e2e8f0);
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.summaryBadgeGroup {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.summaryPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 600;
+  background: #f1f5f9;
+  color: #334155;
+  border: 1px solid #e2e8f0;
+}
+
+.summaryPillPrimary {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border-color: #bfdbfe;
+}
+
+/* ── Corporate Signatories Showcase ────────────────────────────── */
+.signatoryCard {
+  padding: 24px;
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+  border-radius: 12px;
+  border: 1px solid var(--omni-color-border, #e2e8f0);
+  margin-bottom: 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.signatoryCardHeader {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.signatoryAvatar {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+  color: #ffffff;
+  font-size: 20px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(2, 132, 199, 0.25);
+  flex-shrink: 0;
+}
+
+.signatoryInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.signatoryNameRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.signatoryName {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--omni-color-text-primary, #0f172a);
+  margin: 0;
+}
+
+.signatoryBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 600;
+  background: #f0fdf4;
+  color: #15803d;
+  border: 1px solid #bbf7d0;
+}
+
+.signatoryPosition {
+  font-size: 13px;
+  color: var(--omni-color-text-secondary, #64748b);
+  margin-top: 2px;
+}
+
+.signatoryGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+  padding-top: 16px;
+  border-top: 1px solid var(--omni-color-border, #e2e8f0);
+}
+
+.signatoryField {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.signatoryFieldLabel {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--omni-color-text-muted, #64748b);
+  letter-spacing: 0.03em;
+}
+
+.signatoryFieldValue {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--omni-color-text-primary, #1e293b);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ── Interested Products Showcase Card ─────────────────────────── */
+.interestedCard {
+  padding: 24px;
+  background: linear-gradient(135deg, #ffffff 0%, #faf5ff 100%);
+  border-radius: 12px;
+  border: 1px solid #e9d5ff;
+  box-shadow: 0 1px 3px rgba(147, 51, 234, 0.05);
+  margin-bottom: 20px;
+}
+
+.interestedHeader {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+.interestedIconBadge {
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(109, 40, 217, 0.25);
+  flex-shrink: 0;
+}
+
+.interestedTitle {
+  font-size: 17px;
+  font-weight: 700;
+  color: #1e1b4b;
+  margin: 0;
+}
+
+.interestedHint {
+  font-size: 13px;
+  color: #6b7280;
+  margin: 2px 0 0;
+}
+
+.interestedGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #f3e8ff;
+}
+
+.interestedItem {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.interestedLabel {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: #7c3aed;
+  letter-spacing: 0.03em;
+}
+
+.interestedValue {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+/* ── Legacy recent classes preserved for backwards-compat ──────── */
 .recentWrap {
   grid-column: 1 / -1;
   display: flex;

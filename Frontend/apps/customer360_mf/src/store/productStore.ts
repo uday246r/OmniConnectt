@@ -48,6 +48,7 @@ interface ProductStoreState {
   selectedProductType: string;
   modalOpen: boolean;
   loadingDetails: boolean;
+  modalDetailsError: string | null;
 
   setSearchQuery: (query: string) => void;
   setCategoryFilter: (filter: string) => void;
@@ -79,6 +80,7 @@ export const useProductStore = create<ProductStoreState>((set, get) => ({
   selectedProductType: '',
   modalOpen: false,
   loadingDetails: false,
+  modalDetailsError: null,
 
   setSearchQuery: (query) => set({ searchQuery: query, pageNumber: 1 }),
   setCategoryFilter: (filter) => set({ categoryFilter: filter, pageNumber: 1 }),
@@ -86,70 +88,88 @@ export const useProductStore = create<ProductStoreState>((set, get) => ({
   setPageSize: (size) => set({ pageSize: size, pageNumber: 1 }),
 
   openProductModal: async (accountNo, type) => {
-    set({ modalOpen: true, loadingDetails: true, selectedProductDetails: null, selectedProductType: type });
+    // 1. Locate the summary product row already present in the list
+    const prodItem = get().products.find(
+      (p) => p.accountNumber === accountNo || (p as unknown as { accountNo?: string }).accountNo === accountNo
+    );
+
+    // Immediately open modal with existing summary data so the user has instant feedback
+    set({
+      modalOpen: true,
+      loadingDetails: true,
+      selectedProductDetails: prodItem || null,
+      selectedProductType: type,
+      modalDetailsError: null,
+    });
 
     try {
       let details: SelectedProductDetails | null = null;
-      const prodItem = get().products.find((p) => p.accountNumber === accountNo);
-      const normType = (type || '').toLowerCase();
+      const normType = ((type || '') + ' ' + (prodItem?.type || '')).toLowerCase();
       const normCategory = (prodItem?.productCategory || '').toLowerCase();
 
       const customerState = useCustomerStore.getState();
       const isCorp = customerState.customerType === 'corporate';
+      const corpProfile = customerState.corporateProfile || (isCorp ? (customerState.profile as Record<string, unknown> | null) : null);
+      const indProfile = customerState.individualProfile || (!isCorp ? (customerState.profile as Record<string, unknown> | null) : null);
 
-      // Per the CRM API spec's sample requests, every product detail endpoint
-      // (deposit/loan/cards/gold/wm) takes "National ID / BRN" as its "Id" param —
-      // for Individual customers this is the NRIC (nationalId), NOT the phprId.
-      // For Corporate, it is the BRN.
-      const lookupId = isCorp
-        ? (customerState.profile as { brn?: string } | null)?.brn || customerState.activeCorporateId
-        : (customerState.profile as { nationalId?: string } | null)?.nationalId || customerState.activeIndividualId;
+      // Robust customer ID resolution across all profile structures and fallback to product item
+      const lookupId = (isCorp
+        ? ((corpProfile as { brn?: string })?.brn || (corpProfile as { customerId?: string })?.customerId || customerState.activeCorporateId || prodItem?.partyId || '')
+        : ((indProfile as { nationalId?: string })?.nationalId || (indProfile as { phprId?: string })?.phprId || (indProfile as { oldId?: string })?.oldId || (indProfile as { passport?: string })?.passport || customerState.activeIndividualId || prodItem?.phprId || prodItem?.partyId || '')
+      ).trim();
       const nationalId = lookupId;
+      const cleanAccountNo = (accountNo || prodItem?.accountNumber || '').trim();
 
-      // Method names below match api.ts's actual exports (getLoanDetails/getDepositDetails/etc. never
-      // existed — every branch here threw "api.<name> is not a function" the instant a user opened a
-      // product's details, for every product type).
-      if (normType.includes('loan') || normType.includes('financing')) {
-        const res = await api.getLoanProduct(lookupId, accountNo);
-        details = res.data;
-      } else if (normType.includes('deposit') || normType.includes('casa')) {
-        const res = await api.getDepositProduct(lookupId, accountNo);
-        details = res.data;
-      } else if (normType.includes('card')) {
-        const cardType = prodItem?.cardType || 'CR';
-        const res = await api.getCardProduct(nationalId, accountNo, cardType);
-        details = res.data;
-      } else if (normType.includes('gold') || normCategory.includes('gold')) {
-        const res = await api.getGoldProduct(nationalId, accountNo);
-        details = res.data;
-      } else if (normType.includes('unit trust') || normCategory.includes('unit trust')) {
-        const res = await api.getUnitTrustProduct(nationalId, accountNo);
-        details = (res.data && res.data[0]) || null;
-      } else if (normType.includes('will') || normCategory.includes('will')) {
-        const res = await api.getWillWritingProduct(nationalId, accountNo);
-        details = (res.data && res.data[0]) || null;
-      } else if (normType.includes('wm') || normType.includes('wealth') || normType.includes('takaful')) {
-        // accountNo doubles as policyNo here — CustomerProduct exposes one generic "accountNumber"
-        // field regardless of underlying product type, and for a WM row that value IS the policy no.
-        const res = await api.getWmProduct(nationalId, accountNo);
-        details = res.data;
-      } else {
-        // Fallback to basic product item
-        details = prodItem || null;
+      if (cleanAccountNo) {
+        if (normType.includes('loan') || normType.includes('financing') || normType.includes('hire purchase') || normCategory.includes('loan') || normCategory.includes('financing')) {
+          const res = await api.getLoanProduct(lookupId, cleanAccountNo);
+          details = res.data;
+        } else if (normType.includes('deposit') || normType.includes('casa') || normType.includes('saving') || normType.includes('current') || normCategory.includes('deposit') || normCategory.includes('casa')) {
+          const res = await api.getDepositProduct(lookupId, cleanAccountNo);
+          details = res.data;
+        } else if (normType.includes('card') || normCategory.includes('card')) {
+          const cardType = prodItem?.cardType || 'CR';
+          const res = await api.getCardProduct(nationalId, cleanAccountNo, cardType);
+          details = res.data;
+        } else if (normType.includes('gold') || normCategory.includes('gold')) {
+          const res = await api.getGoldProduct(nationalId, cleanAccountNo);
+          details = res.data;
+        } else if (normType.includes('unit trust') || normCategory.includes('unit trust') || normType.includes('investment') || normCategory.includes('investment')) {
+          const res = await api.getUnitTrustProduct(nationalId, cleanAccountNo);
+          details = (res.data && res.data[0]) || null;
+        } else if (normType.includes('will') || normCategory.includes('will')) {
+          const res = await api.getWillWritingProduct(nationalId, cleanAccountNo);
+          details = (res.data && res.data[0]) || null;
+        } else if (normType.includes('wm') || normType.includes('wealth') || normType.includes('takaful') || normType.includes('insurance') || normCategory.includes('wm') || normCategory.includes('wealth') || normCategory.includes('takaful')) {
+          const res = await api.getWmProduct(nationalId, cleanAccountNo);
+          details = res.data;
+        } else {
+          details = prodItem || null;
+        }
       }
 
       if (details && prodItem) {
         details = { ...prodItem, ...details };
+      } else if (!details && prodItem) {
+        details = prodItem;
       }
 
-      set({ selectedProductDetails: details, loadingDetails: false });
+      set({ selectedProductDetails: details, loadingDetails: false, modalDetailsError: null });
     } catch (err) {
-      console.error('Error fetching product details:', err);
-      set({ error: (err as ApiError).message, errorStatus: (err as ApiError).status ?? null, loadingDetails: false });
+      console.warn('Could not fetch deep-dive product details, using product summary data:', err);
+      // Fallback gracefully to summary product item so user can still view the product drawer
+      const fallbackDetails = prodItem || null;
+      // CRITICAL: NEVER set store error / errorStatus here! Setting error on productStore
+      // causes Customer360 to replace the whole products table with "No customer was found...".
+      set({
+        selectedProductDetails: fallbackDetails,
+        modalDetailsError: fallbackDetails ? null : (err as ApiError).message || 'Could not load product details.',
+        loadingDetails: false,
+      });
     }
   },
 
-  closeProductModal: () => set({ selectedProductDetails: null, modalOpen: false, selectedProductType: '' }),
+  closeProductModal: () => set({ selectedProductDetails: null, modalOpen: false, selectedProductType: '', modalDetailsError: null }),
 
   loadProducts: async (customerId, page, size) => {
     if (!customerId) return;

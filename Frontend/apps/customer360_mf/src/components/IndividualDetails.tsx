@@ -56,7 +56,14 @@ export default function IndividualDetails({ subTab, profile, contactInfo, fieldC
 
   const sectionsForTab = SUBTAB_SECTIONS[subTab] || ['Personal Details', 'Residency Details', 'Contact Details'];
 
-  const effectiveConfigs = fieldConfigs && fieldConfigs.length > 0 ? fieldConfigs : DEFAULT_INDIVIDUAL_FIELD_CONFIGS;
+  const configsByApiField = new Map(fieldConfigs.map((config) => [config.apiField, config]));
+  const defaultApiFields = new Set(DEFAULT_INDIVIDUAL_FIELD_CONFIGS.map((config) => config.apiField));
+  const effectiveConfigs = [
+    ...DEFAULT_INDIVIDUAL_FIELD_CONFIGS.map(
+      (defaultConfig) => configsByApiField.get(defaultConfig.apiField) ?? defaultConfig
+    ),
+    ...fieldConfigs.filter((config) => !defaultApiFields.has(config.apiField)),
+  ];
 
   const configsForTab = effectiveConfigs
     .filter((f) => sectionsForTab.includes(f.section))

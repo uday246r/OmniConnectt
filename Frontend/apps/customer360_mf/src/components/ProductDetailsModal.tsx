@@ -107,7 +107,15 @@ const FieldCard = ({
 };
 
 export default function ProductDetailsModal() {
-  const { selectedProductDetails, modalOpen, loadingDetails, closeProductModal } = useProductStore(useShallow((s) => ({ selectedProductDetails: s.selectedProductDetails, modalOpen: s.modalOpen, loadingDetails: s.loadingDetails, closeProductModal: s.closeProductModal })));
+  const { selectedProductDetails, modalOpen, loadingDetails, modalDetailsError, closeProductModal } = useProductStore(
+    useShallow((s) => ({
+      selectedProductDetails: s.selectedProductDetails,
+      modalOpen: s.modalOpen,
+      loadingDetails: s.loadingDetails,
+      modalDetailsError: s.modalDetailsError,
+      closeProductModal: s.closeProductModal,
+    }))
+  );
   const { customerType, profile } = useCustomerStore(useShallow((s) => ({ customerType: s.customerType, profile: s.profile })));
   const isCorp = customerType === 'corporate';
   const profileCountry = (profile as CorporateProfile | null)?.country;
@@ -723,7 +731,7 @@ export default function ProductDetailsModal() {
         ) : (
           <div className="empty-state" style={{ textAlign: 'center', padding: '40px 20px', color: '#64748b' }}>
             <FileText size={32} style={{ margin: '0 auto 12px', opacity: 0.5 }} />
-            <p>Could not load product details.</p>
+            <p>{modalDetailsError || 'Could not load product details.'}</p>
           </div>
         )}
       </div>
