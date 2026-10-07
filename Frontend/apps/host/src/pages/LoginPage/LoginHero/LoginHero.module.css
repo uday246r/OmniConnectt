@@ -96,6 +96,12 @@
   display: flex;
   flex-direction: column;
   height: 100%;
+  animation: heroFadeIn 0.5s ease-out both;
+}
+
+@keyframes heroFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
 /* ── Brand Header ───────────────────────────────────────────── */
@@ -183,9 +189,15 @@
   width: 220px;
   height: 200px;
   flex-shrink: 0;
-  z-index: 3;
+  z-index: 2;
   filter: drop-shadow(0 16px 26px rgba(2,6,23,0.45));
   position: relative;
+  animation: hubEntrance 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes hubEntrance {
+  from { opacity: 0; transform: scale(0.9); }
+  to   { opacity: 1; transform: scale(1); }
 }
 
 /* Invisible anchor div positioned at the center of the stage */
@@ -218,25 +230,38 @@
   align-items: center;
   gap: 9px;
   padding: 8px 13px 8px 9px;
-  background: rgba(255,255,255,0.14);
-  border: 1px solid rgba(255,255,255,0.26);
+  background: rgba(10, 24, 64, 0.88);
+  border: 1px solid rgba(255,255,255,0.22);
   border-radius: var(--omni-radius-lg);
+  /* Polish only. A beam must never depend on this to be hidden - see the note at
+     the top of .overlayLayer. */
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   box-shadow:
-    0 8px 24px -6px rgba(2,6,23,0.45),
+    0 8px 24px -6px rgba(2,6,23,0.60),
+    0 0 16px rgba(59,130,246,0.12),
     inset 0 1px 0 rgba(255,255,255,0.18);
   transition: border-color 0.25s ease, box-shadow 0.25s ease, background 0.25s ease;
   z-index: 10;
   cursor: default;
+  animation: cardEntrance 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Both frames keep the centring translate that getCardStyle() sets inline: the
+   animation's `both` fill mode would otherwise replace it and the card would jump
+   to its top-left corner. */
+@keyframes cardEntrance {
+  from { opacity: 0; transform: translate(-50%, -50%) scale(0.92); }
+  to   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
 }
 
 .appCard:hover {
-  background: rgba(255,255,255,0.20);
+  background: rgba(18, 40, 100, 0.94);
   border-color: rgba(255,255,255,0.44);
   box-shadow:
-    0 10px 28px -6px rgba(2,6,23,0.50),
-    inset 0 1px 0 rgba(255,255,255,0.22);
+    0 12px 28px -6px rgba(2,6,23,0.70),
+    0 0 20px rgba(59,130,246,0.22),
+    inset 0 1px 0 rgba(255,255,255,0.26);
 }
 
 .cardIconBox {
@@ -296,7 +321,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .statusDot, .statusDot::after, .pulseBeam { animation: none; }
+  .statusDot, .statusDot::after, .pulseBeam,
+  .heroInner, .hubSvg, .appCard { animation: none; }
 }
 
 /* ── Feature Strip ──────────────────────────────────────────── */
@@ -383,13 +409,26 @@
   .featureItem    { border-right: none; padding: 4px 6px; }
 }
 
-/* Decorative overlay drawn above the hero art; never intercepts pointer events. */
+/* The connector beams. Drawn BELOW .appCard (z-index 10) and below .hubSvg (2), and
+   the geometry in LoginHero.tsx stops each beam at the card's edge, so nothing here
+   relies on the cards being opaque or on backdrop-filter working. Never intercepts
+   pointer events.
+
+   Starts invisible: the beams' endpoints are measured after first paint, so without
+   this they would appear for one frame as five lines collapsed at the origin. The
+   component adds .overlayVisible once it has real coordinates. */
 .overlayLayer {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
   pointer-events: none;
-  z-index: 2;
+  z-index: 1;
   overflow: visible;
+  opacity: 0;
+  transition: opacity 0.45s ease-in-out;
+}
+
+.overlayVisible {
+  opacity: 1;
 }

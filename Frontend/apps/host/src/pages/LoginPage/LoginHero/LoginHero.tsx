@@ -58,6 +58,49 @@ function getCardStyle(
 
 interface LineCoord { x1: number; y1: number; x2: number; y2: number }
 
+/** Gap between where a beam stops and the card it points at, in px. */
+const BEAM_GAP = 2
+
+/**
+ * Where a beam from the hub should stop: on the near EDGE of the card it points at,
+ * not at its centre.
+ *
+ * Drawing to the centre meant every beam ran straight through the card, with a bright
+ * terminal dot sitting in the middle of it. That only ever looked right because
+ * `backdrop-filter` smeared the part underneath — and that property silently no-ops
+ * wherever GPU compositing is unavailable (RDP and VDI sessions, hardware acceleration
+ * off, driver blocklists), which is why the deployed build showed the beams on top of
+ * the cards while a dev machine did not. Stopping at the edge makes the geometry
+ * correct on its own, so the fix does not depend on a card being opaque.
+ *
+ * Returns the point where the hub→centre ray leaves the card's bounding box, which for
+ * a rectangle is whichever axis is crossed first.
+ */
+export function edgePoint(
+  hubX: number, hubY: number,
+  centreX: number, centreY: number,
+  halfWidth: number, halfHeight: number,
+): { x: number; y: number } {
+  const dx = centreX - hubX
+  const dy = centreY - hubY
+  const length = Math.hypot(dx, dy)
+
+  // The card is sitting on the hub (only possible mid-resize): nothing sensible to draw.
+  if (length === 0) return { x: centreX, y: centreY }
+
+  // Fraction of the hub→centre vector to walk back from the centre. Infinity for an
+  // axis the ray does not travel along, so `min` ignores it.
+  const alongX = dx === 0 ? Infinity : halfWidth / Math.abs(dx)
+  const alongY = dy === 0 ? Infinity : halfHeight / Math.abs(dy)
+  const back = Math.min(alongX, alongY) + BEAM_GAP / length
+
+  // A card closer to the hub than its own half-extent would pull the endpoint behind
+  // the hub and flip the beam, so never retreat past the hub itself.
+  const clamped = Math.min(back, 1)
+
+  return { x: centreX - dx * clamped, y: centreY - dy * clamped }
+}
+
 // ── Component ──────────────────────────────────────────────────
 export function LoginHero() {
   const stageRef = useRef<HTMLDivElement>(null)
@@ -80,12 +123,13 @@ export function LoginHero() {
       const el = cardRefs.current.get(app.id)
       if (!el) continue
       const cr = el.getBoundingClientRect()
-      next.push({
-        x1: hubCX,
-        y1: hubCY,
-        x2: cr.left - sr.left + cr.width  / 2,
-        y2: cr.top  - sr.top  + cr.height / 2,
-      })
+      const end = edgePoint(
+        hubCX, hubCY,
+        cr.left - sr.left + cr.width  / 2,
+        cr.top  - sr.top  + cr.height / 2,
+        cr.width / 2, cr.height / 2,
+      )
+      next.push({ x1: hubCX, y1: hubCY, x2: end.x, y2: end.y })
     }
     setLines(next)
   }, [])
@@ -137,7 +181,11 @@ export function LoginHero() {
           {/* Dynamic SVG lines — redrawn automatically */}
           <svg
             aria-hidden="true"
-            className={styles.overlayLayer}
+            className={
+              lines.length > 0
+                ? `${styles.overlayLayer} ${styles.overlayVisible}`
+                : styles.overlayLayer
+            }
           >
             <defs>
               <filter id="lineGlow">
@@ -156,7 +204,7 @@ export function LoginHero() {
                   stroke="#ffffff" strokeWidth="1.5" strokeOpacity="0.65"
                   strokeLinecap="round" strokeDasharray="6 5"
                   className={styles.pulseBeam} />
-                {/* Terminal dot at card end */}
+                {/* Terminal dot, on the card's edge rather than inside it */}
                 <circle cx={ln.x2} cy={ln.y2} r="3.5"
                   fill="#ffffff" fillOpacity="0.85" />
               </g>
