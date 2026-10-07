@@ -8,7 +8,6 @@ import { loadRemoteAppModule, needsReloadForNewVersion } from '../../shared/fede
 import { FederationErrorBoundary } from '../../shared/components/ErrorBoundary/FederationErrorBoundary'
 import { SkeletonBlock } from '../../shared/components/Skeleton'
 import { MaintenancePage } from '../MaintenancePage/MaintenancePage'
-import { NotFoundPage } from '../NotFoundPage/NotFoundPage'
 import styles from './RemoteAppPage.module.css'
 
 /** The props every remote's exported App accepts. The host is the only caller. */
@@ -94,10 +93,11 @@ export function RemoteAppPage() {
     return <LoadingFrame />
   }
 
-  // Absent from the tree: either no such app, or one this user has no access to. Both answer 404,
-  // deliberately — distinguishing them would confirm the existence of apps the caller cannot use.
+  // Absent from the tree: either no such app, or one this user has no access to. Both send the caller
+  // to the dashboard — an error page is a dead end for someone whose only problem is that this
+  // account was not given the module, and the tree itself is what keeps an app's existence private.
   if (!node?.remote) {
-    return <NotFoundPage />
+    return <Navigate to="/" replace />
   }
 
   // Maintenance, and this caller holds no bypass: the server did not even send where the app lives.
@@ -112,8 +112,10 @@ export function RemoteAppPage() {
   }
 
   // A page segment that is not in this app's children is a stale bookmark or a hand-typed guess.
+  // Send them to the app's own first reachable page rather than off to the dashboard: they do have
+  // this app, so the nearest useful place is inside it.
   if (page && !node.children.some((c) => c.page === page)) {
-    return <NotFoundPage />
+    return <Navigate to={node.remote.defaultRoutePath ?? '/'} replace />
   }
 
   // Keyed by app: an error screen belongs to the app that failed, and must not stay on screen (or keep

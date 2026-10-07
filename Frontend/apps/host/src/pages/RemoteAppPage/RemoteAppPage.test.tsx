@@ -1,182 +1,83 @@
+import { describe, expect, it, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { RemoteAppPage } from './RemoteAppPage'
 import { useNavigationStore } from '../../shared/stores/navigationStore'
 import type { NavNodeDto, NavSectionDto } from '../../shared/api/navigationApi'
 
 /**
- * Access is decided BEFORE the remote is fetched.
+ * Where a user ends up when they type a remote app's URL and the navigation tree does not have it.
  *
- * The assertion that matters most here is the negative one: loadRemoteAppModule must never be called
- * for an app the caller may not use. Previously this page checked only the registry's status and
- * mounted for any authenticated user, so a remote's bundle was downloadable by typing its URL — the
- * gate existed in the sidebar, which is presentation, not enforcement.
+ * The tree is the access decision: the server omits what the caller may not reach, so a missing node
+ * means either "no such app" or "not yours". Both used to render the 404 page. They now redirect,
+ * because the person on the other end is following a stale bookmark, not probing — and a 404 told
+ * them the platform was broken. A page segment inside an app they DO have is kept inside that app,
+ * which is nearer to where they were going than the dashboard is.
+ *
+ * None of these mount a remote: every gate runs before loadRemoteAppModule, and that ordering is the
+ * reason an app the caller cannot reach is never even fetched.
  */
-const loadRemoteAppModule = vi.fn()
-const needsReloadForNewVersion = vi.fn(() => false)
-let remoteProps: Record<string, unknown> = {}
 
-vi.mock('../../shared/federation/remoteLoader', () => ({
-  loadRemoteAppModule: (...args: unknown[]) => {
-    loadRemoteAppModule(...args)
-    return Promise.resolve({
-      default: (props: Record<string, unknown>) => {
-        remoteProps = props
-        return <div>remote content</div>
-      },
-    })
-  },
-  needsReloadForNewVersion: (...args: unknown[]) => needsReloadForNewVersion(...(args as [])),
-}))
-
-// Imported after the mock so the page picks up the stub.
-const { RemoteAppPage } = await import('./RemoteAppPage')
-
-function node(over: Partial<NavNodeDto> & Pick<NavNodeDto, 'key' | 'label' | 'routePath'>): NavNodeDto {
+function node(over: Partial<NavNodeDto> = {}): NavNodeDto {
   return {
-    iconKey: null,
-    page: null,
-    order: 0,
-    kind: 'host',
-    state: 'visible',
-    maintenanceMessage: null,
-    remote: null,
+    key: 'lead', label: 'Lead Management', iconKey: null, routePath: '/apps/lead', page: null,
+    order: 1, kind: 'remote-app', state: 'visible', maintenanceMessage: null,
+    remote: {
+      appKey: 'lead',
+      manifestUrl: '/modules/lead/1.0.0/mf-manifest.json',
+      containerName: 'lead_mf',
+      defaultRoutePath: '/apps/lead/view-lead',
+    },
     children: [],
     ...over,
   }
 }
 
-const LEAD = node({
-  key: 'remote.lead',
-  label: 'Lead Management',
-  routePath: '/apps/lead',
-  kind: 'remote-app',
-  remote: {
-    appKey: 'lead',
-    manifestUrl: 'http://localhost:5002/mf-manifest.json',
-    containerName: 'lead_mf',
-    defaultRoutePath: '/apps/lead/view-lead',
-  },
-  children: [
-    node({ key: 'remote.lead.lead#view-lead', label: 'View Leads', routePath: '/apps/lead/view-lead', kind: 'submodule', page: 'view-lead' }),
-  ],
-})
-
-function sections(items: NavNodeDto[]): NavSectionDto[] {
-  return [{ key: 'apps', label: 'Apps', order: 20, pinToBottom: false, items }]
+function sectionsWith(items: NavNodeDto[]): NavSectionDto[] {
+  return [{ key: 'apps', label: 'Applications', order: 1, pinToBottom: false, items }]
 }
 
-function renderAt(route: string, tree: NavNodeDto[]) {
-  useNavigationStore.setState({ status: 'loaded', sections: sections(tree), error: null, expanded: new Set() })
+function renderAt(path: string) {
   return render(
-    <MemoryRouter initialEntries={[route]}>
+    <MemoryRouter initialEntries={[path]}>
       <Routes>
+        <Route path="/" element={<p>dashboard</p>} />
         <Route path="/apps/:appKey" element={<RemoteAppPage />} />
         <Route path="/apps/:appKey/:page" element={<RemoteAppPage />} />
-        <Route path="/apps/:appKey/:page/*" element={<RemoteAppPage />} />
+        <Route path="/apps/lead/view-lead" element={<p>view leads</p>} />
       </Routes>
     </MemoryRouter>,
   )
 }
 
 beforeEach(() => {
-  loadRemoteAppModule.mockClear()
-  needsReloadForNewVersion.mockReset()
-  needsReloadForNewVersion.mockReturnValue(false)
-  remoteProps = {}
-  useNavigationStore.setState({ status: 'idle', sections: [], error: null, expanded: new Set() })
+  useNavigationStore.setState({ status: 'loaded', sections: [] })
 })
 
-describe('access is checked before the remote loads', () => {
-  it('never fetches the bundle for an app the tree omitted', async () => {
-    // Absent from the tree means either no such app or no access. Both answer 404 — distinguishing
-    // them would confirm the existence of apps the caller cannot use.
-    renderAt('/apps/lead/view-lead', [])
+describe('RemoteAppPage access', () => {
+  it('sends a user to the dashboard for an app that is not in their tree', () => {
+    useNavigationStore.setState({ sections: sectionsWith([]) })
 
-    expect(await screen.findByText('404')).toBeInTheDocument()
-    expect(loadRemoteAppModule).not.toHaveBeenCalled()
+    renderAt('/apps/lead')
+
+    expect(screen.getByText('dashboard')).toBeInTheDocument()
   })
 
-  it('never fetches the bundle for an app under maintenance', async () => {
-    renderAt('/apps/lead', [{ ...LEAD, state: 'maintenance', maintenanceMessage: 'Back at 09:00.' }])
+  it('keeps a user inside the app when only the page segment is unknown', () => {
+    // They do have this app; the nearest useful place is its own first page, not the dashboard.
+    useNavigationStore.setState({ sections: sectionsWith([node()]) })
 
-    expect(await screen.findByText(/under maintenance/i)).toBeInTheDocument()
-    expect(loadRemoteAppModule).not.toHaveBeenCalled()
+    renderAt('/apps/lead/does-not-exist')
+
+    expect(screen.getByText('view leads')).toBeInTheDocument()
+    expect(screen.queryByText('dashboard')).not.toBeInTheDocument()
   })
 
-  it('answers 404 for a page segment the app does not declare', async () => {
-    renderAt('/apps/lead/not-a-page', [LEAD])
+  it('waits while the navigation tree is still loading instead of redirecting', () => {
+    useNavigationStore.setState({ status: 'loading', sections: [] })
 
-    expect(await screen.findByText('404')).toBeInTheDocument()
-    expect(loadRemoteAppModule).not.toHaveBeenCalled()
-  })
-})
+    renderAt('/apps/lead')
 
-describe('direct URL access to a permitted page', () => {
-  it('mounts the remote and hands it the page from the URL', async () => {
-    renderAt('/apps/lead/view-lead', [LEAD])
-
-    expect(await screen.findByText('remote content')).toBeInTheDocument()
-    expect(loadRemoteAppModule).toHaveBeenCalledWith(
-      expect.objectContaining({ key: 'lead', manifestUrl: 'http://localhost:5002/mf-manifest.json' }),
-    )
-  })
-
-  it('redirects the app root to the first page the caller can see', async () => {
-    // Not to whichever page the remote defaults to internally — that may be one they cannot access.
-    renderAt('/apps/lead', [LEAD])
-
-    expect(await screen.findByText('remote content')).toBeInTheDocument()
-  })
-})
-
-describe('while the tree is still loading', () => {
-  it('shows a placeholder rather than a premature 404', async () => {
-    useNavigationStore.setState({ status: 'loading', sections: [], error: null, expanded: new Set() })
-    render(
-      <MemoryRouter initialEntries={['/apps/lead']}>
-        <Routes>
-          <Route path="/apps/:appKey" element={<RemoteAppPage />} />
-        </Routes>
-      </MemoryRouter>,
-    )
-
-    expect(screen.queryByText('404')).not.toBeInTheDocument()
-    expect(loadRemoteAppModule).not.toHaveBeenCalled()
-  })
-})
-
-describe('maintenance and releases', () => {
-  it('shows the maintenance notice when the server sent no manifest URL', async () => {
-    // A caller without the bypass capability is not told where an app in maintenance lives.
-    renderAt('/apps/lead/view-lead', [{ ...LEAD, state: 'maintenance', remote: { ...LEAD.remote!, manifestUrl: null } }])
-
-    expect(await screen.findByText(/under maintenance/i)).toBeInTheDocument()
-    expect(loadRemoteAppModule).not.toHaveBeenCalled()
-  })
-
-  it('mounts the app, with a notice, for a caller allowed past maintenance', async () => {
-    renderAt('/apps/lead/view-lead', [{ ...LEAD, state: 'maintenance-bypass', maintenanceMessage: 'Back at 09:00.' }])
-
-    expect(await screen.findByText('remote content')).toBeInTheDocument()
-    expect(screen.getByRole('status')).toHaveTextContent(/maintenance access/i)
-  })
-
-  it('offers a reload instead of mounting a newer build beside the one this tab already runs', async () => {
-    needsReloadForNewVersion.mockReturnValue(true)
-
-    renderAt('/apps/lead/view-lead', [LEAD])
-
-    expect(await screen.findByRole('button', { name: /reload now/i })).toBeInTheDocument()
-    expect(loadRemoteAppModule).not.toHaveBeenCalled()
-  })
-})
-
-describe('deep links', () => {
-  it('hands the remote whatever follows the page in the URL', async () => {
-    renderAt('/apps/lead/view-lead/42/history', [LEAD])
-
-    expect(await screen.findByText('remote content')).toBeInTheDocument()
-    expect(remoteProps).toMatchObject({ page: 'view-lead', subPath: '42/history' })
+    expect(screen.queryByText('dashboard')).not.toBeInTheDocument()
   })
 })

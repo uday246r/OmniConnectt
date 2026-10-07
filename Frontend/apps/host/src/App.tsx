@@ -41,6 +41,7 @@ const { Component: DashboardPage, preload: preloadDashboard } = lazyWithPreload(
 // entirely and gets the real form on screen sooner. Everything behind authentication stays split.
 const MaintenancePage = lazy(() => import('./pages/MaintenancePage/MaintenancePage').then((m) => ({ default: m.MaintenancePage })))
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage/NotFoundPage').then((m) => ({ default: m.NotFoundPage })))
+const NoAccessPage = lazy(() => import('./pages/NoAccessPage/NoAccessPage').then((m) => ({ default: m.NoAccessPage })))
 const RemoteAppPage = lazy(() => import('./pages/RemoteAppPage/RemoteAppPage').then((m) => ({ default: m.RemoteAppPage })))
 const ProfilePage = lazy(() => import('./features/profile/pages/ProfilePage').then((m) => ({ default: m.ProfilePage })))
 const AuditLogsPage = lazy(() =>
@@ -118,6 +119,10 @@ const FEATURE_KEYS = {
  * would make the first screen after logging in an error page, for a user whose account is working
  * exactly as configured. The navigation tree already knows what they CAN reach, so the first row in
  * it is a far better destination — and it is the server's answer, not a guess made here.
+ *
+ * This route is also where every other denied route now lands (RequireCapability, RemoteAppPage), so
+ * the last fallback matters more than it did: an account with nothing assigned used to arrive at a
+ * 404 that read as a broken platform. It gets a sentence explaining its own state instead.
  */
 function DashboardRoute() {
   const isAdministrator = useAuthStore((s) => isSuperAdminOrAdmin(s.user))
@@ -137,7 +142,7 @@ function DashboardRoute() {
   const firstReachable = sections.flatMap((s) => s.items).find((i) => i.routePath !== '/')
   return firstReachable
     ? <Navigate to={firstReachable.routePath} replace />
-    : <NotFoundPage />
+    : <NoAccessPage />
 }
 
 function LoginRoute() {
