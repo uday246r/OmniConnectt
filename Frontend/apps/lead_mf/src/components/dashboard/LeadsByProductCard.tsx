@@ -3,7 +3,7 @@ import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from 'recharts';
 import card from '../../shared/dashboardCard.module.css';
 import styles from './LeadsByProductCard.module.css';
 import { useLeadStore } from '../../store/useLeadStore';
-import { SkeletonAvatar, SkeletonText } from '@omniconnect/ui';
+import { SkeletonChart } from '@omniconnect/ui';
 import { useShallow } from 'zustand/react/shallow';
 
 export const LeadsByProductCard: React.FC = () => {
@@ -30,12 +30,10 @@ export const LeadsByProductCard: React.FC = () => {
       </div>
 
       {isLoadingDashboard ? (
-        /* Donut plus its legend rows — the two things this card actually draws. */
+        /* A ring with its legend rows — the two things this card actually draws. It was a solid
+           disc beside five text bars, which read as an avatar and a paragraph, not as a chart. */
         <div className={card.chartSkeleton}>
-          <SkeletonAvatar size={132} />
-          <div className={card.legendSkeleton}>
-            <SkeletonText lines={5} />
-          </div>
+          <SkeletonChart variant="donut" />
         </div>
       ) : leadsByProduct.length === 0 ? (
         <div

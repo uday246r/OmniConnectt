@@ -37,7 +37,7 @@ export const DeclarationConsentSection: React.FC<DeclarationConsentSectionProps>
           full
         >
           {/* Two radios under one name: a group named by the label, not a single control. */}
-          <div className={styles.consentText}>
+          <div className={`${styles.consentText} ${styles.consentOptions}`}>
             <label className={styles.consent}>
               <input
                 type="radio"
@@ -75,6 +75,7 @@ export const DeclarationConsentSection: React.FC<DeclarationConsentSectionProps>
 
       {isFieldVisible(config, 'agreedToPrivacyPolicy') && (
         <>
+          <div className={styles.agree}>
           <Checkbox
             checked={formData.agreedToPrivacyPolicy}
             disabled={privacyPolicyLocked}
@@ -104,6 +105,7 @@ export const DeclarationConsentSection: React.FC<DeclarationConsentSectionProps>
               </span>
             }
           />
+          </div>
 
           {errors.agreedToPrivacyPolicy && (
             <div className={styles.consentError} role="alert">

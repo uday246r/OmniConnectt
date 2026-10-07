@@ -11,7 +11,7 @@ import {
 import card from '../../shared/dashboardCard.module.css';
 import styles from './LeadsOverTimeCard.module.css';
 import { useLeadStore } from '../../store/useLeadStore';
-import { Select, SkeletonBlock } from '@omniconnect/ui';
+import { Select, SkeletonChart } from '@omniconnect/ui';
 import { useShallow } from 'zustand/react/shallow';
 
 const GRANULARITY_LABELS: Record<string, string> = {
@@ -61,8 +61,9 @@ export const LeadsOverTimeCard: React.FC = () => {
       {/* Chart */}
       <div className={styles.chartArea}>
         {isLoadingDashboard ? (
-          /* Shaped like the plot area it replaces, so the card keeps its height. */
-          <SkeletonBlock width="100%" height={220} radius="8px" />
+          /* The silhouette of the area chart it replaces — gridlines and a trend — filling the same
+             plot area, so the card keeps its height. It was one grey slab. */
+          <SkeletonChart variant="line" />
         ) : leadsOverTime.length === 0 ? (
           <div
             className={styles.chartState}

@@ -17,10 +17,77 @@
   min-width: 0;
 }
 
+.consentOptions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/*
+ * Each consent choice is a row you can click anywhere on, drawn like the fields above it and tinted
+ * when it is the one chosen. They were two bare browser radios with a paragraph beside each: the only
+ * controls in the form with no box, no hover and a 13px target, on the one question in it that has
+ * legal weight.
+ */
 .consent {
   display: flex;
   align-items: flex-start;
   gap: 10px;
+  padding: 11px 14px;
+  background: var(--omni-color-surface-alt);
+  border: 1.5px solid #e2e8f0; /* Input's border */
+  border-radius: var(--omni-radius-lg);
+  cursor: pointer;
+  transition: border-color 160ms ease, background 160ms ease, box-shadow 160ms ease;
+}
+
+.consent:hover {
+  border-color: #c8d4e0;
+  background: var(--omni-color-surface);
+}
+
+.consent:has(input:checked) {
+  border-color: var(--omni-color-primary-500);
+  background: var(--omni-color-primary-50);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.07);
+}
+
+.consent:has(input:focus-visible) {
+  border-color: var(--omni-color-primary-600);
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
+}
+
+.consent:has(input:disabled) {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.consent input[type='radio'] {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin: 2px 0 0;
+  accent-color: var(--omni-color-primary-600);
+  cursor: inherit;
+}
+
+/* The privacy acknowledgement, set apart from the choice above it. */
+.agree {
+  padding: 11px 14px;
+  background: var(--omni-color-surface);
+  border: 1.5px dashed #dbe3ee;
+  border-radius: var(--omni-radius-lg);
+}
+
+.consentText a {
+  color: var(--omni-color-primary-600);
+  font-weight: var(--omni-font-weight-semibold);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.consentText a:hover {
+  color: var(--omni-color-primary-700);
 }
 
 .consentText {

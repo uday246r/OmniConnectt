@@ -287,20 +287,34 @@ async function fetchWithAuth(url: string, options: RequestInit = {}): Promise<Re
   });
 }
 
+/**
+ * Reads a catalogue response, turning a body that is not JSON into the same plain message a failed
+ * request gets. A misrouted path answers 200 with a web page, and `res.json()` on that throws the
+ * parser's own words — the form then showed `Unexpected token '<', "<!doctype "... is not valid JSON`
+ * to the person taking the lead.
+ */
+async function readCatalogue<T>(res: Response, message: string): Promise<ApiResponse<T>> {
+  try {
+    return (await res.json()) as ApiResponse<T>;
+  } catch {
+    throw new Error(message);
+  }
+}
+
 export const apiClient = {
   // Product catalogue — read from the Marketplace by LeadService. Uncached here (see REFERENCE_DATA).
   // These throw on failure instead of returning []: an empty list would read as "nothing to sell".
   getCatalogCategories: async (): Promise<CatalogCategory[]> => {
     const res = await fetchWithAuth(`${API_BASE_URL}/api/catalog/categories`, { cache: 'no-store' });
     if (!res.ok) throw new Error('The product catalogue could not be loaded.');
-    const json: ApiResponse<CatalogCategory[]> = await res.json();
+    const json = await readCatalogue<CatalogCategory[]>(res, 'The product catalogue could not be loaded.');
     return json.success ? json.data : [];
   },
 
   getCatalogProducts: async (categoryId: string): Promise<CatalogProduct[]> => {
     const res = await fetchWithAuth(`${API_BASE_URL}/api/catalog/categories/${categoryId}/products`, { cache: 'no-store' });
     if (!res.ok) throw new Error('The products in this category could not be loaded.');
-    const json: ApiResponse<CatalogProduct[]> = await res.json();
+    const json = await readCatalogue<CatalogProduct[]>(res, 'The products in this category could not be loaded.');
     return json.success ? json.data : [];
   },
 

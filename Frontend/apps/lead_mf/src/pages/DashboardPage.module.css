@@ -46,3 +46,25 @@
   grid-template-columns: 1fr;
   gap: var(--omni-space-5);
 }
+
+/* The placeholder a chart card shows while its chunk downloads: a title, a subtitle and the outline
+   of a chart, in the card's own padding. It was an empty white box, which looked like a card that had
+   failed to render rather than one that was on its way. */
+.panelFallback {
+  display: flex;
+  flex-direction: column;
+  gap: var(--omni-space-4);
+  padding: var(--omni-space-5);
+  box-sizing: border-box;
+}
+
+.panelFallbackHead {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.panelFallbackChart {
+  flex: 1;
+  min-height: 200px;
+}

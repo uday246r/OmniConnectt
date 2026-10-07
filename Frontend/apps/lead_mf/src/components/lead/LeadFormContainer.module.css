@@ -1,17 +1,138 @@
 /*
- * Styles extracted from this component's former inline blocks.
+ * The Create Lead form, as three bands of one card: the product step, the fields, the actions.
+ *
+ * The card's own chrome (18px / 1.5px / the platform shadow) comes from the page — CreateLeadPage
+ * composes leadPage.module.css's `.card`. This file owns only what is inside it.
  */
 
-/* The gap between the shared FormSections. The cards own their own chrome but deliberately not the
-   space above them, so one can be placed anywhere. */
+.form {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+/* The card does not clip (a calendar has to be able to open past its edge), so the first and last
+   band round their own outer corners to sit inside the card's 18px radius and 1.5px border. */
+.form > :first-child {
+  border-top-left-radius: 16.5px;
+  border-top-right-radius: 16.5px;
+}
+
+.form > :last-child {
+  border-bottom-left-radius: 16.5px;
+  border-bottom-right-radius: 16.5px;
+}
+
+/* Drawer mode, and anywhere else the sections simply stack. The cards own their chrome but
+   deliberately not the space above them, so one can be placed anywhere. */
 .sections {
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
 
-.stepSpacer {
-  margin-bottom: 12px;
+/* ── Band 1: the product step ─────────────────────────────────────────────── */
+
+.productBand {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px 22px 20px;
+  background: var(--omni-color-surface);
+}
+
+.bandHead {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+/* The icon tile the platform's stat tiles and Setup card headers use, so this header reads as the
+   same kind of thing as the headers on the pages around it. */
+.bandIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  background: linear-gradient(135deg, var(--omni-color-primary-50) 0%, var(--omni-color-primary-100) 100%);
+  border: 1px solid var(--omni-color-primary-200);
+  border-radius: var(--omni-radius-lg);
+  color: var(--omni-color-primary-600);
+}
+
+.bandText {
+  flex: 1;
+  min-width: 0;
+}
+
+.bandTitle {
+  margin: 0;
+  font-size: var(--omni-font-size-md-plus);
+  font-weight: var(--omni-font-weight-semibold);
+  color: var(--omni-color-text-primary);
+  letter-spacing: -0.01em;
+}
+
+.bandHint {
+  margin: 2px 0 0;
+  font-size: var(--omni-font-size-sm-minus);
+  color: var(--omni-color-text-secondary);
+}
+
+/* What has been chosen, said once at the top of the card so it stays in view while the form below
+   is filled in. */
+.chosen {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 44%;
+  padding: 5px 12px 5px 9px;
+  background: var(--omni-color-success-50);
+  border: 1px solid var(--omni-color-success-200);
+  border-radius: var(--omni-radius-pill);
+  color: var(--omni-color-success-700);
+  font-size: var(--omni-font-size-xs-plus);
+  font-weight: var(--omni-font-weight-semibold);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chosen svg { flex: none; }
+
+/* The one line that stands in for the form before a product is chosen. It replaced a tall dashed
+   panel that filled the card with an empty state. */
+.prompt {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+  font-size: var(--omni-font-size-sm-minus);
+  color: var(--omni-color-text-muted);
+}
+
+.promptIcon {
+  flex: none;
+  color: var(--omni-color-primary-500);
+}
+
+/* ── Band 2: the fields ───────────────────────────────────────────────────── */
+
+/*
+ * The sections sit on a sunken surface, not on white.
+ *
+ * FormSection is a copy of the host's Create/Edit User form card — white, a 1px #eaecf0 border and a
+ * shadow barely above zero. The host can afford that because its form scrolls on a tinted content
+ * area, so each card is lighter than what is behind it. One step below --omni-color-surface-alt here:
+ * the host's form is in a narrow drawer, where a 2% tint is enough to read, and across a 1340px page
+ * it is invisible. #f1f5f9 is the slate the platform already uses for a disabled input.
+ */
+.body {
+  padding: 18px 22px 22px;
+  background: #f1f5f9;
+  border-top: 1.5px solid #eaeff7; /* host raw: the rule between a card's toolbar and its table */
 }
 
 .formFade {
@@ -21,54 +142,53 @@
   animation: fadeInForm 0.25s ease-out;
 }
 
-/* White, like the FormSections it stands in for — it sits on the page's sunken form body, where a
-   surface-alt panel would have disappeared into the background. */
-.emptyIcon {
-  margin-top: 20px;
-  padding: 32px 24px;
-  text-align: center;
-  color: var(--omni-color-text-secondary);
-  font-size: var(--omni-font-size-sm-plus);
+/* ── Band 3: the actions ──────────────────────────────────────────────────── */
+
+/*
+ * A footer bar with the actions at the right, as a drawer has. The submit button used to be a
+ * full-width, large button at the bottom of the scroll: the single heaviest element on the page, on a
+ * form whose every other control is ordinary size.
+ */
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--omni-space-3);
+  flex-wrap: wrap;
+  padding: 14px 22px;
   background: var(--omni-color-surface);
-  border-radius: var(--omni-radius-lg);
-  border: 1.5px dashed var(--omni-color-border-strong);
-  line-height: 1.6;
+  border-top: 1.5px solid #eaeff7; /* host raw */
 }
 
-.emptyTitle {
-  font-size: 24px;
-  margin-bottom: 8px;
-}
-
-.emptyText {
-  font-weight: var(--omni-font-weight-semibold);
-  color: var(--omni-color-text-primary);
-  margin-bottom: 4px;
-}
-
-/*
- * The submit button is the shared Button at size="lg" fullWidth; the only thing that was ever
- * page-specific about `.submit-btn-primary` was this gap above it. Its other 20 declarations
- * re-stated the shared primary button exactly (same gradient, shadow, radius, transition).
- */
-.submit {
-  margin-top: var(--omni-space-6, 24px);
-}
-
-/* Replaces the clipboard emoji that stood in for an icon here — the only emoji glyph used as UI on the
-   platform, and the one thing on this screen that did not scale with the text size. */
-.emptyGlyph {
+.footerNote {
+  font-size: var(--omni-font-size-xs-plus);
   color: var(--omni-color-text-muted);
-  margin-bottom: 10px;
 }
 
-/*
- * Lived in index.css as a global, animating a module class from outside it — the kind of link
- * neither file declares and nothing checks. It is used here and only here.
- */
+.asterisk {
+  color: var(--omni-color-danger-600);
+  font-weight: var(--omni-font-weight-bold);
+}
+
+.footerActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+}
+
 @keyframes fadeInForm {
   from { opacity: 0; transform: translateY(6px); }
   to   { opacity: 1; transform: none; }
+}
+
+@media (max-width: 768px) {
+  .productBand { padding: 16px 14px 18px; }
+  .body { padding: 14px 12px 18px; }
+  .footer { padding: 12px 14px; }
+  .chosen { display: none; }
+  .footerNote { width: 100%; }
+  .footerActions { width: 100%; justify-content: flex-end; }
 }
 
 @media (prefers-reduced-motion: reduce) {

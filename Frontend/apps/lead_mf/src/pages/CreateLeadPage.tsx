@@ -25,9 +25,7 @@ export const CreateLeadPage: React.FC = () => {
       />
 
       <div className={styles.formCard}>
-        <div className={styles.formBody}>
-          <LeadFormContainer />
-        </div>
+        <LeadFormContainer />
       </div>
     </div>
   );

@@ -1,14 +1,17 @@
-/* Sits flush inside the phone field's border, where the fixed prefix label used to be. */
+/*
+ * The dial-code dropdown beside the phone number.
+ *
+ * It used to strip the dropdown's own border, fill and radius so that it could sit "flush inside the
+ * phone field's border" — but the box it was meant to sit inside went away when the form moved to the
+ * shared field layer, and what was left was a bare "MY +60" with a hairline after it, floating beside
+ * a fully-drawn number input. It is now simply a field control of its own: inside a FormField the
+ * dropdown takes the Input's height and fill, so the two read as one row of matching boxes.
+ */
 .picker {
-  flex: 0 0 116px;
+  flex: 0 0 124px;
+  /* Without this the fixed basis is ignored: a flex item will not go below its content's intrinsic
+     width, and a text input's is about twenty characters — the dial code took the row and left the
+     number a sliver. */
+  min-width: 0;
   display: flex;
-  border-right: 1px solid var(--border-input);
-}
-
-.picker > div {
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none;
-  height: 100%;
 }

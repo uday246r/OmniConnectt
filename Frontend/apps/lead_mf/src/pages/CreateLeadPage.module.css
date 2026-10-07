@@ -2,39 +2,20 @@
  * Create Lead page.
  *
  * The banner comes from @omniconnect/ui's PageHeader and the page column from the app-level
- * leadPage shell. The card below used the legacy global `.form-card`, which had drifted to its own
- * chrome — 12px radius, a 1px border and the heavier `--shadow-card` — while every other screen in
- * this app (Dashboard, View Leads, Audit Trail, Field Settings) uses leadPage.module.css's `.card`
- * at 18px / 1.5px / `0 2px 8px`. Side by side the form read as a different product, which is the
- * whole complaint. It now composes that same card rather than restating it, so the two cannot drift
- * apart again.
+ * leadPage shell. The card is this app's own `.card` — the 18px / 1.5px / `0 2px 8px` chrome that
+ * Dashboard, View Leads, Audit Trail and Field Settings all use — composed rather than restated, so
+ * the form cannot drift from them again. (It used to carry a global `.form-card` at 12px / 1px / a
+ * heavier shadow, and next to any other screen read as a different product.)
+ *
+ * What is inside the card — the product band, the sunken field area, the footer — belongs to
+ * LeadFormContainer, which lays out its own bands edge to edge; hence no padding here.
  */
 
 .formCard {
   composes: card from '../shared/leadPage.module.css';
   width: 100%;
-}
-
-/*
- * The sections sit on a sunken surface, not on white.
- *
- * FormSection is a copy of the host's Create/Edit User form card — white, a 1px #eaecf0 border and a
- * shadow barely above zero. The host can afford that because its form scrolls on
- * `--omni-color-surface-alt` (UserFormLayer.module.css `.contentArea`): the cards are lighter than
- * what is behind them, so each one reads as a card. Dropped straight onto a white page card they
- * were white on white, and the form looked like one flat sheet with faint lines on it.
- */
-.formBody {
-  padding: var(--omni-space-5) var(--omni-space-5) var(--omni-space-6);
-  /* One step below --omni-color-surface-alt (#f8fafc). The host can use surface-alt because its form
-     is in a narrow drawer, where a 2% tint over that width is enough to read; across a 1340px page it
-     is invisible and the cards go back to being white on white. #f1f5f9 is the same slate the
-     platform already uses for a disabled input, not a new colour. */
-  background: #f1f5f9;
-}
-
-@media (max-width: 768px) {
-  .formBody {
-    padding: var(--omni-space-4) var(--omni-space-3) var(--omni-space-5);
-  }
+  /* `.card` clips its content so a table's corners follow the card's. A form must not: the calendar
+     opens below its field and would be cut off at the card's edge. The bands round their own outer
+     corners instead (LeadFormContainer.module.css). */
+  overflow: visible;
 }

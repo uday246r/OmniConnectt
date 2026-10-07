@@ -1,4 +1,5 @@
 import React, { useEffect, lazy, Suspense } from 'react';
+import { SkeletonBlock, SkeletonChart } from '@omniconnect/ui';
 import { useLeadStore } from '../store/useLeadStore';
 import { canSeeDashboardCapability } from '../api/hostBridge';
 import { DashboardHeader } from '../components/dashboard/DashboardHeader';
@@ -30,9 +31,15 @@ const LeadsByProductCard = lazy(() =>
 
 /** Mirrors the chart cards' own in-card loading treatment so the swap is not a visual jolt. */
 const ChartCardFallback: React.FC = () => (
-  <div
-    className={styles.panel}
-  />
+  <div className={`${styles.panel} ${styles.panelFallback}`} aria-hidden="true">
+    <div className={styles.panelFallbackHead}>
+      <SkeletonBlock width={148} height={14} radius="4px" />
+      <SkeletonBlock width={220} height={10} radius="4px" />
+    </div>
+    <div className={styles.panelFallbackChart}>
+      <SkeletonChart variant="bars" />
+    </div>
+  </div>
 );
 
 export const DashboardPage: React.FC = () => {

@@ -2,7 +2,7 @@ import React from 'react';
 import card from '../../shared/dashboardCard.module.css';
 import styles from './LeadsByBranchCard.module.css';
 import { useLeadStore } from '../../store/useLeadStore';
-import { SkeletonText } from '@omniconnect/ui';
+import { SkeletonList } from '@omniconnect/ui';
 import { useShallow } from 'zustand/react/shallow';
 
 const BRANCH_COLORS = [
@@ -39,8 +39,8 @@ export const LeadsByBranchCard: React.FC = () => {
         className={styles.list}
       >
         {isLoadingDashboard ? (
-          /* One shimmer bar per branch row, at the row height the real list uses. */
-          <SkeletonText lines={5} />
+          /* Two lines per branch, as the real rows have: the name, and the bar under it. */
+          <SkeletonList rows={5} leading="none" />
         ) : sortedBranches.length === 0 ? (
           <div className={styles.listState}>
             No branch data available.

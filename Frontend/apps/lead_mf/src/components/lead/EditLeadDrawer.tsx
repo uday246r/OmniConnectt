@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { Save, ArrowLeft, CheckCircle2 } from '@omniconnect/ui/icons';
-import { Button, Drawer, EmptyState } from '@omniconnect/ui';
+import { Button, Drawer, EmptyState, SkeletonForm } from '@omniconnect/ui';
 import { ProductPicker } from './ProductPicker';
 import { hasVisibleField } from '../../config/fieldControlRegistry';
 import { LeadDiffTable } from '../../shared/LeadDiffTable';
@@ -34,7 +34,8 @@ export const EditLeadDrawer: React.FC = () => {
     setIsConfirmingEdit,
     isSubmitting,
     fieldConfig,
-  } = useLeadStore(useShallow((s) => ({ isEditLeadOpen: s.isEditLeadOpen, editLeadTarget: s.editLeadTarget, editReason: s.editReason, editFormData: s.editFormData, editErrors: s.editErrors, setEditProduct: s.setEditProduct, validateEditForm: s.validateEditForm, submitEditLead: s.submitEditLead, closeEditLeadDrawer: s.closeEditLeadDrawer, isConfirmingEdit: s.isConfirmingEdit, setIsConfirmingEdit: s.setIsConfirmingEdit, isSubmitting: s.isSubmitting, fieldConfig: s.fieldConfig })));
+    isLoadingFieldConfig,
+  } = useLeadStore(useShallow((s) => ({ isEditLeadOpen: s.isEditLeadOpen, editLeadTarget: s.editLeadTarget, editReason: s.editReason, editFormData: s.editFormData, editErrors: s.editErrors, setEditProduct: s.setEditProduct, validateEditForm: s.validateEditForm, submitEditLead: s.submitEditLead, closeEditLeadDrawer: s.closeEditLeadDrawer, isConfirmingEdit: s.isConfirmingEdit, setIsConfirmingEdit: s.setIsConfirmingEdit, isSubmitting: s.isSubmitting, fieldConfig: s.fieldConfig, isLoadingFieldConfig: s.isLoadingFieldConfig })));
 
   // Compute diffs between original lead target and current editFormData
   const changedFields = useMemo<FieldDiff[]>(() => {
@@ -160,6 +161,13 @@ export const EditLeadDrawer: React.FC = () => {
                 />
               </div>
 
+              {/* The same reason as the create form: a field counts as visible until the settings
+                  say otherwise, so drawing the sections before the settings arrive showed every
+                  field and then removed the ones that are switched off. */}
+              {isLoadingFieldConfig ? (
+                <SkeletonForm sections={3} fieldsPerSection={4} />
+              ) : (
+              <>
               {/* Common Customer Details */}
               <CustomerInformationSection isEdit={true} />
 
@@ -178,6 +186,8 @@ export const EditLeadDrawer: React.FC = () => {
               <div className={form.stack}>
                 <DeclarationConsentSection isEdit={true} />
               </div>
+              </>
+              )}
         </form>
       ) : (
         /* STEP 2: CONFIRMATION DIFF TABLE */
