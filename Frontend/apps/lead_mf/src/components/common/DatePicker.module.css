@@ -1,51 +1,266 @@
 /*
- * Styles extracted from this component's former inline blocks. Values map to platform
- * tokens where an exact equivalent exists; the rest are the original literals.
+ * The calendar control.
+ *
+ * The trigger deliberately restates @omniconnect/ui's Input geometry — 46px tall, 1.5px #e2e8f0,
+ * --omni-radius-lg, the same hover, focus ring and invalid colours — rather than inventing its own.
+ * It sits in a FormGrid beside real Inputs, and a date field that is two pixels shorter or a shade
+ * differently bordered than the field next to it is exactly the kind of drift that makes a form look
+ * assembled from parts. It cannot `composes:` from the package (different package, and the trigger is
+ * a div, not an input), so the values are copied with this note; if Input's geometry changes, change
+ * it here too.
+ *
+ * Everything below used to be global `.dropdown-trigger` / `.date-picker-*` classes in index.css —
+ * a third form vocabulary alongside the host's and the shared one. Nothing outside this component
+ * used them.
  */
 
 .container {
   position: relative;
+  width: 100%;
 }
 
-.triggerRow {
+/* ── Trigger ──────────────────────────────────────────────────────────────── */
+
+.trigger {
   display: flex;
   align-items: center;
-  gap: 6px;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  height: 46px;
+  padding: 0 12px 0 14px;
+  background: var(--omni-color-surface-alt);
+  border: 1.5px solid #e2e8f0;
+  border-radius: var(--omni-radius-lg);
+  color: var(--omni-color-text-primary);
+  font-size: var(--omni-font-size-md);
+  font-family: inherit;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  box-sizing: border-box;
+  transition:
+    border-color 160ms ease,
+    background   160ms ease,
+    box-shadow   160ms ease;
 }
 
-.calendarIcon {
-  background: none;
+.trigger:hover:not(.disabled) {
+  border-color: #c8d4e0;
+  background: var(--omni-color-surface);
+}
+
+.trigger:focus-visible {
+  outline: none;
+  border-color: var(--omni-color-primary-600);
+  background: var(--omni-color-surface);
+  box-shadow:
+    0 0 0 4px rgba(37, 99, 235, 0.09),
+    0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.open {
+  border-color: var(--omni-color-primary-600);
+  background: var(--omni-color-surface);
+}
+
+.invalid {
+  border-color: #f43f5e;
+  background: #fff5f6;
+}
+
+.invalid:focus-visible {
+  border-color: #f43f5e;
+  box-shadow: 0 0 0 4px rgba(244, 63, 94, 0.1);
+}
+
+.disabled {
+  background: #f1f5f9;
+  color: var(--omni-color-text-muted);
+  border-color: var(--omni-color-border);
+  cursor: not-allowed;
+}
+
+/* Matches Input's ::placeholder rather than looking like a real value. */
+.placeholder {
+  color: #b0bfcc;
+}
+
+.triggerActions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+  color: var(--omni-color-text-muted);
+}
+
+.clearButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
   border: none;
+  border-radius: var(--omni-radius-sm);
+  background: transparent;
   color: var(--omni-color-text-muted);
   cursor: pointer;
-  display: flex;
+  transition: background 120ms ease, color 120ms ease;
 }
 
-.footerRow {
+.clearButton:hover {
+  background: var(--omni-color-border);
+  color: var(--omni-color-text-secondary);
+}
+
+.trigger:focus-visible .calendarGlyph,
+.trigger.open .calendarGlyph {
   color: var(--omni-color-primary-600);
 }
 
-.clearBtn {
-  display: flex;
-  gap: 6px;
-  align-items: center;
+.calendarGlyph {
+  transition: color 160ms ease;
 }
 
-.todayBtn {
-  border: 1px solid #e2e8f0;
-  border-radius: var(--omni-radius-xs);
-  padding: 2px 6px;
-  font-size: var(--omni-font-size-sm);
-  font-weight: var(--omni-font-weight-semibold);
+/* ── Popup ────────────────────────────────────────────────────────────────── */
+
+.popup {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: var(--omni-z-dropdown);
+  width: 100%;
+  min-width: 280px;
+  padding: 12px;
+  background: var(--omni-color-surface);
+  border: 1px solid var(--omni-color-border);
+  border-radius: var(--omni-radius-lg);
+  box-shadow: var(--omni-shadow-lg);
+  box-sizing: border-box;
+  animation: popupIn 140ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes popupIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .popup { animation: none; }
+}
+
+.popupHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.navButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--omni-color-border);
+  border-radius: var(--omni-radius-sm);
+  background: var(--omni-color-surface);
+  color: var(--omni-color-text-secondary);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+
+.navButton:hover {
+  background: var(--omni-color-surface-alt);
+  border-color: var(--omni-color-border-strong);
+  color: var(--omni-color-text-primary);
+}
+
+.monthYear {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.monthYearSelect {
+  height: 30px;
+  padding: 0 6px;
+  border: 1px solid var(--omni-color-border);
+  border-radius: var(--omni-radius-sm);
   background: var(--omni-color-surface);
   color: var(--omni-color-text-primary);
+  font-size: var(--omni-font-size-sm);
+  font-family: inherit;
+  font-weight: var(--omni-font-weight-medium);
   cursor: pointer;
 }
 
-/* Replaces the inline style that used to grey out the trigger. The package forbids inline style and
-   it could not express a cursor on the disabled state without one. */
-.disabled {
-  cursor: not-allowed;
-  opacity: 0.6;
-  background: var(--omni-color-surface-alt);
+.monthYearSelect:focus-visible {
+  outline: none;
+  border-color: var(--omni-color-primary-600);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.09);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+
+.dayHead {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  font-size: var(--omni-font-size-2xs);
+  font-weight: var(--omni-font-weight-semibold);
+  color: var(--omni-color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  border: none;
+  border-radius: var(--omni-radius-sm);
+  background: transparent;
+  color: var(--omni-color-text-primary);
+  font-size: var(--omni-font-size-sm);
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease;
+}
+
+.cell:hover {
+  background: var(--omni-color-primary-50);
+  color: var(--omni-color-primary-700);
+}
+
+.cell:focus-visible {
+  outline: 2px solid var(--omni-color-primary-600);
+  outline-offset: -2px;
+}
+
+.selected,
+.selected:hover {
+  background: var(--omni-color-primary-600);
+  color: var(--omni-color-text-on-primary);
+  font-weight: var(--omni-font-weight-semibold);
+}
+
+/* Today, when it is not the selected day — a quiet marker, not a second selection. */
+.today:not(.selected) {
+  font-weight: var(--omni-font-weight-semibold);
+  color: var(--omni-color-primary-700);
+  box-shadow: inset 0 0 0 1.5px var(--omni-color-primary-200);
+}
+
+.blank {
+  height: 32px;
 }

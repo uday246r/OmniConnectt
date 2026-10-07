@@ -10,7 +10,9 @@ import styles from './CreateLeadPage.module.css';
  *
  * The banner is @omniconnect/ui's PageHeader, which replaced a hand-rolled copy of the platform
  * banner — its own gradient, two decorative circles, glass icon tile, title and role chip — that had
- * drifted from the host's on radius, padding, gradient angle and title size.
+ * drifted from the host's on radius, padding, gradient angle and title size. The card below is this
+ * app's own `.card`, for the same reason: the global `.form-card` it used to carry was the last
+ * thing on this screen still drawing its own chrome.
  */
 export const CreateLeadPage: React.FC = () => {
   return (
@@ -22,8 +24,10 @@ export const CreateLeadPage: React.FC = () => {
         pill="Lead Submission Form"
       />
 
-      <div className={`form-card ${styles.formCard}`}>
-        <LeadFormContainer />
+      <div className={styles.formCard}>
+        <div className={styles.formBody}>
+          <LeadFormContainer />
+        </div>
       </div>
     </div>
   );

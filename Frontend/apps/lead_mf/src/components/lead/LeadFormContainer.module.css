@@ -21,15 +21,17 @@
   animation: fadeInForm 0.25s ease-out;
 }
 
+/* White, like the FormSections it stands in for — it sits on the page's sunken form body, where a
+   surface-alt panel would have disappeared into the background. */
 .emptyIcon {
   margin-top: 20px;
   padding: 32px 24px;
   text-align: center;
   color: var(--omni-color-text-secondary);
   font-size: var(--omni-font-size-sm-plus);
-  background: var(--omni-color-surface-alt);
+  background: var(--omni-color-surface);
   border-radius: var(--omni-radius-lg);
-  border: 1.5px dashed #e2e8f0;
+  border: 1.5px dashed var(--omni-color-border-strong);
   line-height: 1.6;
 }
 
@@ -58,4 +60,17 @@
 .emptyGlyph {
   color: var(--omni-color-text-muted);
   margin-bottom: 10px;
+}
+
+/*
+ * Lived in index.css as a global, animating a module class from outside it — the kind of link
+ * neither file declares and nothing checks. It is used here and only here.
+ */
+@keyframes fadeInForm {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .formFade { animation: none; }
 }
