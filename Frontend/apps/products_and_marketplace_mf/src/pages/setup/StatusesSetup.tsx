@@ -10,6 +10,7 @@ import type { StatusConfig, StatusEntityType, StatusTone } from '../../types/dom
 import { STATUS_TONES, humanizeEntityType } from './statusTones';
 import page from '../page.module.css';
 import styles from './setup.module.css';
+import { SetupSectionHead } from './SetupSectionHead';
 
 interface FormState { value: string; label: string; color: StatusTone; enabled: boolean; isLive: boolean; sortOrder: string }
 
@@ -126,18 +127,20 @@ export function StatusesSetup() {
 
   return (
     <div className={styles.section}>
+      {/* Said once, above the three cards, instead of repeated word for word in each of them. */}
+      <p className={styles.note}>
+        <Icon.Eye aria-hidden="true" />
+        <span>A <strong>live</strong> status makes a record show in the catalogue; anything else hides it.</span>
+      </p>
 
       {grouped.map(({ type, rows }) => (
         <div key={type} className={page.card}>
-          <div className={styles.sectionHead}>
-            <div>
-              <h3 className={styles.sectionTitle}>{humanizeEntityType(type)} statuses</h3>
-              <p className={styles.sectionHint}>
-                A <strong>live</strong> status makes a record show in the catalogue; anything else hides it.
-              </p>
-            </div>
-            {canManage && <Button variant="secondary" size="sm" leadingIcon={<Icon.Plus />} onClick={() => open(type, null)}>Add status</Button>}
-          </div>
+          <SetupSectionHead
+            icon={<Icon.CheckCircle />}
+            title={`${humanizeEntityType(type)} statuses`}
+            hint={`The states a ${humanizeEntityType(type).toLowerCase()} can be in, in the order they are offered.`}
+            action={canManage ? <Button variant="secondary" size="sm" leadingIcon={<Icon.Plus />} onClick={() => open(type, null)}>Add status</Button> : undefined}
+          />
           <DataTable bare>
             {/* Was the one table in this app with no skeleton and no empty state — just a bare
                 "No statuses defined." cell. ResponsiveRows gives it both, from the same columns. */}

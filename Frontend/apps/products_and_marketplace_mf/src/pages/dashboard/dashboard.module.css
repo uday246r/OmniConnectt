@@ -39,3 +39,8 @@
   .grid2 { grid-template-columns: 1fr; }
   .donutRow { grid-template-columns: 1fr; }
 }
+
+/* Frames for the chart placeholders, at the real charts' proportions (BarChart draws a 600x260
+   viewBox) so the panel is already its final height while the figures load. */
+.chartFrame { width: 100%; aspect-ratio: 600 / 260; }
+.donutFrame { width: 100%; min-height: 200px; display: flex; }

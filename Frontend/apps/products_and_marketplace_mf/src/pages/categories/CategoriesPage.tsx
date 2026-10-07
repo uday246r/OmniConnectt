@@ -15,6 +15,7 @@ import {
   readStoredPageSize,
   type ActiveFilter,
   type ResponsiveColumn,
+  StatTileSkeleton,
 } from '@omniconnect/ui';
 import { CatalogIcon } from '../../components/CatalogIcon';
 import { ListToolbar } from '../../components/ListToolbar';
@@ -55,6 +56,7 @@ export function CategoriesPage() {
   const invalidateOptions = useCatalogOptionsStore((s) => s.invalidate);
   const summary = useCatalogSummaryStore((s) => s.summary);
   const loadSummary = useCatalogSummaryStore((s) => s.load);
+  const summaryLoading = useCatalogSummaryStore((s) => s.loading);
   const statuses = useStatusOptions('Category', { includeDisabled: true });
   const { has } = usePermissions();
 
@@ -172,13 +174,21 @@ export function CategoriesPage() {
         actions={canCreate ? <Button variant="onHeader" leadingIcon={<Icon.Plus />} onClick={() => openForm(null)}>Add Category</Button> : undefined}
       />
 
-      {summary && (
+      {/* While the totals load the row holds its place with shape-matched placeholders; if the read
+          fails it is left out, because a tile showing the wrong number is worse than no tile. */}
+      {summary ? (
         <div className={styles.kpis}>
           <StatTile label="Categories" value={summary.totalCategories.value} icon={<Icon.Layers />} accent="primary" />
-          <StatTile label="Sub-categories" value={summary.totalSubCategories.value} icon={<Icon.Package />} accent="info" />
+          <StatTile label="Sub-categories" value={summary.totalSubCategories.value} icon={<Icon.Package />} accent="violet" />
           <StatTile label="Products in catalogue" value={summary.totalProducts.value} icon={<Icon.Box />} accent="success" />
         </div>
-      )}
+      ) : summaryLoading ? (
+        <div className={styles.kpis} aria-hidden="true">
+          <StatTileSkeleton />
+          <StatTileSkeleton />
+          <StatTileSkeleton />
+        </div>
+      ) : null}
 
       <FilterBar filters={activeFilters} onClearAll={resetQuery} />
 
@@ -233,7 +243,8 @@ export function CategoriesPage() {
               page={query.page}
               pageSize={query.pageSize}
               total={totalCount}
-              itemLabel="categories"
+              itemLabel="category"
+              itemLabelPlural="categories"
               onPageChange={(page) => setQuery({ page })}
             />
           }

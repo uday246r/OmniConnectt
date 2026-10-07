@@ -251,7 +251,7 @@ export function AuditLogsPage() {
         <DataTable
           bare
           reserveHeight
-          footer={<Pagination page={s.page} pageSize={s.pageSize} total={s.totalCount} itemLabel="events" onPageChange={a.setPage} />}
+          footer={<Pagination page={s.page} pageSize={s.pageSize} total={s.totalCount} itemLabel="event" onPageChange={a.setPage} />}
         >
           <ResponsiveRows
             columns={columns}

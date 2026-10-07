@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import { Button, Drawer, EmptyState, FormField, FormGrid, FormSection, Icon, Input, Select, SkeletonBlock, TextArea } from '@omniconnect/ui';
+import { Button, Drawer, EmptyState, FormField, FormGrid, FormSection, Icon, Input, Select, SkeletonForm, TextArea } from '@omniconnect/ui';
 import { CatalogIcon } from '../../components/CatalogIcon';
 import { IconPicker } from '../../components/IconPicker';
 import { useSaveAction } from '../../hooks/useSaveAction';
@@ -228,7 +228,7 @@ export function ProductFormDrawer({ open, product, defaultCategoryId, defaultSub
       {loadError ? (
         <EmptyState title="Could not load this product" description={loadError} />
       ) : loading ? (
-        <SkeletonBlock width="100%" height={320} />
+        <SkeletonForm sections={2} fieldsPerSection={4} />
       ) : (
         <form id={FORM_ID} onSubmit={submit} noValidate className={page.formStack}>
           {save.error && (
@@ -295,7 +295,7 @@ export function ProductFormDrawer({ open, product, defaultCategoryId, defaultSub
             {!basics.subCategoryId ? (
               <p className={styles.hint}>Choose a sub-category to see the attributes its products carry.</p>
             ) : definitionsLoading ? (
-              <SkeletonBlock width="100%" height={120} />
+              <SkeletonForm sections={1} fieldsPerSection={4} />
             ) : definitions.length === 0 ? (
               <p className={styles.hint}>This sub-category has no attributes yet. Define them in Setup → Fields, and they will appear here.</p>
             ) : (

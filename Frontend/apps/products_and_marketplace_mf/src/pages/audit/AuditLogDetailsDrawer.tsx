@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Badge, Button, DetailField, DetailGrid, DetailSection, DetailSections, Drawer, EmptyState, Icon, SkeletonBlock, formatAuditTimestamp } from '@omniconnect/ui';
+import { Badge, Button, DetailField, DetailGrid, DetailSection, DetailSections, Drawer, EmptyState, Icon, SkeletonDetail, formatAuditTimestamp } from '@omniconnect/ui';
 import { auditLogApi } from '../../services/auditLogApi';
 import { useAuditLogStore } from '../../stores/useAuditLogStore';
 import { formatAuditAction } from '../../utils/format';
@@ -58,7 +58,7 @@ export function AuditLogDetailsDrawer({ auditLogId, onClose }: AuditLogDetailsDr
           action={<Button variant="secondary" size="sm" onClick={() => setAttempt((n) => n + 1)}>Retry</Button>}
         />
       ) : loading || !entry ? (
-        <SkeletonBlock width="100%" height={220} />
+        <SkeletonDetail sections={3} fieldsPerSection={4} />
       ) : (
         <DetailSections>
           <DetailSection title="What happened">

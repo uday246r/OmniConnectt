@@ -16,6 +16,7 @@ import {
   readStoredPageSize,
   type ActiveFilter,
   type ResponsiveColumn,
+  StatTileSkeleton,
 } from '@omniconnect/ui';
 import { CatalogIcon } from '../../components/CatalogIcon';
 import { ListToolbar } from '../../components/ListToolbar';
@@ -58,6 +59,7 @@ export function SubCategoriesPage() {
   const invalidateOptions = useCatalogOptionsStore((s) => s.invalidate);
   const summary = useCatalogSummaryStore((s) => s.summary);
   const loadSummary = useCatalogSummaryStore((s) => s.load);
+  const summaryLoading = useCatalogSummaryStore((s) => s.loading);
   const statuses = useStatusOptions('SubCategory', { includeDisabled: true });
   const { has } = usePermissions();
 
@@ -181,13 +183,19 @@ export function SubCategoriesPage() {
         actions={canCreate ? <Button variant="onHeader" leadingIcon={<Icon.Plus />} onClick={() => openForm(null)}>Add Sub-category</Button> : undefined}
       />
 
-      {summary && (
+      {summary ? (
         <div className={styles.kpis}>
           <StatTile label="Sub-categories" value={summary.totalSubCategories.value} icon={<Icon.Package />} accent="primary" />
-          <StatTile label="Categories" value={summary.totalCategories.value} icon={<Icon.Layers />} accent="info" />
+          <StatTile label="Categories" value={summary.totalCategories.value} icon={<Icon.Layers />} accent="violet" />
           <StatTile label="Products in catalogue" value={summary.totalProducts.value} icon={<Icon.Box />} accent="success" />
         </div>
-      )}
+      ) : summaryLoading ? (
+        <div className={styles.kpis} aria-hidden="true">
+          <StatTileSkeleton />
+          <StatTileSkeleton />
+          <StatTileSkeleton />
+        </div>
+      ) : null}
 
       <FilterBar filters={activeFilters} onClearAll={resetQuery} />
 
@@ -253,7 +261,8 @@ export function SubCategoriesPage() {
               page={query.page}
               pageSize={query.pageSize}
               total={totalCount}
-              itemLabel="sub-categories"
+              itemLabel="sub-category"
+              itemLabelPlural="sub-categories"
               onPageChange={(page) => setQuery({ page })}
             />
           }

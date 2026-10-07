@@ -73,42 +73,46 @@ export function ListToolbar({
   }, [search]);
 
   return (
-    <div className={styles.toolbar} role="search" aria-label={searchLabel}>
-      <SearchField
-        className={styles.search}
-        value={text}
-        onValueChange={setText}
-        placeholder={searchPlaceholder}
-        aria-label={searchLabel}
-      />
-      {children}
-      {statusOptions && onStatusChange && (
-        <div className={styles.control}>
-          <Select
-            aria-label="Filter by status"
-            options={statusOptions}
-            value={status ?? ''}
-            placeholder="All statuses"
-            clearLabel="All statuses"
-            onChange={(event) => onStatusChange(event.target.value)}
-          />
+    // The outer element is a size container (see the stylesheet): the row lays itself out by the
+    // width of the card it is in, which the host sidebar makes much narrower than the window.
+    <div className={styles.frame}>
+      <div className={styles.toolbar} role="search" aria-label={searchLabel}>
+        <SearchField
+          className={styles.search}
+          value={text}
+          onValueChange={setText}
+          placeholder={searchPlaceholder}
+          aria-label={searchLabel}
+        />
+        {children}
+        {statusOptions && onStatusChange && (
+          <div className={styles.control}>
+            <Select
+              aria-label="Filter by status"
+              options={statusOptions}
+              value={status ?? ''}
+              placeholder="All statuses"
+              clearLabel="All statuses"
+              onChange={(event) => onStatusChange(event.target.value)}
+            />
+          </div>
+        )}
+        {sortOptions && onSortChange && (
+          <div className={styles.control}>
+            <Select
+              aria-label="Sort by"
+              options={sortOptions}
+              value={sort ?? ''}
+              onChange={(event) => onSortChange(event.target.value)}
+            />
+          </div>
+        )}
+        <div className={styles.actions}>
+          <Button variant="secondary" size="sm" onClick={onReset} disabled={!canReset}>
+            Reset
+          </Button>
+          {trailing}
         </div>
-      )}
-      {sortOptions && onSortChange && (
-        <div className={styles.control}>
-          <Select
-            aria-label="Sort by"
-            options={sortOptions}
-            value={sort ?? ''}
-            onChange={(event) => onSortChange(event.target.value)}
-          />
-        </div>
-      )}
-      <div className={styles.actions}>
-        <Button variant="secondary" size="sm" onClick={onReset} disabled={!canReset}>
-          Reset
-        </Button>
-        {trailing}
       </div>
     </div>
   );

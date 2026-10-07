@@ -1,22 +1,76 @@
+/*
+ * One row: search, then the filters, then the list-wide actions flush right.
+ *
+ * It used to break onto two lines on any screen with three filters. The widths were generous in every
+ * direction at once — each filter claimed 200px, the rows-per-page control took ~180px to show a
+ * two-digit number — so on Sub-categories and Products the row needed more than the card had, and
+ * Reset / Rows / Refresh dropped to a second line on their own, right-aligned under nothing.
+ *
+ * Two things fix it, and both matter:
+ *
+ *  1. The controls ask for less. A flex row decides where to break from what each item ASKS for
+ *     (its flex-basis), not from how far it could shrink, so a filter with a 200px basis forced a
+ *     wrap even when there was room for it at 150px. Search and filters now ask for a small basis
+ *     and GROW into what is left; the actions never shrink and never wrap among themselves. One row
+ *     fits from ~975px of toolbar width with three filters — the host at 1366px with its sidebar open.
+ *
+ *  2. Below that there is a designed second layout rather than an accident. The frame is a size
+ *     container, so the toolbar responds to the width of the CARD it is in, not the window (the
+ *     host's sidebar makes those very different). When it is too narrow for one row, search takes the
+ *     first row to itself and the filters share the second with the actions — two full rows, instead
+ *     of one full row and three orphaned buttons.
+ */
+
+.frame {
+  container-type: inline-size;
+  /* A size container is also a stacking context. Lifting it keeps anything that opens downward out
+     of the toolbar (a search suggestion list, say) above the table's sticky header rather than
+     behind it; the dropdowns here are portalled to <body> and never needed it. */
+  position: relative;
+  z-index: 2;
+}
+
 .toolbar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--omni-space-3);
+  gap: 10px;
 }
 
-/* Reset and the list-wide actions, pushed to the right end of the row as the host does. */
+.search {
+  flex: 2 1 200px;
+  min-width: 180px;
+  max-width: 460px;
+}
+
+.control {
+  flex: 1 1 140px;
+  min-width: 128px;
+  max-width: 190px;
+}
+
+/* Reset and the list-wide actions. `margin-left: auto` keeps them against the right edge whether
+   they share the row or have wrapped below it. */
 .actions {
   display: flex;
+  flex-wrap: nowrap;
+  flex: none;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   margin-left: auto;
-  flex-wrap: wrap;
 }
 
-.search { flex: 1 1 280px; min-width: 220px; max-width: 420px; }
-.control { flex: 0 1 200px; min-width: 150px; }
+/* A little extra room after Reset: it belongs with the filters, the rest act on the list. */
+.actions > :first-child {
+  margin-right: 4px;
+}
 
-@media (max-width: 720px) {
-  .control { flex: 1 1 100%; }
+@container (max-width: 960px) {
+  .search { flex: 1 1 100%; max-width: none; }
+  .control { flex: 1 1 150px; max-width: 240px; }
+}
+
+@container (max-width: 600px) {
+  .control { flex: 1 1 100%; max-width: none; }
+  .actions { width: 100%; justify-content: flex-end; flex-wrap: wrap; }
 }

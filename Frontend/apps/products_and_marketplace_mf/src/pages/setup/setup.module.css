@@ -1,45 +1,110 @@
 .section { display: flex; flex-direction: column; gap: var(--omni-space-4); }
 
-/* A tab's heading, under Setup's one PageHeader rather than competing with it. Each tab used to render
-   its own page-sized <h2>, so Setup appeared to have two titles. The treatment is FormSection's — the
-   blue rule and the smaller bold label the platform uses for a group inside a page. */
+/* The bar the three views are switched from: a white card holding a segmented control, as on the
+   host's user-detail screen (UserDetailPage.module.css `.navBar`), with a line on the right saying
+   what the chosen view is for. */
+.navBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--omni-space-4);
+  flex-wrap: wrap;
+  padding: 6px 18px 6px 12px;
+  background: var(--omni-color-surface);
+  border: 1.5px solid #e8edf5; /* host raw */
+  border-radius: var(--omni-radius-xl);
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04); /* host raw */
+}
+
+.navHint {
+  font-size: var(--omni-font-size-sm);
+  color: var(--omni-color-text-secondary);
+}
+
+/* A Setup card's header — see SetupSectionHead. */
 .sectionHead {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--omni-space-3);
-  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
   padding: var(--omni-space-4) 18px;
   border-bottom: 1.5px solid #eaeff7; /* host raw, matching page.module.css's .toolbar */
 }
 
+/* The stat tiles' icon tile, so a card header and a figure above it share one visual vocabulary. */
+.sectionIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  background: linear-gradient(135deg, var(--omni-color-primary-50) 0%, var(--omni-color-primary-100) 100%);
+  border: 1px solid var(--omni-color-primary-200);
+  border-radius: var(--omni-radius-lg);
+  color: var(--omni-color-primary-600);
+}
+.sectionIcon svg { width: 19px; height: 19px; }
+
+.sectionText { flex: 1; min-width: 0; }
+
 .sectionTitle {
   margin: 0;
-  padding-left: 8px;
-  border-left: 3px solid var(--omni-color-primary-600);
-  font-size: var(--omni-font-size-sm-minus);
-  font-weight: var(--omni-font-weight-bold);
+  font-size: var(--omni-font-size-md-plus);
+  font-weight: var(--omni-font-weight-semibold);
   color: var(--omni-color-text-primary);
   letter-spacing: -0.01em;
 }
 
 .sectionHint {
-  margin: 6px 0 0 11px;
-  font-size: var(--omni-font-size-xs);
+  margin: 2px 0 0;
+  font-size: var(--omni-font-size-sm-minus);
   color: var(--omni-color-text-secondary);
-  max-width: 68ch;
+  line-height: var(--omni-line-height-normal);
+  max-width: 78ch;
 }
+
+.sectionAction { flex: none; }
 
 /* The category / sub-category pickers, in the card's own toolbar row. */
 .pickers {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--omni-space-3);
-  padding: var(--omni-space-4) 18px;
+  gap: 10px;
+  padding: var(--omni-space-3) 18px;
+  background: var(--omni-color-surface-alt);
   border-bottom: 1.5px solid #eaeff7; /* host raw, matching page.module.css's .toolbar */
 }
-.picker { flex: 1 1 240px; min-width: 200px; max-width: 320px; }
+.pickersLabel {
+  font-size: var(--omni-font-size-xs-plus);
+  font-weight: var(--omni-font-weight-bold);
+  color: #64748b; /* host raw, as RowsPerPage's "ROWS" label */
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.picker { flex: 1 1 220px; min-width: 180px; max-width: 300px; }
+
+/* A one-line explanation above a group of cards. */
+.note {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  padding: 10px 14px;
+  background: var(--omni-color-primary-50);
+  border: 1px solid var(--omni-color-primary-100);
+  border-radius: var(--omni-radius-lg);
+  font-size: var(--omni-font-size-sm);
+  color: var(--omni-color-primary-800);
+}
+.note svg { flex: none; width: 16px; height: 16px; color: var(--omni-color-primary-600); }
+
+@media (max-width: 640px) {
+  .navHint { display: none; }
+  .sectionHead { flex-wrap: wrap; }
+  .sectionAction { width: 100%; }
+}
 
 .toggles { display: grid; grid-template-columns: 1fr 1fr; gap: var(--omni-space-3); }
 .toggle {

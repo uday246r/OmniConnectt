@@ -152,6 +152,19 @@ type RetriableConfig = InternalAxiosRequestConfig & { _retriedAfterRefresh?: boo
 
 httpClient.interceptors.response.use(
   (response: AxiosResponse) => {
+    /*
+     * A 2xx whose body is a web page is not an answer from this API. It is what a reverse proxy or a
+     * single-page fallback sends when the path was routed to the wrong place: index.html, status 200.
+     * Passed through, the page that asked for a list received a string, called .map on it and took the
+     * whole screen down with it. It is refused here, once, as the failure it is, so every screen shows
+     * its ordinary error state instead.
+     */
+    const contentType = String(response.headers?.['content-type'] ?? '');
+    if (contentType.includes('text/html') && typeof response.data === 'string') {
+      return Promise.reject(
+        new ApiError('The Products service could not be reached. Please try again in a moment.', response.status),
+      );
+    }
     if (response.status === 202 && isApprovalPendingBody(response.data)) {
       const error = new ApprovalPendingError(response.data);
       useToastStore.getState().info('Sent for approval', error.message);

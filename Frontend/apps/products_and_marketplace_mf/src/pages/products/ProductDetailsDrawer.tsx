@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Button, DetailField, DetailGrid, DetailSection, DetailSections, Drawer, EmptyState, Icon, SkeletonBlock, formatDateTime } from '@omniconnect/ui';
+import { Button, DetailField, DetailGrid, DetailSection, DetailSections, Drawer, EmptyState, Icon, SkeletonDetail, formatDateTime } from '@omniconnect/ui';
 import { CatalogIcon } from '../../components/CatalogIcon';
 import { StatusBadge } from '../../components/StatusBadge';
 import { productApi } from '../../services/productApi';
@@ -56,7 +56,7 @@ export function ProductDetailsDrawer({ productId, onClose, onEdit }: ProductDeta
       {error ? (
         <EmptyState title="Could not load this product" description={error} action={<Button variant="secondary" size="sm" onClick={() => setAttempt((n) => n + 1)}>Retry</Button>} />
       ) : loading || !product ? (
-        <SkeletonBlock width="100%" height={260} />
+        <SkeletonDetail sections={3} fieldsPerSection={4} />
       ) : (
         <DetailSections>
           <DetailSection title="Overview">

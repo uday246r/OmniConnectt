@@ -52,7 +52,15 @@
 
 /* A screen's own filter control inside the toolbar (the category picker on Sub-categories and
    Products). Matches ListToolbar's own `.control` width so the row reads as one set of controls. */
-.filterControl { flex: 0 1 200px; min-width: 150px; }
+.filterControl { flex: 1 1 140px; min-width: 128px; max-width: 190px; }
+
+/* Kept in step with ListToolbar's own breakpoints — it is the size container these sit in. */
+@container (max-width: 960px) {
+  .filterControl { flex: 1 1 150px; max-width: 240px; }
+}
+@container (max-width: 600px) {
+  .filterControl { flex: 1 1 100%; max-width: none; }
+}
 
 .footer {
   padding: var(--omni-space-3) var(--omni-space-5) var(--omni-space-4);
@@ -101,6 +109,23 @@
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
   gap: 16px;
+}
+
+/*
+ * Exactly four tiles go 4 -> 2 -> 1, at the host's own breakpoints (UsersPage.module.css
+ * `.summaryGrid`). Left to auto-fit they broke 3 + 1 at every width in between, with the fourth tile
+ * alone on a row of its own at a third of the width.
+ */
+.kpis:has(> :nth-child(4):last-child) {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+@media (max-width: 1100px) {
+  .kpis:has(> :nth-child(4):last-child) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 600px) {
+  .kpis:has(> :nth-child(4):last-child) { grid-template-columns: 1fr; }
 }
 
 /* The live-events banner, now inside the card rather than loose on the page background. */

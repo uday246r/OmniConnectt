@@ -10,8 +10,8 @@ import {
   PageHeader,
   Pagination,
   Select,
-  SkeletonBlock,
   StatTile,
+  StatTileSkeleton,
   TabPanel,
   Tabs,
   describeTruncation,
@@ -30,7 +30,7 @@ import { useProductStore } from '../../stores/useProductStore';
 import { useStatusOptions } from '../../stores/useStatusConfigStore';
 import { useToastStore } from '../../stores/useToastStore';
 import type { ProductDetail, ProductListItem, StatusCount } from '../../types/domain';
-import { ProductCard } from './ProductCard';
+import { ProductCard, ProductCardSkeleton } from './ProductCard';
 import { ProductDetailsDrawer } from './ProductDetailsDrawer';
 import { ProductFormDrawer } from './ProductFormDrawer';
 import page from '../page.module.css';
@@ -62,6 +62,7 @@ export function ProductsPage() {
   const loadSubCategories = useCatalogOptionsStore((s) => s.loadSubCategories);
   const summary = useCatalogSummaryStore((s) => s.summary);
   const loadSummary = useCatalogSummaryStore((s) => s.load);
+  const summaryLoading = useCatalogSummaryStore((s) => s.loading);
   const statuses = useStatusOptions('Product');
   const { has } = usePermissions();
 
@@ -203,7 +204,7 @@ export function ProductsPage() {
       />
 
       {/* Counted on the server, not from the rows on screen: these must not change when you page. */}
-      {summary && (
+      {summary ? (
         <div className={page.kpis}>
           <StatTile
             label="Products"
@@ -228,20 +229,18 @@ export function ProductsPage() {
             accent="warning"
             caption="Not on the catalogue"
           />
-          <StatTile label="Categories" value={summary.totalCategories.value} icon={<Icon.Layers />} accent="info" />
+          <StatTile label="Categories" value={summary.totalCategories.value} icon={<Icon.Layers />} accent="violet" />
         </div>
-      )}
+      ) : summaryLoading ? (
+        <div className={page.kpis} aria-hidden="true">
+          <StatTileSkeleton foot />
+          <StatTileSkeleton foot />
+          <StatTileSkeleton foot />
+          <StatTileSkeleton />
+        </div>
+      ) : null}
 
       <FilterBar filters={activeFilters} onClearAll={resetQuery} />
-
-      <div className={styles.tabs}>
-        <Tabs
-          id={TABS_ID}
-          tabs={tabs}
-          activeKey={activeTab}
-          onChange={(key) => setQuery({ categoryId: key === ALL ? '' : key, subCategoryId: '' })}
-        />
-      </div>
 
       {error && (
         <div role="alert" className={page.error}>
@@ -254,6 +253,15 @@ export function ProductsPage() {
           platform uses. The pager used to sit in a card of its own below the grid: a card whose only
           content was a footer with a border-top and no body. */}
       <div className={page.card} aria-busy={loading}>
+        {/* The category tabs head the card they filter, instead of floating on the page above it. */}
+        <div className={styles.tabs}>
+          <Tabs
+            id={TABS_ID}
+            tabs={tabs}
+            activeKey={activeTab}
+            onChange={(key) => setQuery({ categoryId: key === ALL ? '' : key, subCategoryId: '' })}
+          />
+        </div>
         <div className={page.toolbar}>
           <ListToolbar
             searchLabel="Search products"
@@ -298,7 +306,7 @@ export function ProductsPage() {
           <div className={page.cardBody}>
             {!loaded && loading ? (
               <div className={styles.grid}>
-                {Array.from({ length: 6 }, (_, i) => <SkeletonBlock key={i} width="100%" height={280} radius="14px" />)}
+                {Array.from({ length: 6 }, (_, i) => <ProductCardSkeleton key={i} />)}
               </div>
             ) : items.length === 0 ? (
               <EmptyState
@@ -322,7 +330,7 @@ export function ProductsPage() {
             page={query.page}
             pageSize={query.pageSize}
             total={totalCount}
-            itemLabel="products"
+            itemLabel="product"
             pageSizeOptions={PAGE_SIZES}
             onPageChange={(p) => setQuery({ page: p })}
             onPageSizeChange={(pageSize) => setQuery({ pageSize, page: 1 })}

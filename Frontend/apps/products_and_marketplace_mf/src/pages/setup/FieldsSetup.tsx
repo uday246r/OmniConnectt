@@ -10,6 +10,7 @@ import type { FieldDefinition, SubCategoryDetail } from '../../types/domain';
 import { FieldFormDrawer } from './FieldFormDrawer';
 import page from '../page.module.css';
 import styles from './setup.module.css';
+import { SetupSectionHead } from './SetupSectionHead';
 
 /** Setup → Fields: the attributes each sub-category's products carry. Pick a sub-category, then define them. */
 export function FieldsSetup() {
@@ -114,20 +115,17 @@ export function FieldsSetup() {
       {error && <div role="alert" className={page.error}>{error}</div>}
 
       <div className={page.card} aria-busy={loading}>
-        <div className={styles.sectionHead}>
-          <div>
-            <h3 className={styles.sectionTitle}>Fields</h3>
-            <p className={styles.sectionHint}>
-              The attributes products carry are defined per sub-category, so every home loan asks for the
-              same things without configuring each one.
-            </p>
-          </div>
-          {canManage && subCategoryId && (
+        <SetupSectionHead
+          icon={<Icon.Grid />}
+          title="Fields"
+          hint="The attributes products carry are defined per sub-category, so every home loan asks for the same things without configuring each one."
+          action={canManage && subCategoryId ? (
             <Button size="sm" leadingIcon={<Icon.Plus />} onClick={() => { setEditing(null); setFormOpen(true); }}>Add field</Button>
-          )}
-        </div>
+          ) : undefined}
+        />
 
         <div className={styles.pickers}>
+          <span className={styles.pickersLabel}>Show fields for</span>
           <div className={styles.picker}>
             <Select aria-label="Category" options={categoryOptions} value={categoryId} placeholder="Choose a category" onChange={(e) => { setCategoryId(e.target.value); setSubCategoryId(''); }} />
           </div>

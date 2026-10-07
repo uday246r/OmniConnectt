@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from 'react';
-import { Button, DataTable, EmptyState, Icon, PageHeader, ResponsiveRows, Select, SkeletonBlock, StatTile, formatDate, formatRelativeTime, type ResponsiveColumn } from '@omniconnect/ui';
+import { Button, DataTable, EmptyState, Icon, PageHeader, ResponsiveRows, Select, SkeletonChart, SkeletonList, StatTile, StatTileSkeleton, formatDate, formatRelativeTime, type ResponsiveColumn } from '@omniconnect/ui';
 import { BarChart } from '../../components/charts/BarChart';
 import { DonutChart } from '../../components/charts/DonutChart';
 import { CatalogIcon } from '../../components/CatalogIcon';
@@ -35,6 +35,8 @@ export function DashboardPage() {
     void loadCategories();
   }, [load, loadCategories]);
 
+  // The first read only: a refetch keeps what is on screen rather than flashing placeholders over it.
+  const firstLoad = !loaded && loading;
   const compared = summary?.comparedDays ?? 30;
   const changeLabel = `vs previous ${compared} days`;
   const categoryOptions = useMemo(() => categories.map((c) => ({ value: c.id, label: c.name })), [categories]);
@@ -79,14 +81,14 @@ export function DashboardPage() {
 
       <div className={page.kpis} aria-busy={loading}>
         {!loaded && loading ? (
-          Array.from({ length: 5 }, (_, i) => <SkeletonBlock key={i} width="100%" height={132} radius="14px" />)
+          Array.from({ length: 5 }, (_, i) => <StatTileSkeleton key={i} foot />)
         ) : summary ? (
           <>
             <StatTile label="Total products" value={summary.totalProducts.value} changePercent={summary.totalProducts.changePercent} changeLabel={changeLabel} accent="primary" icon={<Icon.Box />} caption="All products" />
             <StatTile label="Live products" value={summary.liveProducts.value} changePercent={summary.liveProducts.changePercent} changeLabel={changeLabel} accent="success" icon={<Icon.CheckCircle />} caption="Status is live" />
             <StatTile label="Not live" value={summary.unpublishedProducts.value} changePercent={summary.unpublishedProducts.changePercent} changeLabel={changeLabel} accent="warning" icon={<Icon.FileText />} caption="Drafts and inactive" />
-            <StatTile label="Categories" value={summary.totalCategories.value} changePercent={summary.totalCategories.changePercent} changeLabel={changeLabel} accent="info" icon={<Icon.Layers />} caption="Lines of business" />
-            <StatTile label="Sub-categories" value={summary.totalSubCategories.value} changePercent={summary.totalSubCategories.changePercent} changeLabel={changeLabel} accent="danger" icon={<Icon.Grid />} caption="Types of product" />
+            <StatTile label="Categories" value={summary.totalCategories.value} changePercent={summary.totalCategories.changePercent} changeLabel={changeLabel} accent="violet" icon={<Icon.Layers />} caption="Lines of business" />
+            <StatTile label="Sub-categories" value={summary.totalSubCategories.value} changePercent={summary.totalSubCategories.changePercent} changeLabel={changeLabel} accent="neutral" icon={<Icon.Grid />} caption="Types of product" />
           </>
         ) : null}
       </div>
@@ -102,7 +104,11 @@ export function DashboardPage() {
               <Select aria-label="Show products for" options={categoryOptions} value={breakdownCategoryId} placeholder="All categories" clearLabel="All categories" onChange={(e) => void setBreakdownCategory(e.target.value)} />
             </div>
           </div>
-          <BarChart data={breakdown.map((b) => ({ id: b.id, label: b.name, value: b.count }))} ariaLabel={breakdownCategoryId ? 'Products per sub-category' : 'Products per category'} emptyText="No categories yet." />
+          {firstLoad ? (
+            <div className={styles.chartFrame}><SkeletonChart variant="bars" /></div>
+          ) : (
+            <BarChart data={breakdown.map((b) => ({ id: b.id, label: b.name, value: b.count }))} ariaLabel={breakdownCategoryId ? 'Products per sub-category' : 'Products per category'} emptyText="No categories yet." />
+          )}
         </section>
 
         <section className={`${page.card} ${styles.panel}`} aria-label="Product status distribution">
@@ -110,7 +116,9 @@ export function DashboardPage() {
             <h2 className={styles.panelTitle}>Product status</h2>
             <p className={styles.panelHint}>How products are spread across statuses.</p>
           </div>
-          {segments.length === 0 ? (
+          {firstLoad ? (
+            <div className={styles.donutFrame}><SkeletonChart variant="donut" /></div>
+          ) : segments.length === 0 ? (
             <p className={styles.emptyNote}>No products yet.</p>
           ) : (
             <div className={styles.donutRow}>
@@ -141,7 +149,7 @@ export function DashboardPage() {
               columns={recentColumns}
               rows={recentProducts}
               rowKey={(product) => product.id}
-              loading={!loaded && loading}
+              loading={firstLoad}
               loadingRows={5}
               empty="Nothing added yet."
             />
@@ -153,7 +161,9 @@ export function DashboardPage() {
             <h2 className={styles.panelTitle}>Recent activity</h2>
             <p className={styles.panelHint}>Latest changes to the catalogue.</p>
           </div>
-          {recentActivity.length === 0 ? (
+          {firstLoad ? (
+            <SkeletonList rows={5} leading="dot" />
+          ) : recentActivity.length === 0 ? (
             loaded ? <EmptyState compact title="No activity yet" description="Changes will appear here as they are made." /> : null
           ) : (
             <ul className={styles.activity}>

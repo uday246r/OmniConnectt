@@ -1,4 +1,4 @@
-import { Button, Icon } from '@omniconnect/ui';
+import { Button, Icon, SkeletonBlock } from '@omniconnect/ui';
 import { CatalogIcon } from '../../components/CatalogIcon';
 import { RowMenu, type RowMenuItem } from '../../components/RowMenu';
 import { StatusBadge } from '../../components/StatusBadge';
@@ -81,5 +81,58 @@ export function ProductCard({ product, onView, onEdit, menu }: ProductCardProps)
         {menu.length > 0 && <RowMenu label={`More actions for ${product.name}`} items={menu} />}
       </footer>
     </article>
+  );
+}
+
+/**
+ * A product card that has not loaded yet.
+ *
+ * The same card with every part replaced by a placeholder in the place it will occupy: the icon tile
+ * and two title lines, the status pill, a description, the attribute panel, the benefit tags, the two
+ * buttons and the code. The grid used to show six blank grey slabs instead, which said "something is
+ * loading" without saying what; this says "product cards are loading", and the grid does not reflow
+ * when they arrive.
+ */
+export function ProductCardSkeleton() {
+  return (
+    <div className={`${styles.card} ${styles.cardSkeleton}`} aria-hidden="true">
+      <div className={styles.head}>
+        <SkeletonBlock width={40} height={40} radius="var(--omni-radius-lg-minus)" className={styles.fixed} />
+        <div className={styles.titles}>
+          <SkeletonBlock width="68%" height={14} radius="4px" />
+          <SkeletonBlock width="46%" height={10} radius="4px" />
+        </div>
+        <SkeletonBlock width={58} height={22} radius="var(--omni-radius-pill)" className={styles.fixed} />
+      </div>
+
+      <div className={styles.skeletonLines}>
+        <SkeletonBlock width="100%" height={11} radius="4px" />
+        <SkeletonBlock width="74%" height={11} radius="4px" />
+      </div>
+
+      <div className={styles.metrics}>
+        {['52%', '40%', '46%'].map((w, i) => (
+          <div key={i} className={styles.metric}>
+            <SkeletonBlock width={w} height={11} radius="4px" />
+            <SkeletonBlock width={54} height={11} radius="4px" className={styles.fixed} />
+          </div>
+        ))}
+      </div>
+
+      <div className={styles.tags}>
+        <SkeletonBlock width={84} height={22} radius="var(--omni-radius-sm)" />
+        <SkeletonBlock width={66} height={22} radius="var(--omni-radius-sm)" />
+        <SkeletonBlock width={92} height={22} radius="var(--omni-radius-sm)" />
+      </div>
+
+      <div className={styles.actions}>
+        <SkeletonBlock width="100%" height={38} radius="var(--omni-radius-lg-minus)" />
+        <SkeletonBlock width="100%" height={38} radius="var(--omni-radius-lg-minus)" />
+      </div>
+
+      <div className={styles.foot}>
+        <SkeletonBlock width={96} height={10} radius="4px" />
+      </div>
+    </div>
   );
 }

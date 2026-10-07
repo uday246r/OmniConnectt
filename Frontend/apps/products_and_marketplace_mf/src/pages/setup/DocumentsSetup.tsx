@@ -10,6 +10,7 @@ import { useToastStore } from '../../stores/useToastStore';
 import type { DocumentDefinition, SubCategory } from '../../types/domain';
 import page from '../page.module.css';
 import styles from './setup.module.css';
+import { SetupSectionHead } from './SetupSectionHead';
 
 interface FormState { name: string; documentType: string; subCategoryId: string; required: boolean; active: boolean; sortOrder: string }
 
@@ -126,15 +127,12 @@ export function DocumentsSetup() {
       {error && <div role="alert" className={page.error}>{error}</div>}
 
       <div className={page.card} aria-busy={loading}>
-        <div className={styles.sectionHead}>
-          <div>
-            <h3 className={styles.sectionTitle}>Documents</h3>
-            <p className={styles.sectionHint}>
-              What a customer is asked to provide — for every product, or only for one sub-category.
-            </p>
-          </div>
-          {canManage && <Button size="sm" leadingIcon={<Icon.Plus />} onClick={() => open(null)}>Add document</Button>}
-        </div>
+        <SetupSectionHead
+          icon={<Icon.FileText />}
+          title="Documents"
+          hint="What a customer is asked to provide — for every product, or only for one sub-category."
+          action={canManage ? <Button size="sm" leadingIcon={<Icon.Plus />} onClick={() => open(null)}>Add document</Button> : undefined}
+        />
 
         <DataTable bare>
           <ResponsiveRows
