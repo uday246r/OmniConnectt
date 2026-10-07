@@ -333,6 +333,12 @@
   color: #0f172a;
 }
 
+.moduleActions {
+  font-size: var(--omni-font-size-xs);
+  font-weight: var(--omni-font-weight-medium);
+  color: var(--omni-color-primary-700);
+}
+
 .moduleKey {
   font-size: 11.5px;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;

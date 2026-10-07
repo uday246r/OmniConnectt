@@ -143,9 +143,23 @@ public record BulkUpsertCheckerAssignmentRequest(
     Guid? CheckerUserId,
     Guid? CheckerRoleId);
 
-/// <summary>One module the Checker Assignment UI may offer a checker for — either <see cref="ApprovalModuleKeys.Users"/>/
-/// <see cref="ApprovalModuleKeys.Roles"/>, or a live PermissionFeature.Key from any registered remote app.</summary>
-public record AssignableModuleDto(string Key, string Label);
+/// <summary>
+/// One module the Checker Assignment UI may offer a checker for — either <see cref="ApprovalModuleKeys.Users"/>/
+/// <see cref="ApprovalModuleKeys.Roles"/>, or a live PermissionFeature.Key from any registered remote app.
+/// </summary>
+/// <param name="Actions">
+/// The mutating capabilities this row gates, in the editors' usual verb order — "Create", "Edit",
+/// "Delete". The UI shows them next to the label so the entry reads as the task it governs rather
+/// than as a module name, which is what people were actually looking for when they went to assign a
+/// checker for "creating a lead".
+/// <para>
+/// It is a LIST, not a single action, and that is not a UI nicety: an assignment is stored once per
+/// module (<c>CheckerAssignment.Module</c>, no action column), so one checker genuinely covers all of
+/// them. Naming a row "Create Lead" while the storage gates Edit and Delete too would be a label that
+/// lies. Splitting storage per action is a schema change, deliberately not made here.
+/// </para>
+/// </param>
+public record AssignableModuleDto(string Key, string Label, IReadOnlyList<string> Actions);
 
 /// <summary>Generic payload AuthService POSTs to a remote service's own internal/approvals/apply endpoint
 /// when replaying an approved mutation that originated there. Mirrors RecordAuditLogRequest's role as the

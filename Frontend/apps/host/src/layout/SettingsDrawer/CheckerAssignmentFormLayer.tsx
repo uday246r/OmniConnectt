@@ -349,6 +349,9 @@ export function CheckerAssignmentFormLayer({ module: initialModule, appId: initi
                               >
                                 <div className={styles.dropdownItemLeft}>
                                   <span className={styles.dropdownName}>{m.label}</span>
+                                  {/* The actions a checker assigned here would hold, so the choice is
+                                      made on what it does rather than on a module name alone. */}
+                                  <span className={styles.dropdownActions}>{m.actions.join(' / ')}</span>
                                 </div>
                                 {isSelected && (
                                   <Icon.CheckCircle width={14} height={14} className={styles.dropdownCheckIcon} />

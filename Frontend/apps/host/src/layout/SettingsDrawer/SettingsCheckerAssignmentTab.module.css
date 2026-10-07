@@ -669,6 +669,12 @@
   flex-wrap: wrap;
 }
 
+.moduleActions {
+  font-size: var(--omni-font-size-2xs-plus);
+  font-weight: var(--omni-font-weight-medium);
+  color: var(--omni-color-primary-700);
+}
+
 .moduleName {
   font-size: var(--omni-font-size-sm);
   font-weight: var(--omni-font-weight-bold);

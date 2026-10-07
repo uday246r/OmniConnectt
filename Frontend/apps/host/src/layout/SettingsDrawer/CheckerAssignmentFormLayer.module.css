@@ -380,6 +380,12 @@
   overflow: hidden;
 }
 
+.dropdownActions {
+  font-size: var(--omni-font-size-2xs-plus);
+  font-weight: var(--omni-font-weight-medium);
+  color: var(--omni-color-primary-700);
+}
+
 .dropdownName {
   font-size: var(--omni-font-size-xs-plus);
   font-weight: var(--omni-font-weight-semibold);

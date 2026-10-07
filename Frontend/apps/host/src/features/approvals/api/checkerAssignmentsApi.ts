@@ -10,6 +10,20 @@ const base = env.authServiceUrl
 export interface AssignableModuleDto {
   key: string
   label: string
+  /**
+   * The mutating capabilities this row gates, already in the editors' verb order
+   * ("Create", "Edit", "Delete"). Shown next to the label so an entry reads as the task it governs
+   * rather than as a module name — which is what people were looking for when they came here to
+   * assign a checker for "creating a lead".
+   *
+   * Always at least one: the server no longer offers a feature that can only be read, because
+   * maker-checker holds a change and an audit log or a dashboard has no change to hold.
+   *
+   * It is a list rather than one action because an assignment is stored once per MODULE, so a single
+   * checker genuinely covers all of them. Labelling a row "Create Lead" on its own would be a label
+   * that lies.
+   */
+  actions: string[]
 }
 
 /**

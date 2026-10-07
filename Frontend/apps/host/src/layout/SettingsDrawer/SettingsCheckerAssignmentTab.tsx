@@ -581,6 +581,7 @@ export function SettingsCheckerAssignmentTab() {
                               </div>
                               <div className={styles.moduleTitleBlock}>
                                 <span className={styles.moduleName}>{mod.label}</span>
+                                <span className={styles.moduleActions}>{mod.actions.join(' / ')}</span>
                                 {isGated ? (
                                   <span className={styles.badgeGated}>
                                     <span className={styles.badgeDotGreen} />

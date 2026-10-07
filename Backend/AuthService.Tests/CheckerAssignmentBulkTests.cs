@@ -197,7 +197,12 @@ public class CheckerAssignmentBulkTests : IDisposable
 
     private const string Module = "host.settings.users";
 
-    private async Task<PermissionFeature> SeedFeatureAsync(string key)
+    /// <summary>
+    /// A feature with the capabilities a real one declares. The capabilities are not decoration: a
+    /// feature offering nothing but reads is no longer assignable a checker, so a fixture that seeds
+    /// none would make every assignment in this class fail for the wrong reason.
+    /// </summary>
+    private async Task<PermissionFeature> SeedFeatureAsync(string key, params string[] capabilities)
     {
         var feature = new PermissionFeature
         {
@@ -208,6 +213,20 @@ public class CheckerAssignmentBulkTests : IDisposable
             IsActive = true,
         };
         db.PermissionFeatures.Add(feature);
+
+        foreach (var capability in capabilities.Length > 0 ? capabilities : ["View", "Create", "Edit", "Delete"])
+        {
+            db.PermissionFeatureCapabilities.Add(new PermissionFeatureCapability
+            {
+                Id = Guid.NewGuid(),
+                FeatureId = feature.Id,
+                Key = capability,
+                DisplayName = capability,
+                Type = CapabilityType.Api,
+                IsActive = true,
+            });
+        }
+
         await db.SaveChangesAsync();
         return feature;
     }
@@ -217,7 +236,7 @@ public class CheckerAssignmentBulkTests : IDisposable
     {
         await SeedFeatureAsync(Module);
 
-        var approvals = await SeedFeatureAsync(AuthDbSeeder.HostFeatureKeys.SystemApprovals);
+        var approvals = await SeedFeatureAsync(AuthDbSeeder.HostFeatureKeys.SystemApprovals, "View");
         db.PermissionFeatureCapabilities.Add(new PermissionFeatureCapability
         {
             Id = Guid.NewGuid(),

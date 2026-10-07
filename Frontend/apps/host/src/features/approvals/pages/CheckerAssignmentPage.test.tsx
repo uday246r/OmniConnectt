@@ -44,8 +44,8 @@ describe('CheckerAssignmentPage', () => {
     })
 
     checkerApi.listModules.mockResolvedValue([
-      { key: 'host.settings.users', label: 'User Directory' },
-      { key: 'remote.lead.create', label: 'Create Lead' },
+      { key: 'host.settings.users', label: 'User Directory', actions: ['Create', 'Edit', 'Delete'] },
+      { key: 'remote.lead.lead', label: 'Lead Management — Leads', actions: ['Create', 'Edit'] },
     ] satisfies AssignableModuleDto[])
 
     checkerApi.list.mockResolvedValue([
@@ -101,6 +101,24 @@ describe('CheckerAssignmentPage', () => {
     expect(screen.getByText('Gated Modules')).toBeInTheDocument()
     expect(screen.getByText('Ungated Modules')).toBeInTheDocument()
     expect(screen.getByText('Active Checkers')).toBeInTheDocument()
+  })
+
+  it('names the actions each module gates, not just the module', async () => {
+    /*
+     * An operator coming here wants to assign a checker for "creating a lead" and was shown a list of
+     * module names, which does not say what an assignment would actually hold. The actions come from
+     * the server (the feature's mutating capabilities) rather than being guessed from the key.
+     *
+     * They are shown as a set because storage is one row per MODULE — CheckerAssignment has no action
+     * column — so a single checker genuinely covers all of them. Rendering one row per action would
+     * be a label that lies about what is stored.
+     */
+    renderWithQuery(<CheckerAssignmentPage />, { route: '/settings/checker-assignment' })
+
+    await waitFor(() => {
+      expect(screen.getByText('Create / Edit / Delete')).toBeInTheDocument()
+    })
+    expect([screen.queryAllByText(/Lead/).map((e) => e.textContent), screen.queryAllByText(/remote\./).map((e) => e.textContent)]).toEqual(['PROBE'])
   })
 
   it('triggers drawer layer when clicking Assign Checker', async () => {

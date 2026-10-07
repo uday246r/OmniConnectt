@@ -114,6 +114,22 @@ public class CheckerAssignmentAppService(
     }
 
     /// <summary>
+    /// The capabilities that CHANGE something, and so are the only ones a checker has anything to
+    /// approve. There is no read/write axis on a capability to ask instead — <c>CapabilityType</c> is
+    /// delivery metadata ("does this ride in the JWT"), not policy, and its own doc-comment says so —
+    /// which is why this is a list of verb names, kept in one place so a new remote's vocabulary is
+    /// classified here rather than in three call sites.
+    /// <para>
+    /// Deliberately absent: <c>View</c> and <c>Export</c> (reads), <c>Approve</c> (the checker's own
+    /// act, not a maker's), and <c>MaintenanceBypass</c> (a privilege, not an edit to business data).
+    /// </para>
+    /// </summary>
+    private static readonly HashSet<string> MutatingCapabilities = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "Create", "Edit", "Update", "Delete", "Disable", "Enable", "Register", "Manage",
+    };
+
+    /// <summary>
     /// Every module the Checker Assignment UI may offer a checker for — every active top-level and
     /// sub-module <c>PermissionFeature</c>, the exact same live catalog the Role editor renders. Users
     /// and Roles are no longer special-cased here: ApprovalModuleKeys.Users/Roles are literally
@@ -121,6 +137,18 @@ public class CheckerAssignmentAppService(
     /// like any other host feature. A remote app's module shows up here the moment it registers/syncs,
     /// and disappears (without deleting its existing assignments) the moment it's deactivated — no
     /// code change on this side ever, for any module.
+    /// <para>
+    /// A feature whose capabilities are all reads is left out: maker-checker holds a change until
+    /// someone approves it, and Audit Logs, System Logs and the dashboards have no change to hold.
+    /// Offering them invited an assignment that could never fire and that read, to anyone looking at
+    /// the list, as though viewing a log required approval. Read access is a permission question and
+    /// is answered in Roles &amp; Permissions.
+    /// </para>
+    /// <para>
+    /// Narrowing this list does not cost the Approval Center anything: its module filter is built from
+    /// the queue's own facets (the modules requests were actually raised against), not from here, so a
+    /// request submitted before a module was excluded stays filterable.
+    /// </para>
     /// </summary>
     public async Task<IReadOnlyList<AssignableModuleDto>> GetAssignableModulesAsync(CancellationToken ct = default)
     {
@@ -132,16 +160,44 @@ public class CheckerAssignmentAppService(
         };
 
         var modules = new List<AssignableModuleDto>();
+
+        void AddIfGateable(string key, string label, IReadOnlyList<CapabilityDto> capabilities)
+        {
+            var actions = MutatingActionsOf(capabilities);
+            if (actions.Count == 0) return;
+            modules.Add(new AssignableModuleDto(key, label, actions));
+        }
+
         foreach (var feature in features.Where(f => !excluded.Contains(f.Key)))
         {
-            modules.Add(new AssignableModuleDto(feature.Key, feature.DisplayName));
+            AddIfGateable(feature.Key, feature.DisplayName, feature.Capabilities);
             foreach (var child in feature.Children)
             {
-                modules.Add(new AssignableModuleDto(child.Key, $"{feature.DisplayName} — {child.DisplayName}"));
+                AddIfGateable(child.Key, $"{feature.DisplayName} — {child.DisplayName}", child.Capabilities);
             }
         }
 
         return modules;
+    }
+
+    /// <summary>
+    /// The mutating capabilities of one feature, ordered the way the permission editors order their
+    /// columns (create, edit, delete, …) rather than however the catalog happened to return them, so
+    /// a row always reads "Create / Edit / Delete" and never "Delete / Create / Edit".
+    /// </summary>
+    private static IReadOnlyList<string> MutatingActionsOf(IReadOnlyList<CapabilityDto> capabilities)
+    {
+        var order = new[] { "Create", "Register", "Edit", "Update", "Manage", "Disable", "Enable", "Delete" };
+
+        return capabilities
+            .Select(c => c.Key)
+            // A remote declares business capabilities as dotted keys ("chart.leads-by-branch"); only a
+            // bare verb is a module-level action, so a dotted key can never be mistaken for one.
+            .Where(k => !k.Contains('.') && MutatingCapabilities.Contains(k))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(k => Array.FindIndex(order, o => string.Equals(o, k, StringComparison.OrdinalIgnoreCase)))
+            .ThenBy(k => k, StringComparer.OrdinalIgnoreCase)
+            .ToList();
     }
 
     public async Task<CheckerAssignmentDto> UpsertAsync(

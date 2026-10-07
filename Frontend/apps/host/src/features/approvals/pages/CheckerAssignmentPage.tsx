@@ -435,6 +435,11 @@ export function CheckerAssignmentPage() {
                                   </div>
                                   <div className={styles.moduleDetails}>
                                     <span className={styles.moduleLabel}>{mod.label}</span>
+                                    {/* What a checker assigned here would actually hold. Without it the
+                                        row named a module and left the operator to guess. */}
+                                    <span className={styles.moduleActions}>
+                                      {mod.actions.join(' / ')}
+                                    </span>
                                     <span className={styles.moduleKey}>{mod.key}</span>
                                   </div>
                                 </div>

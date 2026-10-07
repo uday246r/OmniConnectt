@@ -29,7 +29,12 @@ public class CheckerAssignmentsController(CheckerAssignmentAppService assignment
     /// <summary>Every module currently assignable a checker — AuthService's own Users/Roles plus every
     /// active PermissionFeature from the same live catalog the Role editor renders. Sources the Checker
     /// Assignment picker AND the Approval Center's module filter, so both stay in sync with whatever
-    /// remote apps are actually registered, with zero code change here as new ones are added.</summary>
+    /// remote apps are actually registered, with zero code change here as new ones are added.
+    /// <para>
+    /// A feature with nothing but read capabilities is left out — there is no change for a checker to
+    /// hold on an audit log or a dashboard. The Approval Center is unaffected: its module filter comes
+    /// from the queue's own facets, not from here.
+    /// </para></summary>
     [HttpGet("modules")]
     [RequirePermission(Feature, "View")]
     public async Task<ActionResult<IReadOnlyList<AssignableModuleDto>>> Modules(CancellationToken ct)
