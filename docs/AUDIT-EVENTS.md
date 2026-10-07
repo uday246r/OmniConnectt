@@ -176,10 +176,44 @@ Customer 360's local `Timestamp` is a UTC `timestamptz` (migration
 filtering impossible. The migration reads legacy text as UTC — see `LegacyTimestampZone` in that
 migration for the assumption and how to change it.
 
+## ProductsService — `SourceApplication = Products & Marketplace`
+
+Written locally (`AuditLogService`, read by the remote's own Audit Logs screen) and pushed centrally by
+`CentralAuditForwarder`. The central key is the local key prefixed with the app key —
+`products.product.create` — so the family filters as one in the host and cannot collide with another
+application's vocabulary. Keys live in
+`src/ProductMarketplace.Application/Common/AuditActions.cs`; the category each maps to is decided by
+`CentralAuditForwarder.CategoryFor`, and the module/page labels by `Describe`.
+
+| Central key | Fires when | Category |
+|---|---|---|
+| `products.product.create` / `.update` / `.delete` | Product CRUD, direct or replayed on approval | `CRUD` |
+| `products.product.status_change` | A product's status is changed from the row menu or the form | `CRUD` |
+| `products.product.view` | A product's full record is opened | `ViewDetails` |
+| `products.product.export` | `GET /api/products-service/products/export` | `Export` |
+| `products.category.create` / `.update` / `.delete` | Category CRUD | `CRUD` |
+| `products.category.reorder` | A category is moved up or down in the configured order | `CRUD` |
+| `products.sub_category.create` / `.update` / `.delete` | Sub-category CRUD | `CRUD` |
+| `products.sub_category.reorder` | A sub-category is moved within its category | `CRUD` |
+| `products.field.create` / `.update` / `.delete` | Setup → Fields: a sub-category's product attributes | `Configuration` |
+| `products.document_definition.create` / `.update` / `.delete` | Setup → Documents | `Configuration` |
+| `products.status_config.create` / `.update` / `.delete` | Setup → Statuses, including the live/enabled switches | `Configuration` |
+| `products.audit_log.export` | `GET /api/products-service/audit-logs/export` | `Export` |
+
+**`search` is deliberately local only.** Free-text product searches are search analytics — every
+settled query from every customer — and belong in this app's own search statistics, not in the
+platform's security trail, where at scale they would bury the actions an auditor is looking for.
+`CentralAuditForwarder.ForwardAsync` returns early for it.
+
+The remote's Audit Logs screen also carries a **live feed**: `AuditLogHub` (`/hubs/audit-log`)
+broadcasts each new entry to viewers who may see it, and the screen prepends it when the reader is on
+page 1 with no filters applied, or counts it in a banner otherwise. That is a delivery mechanism, not
+an event — nothing extra is written.
+
 ## Filtering and export — the same on every log screen
 
-All five log screens (host Audit Logs, System Logs, Approval Center, Lead Audit Logs, Customer 360
-Audit Trail) and the per-user Activity tab use one date-range control from `@omniconnect/ui`
+All six log screens (host Audit Logs, System Logs, Approval Center, Lead Audit Logs, Customer 360
+Audit Trail, Products & Marketplace Audit Logs) and the per-user Activity tab use one date-range control from `@omniconnect/ui`
 (`DateRangeColumnFilter` / `DateRangeFilterButton`, backed by `resolveDateRange`):
 
 - **Local-time semantics.** Presets snap to calendar-day boundaries in the viewer's timezone. The

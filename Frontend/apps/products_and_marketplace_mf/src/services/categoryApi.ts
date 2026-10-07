@@ -11,8 +11,8 @@ export interface CategoryQuery {
 }
 
 export const categoryApi = {
-  async list(query: CategoryQuery, signal?: AbortSignal): Promise<PagedResult<Category>> {
-    const { data } = await httpClient.get('/categories', { params: cleanParams(query), signal });
+  async list(query: CategoryQuery, signal?: AbortSignal, fresh = false): Promise<PagedResult<Category>> {
+    const { data } = await httpClient.get('/categories', { params: cleanParams(query), signal, fresh });
     return data;
   },
   async get(id: string): Promise<Category> {

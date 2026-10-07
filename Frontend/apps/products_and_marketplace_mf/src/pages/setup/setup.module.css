@@ -1,11 +1,45 @@
 .section { display: flex; flex-direction: column; gap: var(--omni-space-4); }
 
-.sectionHead { display: flex; align-items: center; justify-content: space-between; gap: var(--omni-space-3); flex-wrap: wrap; }
-.sectionTitle { margin: 0; font-size: var(--omni-font-size-lg); font-weight: var(--omni-font-weight-semibold); color: var(--omni-color-text-primary); }
-.sectionHint { margin: 2px 0 0; font-size: var(--omni-font-size-sm); color: var(--omni-color-text-secondary); }
+/* A tab's heading, under Setup's one PageHeader rather than competing with it. Each tab used to render
+   its own page-sized <h2>, so Setup appeared to have two titles. The treatment is FormSection's — the
+   blue rule and the smaller bold label the platform uses for a group inside a page. */
+.sectionHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--omni-space-3);
+  flex-wrap: wrap;
+  padding: var(--omni-space-4) 18px;
+  border-bottom: 1.5px solid #eaeff7; /* host raw, matching page.module.css's .toolbar */
+}
 
-.pickers { display: flex; flex-wrap: wrap; gap: var(--omni-space-3); }
-.picker { flex: 1 1 240px; min-width: 200px; }
+.sectionTitle {
+  margin: 0;
+  padding-left: 8px;
+  border-left: 3px solid var(--omni-color-primary-600);
+  font-size: var(--omni-font-size-sm-minus);
+  font-weight: var(--omni-font-weight-bold);
+  color: var(--omni-color-text-primary);
+  letter-spacing: -0.01em;
+}
+
+.sectionHint {
+  margin: 6px 0 0 11px;
+  font-size: var(--omni-font-size-xs);
+  color: var(--omni-color-text-secondary);
+  max-width: 68ch;
+}
+
+/* The category / sub-category pickers, in the card's own toolbar row. */
+.pickers {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--omni-space-3);
+  padding: var(--omni-space-4) 18px;
+  border-bottom: 1.5px solid #eaeff7; /* host raw, matching page.module.css's .toolbar */
+}
+.picker { flex: 1 1 240px; min-width: 200px; max-width: 320px; }
 
 .toggles { display: grid; grid-template-columns: 1fr 1fr; gap: var(--omni-space-3); }
 .toggle {

@@ -1,7 +1,22 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { Button, CsvExportError, EmptyState, Icon, PageHeader, Pagination, Select, SkeletonBlock, TabPanel, Tabs, describeTruncation } from '@omniconnect/ui';
-import { ConfirmDialog } from '../../components/ConfirmDialog';
+import {
+  Button,
+  ConfirmDialog,
+  CsvExportError,
+  EmptyState,
+  FilterBar,
+  Icon,
+  PageHeader,
+  Pagination,
+  Select,
+  SkeletonBlock,
+  StatTile,
+  TabPanel,
+  Tabs,
+  describeTruncation,
+  type ActiveFilter,
+} from '@omniconnect/ui';
 import { ListToolbar } from '../../components/ListToolbar';
 import type { RowMenuItem } from '../../components/RowMenu';
 import { usePermissions } from '../../permissions/PermissionContext';
@@ -10,6 +25,7 @@ import { isApprovalPending } from '../../services/httpClient';
 import { downloadServerCsv } from '../../services/exportCsv';
 import { productApi } from '../../services/productApi';
 import { useCatalogOptionsStore } from '../../stores/useCatalogOptionsStore';
+import { useCatalogSummaryStore } from '../../stores/useCatalogSummaryStore';
 import { useProductStore } from '../../stores/useProductStore';
 import { useStatusOptions } from '../../stores/useStatusConfigStore';
 import { useToastStore } from '../../stores/useToastStore';
@@ -44,6 +60,8 @@ export function ProductsPage() {
   const subCategoriesByCategory = useCatalogOptionsStore((s) => s.subCategoriesByCategory);
   const loadCategories = useCatalogOptionsStore((s) => s.loadCategories);
   const loadSubCategories = useCatalogOptionsStore((s) => s.loadSubCategories);
+  const summary = useCatalogSummaryStore((s) => s.summary);
+  const loadSummary = useCatalogSummaryStore((s) => s.load);
   const statuses = useStatusOptions('Product');
   const { has } = usePermissions();
 
@@ -62,7 +80,8 @@ export function ProductsPage() {
   useEffect(() => {
     void fetch();
     void loadCategories();
-  }, [fetch, loadCategories]);
+    void loadSummary();
+  }, [fetch, loadCategories, loadSummary]);
 
   useEffect(() => {
     if (query.categoryId) void loadSubCategories(query.categoryId);
@@ -82,6 +101,13 @@ export function ProductsPage() {
   const refresh = () => {
     void fetch();
     void loadCategories({ force: true });
+    void loadSummary({ fresh: true });
+  };
+
+  /** The Refresh button: ask the server, do not accept the briefly-cached answer. */
+  const refetch = () => {
+    void fetch({ fresh: true });
+    void loadSummary({ fresh: true });
   };
 
   const tabs = useMemo(() => {
@@ -139,6 +165,29 @@ export function ProductsPage() {
   const filtered = Boolean(query.search || query.status || query.categoryId || query.subCategoryId);
   const canReset = filtered || query.sort !== 'newest';
 
+  const activeFilters: ActiveFilter[] = [
+    query.search && { key: 'search', label: 'Search', value: query.search, onRemove: () => setQuery({ search: '' }) },
+    // The category is also the active tab, so removing the chip moves the tabs back to All products.
+    query.categoryId && {
+      key: 'category',
+      label: 'Category',
+      value: categories.find((c) => c.id === query.categoryId)?.name ?? query.categoryId,
+      onRemove: () => setQuery({ categoryId: '', subCategoryId: '' }),
+    },
+    query.subCategoryId && {
+      key: 'subCategory',
+      label: 'Sub-category',
+      value: subCategoryOptions.find((s) => s.value === query.subCategoryId)?.label ?? query.subCategoryId,
+      onRemove: () => setQuery({ subCategoryId: '' }),
+    },
+    query.status && {
+      key: 'status',
+      label: 'Status',
+      value: statuses.find((s) => s.value === query.status)?.label ?? query.status,
+      onRemove: () => setQuery({ status: '' }),
+    },
+  ].filter(Boolean) as ActiveFilter[];
+
   return (
     <div className={page.page}>
       <PageHeader
@@ -153,6 +202,38 @@ export function ProductsPage() {
         }
       />
 
+      {/* Counted on the server, not from the rows on screen: these must not change when you page. */}
+      {summary && (
+        <div className={page.kpis}>
+          <StatTile
+            label="Products"
+            value={summary.totalProducts.value}
+            icon={<Icon.Package />}
+            accent="primary"
+            changePercent={summary.totalProducts.changePercent}
+            changeLabel={`vs previous ${summary.comparedDays} days`}
+          />
+          <StatTile
+            label="Live"
+            value={summary.liveProducts.value}
+            icon={<Icon.CheckCircle />}
+            accent="success"
+            changePercent={summary.liveProducts.changePercent}
+            changeLabel={`vs previous ${summary.comparedDays} days`}
+          />
+          <StatTile
+            label="Not published"
+            value={summary.unpublishedProducts.value}
+            icon={<Icon.Eye />}
+            accent="warning"
+            caption="Not on the catalogue"
+          />
+          <StatTile label="Categories" value={summary.totalCategories.value} icon={<Icon.Layers />} accent="info" />
+        </div>
+      )}
+
+      <FilterBar filters={activeFilters} onClearAll={resetQuery} />
+
       <div className={styles.tabs}>
         <Tabs
           id={TABS_ID}
@@ -162,66 +243,80 @@ export function ProductsPage() {
         />
       </div>
 
-      <ListToolbar
-        searchLabel="Search products"
-        searchPlaceholder="Search products by name, code or description…"
-        search={query.search}
-        onSearchChange={(value) => setQuery({ search: value })}
-        statusOptions={statusOptions}
-        status={query.status}
-        onStatusChange={(status) => setQuery({ status })}
-        sortOptions={SORT_OPTIONS}
-        sort={query.sort}
-        onSortChange={(sort) => setQuery({ sort })}
-        canReset={canReset}
-        onReset={resetQuery}
-      >
-        <div className={page.control}>
-          <Select
-            aria-label="Filter by sub-category"
-            options={subCategoryOptions}
-            value={query.subCategoryId}
-            placeholder={query.categoryId ? 'All sub-categories' : 'Choose a category first'}
-            clearLabel="All sub-categories"
-            disabled={!query.categoryId}
-            onChange={(e) => setQuery({ subCategoryId: e.target.value })}
-          />
-        </div>
-      </ListToolbar>
-
       {error && (
         <div role="alert" className={page.error}>
           <span>{error}</span>
-          <Button variant="secondary" size="sm" onClick={() => void fetch()}>Try again</Button>
+          <Button variant="secondary" size="sm" onClick={refetch}>Try again</Button>
         </div>
       )}
 
-      <TabPanel id={TABS_ID} tabId={activeTab} active>
-        <div aria-busy={loading}>
-          {!loaded && loading ? (
-            <div className={styles.grid}>
-              {Array.from({ length: 6 }, (_, i) => <SkeletonBlock key={i} width="100%" height={280} radius="14px" />)}
+      {/* One card holds the toolbar, the grid and the pager — the frame every other list on the
+          platform uses. The pager used to sit in a card of its own below the grid: a card whose only
+          content was a footer with a border-top and no body. */}
+      <div className={page.card} aria-busy={loading}>
+        <div className={page.toolbar}>
+          <ListToolbar
+            searchLabel="Search products"
+            searchPlaceholder="Search products by name, code or description…"
+            search={query.search}
+            onSearchChange={(value) => setQuery({ search: value })}
+            statusOptions={statusOptions}
+            status={query.status}
+            onStatusChange={(status) => setQuery({ status })}
+            sortOptions={SORT_OPTIONS}
+            sort={query.sort}
+            onSortChange={(sort) => setQuery({ sort })}
+            canReset={canReset}
+            onReset={resetQuery}
+            trailing={
+              <Button
+                variant="secondary"
+                size="sm"
+                leadingIcon={<Icon.Activity width={15} height={15} />}
+                disabled={loading}
+                onClick={refetch}
+              >
+                Refresh
+              </Button>
+            }
+          >
+            <div className={page.filterControl}>
+              <Select
+                aria-label="Filter by sub-category"
+                options={subCategoryOptions}
+                value={query.subCategoryId}
+                placeholder={query.categoryId ? 'All sub-categories' : 'Choose a category first'}
+                clearLabel="All sub-categories"
+                disabled={!query.categoryId}
+                onChange={(e) => setQuery({ subCategoryId: e.target.value })}
+              />
             </div>
-          ) : items.length === 0 ? (
-            <div className={page.card}>
+          </ListToolbar>
+        </div>
+
+        <TabPanel id={TABS_ID} tabId={activeTab} active>
+          <div className={page.cardBody}>
+            {!loaded && loading ? (
+              <div className={styles.grid}>
+                {Array.from({ length: 6 }, (_, i) => <SkeletonBlock key={i} width="100%" height={280} radius="14px" />)}
+              </div>
+            ) : items.length === 0 ? (
               <EmptyState
                 icon={<Icon.Package />}
                 title={filtered ? 'No products match' : 'No products yet'}
                 description={filtered ? 'Try a different search, category or status.' : 'Add your first product to start building the catalogue.'}
                 action={filtered ? <Button variant="secondary" onClick={resetQuery}>Reset filters</Button> : canCreate ? <Button onClick={() => openForm(null)}>Add Product</Button> : undefined}
               />
-            </div>
-          ) : (
-            <div className={styles.grid}>
-              {items.map((product) => (
-                <ProductCard key={product.id} product={product} onView={() => setViewingId(product.id)} onEdit={canEdit ? () => openForm(product) : undefined} menu={menuFor(product)} />
-              ))}
-            </div>
-          )}
-        </div>
-      </TabPanel>
+            ) : (
+              <div className={styles.grid}>
+                {items.map((product) => (
+                  <ProductCard key={product.id} product={product} onView={() => setViewingId(product.id)} onEdit={canEdit ? () => openForm(product) : undefined} menu={menuFor(product)} />
+                ))}
+              </div>
+            )}
+          </div>
+        </TabPanel>
 
-      <div className={page.card}>
         <div className={page.footer}>
           <Pagination
             page={query.page}
@@ -262,6 +357,7 @@ export function ProductsPage() {
         title="Delete product?"
         destructive
         confirmLabel="Delete product"
+        pendingApproval={isApprovalPending}
         message={
           <>
             <strong>{deleting?.name}</strong> will be removed permanently. To take it off the catalogue without deleting it, change its

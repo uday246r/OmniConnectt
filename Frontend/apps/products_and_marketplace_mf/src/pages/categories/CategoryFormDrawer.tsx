@@ -1,9 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { Button, Drawer, Icon, Input, Select } from '@omniconnect/ui';
+import { Button, Drawer, FormField, FormGrid, FormSection, Icon, Input, Select, TextArea } from '@omniconnect/ui';
 import { CatalogIcon } from '../../components/CatalogIcon';
 import { IconPicker } from '../../components/IconPicker';
-import { Field } from '../../components/form/Field';
-import { TextArea } from '../../components/form/TextArea';
 import { useSaveAction } from '../../hooks/useSaveAction';
 import { categoryApi } from '../../services/categoryApi';
 import { useStatusOptions } from '../../stores/useStatusConfigStore';
@@ -30,7 +28,14 @@ interface FormState {
 
 const FORM_ID = 'category-form';
 
-/** Add a category, or edit one. Everything that can vary — statuses, icons — comes from Setup and the icon set, not from this file. */
+/**
+ * Add a category, or edit one. Everything that can vary — statuses, icons — comes from Setup and the
+ * icon set, not from this file.
+ *
+ * The fields are grouped into sections on the shared form layer, the way the host's own Create User
+ * drawer groups its own. They used to be one flat column of controls in this app's local `Field` and
+ * `TextArea`, which is why the same drawer read as a different product here.
+ */
 export function CategoryFormDrawer({ open, category, onClose, onSaved }: CategoryFormDrawerProps) {
   const statusOptions = useStatusOptions('Category');
   const save = useSaveAction();
@@ -102,15 +107,37 @@ export function CategoryFormDrawer({ open, category, onClose, onSaved }: Categor
     >
       <form id={FORM_ID} onSubmit={submit} noValidate className={styles.formStack}>
         {save.error && <p role="alert" className={styles.error}>{save.error}</p>}
-        <Input label="Category name" value={form.name} onChange={(e) => set('name', e.target.value)} errorText={shown('name')} required autoFocus />
-        <Input label="Category code" value={form.code} onChange={(e) => set('code', e.target.value)} errorText={shown('code')} helperText={CODE_HINT} required />
-        <TextArea label="Description" value={form.description} onChange={(e) => set('description', e.target.value)} errorText={shown('description')} />
-        <Field label="Status" helper="Which statuses exist, and which make a category live, is set in Setup.">
-          <Select aria-label="Status" options={options} value={form.status} onChange={(e) => set('status', e.target.value)} />
-        </Field>
-        <Field label="Icon">
-          <IconPicker label="Category icon" value={form.iconKey} onChange={(key) => set('iconKey', key)} />
-        </Field>
+
+        <FormSection title="Category details" icon={<Icon.Layers width={15} height={15} />}>
+          <FormGrid>
+            <FormField label="Category name" required error={shown('name')}>
+              {(control) => (
+                <Input {...control.aria} value={form.name} onChange={(e) => set('name', e.target.value)} autoFocus />
+              )}
+            </FormField>
+            <FormField label="Category code" required error={shown('code')} helper={CODE_HINT}>
+              {(control) => <Input {...control.aria} value={form.code} onChange={(e) => set('code', e.target.value)} />}
+            </FormField>
+            <FormField label="Description" full error={shown('description')}>
+              {(control) => (
+                <TextArea {...control.aria} value={form.description} onChange={(e) => set('description', e.target.value)} />
+              )}
+            </FormField>
+          </FormGrid>
+        </FormSection>
+
+        <FormSection title="Appearance and visibility" icon={<Icon.Eye width={15} height={15} />}>
+          <FormGrid>
+            <FormField label="Status" helper="Which statuses exist, and which make a category live, is set in Setup.">
+              {(control) => (
+                <Select id={control.id} options={options} value={form.status} onChange={(e) => set('status', e.target.value)} />
+              )}
+            </FormField>
+            <FormField label="Icon">
+              <IconPicker label="Category icon" value={form.iconKey} onChange={(key) => set('iconKey', key)} />
+            </FormField>
+          </FormGrid>
+        </FormSection>
       </form>
     </Drawer>
   );

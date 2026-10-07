@@ -16,8 +16,8 @@ export interface ProductQuery {
 export type ProductFilters = Omit<ProductQuery, 'page' | 'pageSize'>;
 
 export const productApi = {
-  async list(query: ProductQuery, signal?: AbortSignal): Promise<PagedResult<ProductListItem>> {
-    const { data } = await httpClient.get('/products', { params: cleanParams(query), signal });
+  async list(query: ProductQuery, signal?: AbortSignal, fresh = false): Promise<PagedResult<ProductListItem>> {
+    const { data } = await httpClient.get('/products', { params: cleanParams(query), signal, fresh });
     return data;
   },
   /** Products per status under the other filters; the status filter itself is ignored. */

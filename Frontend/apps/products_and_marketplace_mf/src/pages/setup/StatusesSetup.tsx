@@ -1,7 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import { Badge, Button, DataTable, Drawer, Icon, Input, RowAction, Select, Switch } from '@omniconnect/ui';
-import { ConfirmDialog } from '../../components/ConfirmDialog';
-import { Field } from '../../components/form/Field';
+import { Badge, Button, ConfirmDialog, DataTable, Drawer, FormField, FormGrid, FormSection, Icon, Input, ResponsiveRows, RowAction, Select, Switch, type ResponsiveColumn } from '@omniconnect/ui';
 import { useSaveAction } from '../../hooks/useSaveAction';
 import { usePermissions } from '../../permissions/PermissionContext';
 import { PERMISSIONS } from '../../permissions/permissions';
@@ -90,54 +88,67 @@ export function StatusesSetup() {
     });
   };
 
+  /* One set of columns for every entity type's table: the rows differ, the shape does not. */
+  const columnsFor = (type: StatusEntityType): ResponsiveColumn<StatusConfig>[] => [
+    { key: 'label', label: 'Status', priority: 'always', render: (status) => <Badge tone={status.color}>{status.label}</Badge> },
+    { key: 'value', label: 'Value', priority: 'low', render: (status) => <span className={styles.mono}>{status.value}</span> },
+    {
+      key: 'live',
+      label: 'Live in catalogue',
+      priority: 'high',
+      render: (status) => (
+        <Switch aria-label={`${status.label} is live`} checked={status.isLive} disabled={!canManage} onChange={(e) => void toggle(status, { isLive: e.target.checked })} />
+      ),
+    },
+    {
+      key: 'enabled',
+      label: 'Can be chosen',
+      priority: 'high',
+      render: (status) => (
+        <Switch aria-label={`${status.label} can be chosen`} checked={status.enabled} disabled={!canManage} onChange={(e) => void toggle(status, { enabled: e.target.checked })} />
+      ),
+    },
+    { key: 'order', label: 'Order', priority: 'low', render: (status) => <span className={page.numeric}>{status.sortOrder}</span> },
+    {
+      key: 'actions',
+      label: <span className={page.srOnly}>Actions</span>,
+      priority: 'always',
+      align: 'right',
+      render: (status) =>
+        canManage ? (
+          <>
+            <RowAction onClick={() => open(type, status)} aria-label={`Edit ${status.label}`}>Edit</RowAction>
+            <RowAction onClick={() => setDeleting(status)} aria-label={`Delete ${status.label}`}>Delete</RowAction>
+          </>
+        ) : null,
+    },
+  ];
+
   return (
     <div className={styles.section}>
-      <div>
-        <h2 className={styles.sectionTitle}>Statuses</h2>
-        <p className={styles.sectionHint}>What each kind of record can be. A <strong>live</strong> status makes a record show in the catalogue; anything else hides it.</p>
-      </div>
 
       {grouped.map(({ type, rows }) => (
         <div key={type} className={page.card}>
-          <div className={page.cardBody}>
-            <div className={styles.sectionHead}>
+          <div className={styles.sectionHead}>
+            <div>
               <h3 className={styles.sectionTitle}>{humanizeEntityType(type)} statuses</h3>
-              {canManage && <Button variant="secondary" size="sm" leadingIcon={<Icon.Plus />} onClick={() => open(type, null)}>Add status</Button>}
+              <p className={styles.sectionHint}>
+                A <strong>live</strong> status makes a record show in the catalogue; anything else hides it.
+              </p>
             </div>
+            {canManage && <Button variant="secondary" size="sm" leadingIcon={<Icon.Plus />} onClick={() => open(type, null)}>Add status</Button>}
           </div>
-          <DataTable minWidth={720} bare>
-            <thead>
-              <tr>
-                <th scope="col">Status</th>
-                <th scope="col">Value</th>
-                <th scope="col">Live in catalogue</th>
-                <th scope="col">Can be chosen</th>
-                <th scope="col" className={page.numeric}>Order</th>
-                <th scope="col"><span className={page.srOnly}>Actions</span></th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((status) => (
-                <tr key={status.id}>
-                  <td><Badge tone={status.color}>{status.label}</Badge></td>
-                  <td className={styles.mono}>{status.value}</td>
-                  <td><Switch aria-label={`${status.label} is live`} checked={status.isLive} disabled={!canManage} onChange={(e) => void toggle(status, { isLive: e.target.checked })} /></td>
-                  <td><Switch aria-label={`${status.label} can be chosen`} checked={status.enabled} disabled={!canManage} onChange={(e) => void toggle(status, { enabled: e.target.checked })} /></td>
-                  <td className={page.numeric}>{status.sortOrder}</td>
-                  <td className={page.actions}>
-                    {canManage && (
-                      <>
-                        <RowAction onClick={() => open(type, status)} aria-label={`Edit ${status.label}`}>Edit</RowAction>
-                        <RowAction onClick={() => setDeleting(status)} aria-label={`Delete ${status.label}`}>Delete</RowAction>
-                      </>
-                    )}
-                  </td>
-                </tr>
-              ))}
-              {rows.length === 0 && !loading && (
-                <tr><td colSpan={6} className={page.muted}>No statuses defined.</td></tr>
-              )}
-            </tbody>
+          <DataTable bare>
+            {/* Was the one table in this app with no skeleton and no empty state — just a bare
+                "No statuses defined." cell. ResponsiveRows gives it both, from the same columns. */}
+            <ResponsiveRows
+              columns={columnsFor(type)}
+              rows={rows}
+              rowKey={(status) => status.id}
+              loading={loading && rows.length === 0}
+              loadingRows={3}
+              empty={`No ${humanizeEntityType(type).toLowerCase()} statuses defined yet.`}
+            />
           </DataTable>
         </div>
       ))}
@@ -156,17 +167,49 @@ export function StatusesSetup() {
       >
         <form id={FORM_ID} onSubmit={submit} noValidate className={page.formStack}>
           {save.error && <p role="alert" className={page.error}>{save.error}</p>}
-          <Input label="Value" value={form.value} disabled={Boolean(formFor?.status)} onChange={(e) => setForm({ ...form, value: e.target.value })} errorText={submitted ? errors.value : undefined} helperText={formFor?.status ? 'A status value cannot change once records may hold it.' : 'What is stored on a record, e.g. PendingReview.'} required />
-          <Input label="Label" value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} errorText={submitted ? errors.label : undefined} helperText="What people see, e.g. Pending review." required />
-          <Field label="Colour">
-            <div className={styles.tonePreview}>
-              <Select aria-label="Colour" options={STATUS_TONES.map((t) => ({ value: t, label: t.charAt(0).toUpperCase() + t.slice(1) }))} value={form.color} onChange={(e) => setForm({ ...form, color: e.target.value as StatusTone })} />
-              <Badge tone={form.color}>{form.label || 'Preview'}</Badge>
-            </div>
-          </Field>
-          <Input label="Order" type="number" value={form.sortOrder} onChange={(e) => setForm({ ...form, sortOrder: e.target.value })} helperText="Lower comes first. The first enabled status is what a new record starts as." />
-          <label className={styles.toggle}><Switch checked={form.isLive} onChange={(e) => setForm({ ...form, isLive: e.target.checked })} /> Live — records with this status show in the catalogue</label>
-          <label className={styles.toggle}><Switch checked={form.enabled} onChange={(e) => setForm({ ...form, enabled: e.target.checked })} /> Can be chosen for new and edited records</label>
+
+          <FormSection title="Status" icon={<Icon.Activity width={15} height={15} />}>
+            <FormGrid>
+              <FormField
+                label="Value"
+                required
+                error={submitted ? errors.value : undefined}
+                helper={formFor?.status ? 'A status value cannot change once records may hold it.' : 'What is stored on a record, e.g. PendingReview.'}
+              >
+                {(control) => (
+                  <Input {...control.aria} value={form.value} disabled={Boolean(formFor?.status)} onChange={(e) => setForm({ ...form, value: e.target.value })} />
+                )}
+              </FormField>
+              <FormField label="Label" required error={submitted ? errors.label : undefined} helper="What people see, e.g. Pending review.">
+                {(control) => <Input {...control.aria} value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} />}
+              </FormField>
+              <FormField label="Colour">
+                {(control) => (
+                  <div className={styles.tonePreview}>
+                    <Select
+                      id={control.id}
+                      options={STATUS_TONES.map((t) => ({ value: t, label: t.charAt(0).toUpperCase() + t.slice(1) }))}
+                      value={form.color}
+                      onChange={(e) => setForm({ ...form, color: e.target.value as StatusTone })}
+                    />
+                    <Badge tone={form.color}>{form.label || 'Preview'}</Badge>
+                  </div>
+                )}
+              </FormField>
+              <FormField label="Order" helper="Lower comes first. The first enabled status is what a new record starts as.">
+                {(control) => <Input {...control.aria} type="number" value={form.sortOrder} onChange={(e) => setForm({ ...form, sortOrder: e.target.value })} />}
+              </FormField>
+            </FormGrid>
+          </FormSection>
+
+          <FormSection title="What it does" icon={<Icon.Eye width={15} height={15} />}>
+            <label className={styles.toggle}>
+              <Switch checked={form.isLive} onChange={(e) => setForm({ ...form, isLive: e.target.checked })} /> Live — records with this status show in the catalogue
+            </label>
+            <label className={styles.toggle}>
+              <Switch checked={form.enabled} onChange={(e) => setForm({ ...form, enabled: e.target.checked })} /> Can be chosen for new and edited records
+            </label>
+          </FormSection>
         </form>
       </Drawer>
 

@@ -7,8 +7,8 @@
 .donut { max-width: 220px; margin: 0 auto; }
 
 .grid { stroke: var(--omni-color-border); stroke-width: 1; stroke-dasharray: 3 4; }
-.axis { fill: var(--omni-color-text-secondary); font-size: 11px; }
-.value { fill: var(--omni-color-text-primary); font-size: 12px; font-weight: 700; }
+.axis { fill: var(--omni-color-text-secondary); font-size: var(--omni-font-size-xs); }
+.value { fill: var(--omni-color-text-primary); font-size: var(--omni-font-size-sm); font-weight: var(--omni-font-weight-bold); }
 .bar { transition: opacity var(--omni-transition-fast); }
 .bar:hover { opacity: 0.85; }
 
@@ -20,8 +20,11 @@
 .series5 { fill: var(--omni-color-success-300); }
 
 .track { stroke: var(--omni-color-surface-sunken); }
-.centerValue { fill: var(--omni-color-text-primary); font-size: 7px; font-weight: 700; }
-.centerLabel { fill: var(--omni-color-text-secondary); font-size: 2.6px; }
+/* Both sizes are in the donut's 42-unit viewBox, not pixels. The label was 2.6 against the value's 7 —
+   a ratio of 1:2.7, which rendered "Products" at roughly 5px on screen and all but illegible. 4.2 puts
+   it at the same relation to its value that every other label on the platform has to its figure. */
+.centerValue { fill: var(--omni-color-text-primary); font-size: 7px; font-weight: var(--omni-font-weight-bold); }
+.centerLabel { fill: var(--omni-color-text-secondary); font-size: 4.2px; }
 
 .tone_success { stroke: var(--omni-color-success-600); }
 .tone_warning { stroke: var(--omni-color-warning-500); }

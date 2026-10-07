@@ -1,39 +1,63 @@
 /*
- * What every screen in this remote shares: the page frame, the filter row, the table card and its cells.
+ * What every screen in this remote shares: the page frame, the table card and its cells.
  * A CSS module, so nothing here can leak into the host or another remote.
+ *
+ * The values are the host's, not this app's former ones. This app was built against the design tokens
+ * but never against the component set, so the misalignment was structural rather than chromatic: no
+ * page max-width (so it stretched edge-to-edge while every other screen was capped), its own padding
+ * on top of the host shell's, no entry animation, 1px/12px card chrome where the rest of the platform
+ * uses 1.5px/18px, and a toolbar floating on the page background instead of inside the card.
  */
 
 .page {
   display: flex;
   flex-direction: column;
-  gap: var(--omni-space-5);
-  padding: var(--omni-space-5);
+  gap: 20px;
+  /* The cap every host page and lead_mf page has. Without it this was the one screen that ran the
+     full width of a wide monitor, which was the loudest "different app" tell in the whole remote. */
+  max-width: 1340px;
+  width: 100%;
+  /* The host shell already supplies the side padding; adding more here sat these pages ~46px in
+     while every other screen sat at 26-28px. */
+  padding-bottom: 36px;
   font-family: var(--omni-font-family);
   color: var(--omni-color-text-primary);
+  animation: pageFadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--omni-space-3);
+@keyframes pageFadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: none; }
 }
 
-.search { flex: 1 1 280px; min-width: 220px; }
-.control { flex: 0 1 200px; min-width: 150px; }
-.spacer { flex: 1 1 0; }
-
+/* ── Table card — the toolbar and the table together in one white card, as on the host's Users page
+   and lead_mf's View Leads, rather than a bare table under a floating filter row. */
 .card {
+  display: flex;
+  flex-direction: column;
   background: var(--omni-color-surface);
-  border: 1px solid var(--omni-color-border);
-  border-radius: var(--omni-radius-lg);
-  box-shadow: var(--omni-shadow-sm);
+  border: 1.5px solid #e8edf5; /* host raw */
+  border-radius: 18px; /* host raw: --omni-radius-lg is 12px, the host's cards are 18px */
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04); /* host raw */
   overflow: hidden;
+}
+
+/* The toolbar row inside the card. ListToolbar lays out its own controls; this owns the frame. */
+.toolbar {
+  padding: var(--omni-space-4) 18px;
+  border-bottom: 1.5px solid #eaeff7; /* host raw */
 }
 
 .cardBody { padding: var(--omni-space-5); }
 
-.footer { padding: var(--omni-space-3) var(--omni-space-5) var(--omni-space-4); border-top: 1px solid var(--omni-color-border); }
+/* A screen's own filter control inside the toolbar (the category picker on Sub-categories and
+   Products). Matches ListToolbar's own `.control` width so the row reads as one set of controls. */
+.filterControl { flex: 0 1 200px; min-width: 150px; }
+
+.footer {
+  padding: var(--omni-space-3) var(--omni-space-5) var(--omni-space-4);
+  border-top: 1.5px solid #eaeff7; /* host raw */
+}
 
 .nameCell { display: flex; align-items: center; gap: var(--omni-space-3); min-width: 0; }
 .nameText { display: flex; flex-direction: column; min-width: 0; }
@@ -43,6 +67,8 @@
 .muted { color: var(--omni-color-text-secondary); }
 .description { max-width: 340px; color: var(--omni-color-text-secondary); line-height: var(--omni-line-height-normal); }
 .numeric { text-align: center; font-weight: var(--omni-font-weight-semibold); }
+/* A value that must not wrap mid-way — a timestamp, an id. Was an inline style on the audit table. */
+.nowrap { white-space: nowrap; }
 /* Visible to assistive technology only — a column header that is a button, not a word. */
 .srOnly {
   position: absolute;
@@ -70,10 +96,16 @@
   font-size: var(--omni-font-size-sm);
 }
 
+/* ── Stat tiles above a list — the same four-then-two-then-one grid the host uses. */
 .kpis {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
-  gap: var(--omni-space-4);
+  gap: 16px;
+}
+
+/* The live-events banner, now inside the card rather than loose on the page background. */
+.liveRow {
+  padding: var(--omni-space-3) 18px 0;
 }
 
 .liveBanner {
@@ -93,12 +125,9 @@
 .liveBanner:hover { background: var(--omni-color-primary-100); }
 .liveBanner svg { width: 14px; height: 14px; }
 
-.formGrid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--omni-space-4); }
-.formGrid > .wide { grid-column: 1 / -1; }
-.formStack { display: flex; flex-direction: column; gap: var(--omni-space-4); }
+/* Stacked FormSections inside a drawer. The cards own their chrome but not the gap above them. */
+.formStack { display: flex; flex-direction: column; gap: var(--omni-space-3); }
 
 @media (max-width: 720px) {
-  .page { padding: var(--omni-space-3); }
-  .formGrid { grid-template-columns: 1fr; }
-  .control { flex: 1 1 100%; }
+  .page { gap: 14px; }
 }

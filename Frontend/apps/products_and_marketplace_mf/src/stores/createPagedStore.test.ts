@@ -39,8 +39,19 @@ describe('createPagedStore', () => {
 
     await store.getState().fetch();
 
-    expect(load).toHaveBeenCalledWith(initial, expect.any(AbortSignal));
+    expect(load).toHaveBeenCalledWith(initial, expect.any(AbortSignal), false);
     expect(store.getState()).toMatchObject({ items: ['Loans', 'Cards'], totalCount: 23, totalPages: 3, loading: false, loaded: true, error: null });
+  });
+
+  it('asks the server rather than the cache when the read is a refresh', async () => {
+    const load = vi.fn().mockResolvedValue(result(['Loans']));
+    const store = createPagedStore<string, Query>(load, initial);
+
+    await store.getState().fetch({ fresh: true });
+
+    // What a Refresh button needs: an identical URL inside the HTTP layer's 30s reuse window would
+    // otherwise be answered from memory and send no request at all.
+    expect(load).toHaveBeenCalledWith(initial, expect.any(AbortSignal), true);
   });
 
   it('returns to page 1 when a filter changes, so a narrowed list is never asked for a page that is gone', async () => {

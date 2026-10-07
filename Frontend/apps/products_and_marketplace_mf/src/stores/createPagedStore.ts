@@ -17,8 +17,14 @@ export interface PagedState<T, Q extends PagedQuery> {
   loaded: boolean;
   error: string | null;
 
-  /** Reads the list for the current query. */
-  fetch: () => Promise<void>;
+  /**
+   * Reads the list for the current query.
+   *
+   * `fresh` asks the server rather than accepting the briefly-cached answer — what a Refresh button
+   * needs. Without it a Refresh re-sending an identical URL within the cache window made no request
+   * at all: the spinner turned and the same rows came back.
+   */
+  fetch: (options?: { fresh?: boolean }) => Promise<void>;
   /**
    * Changes the query and reads the list again. Changing anything but the page returns to page 1 —
    * otherwise narrowing a filter while on page 4 would ask for a page that no longer exists.
@@ -42,7 +48,7 @@ export interface PagedState<T, Q extends PagedQuery> {
  * every write to the store; never subscribe to the whole store.
  */
 export function createPagedStore<T, Q extends PagedQuery>(
-  load: (query: Q, signal: AbortSignal) => Promise<PagedResult<T>>,
+  load: (query: Q, signal: AbortSignal, fresh: boolean) => Promise<PagedResult<T>>,
   initialQuery: Q,
 ) {
   let controller: AbortController | null = null;
@@ -57,14 +63,14 @@ export function createPagedStore<T, Q extends PagedQuery>(
     loaded: false,
     error: null,
 
-    fetch: async () => {
+    fetch: async (options) => {
       controller?.abort();
       controller = new AbortController();
       const mine = ++latest;
       set({ loading: true, error: null });
 
       try {
-        const result = await load(get().query, controller.signal);
+        const result = await load(get().query, controller.signal, options?.fresh === true);
         if (mine !== latest) return;
         set({ items: result.items, totalCount: result.totalCount, totalPages: result.totalPages, loading: false, loaded: true });
       } catch (error) {

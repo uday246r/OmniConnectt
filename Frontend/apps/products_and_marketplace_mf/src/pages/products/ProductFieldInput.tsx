@@ -1,5 +1,4 @@
-import { Checkbox, Input, Select, Switch } from '@omniconnect/ui';
-import { Field } from '../../components/form/Field';
+import { Checkbox, FormField, Input, Select, Switch } from '@omniconnect/ui';
 import { joinChoices, splitChoices } from '../../utils/productForm';
 import type { FieldDefinition } from '../../types/domain';
 import styles from './products.module.css';
@@ -24,14 +23,14 @@ export function ProductFieldInput({ field, value, error, onChange }: ProductFiel
   switch (field.dataType) {
     case 'Boolean':
       return (
-        <Field label={field.label} required={field.required} error={error}>
+        <FormField label={field.label} required={field.required} error={error}>
           <Switch aria-label={field.label} checked={value.toLowerCase() === 'true'} disabled={disabled} onChange={(e) => onChange(e.target.checked ? 'true' : 'false')} />
-        </Field>
+        </FormField>
       );
 
     case 'Dropdown':
       return (
-        <Field label={field.label} required={field.required} error={error}>
+        <FormField label={field.label} required={field.required} error={error}>
           <Select
             aria-label={field.label}
             options={(field.options ?? []).map((o) => ({ value: o, label: o }))}
@@ -41,7 +40,7 @@ export function ProductFieldInput({ field, value, error, onChange }: ProductFiel
             disabled={disabled}
             onChange={(e) => onChange(e.target.value)}
           />
-        </Field>
+        </FormField>
       );
 
     case 'MultiSelect': {
@@ -51,37 +50,59 @@ export function ProductFieldInput({ field, value, error, onChange }: ProductFiel
         onChange(joinChoices(next));
       };
       return (
-        <Field label={field.label} required={field.required} error={error}>
+        <FormField label={field.label} required={field.required} error={error}>
           <div className={styles.choices}>
             {(field.options ?? []).map((option) => (
               <Checkbox key={option} label={option} checked={chosen.has(option.toLowerCase())} disabled={disabled} onChange={(e) => toggle(option, e.target.checked)} />
             ))}
           </div>
-        </Field>
+        </FormField>
       );
     }
 
+    // Every branch goes through FormField, including the plain text ones, so one attribute's label is
+    // never a step larger than its neighbour's just because it happens to be a date.
     case 'Date':
-      return <Input label={field.label} type="date" value={value} required={field.required} readOnly={disabled} errorText={error} onChange={(e) => onChange(e.target.value)} />;
+      return (
+        <FormField label={field.label} required={field.required} error={error}>
+          {(control) => (
+            <Input {...control.aria} type="date" value={value} readOnly={disabled} onChange={(e) => onChange(e.target.value)} />
+          )}
+        </FormField>
+      );
 
     case 'Number':
     case 'Currency':
     case 'Percentage':
       return (
-        <Input
-          label={field.label}
-          value={value}
-          inputMode="decimal"
-          required={field.required}
-          readOnly={disabled}
-          errorText={error}
-          leading={field.dataType === 'Currency' && field.unit ? <span>{field.unit}</span> : undefined}
-          trailing={field.dataType !== 'Currency' && field.unit ? <span>{field.unit}</span> : undefined}
-          onChange={(e) => onChange(e.target.value)}
-        />
+        <FormField label={field.label} required={field.required} error={error}>
+          {(control) => (
+            <Input
+              {...control.aria}
+              value={value}
+              inputMode="decimal"
+              readOnly={disabled}
+              leading={field.dataType === 'Currency' && field.unit ? <span>{field.unit}</span> : undefined}
+              trailing={field.dataType !== 'Currency' && field.unit ? <span>{field.unit}</span> : undefined}
+              onChange={(e) => onChange(e.target.value)}
+            />
+          )}
+        </FormField>
       );
 
     default:
-      return <Input label={field.label} value={value} required={field.required} readOnly={disabled} errorText={error} trailing={field.unit ? <span>{field.unit}</span> : undefined} onChange={(e) => onChange(e.target.value)} />;
+      return (
+        <FormField label={field.label} required={field.required} error={error}>
+          {(control) => (
+            <Input
+              {...control.aria}
+              value={value}
+              readOnly={disabled}
+              trailing={field.unit ? <span>{field.unit}</span> : undefined}
+              onChange={(e) => onChange(e.target.value)}
+            />
+          )}
+        </FormField>
+      );
   }
 }

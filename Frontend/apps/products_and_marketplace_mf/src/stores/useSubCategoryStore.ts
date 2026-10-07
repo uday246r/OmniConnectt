@@ -4,6 +4,6 @@ import type { SubCategory } from '../types/domain';
 
 /** Sub-categories, a page at a time, grouped by category in the categories' own order. */
 export const useSubCategoryStore = createPagedStore<SubCategory, SubCategoryQuery>(
-  (query, signal) => subCategoryApi.list(query, signal),
+  (query, signal, fresh) => subCategoryApi.list(query, signal, fresh),
   { search: '', categoryId: '', status: '', sort: 'order', page: 1, pageSize: 10 },
 );

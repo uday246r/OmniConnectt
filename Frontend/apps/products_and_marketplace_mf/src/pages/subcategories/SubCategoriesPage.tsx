@@ -1,15 +1,32 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { Button, DataTable, DataTableEmpty, EmptyState, Icon, PageHeader, Pagination, Select, TableSkeleton, formatDate } from '@omniconnect/ui';
+import {
+  Button,
+  ConfirmDialog,
+  DataTable,
+  FilterBar,
+  Icon,
+  PageHeader,
+  Pagination,
+  ResponsiveRows,
+  RowsPerPage,
+  Select,
+  StatTile,
+  formatDate,
+  readStoredPageSize,
+  type ActiveFilter,
+  type ResponsiveColumn,
+} from '@omniconnect/ui';
 import { CatalogIcon } from '../../components/CatalogIcon';
-import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { ListToolbar } from '../../components/ListToolbar';
 import { RowMenu, type RowMenuItem } from '../../components/RowMenu';
 import { StatusBadge } from '../../components/StatusBadge';
 import { usePermissions } from '../../permissions/PermissionContext';
 import { PERMISSIONS } from '../../permissions/permissions';
 import { subCategoryApi } from '../../services/subCategoryApi';
+import { isApprovalPending } from '../../services/httpClient';
 import { useCatalogOptionsStore } from '../../stores/useCatalogOptionsStore';
+import { useCatalogSummaryStore } from '../../stores/useCatalogSummaryStore';
 import { useStatusOptions } from '../../stores/useStatusConfigStore';
 import { useSubCategoryStore } from '../../stores/useSubCategoryStore';
 import { useToastStore } from '../../stores/useToastStore';
@@ -27,7 +44,7 @@ const SORT_OPTIONS = [
   { value: 'products', label: 'Sort by: Fewest products' },
 ];
 
-const COLUMNS = 8;
+const PAGE_SIZE_KEY = 'products.sub-categories';
 
 export function SubCategoriesPage() {
   const { items, totalCount, query, loading, loaded, error } = useSubCategoryStore(
@@ -39,6 +56,8 @@ export function SubCategoriesPage() {
   const categories = useCatalogOptionsStore((s) => s.categories);
   const loadCategories = useCatalogOptionsStore((s) => s.loadCategories);
   const invalidateOptions = useCatalogOptionsStore((s) => s.invalidate);
+  const summary = useCatalogSummaryStore((s) => s.summary);
+  const loadSummary = useCatalogSummaryStore((s) => s.load);
   const statuses = useStatusOptions('SubCategory', { includeDisabled: true });
   const { has } = usePermissions();
 
@@ -47,9 +66,12 @@ export function SubCategoriesPage() {
   const [deleting, setDeleting] = useState<SubCategory | null>(null);
 
   useEffect(() => {
-    void fetch();
+    setQuery({ pageSize: readStoredPageSize(PAGE_SIZE_KEY, query.pageSize) });
     void loadCategories();
-  }, [fetch, loadCategories]);
+    void loadSummary();
+    // Deliberately once, on mount: setQuery fetches, and re-running on its identity would loop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const statusOptions = useMemo(() => statuses.map((s) => ({ value: s.value, label: s.label })), [statuses]);
   const categoryOptions = useMemo(() => categories.map((c) => ({ value: c.id, label: c.name })), [categories]);
@@ -67,6 +89,13 @@ export function SubCategoriesPage() {
     invalidateOptions();
     void fetch();
     void loadCategories({ force: true });
+    void loadSummary({ fresh: true });
+  };
+
+  /** The Refresh button: ask the server, do not accept the cached answer. */
+  const refetch = () => {
+    void fetch({ fresh: true });
+    void loadSummary({ fresh: true });
   };
 
   const openForm = (subCategory: SubCategory | null) => {
@@ -97,6 +126,52 @@ export function SubCategoriesPage() {
   const filtered = Boolean(query.search || query.status || query.categoryId);
   const canReset = filtered || query.sort !== 'order';
 
+  const activeFilters: ActiveFilter[] = [
+    query.search && { key: 'search', label: 'Search', value: query.search, onRemove: () => setQuery({ search: '' }) },
+    query.categoryId && {
+      key: 'category',
+      label: 'Category',
+      value: categoryOptions.find((c) => c.value === query.categoryId)?.label ?? query.categoryId,
+      onRemove: () => setQuery({ categoryId: '' }),
+    },
+    query.status && {
+      key: 'status',
+      label: 'Status',
+      value: statusOptions.find((s) => s.value === query.status)?.label ?? query.status,
+      onRemove: () => setQuery({ status: '' }),
+    },
+  ].filter(Boolean) as ActiveFilter[];
+
+  const columns: ResponsiveColumn<SubCategory>[] = [
+    {
+      key: 'name',
+      label: 'Sub-category',
+      priority: 'always',
+      render: (subCategory) => (
+        <div className={styles.nameCell}>
+          <CatalogIcon iconKey={subCategory.iconKey} />
+          <span className={styles.name}>{subCategory.name}</span>
+        </div>
+      ),
+    },
+    { key: 'code', label: 'Code', priority: 'low', render: (s) => <span className={styles.mono}>{s.code}</span> },
+    { key: 'category', label: 'Category', priority: 'high', render: (s) => <span className={styles.muted}>{s.categoryName}</span> },
+    { key: 'description', label: 'Description', priority: 'low', clamp: true, render: (s) => s.description || '—' },
+    { key: 'status', label: 'Status', priority: 'high', render: (s) => <StatusBadge entityType="SubCategory" value={s.status} /> },
+    { key: 'products', label: 'Total products', priority: 'low', render: (s) => <span className={styles.numeric}>{s.productCount}</span> },
+    { key: 'created', label: 'Created', priority: 'low', render: (s) => <span className={styles.muted}>{formatDate(s.createdAt)}</span> },
+    {
+      key: 'actions',
+      label: <span className={styles.srOnly}>Actions</span>,
+      priority: 'always',
+      align: 'right',
+      render: (subCategory, index) => {
+        const menu = menuFor(subCategory, index);
+        return menu.length > 0 ? <RowMenu label={`Actions for ${subCategory.name}`} items={menu} /> : null;
+      },
+    },
+  ];
+
   return (
     <div className={styles.page}>
       <PageHeader
@@ -106,93 +181,96 @@ export function SubCategoriesPage() {
         actions={canCreate ? <Button variant="onHeader" leadingIcon={<Icon.Plus />} onClick={() => openForm(null)}>Add Sub-category</Button> : undefined}
       />
 
-      <ListToolbar
-        searchLabel="Search sub-categories"
-        searchPlaceholder="Search sub-categories by name, code, description or category…"
-        search={query.search}
-        onSearchChange={(search) => setQuery({ search })}
-        statusOptions={statusOptions}
-        status={query.status}
-        onStatusChange={(status) => setQuery({ status })}
-        sortOptions={SORT_OPTIONS}
-        sort={query.sort}
-        onSortChange={(sort) => setQuery({ sort })}
-        canReset={canReset}
-        onReset={resetQuery}
-      >
-        <div className={styles.control}>
-          <Select aria-label="Filter by category" options={categoryOptions} value={query.categoryId} placeholder="All categories" clearLabel="All categories" onChange={(e) => setQuery({ categoryId: e.target.value })} />
+      {summary && (
+        <div className={styles.kpis}>
+          <StatTile label="Sub-categories" value={summary.totalSubCategories.value} icon={<Icon.Package />} accent="primary" />
+          <StatTile label="Categories" value={summary.totalCategories.value} icon={<Icon.Layers />} accent="info" />
+          <StatTile label="Products in catalogue" value={summary.totalProducts.value} icon={<Icon.Box />} accent="success" />
         </div>
-      </ListToolbar>
+      )}
+
+      <FilterBar filters={activeFilters} onClearAll={resetQuery} />
 
       {error && (
         <div role="alert" className={styles.error}>
           <span>{error}</span>
-          <Button variant="secondary" size="sm" onClick={() => void fetch()}>Try again</Button>
+          <Button variant="secondary" size="sm" onClick={refetch}>Try again</Button>
         </div>
       )}
 
       <div className={styles.card} aria-busy={loading}>
-        <DataTable minWidth={960}>
-          <thead>
-            <tr>
-              <th scope="col">Sub-category</th>
-              <th scope="col">Code</th>
-              <th scope="col">Category</th>
-              <th scope="col">Description</th>
-              <th scope="col">Status</th>
-              <th scope="col" className={styles.numeric}>Total products</th>
-              <th scope="col">Created</th>
-              <th scope="col"><span className={styles.srOnly}>Actions</span></th>
-            </tr>
-          </thead>
-          <tbody>
-            {!loaded && loading ? (
-              <TableSkeleton rows={Math.min(query.pageSize, 8)} columns={COLUMNS} />
-            ) : items.length === 0 ? (
-              <DataTableEmpty colSpan={COLUMNS}>
-                <EmptyState
-                  compact
-                  icon={<Icon.Layers />}
-                  title={filtered ? 'No sub-categories match' : 'No sub-categories yet'}
-                  description={filtered ? 'Try a different search, category or status.' : 'Add a sub-category — a type of product, like Home Loan — under one of your categories.'}
-                  action={filtered ? <Button variant="secondary" onClick={resetQuery}>Reset filters</Button> : canCreate ? <Button onClick={() => openForm(null)}>Add Sub-category</Button> : undefined}
+        <div className={styles.toolbar}>
+          <ListToolbar
+            searchLabel="Search sub-categories"
+            searchPlaceholder="Search sub-categories by name, code, description or category…"
+            search={query.search}
+            onSearchChange={(search) => setQuery({ search })}
+            statusOptions={statusOptions}
+            status={query.status}
+            onStatusChange={(status) => setQuery({ status })}
+            sortOptions={SORT_OPTIONS}
+            sort={query.sort}
+            onSortChange={(sort) => setQuery({ sort })}
+            canReset={canReset}
+            onReset={resetQuery}
+            trailing={
+              <>
+                <RowsPerPage
+                  storageKey={PAGE_SIZE_KEY}
+                  value={query.pageSize}
+                  onChange={(pageSize) => setQuery({ pageSize, page: 1 })}
                 />
-              </DataTableEmpty>
-            ) : (
-              items.map((subCategory, index) => {
-                const menu = menuFor(subCategory, index);
-                return (
-                  <tr key={subCategory.id}>
-                    <td>
-                      <div className={styles.nameCell}>
-                        <CatalogIcon iconKey={subCategory.iconKey} />
-                        <span className={styles.name}>{subCategory.name}</span>
-                      </div>
-                    </td>
-                    <td className={styles.mono}>{subCategory.code}</td>
-                    <td className={styles.muted}>{subCategory.categoryName}</td>
-                    <td className={styles.description}>{subCategory.description || '—'}</td>
-                    <td><StatusBadge entityType="SubCategory" value={subCategory.status} /></td>
-                    <td className={styles.numeric}>{subCategory.productCount}</td>
-                    <td className={styles.muted}>{formatDate(subCategory.createdAt)}</td>
-                    <td className={styles.actions}>{menu.length > 0 && <RowMenu label={`Actions for ${subCategory.name}`} items={menu} />}</td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </DataTable>
-        <div className={styles.footer}>
-          <Pagination
-            page={query.page}
-            pageSize={query.pageSize}
-            total={totalCount}
-            itemLabel="sub-categories"
-            onPageChange={(page) => setQuery({ page })}
-            onPageSizeChange={(pageSize) => setQuery({ pageSize, page: 1 })}
-          />
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  leadingIcon={<Icon.Activity width={15} height={15} />}
+                  disabled={loading}
+                  onClick={refetch}
+                >
+                  Refresh
+                </Button>
+              </>
+            }
+          >
+            <div className={styles.filterControl}>
+              <Select
+                aria-label="Filter by category"
+                options={categoryOptions}
+                value={query.categoryId}
+                placeholder="All categories"
+                clearLabel="All categories"
+                onChange={(e) => setQuery({ categoryId: e.target.value })}
+              />
+            </div>
+          </ListToolbar>
         </div>
+
+        <DataTable
+          bare
+          reserveHeight
+          footer={
+            <Pagination
+              page={query.page}
+              pageSize={query.pageSize}
+              total={totalCount}
+              itemLabel="sub-categories"
+              onPageChange={(page) => setQuery({ page })}
+            />
+          }
+        >
+          <ResponsiveRows
+            columns={columns}
+            rows={items}
+            rowKey={(subCategory) => subCategory.id}
+            loading={!loaded && loading}
+            loadingRows={Math.min(query.pageSize, 8)}
+            empty={
+              filtered
+                ? 'No sub-categories match. Try a different search, category or status.'
+                : 'No sub-categories yet. Add one — a type of product, like Home Loan — under a category.'
+            }
+          />
+        </DataTable>
       </div>
 
       <SubCategoryFormDrawer
@@ -208,6 +286,7 @@ export function SubCategoriesPage() {
         title="Delete sub-category?"
         destructive
         confirmLabel="Delete sub-category"
+        pendingApproval={isApprovalPending}
         message={
           <>
             <strong>{deleting?.name}</strong> will be removed permanently, along with the attributes defined for its products. To hide it

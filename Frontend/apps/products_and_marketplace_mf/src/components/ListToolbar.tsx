@@ -24,6 +24,15 @@ export interface ListToolbarProps {
   /** Whether anything differs from the default view, so Reset is only offered when it would do something. */
   canReset: boolean;
   onReset: () => void;
+
+  /**
+   * Actions after Reset, pushed to the right of the row — Refresh, rows per page.
+   *
+   * Separate from `children` on purpose: `children` are filters, which belong with the other filters
+   * before the status select, while these act on the list as a whole. The host puts exactly these two
+   * in a right-aligned cluster at the end of its own toolbars.
+   */
+  trailing?: ReactNode;
 }
 
 const SEARCH_PAUSE_MS = 300;
@@ -41,7 +50,7 @@ export function ListToolbar({
   searchLabel, searchPlaceholder, search, onSearchChange,
   statusOptions, status, onStatusChange,
   sortOptions, sort, onSortChange,
-  children, canReset, onReset,
+  children, canReset, onReset, trailing,
 }: ListToolbarProps) {
   const [text, setText] = useState(search);
   const debounced = useDebouncedValue(text, SEARCH_PAUSE_MS);
@@ -95,9 +104,12 @@ export function ListToolbar({
           />
         </div>
       )}
-      <Button variant="secondary" onClick={onReset} disabled={!canReset}>
-        Reset
-      </Button>
+      <div className={styles.actions}>
+        <Button variant="secondary" size="sm" onClick={onReset} disabled={!canReset}>
+          Reset
+        </Button>
+        {trailing}
+      </div>
     </div>
   );
 }

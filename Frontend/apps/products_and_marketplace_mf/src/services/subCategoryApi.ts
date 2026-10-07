@@ -12,8 +12,8 @@ export interface SubCategoryQuery {
 }
 
 export const subCategoryApi = {
-  async list(query: SubCategoryQuery, signal?: AbortSignal): Promise<PagedResult<SubCategory>> {
-    const { data } = await httpClient.get('/sub-categories', { params: cleanParams(query), signal });
+  async list(query: SubCategoryQuery, signal?: AbortSignal, fresh = false): Promise<PagedResult<SubCategory>> {
+    const { data } = await httpClient.get('/sub-categories', { params: cleanParams(query), signal, fresh });
     return data;
   },
   /** With the attributes its products carry — what the product form renders from. */

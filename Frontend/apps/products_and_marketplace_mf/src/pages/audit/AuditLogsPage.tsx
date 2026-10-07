@@ -1,10 +1,27 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import {
-  Badge, Button, CsvExportError, DataTable, DataTableEmpty, DateRangeFilterButton, EMPTY_DATE_RANGE, EmptyState, Icon, PageHeader, Pagination,
-  RowAction, Select, TableSkeleton, describeTruncation, formatAuditTimestamp,
+  Badge,
+  Button,
+  CsvExportError,
+  DataTable,
+  DateRangeFilterButton,
+  EMPTY_DATE_RANGE,
+  FilterBar,
+  Icon,
+  PageHeader,
+  Pagination,
+  ResponsiveRows,
+  RowAction,
+  RowsPerPage,
+  Select,
+  StatTile,
+  describeDateRange,
+  describeTruncation,
+  formatAuditTimestamp,
+  type ActiveFilter,
+  type ResponsiveColumn,
 } from '@omniconnect/ui';
-import { KpiTile } from '../../components/KpiTile';
 import { ListToolbar } from '../../components/ListToolbar';
 import { usePermissions } from '../../permissions/PermissionContext';
 import { PERMISSIONS } from '../../permissions/permissions';
@@ -13,10 +30,11 @@ import { subscribeToAuditLogs } from '../../services/realtime';
 import { useAuditLogStore } from '../../stores/useAuditLogStore';
 import { useToastStore } from '../../stores/useToastStore';
 import { formatAuditAction } from '../../utils/format';
+import type { AuditLog } from '../../types/domain';
 import { AuditLogDetailsDrawer } from './AuditLogDetailsDrawer';
 import styles from '../page.module.css';
 
-const COLUMNS = 7;
+const PAGE_SIZE_KEY = 'products.audit';
 
 /** The trail of who did what in Products & Marketplace, with a live feed of new events. */
 export function AuditLogsPage() {
@@ -62,6 +80,18 @@ export function AuditLogsPage() {
     a.setDateRange(EMPTY_DATE_RANGE);
   };
 
+  /**
+   * Refresh, and jump to the newest page.
+   *
+   * `fresh` is not optional here: every read in this app goes through a cache that reuses a success
+   * for 30s, so a Refresh re-sending the identical URL would make no request at all. Going back to
+   * page 1 is what makes it do what a person pressing it wants — show me what has just happened.
+   */
+  const refetch = () => {
+    a.setPage(1);
+    void fetchAuditLogs({ fresh: true });
+  };
+
   /** Downloads every matching entry, built by the server with the filters on screen. */
   const download = async () => {
     setExporting(true);
@@ -79,6 +109,66 @@ export function AuditLogsPage() {
   // The figures come from the server's aggregate over the whole filtered set; counting `items` would
   // only ever describe the page on screen.
   const total = s.summary?.totalCount ?? s.totalCount;
+
+  const activeFilters: ActiveFilter[] = [
+    s.search && { key: 'search', label: 'Search', value: s.search, onRemove: () => a.setSearch('') },
+    s.action && {
+      key: 'action',
+      label: 'Action',
+      value: actionOptions.find((o) => o.value === s.action)?.label ?? formatAuditAction(s.action),
+      onRemove: () => a.setAction(null),
+    },
+    s.entityType && { key: 'entityType', label: 'Record type', value: s.entityType, onRemove: () => a.setEntityType(null) },
+    s.dateRange.preset !== 'all' && {
+      key: 'dateRange',
+      label: 'Date',
+      value: describeDateRange(s.dateRange),
+      onRemove: () => a.setDateRange(EMPTY_DATE_RANGE),
+    },
+  ].filter(Boolean) as ActiveFilter[];
+
+  const columns: ResponsiveColumn<AuditLog>[] = [
+    {
+      key: 'timestamp',
+      label: 'Time',
+      priority: 'always',
+      render: (log) => <span className={`${styles.muted} ${styles.nowrap}`}>{formatAuditTimestamp(log.timestamp)}</span>,
+    },
+    { key: 'actor', label: 'Performed by', priority: 'high', render: (log) => <span className={styles.name}>{log.actorName}</span> },
+    { key: 'action', label: 'Action', priority: 'high', render: (log) => <Badge tone="info">{formatAuditAction(log.action)}</Badge> },
+    {
+      key: 'record',
+      label: 'Record',
+      priority: 'low',
+      render: (log) => (
+        <div className={styles.nameText}>
+          <span className={styles.name}>{log.entityType}</span>
+          {log.entityName && <span className={styles.sub}>{log.entityName}</span>}
+        </div>
+      ),
+    },
+    { key: 'description', label: 'Description', priority: 'low', clamp: true, render: (log) => log.description },
+    {
+      key: 'result',
+      label: 'Result',
+      priority: 'high',
+      render: (log) => <Badge tone={log.success ? 'success' : 'danger'}>{log.success ? 'Success' : 'Failed'}</Badge>,
+    },
+    {
+      key: 'details',
+      label: <span className={styles.srOnly}>Details</span>,
+      priority: 'always',
+      align: 'right',
+      render: (log) => (
+        <RowAction
+          onClick={() => setSelectedId(log.id)}
+          aria-label={`View details of ${formatAuditAction(log.action)} by ${log.actorName}`}
+        >
+          View
+        </RowAction>
+      ),
+    },
+  ];
 
   return (
     <div className={styles.page}>
@@ -100,83 +190,82 @@ export function AuditLogsPage() {
       />
 
       <div className={styles.kpis}>
-        <KpiTile label="Total events" value={total} accent="primary" icon={<Icon.ShieldCheck />} caption="Everything recorded" />
-        <KpiTile label="Successful" value={s.summary?.successCount ?? 0} accent="success" icon={<Icon.CheckCircle />} caption={`of ${total}`} />
-        <KpiTile label="Action types" value={s.summary?.actionTypeCount ?? s.actionOptions.length} accent="info" icon={<Icon.Activity />} caption="Kinds of change tracked" />
+        <StatTile label="Total events" value={total} accent="primary" icon={<Icon.ShieldCheck />} caption="Everything recorded" />
+        <StatTile label="Successful" value={s.summary?.successCount ?? 0} accent="success" icon={<Icon.CheckCircle />} caption={`of ${total}`} />
+        <StatTile label="Action types" value={s.summary?.actionTypeCount ?? s.actionOptions.length} accent="info" icon={<Icon.Activity />} caption="Kinds of change tracked" />
       </div>
 
-      <ListToolbar
-        searchLabel="Search the audit log"
-        searchPlaceholder="Search by person, record or description…"
-        search={s.search}
-        onSearchChange={a.setSearch}
-        canReset={filtered}
-        onReset={reset}
-      >
-        <div className={styles.control}>
-          <Select aria-label="Filter by action" options={actionOptions} value={s.action ?? ''} placeholder="All actions" clearLabel="All actions" onChange={(e) => a.setAction(e.target.value || null)} />
-        </div>
-        <div className={styles.control}>
-          <Select aria-label="Filter by record type" options={entityOptions} value={s.entityType ?? ''} placeholder="All record types" clearLabel="All record types" onChange={(e) => a.setEntityType(e.target.value || null)} />
-        </div>
-      </ListToolbar>
-
-      {s.liveCount > 0 && (
-        <button type="button" className={styles.liveBanner} onClick={() => { a.setPage(1); void a.fetchAuditLogs({ fresh: true }); }}>
-          <Icon.ChevronUp /> {s.liveCount} new event{s.liveCount === 1 ? '' : 's'} — show them
-        </button>
-      )}
+      <FilterBar filters={activeFilters} onClearAll={reset} />
 
       {s.error && (
         <div role="alert" className={styles.error}>
           <span>{s.error}</span>
-          <Button variant="secondary" size="sm" onClick={() => void a.fetchAuditLogs({ fresh: true })}>Try again</Button>
+          <Button variant="secondary" size="sm" onClick={refetch}>Try again</Button>
         </div>
       )}
 
       <div className={styles.card} aria-busy={s.loading}>
-        <DataTable minWidth={900}>
-          <thead>
-            <tr>
-              <th scope="col">Time</th>
-              <th scope="col">Performed by</th>
-              <th scope="col">Action</th>
-              <th scope="col">Record</th>
-              <th scope="col">Description</th>
-              <th scope="col">Result</th>
-              <th scope="col"><span className={styles.srOnly}>Details</span></th>
-            </tr>
-          </thead>
-          <tbody>
-            {s.loading && s.items.length === 0 ? (
-              <TableSkeleton rows={Math.min(s.pageSize, 8)} columns={COLUMNS} />
-            ) : s.items.length === 0 ? (
-              <DataTableEmpty colSpan={COLUMNS}>
-                <EmptyState compact icon={<Icon.ShieldCheck />} title={filtered ? 'No events match' : 'No events yet'} description={filtered ? 'Try widening the search or the date range.' : 'Changes made in Products & Marketplace will appear here as they happen.'} />
-              </DataTableEmpty>
-            ) : (
-              s.items.map((log) => (
-                <tr key={log.id}>
-                  <td className={styles.muted} style={{ whiteSpace: 'nowrap' }}>{formatAuditTimestamp(log.timestamp)}</td>
-                  <td className={styles.name}>{log.actorName}</td>
-                  <td><Badge tone="info">{formatAuditAction(log.action)}</Badge></td>
-                  <td>
-                    <div className={styles.nameText}>
-                      <span className={styles.name}>{log.entityType}</span>
-                      {log.entityName && <span className={styles.sub}>{log.entityName}</span>}
-                    </div>
-                  </td>
-                  <td className={styles.description}>{log.description}</td>
-                  <td><Badge tone={log.success ? 'success' : 'danger'}>{log.success ? 'Success' : 'Failed'}</Badge></td>
-                  <td className={styles.actions}><RowAction onClick={() => setSelectedId(log.id)} aria-label={`View details of ${formatAuditAction(log.action)} by ${log.actorName}`}>View</RowAction></td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </DataTable>
-        <div className={styles.footer}>
-          <Pagination page={s.page} pageSize={s.pageSize} total={s.totalCount} itemLabel="events" onPageChange={a.setPage} onPageSizeChange={a.setPageSize} />
+        <div className={styles.toolbar}>
+          <ListToolbar
+            searchLabel="Search the audit log"
+            searchPlaceholder="Search by person, record or description…"
+            search={s.search}
+            onSearchChange={a.setSearch}
+            canReset={filtered}
+            onReset={reset}
+            trailing={
+              <>
+                <RowsPerPage storageKey={PAGE_SIZE_KEY} value={s.pageSize} onChange={a.setPageSize} />
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  leadingIcon={<Icon.Activity width={15} height={15} />}
+                  disabled={s.loading}
+                  onClick={refetch}
+                >
+                  Refresh
+                </Button>
+              </>
+            }
+          >
+            <div className={styles.filterControl}>
+              <Select aria-label="Filter by action" options={actionOptions} value={s.action ?? ''} placeholder="All actions" clearLabel="All actions" onChange={(e) => a.setAction(e.target.value || null)} />
+            </div>
+            <div className={styles.filterControl}>
+              <Select aria-label="Filter by record type" options={entityOptions} value={s.entityType ?? ''} placeholder="All record types" clearLabel="All record types" onChange={(e) => a.setEntityType(e.target.value || null)} />
+            </div>
+          </ListToolbar>
         </div>
+
+        {/* Inside the card now, with the toolbar it belongs beside. Refresh complements this rather
+            than replacing it: the banner only appears when events arrived that the current page and
+            filters would not have shown. */}
+        {s.liveCount > 0 && (
+          <div className={styles.liveRow}>
+            <button type="button" className={styles.liveBanner} onClick={refetch}>
+              <Icon.ChevronUp /> {s.liveCount} new event{s.liveCount === 1 ? '' : 's'} — show them
+            </button>
+          </div>
+        )}
+
+        <DataTable
+          bare
+          reserveHeight
+          footer={<Pagination page={s.page} pageSize={s.pageSize} total={s.totalCount} itemLabel="events" onPageChange={a.setPage} />}
+        >
+          <ResponsiveRows
+            columns={columns}
+            rows={s.items}
+            rowKey={(log) => log.id}
+            loading={s.loading && s.items.length === 0}
+            loadingRows={Math.min(s.pageSize, 8)}
+            empty={
+              filtered
+                ? 'No events match. Try widening the search or the date range.'
+                : 'No events yet. Changes made in Products & Marketplace will appear here as they happen.'
+            }
+          />
+        </DataTable>
       </div>
 
       <AuditLogDetailsDrawer auditLogId={selectedId} onClose={() => setSelectedId(null)} />

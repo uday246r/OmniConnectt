@@ -1,11 +1,10 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
-import { Badge, Button, DataTable, DataTableEmpty, Drawer, EmptyState, Icon, Input, RowAction, Select, Switch, TableSkeleton } from '@omniconnect/ui';
-import { ConfirmDialog } from '../../components/ConfirmDialog';
-import { Field } from '../../components/form/Field';
+import { Badge, Button, ConfirmDialog, DataTable, Drawer, FormField, FormGrid, FormSection, Icon, Input, ResponsiveRows, RowAction, Select, Switch, type ResponsiveColumn } from '@omniconnect/ui';
 import { useSaveAction } from '../../hooks/useSaveAction';
 import { usePermissions } from '../../permissions/PermissionContext';
 import { PERMISSIONS } from '../../permissions/permissions';
 import { documentDefinitionApi } from '../../services/documentDefinitionApi';
+import { isApprovalPending } from '../../services/httpClient';
 import { subCategoryApi } from '../../services/subCategoryApi';
 import { useToastStore } from '../../stores/useToastStore';
 import type { DocumentDefinition, SubCategory } from '../../types/domain';
@@ -16,7 +15,6 @@ interface FormState { name: string; documentType: string; subCategoryId: string;
 
 const FORM_ID = 'document-form';
 const EVERYTHING = 100;
-const COLUMNS = 6;
 
 /**
  * Setup → Documents: the documents a customer is asked for, either for every product or for one
@@ -87,57 +85,66 @@ export function DocumentsSetup() {
     });
   };
 
+  const columns: ResponsiveColumn<DocumentDefinition>[] = [
+    { key: 'name', label: 'Document', priority: 'always', render: (doc) => <span className={page.name}>{doc.name}</span> },
+    { key: 'type', label: 'Type', priority: 'low', render: (doc) => <span className={page.muted}>{doc.documentType || '—'}</span> },
+    {
+      key: 'scope',
+      label: 'Applies to',
+      priority: 'high',
+      render: (doc) => doc.subCategoryName ?? <Badge tone="info">Every product</Badge>,
+    },
+    {
+      key: 'required',
+      label: 'Required',
+      priority: 'high',
+      render: (doc) => <Badge tone={doc.required ? 'danger' : 'neutral'}>{doc.required ? 'Required' : 'Optional'}</Badge>,
+    },
+    {
+      key: 'active',
+      label: 'Active',
+      priority: 'low',
+      render: (doc) => <Badge tone={doc.active ? 'success' : 'neutral'}>{doc.active ? 'Active' : 'Inactive'}</Badge>,
+    },
+    {
+      key: 'actions',
+      label: <span className={page.srOnly}>Actions</span>,
+      priority: 'always',
+      align: 'right',
+      render: (doc) =>
+        canManage ? (
+          <>
+            <RowAction onClick={() => open(doc)} aria-label={`Edit ${doc.name}`}>Edit</RowAction>
+            <RowAction onClick={() => setDeleting(doc)} aria-label={`Delete ${doc.name}`}>Delete</RowAction>
+          </>
+        ) : null,
+    },
+  ];
+
   return (
     <div className={styles.section}>
-      <div className={styles.sectionHead}>
-        <div>
-          <h2 className={styles.sectionTitle}>Documents</h2>
-          <p className={styles.sectionHint}>What a customer is asked to provide — for every product, or only for one sub-category.</p>
-        </div>
-        {canManage && <Button leadingIcon={<Icon.Plus />} onClick={() => open(null)}>Add document</Button>}
-      </div>
-
       {error && <div role="alert" className={page.error}>{error}</div>}
 
       <div className={page.card} aria-busy={loading}>
-        <DataTable minWidth={760}>
-          <thead>
-            <tr>
-              <th scope="col">Document</th>
-              <th scope="col">Type</th>
-              <th scope="col">Applies to</th>
-              <th scope="col">Required</th>
-              <th scope="col">Active</th>
-              <th scope="col"><span className={page.srOnly}>Actions</span></th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading && documents.length === 0 ? (
-              <TableSkeleton rows={4} columns={COLUMNS} />
-            ) : documents.length === 0 ? (
-              <DataTableEmpty colSpan={COLUMNS}>
-                <EmptyState compact icon={<Icon.FileText />} title="No documents yet" description="Add the documents customers should provide." action={canManage ? <Button onClick={() => open(null)}>Add document</Button> : undefined} />
-              </DataTableEmpty>
-            ) : (
-              documents.map((doc) => (
-                <tr key={doc.id}>
-                  <td className={page.name}>{doc.name}</td>
-                  <td className={page.muted}>{doc.documentType || '—'}</td>
-                  <td>{doc.subCategoryName ?? <Badge tone="info">Every product</Badge>}</td>
-                  <td><Badge tone={doc.required ? 'danger' : 'neutral'}>{doc.required ? 'Required' : 'Optional'}</Badge></td>
-                  <td><Badge tone={doc.active ? 'success' : 'neutral'}>{doc.active ? 'Active' : 'Inactive'}</Badge></td>
-                  <td className={page.actions}>
-                    {canManage && (
-                      <>
-                        <RowAction onClick={() => open(doc)} aria-label={`Edit ${doc.name}`}>Edit</RowAction>
-                        <RowAction onClick={() => setDeleting(doc)} aria-label={`Delete ${doc.name}`}>Delete</RowAction>
-                      </>
-                    )}
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
+        <div className={styles.sectionHead}>
+          <div>
+            <h3 className={styles.sectionTitle}>Documents</h3>
+            <p className={styles.sectionHint}>
+              What a customer is asked to provide — for every product, or only for one sub-category.
+            </p>
+          </div>
+          {canManage && <Button size="sm" leadingIcon={<Icon.Plus />} onClick={() => open(null)}>Add document</Button>}
+        </div>
+
+        <DataTable bare>
+          <ResponsiveRows
+            columns={columns}
+            rows={documents}
+            rowKey={(doc) => doc.id}
+            loading={loading && documents.length === 0}
+            loadingRows={4}
+            empty="No documents yet. Add the documents customers should provide."
+          />
         </DataTable>
       </div>
 
@@ -154,14 +161,34 @@ export function DocumentsSetup() {
       >
         <form id={FORM_ID} onSubmit={submit} noValidate className={page.formStack}>
           {save.error && <p role="alert" className={page.error}>{save.error}</p>}
-          <Input label="Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} errorText={submitted ? nameError : undefined} helperText="e.g. Proof of income." required autoFocus />
-          <Input label="Kind of document" value={form.documentType} onChange={(e) => setForm({ ...form, documentType: e.target.value })} helperText="Optional grouping, e.g. Identity, Income, Property." />
-          <Field label="Applies to" helper="Leave empty for a document every product needs.">
-            <Select aria-label="Applies to" options={scopeOptions} value={form.subCategoryId} placeholder="Every product" clearLabel="Every product" onChange={(e) => setForm({ ...form, subCategoryId: e.target.value })} />
-          </Field>
-          <Input label="Order" type="number" value={form.sortOrder} onChange={(e) => setForm({ ...form, sortOrder: e.target.value })} />
-          <label className={styles.toggle}><Switch checked={form.required} onChange={(e) => setForm({ ...form, required: e.target.checked })} /> Required</label>
-          <label className={styles.toggle}><Switch checked={form.active} onChange={(e) => setForm({ ...form, active: e.target.checked })} /> Active — currently asked for</label>
+
+          <FormSection title="Document" icon={<Icon.FileText width={15} height={15} />}>
+            <FormGrid>
+              <FormField label="Name" required full error={submitted ? nameError : undefined} helper="e.g. Proof of income.">
+                {(control) => <Input {...control.aria} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} autoFocus />}
+              </FormField>
+              <FormField label="Kind of document" helper="Optional grouping, e.g. Identity, Income, Property.">
+                {(control) => <Input {...control.aria} value={form.documentType} onChange={(e) => setForm({ ...form, documentType: e.target.value })} />}
+              </FormField>
+              <FormField label="Order">
+                {(control) => <Input {...control.aria} type="number" value={form.sortOrder} onChange={(e) => setForm({ ...form, sortOrder: e.target.value })} />}
+              </FormField>
+              <FormField label="Applies to" full helper="Leave empty for a document every product needs.">
+                {(control) => (
+                  <Select id={control.id} options={scopeOptions} value={form.subCategoryId} placeholder="Every product" clearLabel="Every product" onChange={(e) => setForm({ ...form, subCategoryId: e.target.value })} />
+                )}
+              </FormField>
+            </FormGrid>
+          </FormSection>
+
+          <FormSection title="When it is asked for" icon={<Icon.CheckCircle width={15} height={15} />}>
+            <label className={styles.toggle}>
+              <Switch checked={form.required} onChange={(e) => setForm({ ...form, required: e.target.checked })} /> Required
+            </label>
+            <label className={styles.toggle}>
+              <Switch checked={form.active} onChange={(e) => setForm({ ...form, active: e.target.checked })} /> Active — currently asked for
+            </label>
+          </FormSection>
         </form>
       </Drawer>
 
@@ -170,6 +197,7 @@ export function DocumentsSetup() {
         title="Delete document?"
         destructive
         confirmLabel="Delete document"
+        pendingApproval={isApprovalPending}
         message={<><strong>{deleting?.name}</strong> will no longer be asked for.</>}
         onConfirm={async () => {
           if (!deleting) return;

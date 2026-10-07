@@ -1,9 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import { Button, Drawer, EmptyState, Icon, Input, Select, SkeletonBlock } from '@omniconnect/ui';
+import { Button, Drawer, EmptyState, FormField, FormGrid, FormSection, Icon, Input, Select, SkeletonBlock, TextArea } from '@omniconnect/ui';
 import { CatalogIcon } from '../../components/CatalogIcon';
 import { IconPicker } from '../../components/IconPicker';
-import { Field } from '../../components/form/Field';
-import { TextArea } from '../../components/form/TextArea';
 import { useSaveAction } from '../../hooks/useSaveAction';
 import { productApi } from '../../services/productApi';
 import { subCategoryApi } from '../../services/subCategoryApi';
@@ -232,69 +230,98 @@ export function ProductFormDrawer({ open, product, defaultCategoryId, defaultSub
       ) : loading ? (
         <SkeletonBlock width="100%" height={320} />
       ) : (
-        <form id={FORM_ID} onSubmit={submit} noValidate className={styles.section}>
+        <form id={FORM_ID} onSubmit={submit} noValidate className={page.formStack}>
           {save.error && (
             <p role="alert" className={page.error}>
               {[save.error, ...placed.unplaced].filter((m, i, all) => all.indexOf(m) === i).join(' ')}
             </p>
           )}
 
-          <h3 className={styles.sectionTitle}>Where it belongs</h3>
-          <div className={page.formGrid}>
-            <Field label="Category" required>
-              <Select aria-label="Category" options={categoryOptions} value={basics.categoryId} placeholder="Choose a category" onChange={(e) => chooseCategory(e.target.value)} />
-            </Field>
-            <Field label="Sub-category" required error={shownBasic('subCategoryId')}>
-              <Select
-                aria-label="Sub-category"
-                options={subOptions}
-                value={basics.subCategoryId}
-                placeholder={basics.categoryId ? 'Choose a sub-category' : 'Choose a category first'}
-                disabled={!basics.categoryId}
-                onChange={(e) => chooseSubCategory(e.target.value)}
-              />
-            </Field>
-          </div>
-          {isEdit && product && basics.subCategoryId !== product.subCategoryId && (
-            <p className={styles.hint}>Moving this product to another sub-category clears its attribute values — that sub-category defines different ones.</p>
-          )}
+          <FormSection title="Where it belongs" icon={<Icon.Layers width={15} height={15} />}>
+            <FormGrid>
+              <FormField label="Category" required>
+                {(control) => (
+                  <Select id={control.id} options={categoryOptions} value={basics.categoryId} placeholder="Choose a category" onChange={(e) => chooseCategory(e.target.value)} />
+                )}
+              </FormField>
+              <FormField label="Sub-category" required error={shownBasic('subCategoryId')}>
+                {(control) => (
+                  <Select
+                    id={control.id}
+                    options={subOptions}
+                    value={basics.subCategoryId}
+                    placeholder={basics.categoryId ? 'Choose a sub-category' : 'Choose a category first'}
+                    disabled={!basics.categoryId}
+                    onChange={(e) => chooseSubCategory(e.target.value)}
+                  />
+                )}
+              </FormField>
+            </FormGrid>
+            {isEdit && product && basics.subCategoryId !== product.subCategoryId && (
+              <p className={styles.hint}>Moving this product to another sub-category clears its attribute values — that sub-category defines different ones.</p>
+            )}
+          </FormSection>
 
-          <h3 className={styles.sectionTitle}>Basics</h3>
-          <div className={page.formGrid}>
-            <div className={page.wide}><Input label="Product name" value={basics.name} onChange={(e) => setBasic('name', e.target.value)} errorText={shownBasic('name')} helperText="The offering, e.g. Home Loan – Salaried." required /></div>
-            <Input label="Product code" value={basics.code} onChange={(e) => setBasic('code', e.target.value)} errorText={shownBasic('code')} helperText={CODE_HINT} required />
-            <Field label="Status" helper="Which statuses exist, and which make a product live, is set in Setup.">
-              <Select aria-label="Status" options={options} value={basics.status} onChange={(e) => setBasic('status', e.target.value)} />
-            </Field>
-            <div className={page.wide}><TextArea label="Short description" value={basics.shortDescription} onChange={(e) => setBasic('shortDescription', e.target.value)} errorText={shownBasic('shortDescription')} rows={2} helperText="Shown on the product card." /></div>
-            <div className={page.wide}><TextArea label="Description" value={basics.description} onChange={(e) => setBasic('description', e.target.value)} errorText={shownBasic('description')} rows={4} /></div>
-            <div className={page.wide}>
-              <Field label="Icon"><IconPicker label="Product icon" value={basics.iconKey} onChange={(key) => setBasic('iconKey', key)} /></Field>
-            </div>
-          </div>
+          <FormSection title="Basics" icon={<Icon.Package width={15} height={15} />}>
+            <FormGrid>
+              <FormField label="Product name" required full error={shownBasic('name')} helper="The offering, e.g. Home Loan – Salaried.">
+                {(control) => <Input {...control.aria} value={basics.name} onChange={(e) => setBasic('name', e.target.value)} />}
+              </FormField>
+              <FormField label="Product code" required error={shownBasic('code')} helper={CODE_HINT}>
+                {(control) => <Input {...control.aria} value={basics.code} onChange={(e) => setBasic('code', e.target.value)} />}
+              </FormField>
+              <FormField label="Status" helper="Which statuses exist, and which make a product live, is set in Setup.">
+                {(control) => (
+                  <Select id={control.id} options={options} value={basics.status} onChange={(e) => setBasic('status', e.target.value)} />
+                )}
+              </FormField>
+              <FormField label="Short description" full error={shownBasic('shortDescription')} helper="Shown on the product card.">
+                {(control) => (
+                  <TextArea {...control.aria} rows={2} value={basics.shortDescription} onChange={(e) => setBasic('shortDescription', e.target.value)} />
+                )}
+              </FormField>
+              <FormField label="Description" full error={shownBasic('description')}>
+                {(control) => (
+                  <TextArea {...control.aria} rows={4} value={basics.description} onChange={(e) => setBasic('description', e.target.value)} />
+                )}
+              </FormField>
+              <FormField label="Icon" full>
+                <IconPicker label="Product icon" value={basics.iconKey} onChange={(key) => setBasic('iconKey', key)} />
+              </FormField>
+            </FormGrid>
+          </FormSection>
 
-          <h3 className={styles.sectionTitle}>Attributes</h3>
-          {!basics.subCategoryId ? (
-            <p className={styles.hint}>Choose a sub-category to see the attributes its products carry.</p>
-          ) : definitionsLoading ? (
-            <SkeletonBlock width="100%" height={120} />
-          ) : definitions.length === 0 ? (
-            <p className={styles.hint}>This sub-category has no attributes yet. Define them in Setup → Fields, and they will appear here.</p>
-          ) : (
-            <div className={page.formGrid}>
-              {definitions.map((definition) => (
-                <ProductFieldInput
-                  key={definition.id}
-                  field={definition}
-                  value={values[definition.id] ?? ''}
-                  error={shownField(definition.id)}
-                  onChange={(value) => setValues((current) => ({ ...current, [definition.id]: value }))}
-                />
-              ))}
-            </div>
-          )}
+          <FormSection title="Attributes" icon={<Icon.Settings width={15} height={15} />}>
+            {!basics.subCategoryId ? (
+              <p className={styles.hint}>Choose a sub-category to see the attributes its products carry.</p>
+            ) : definitionsLoading ? (
+              <SkeletonBlock width="100%" height={120} />
+            ) : definitions.length === 0 ? (
+              <p className={styles.hint}>This sub-category has no attributes yet. Define them in Setup → Fields, and they will appear here.</p>
+            ) : (
+              <FormGrid>
+                {definitions.map((definition) => (
+                  <ProductFieldInput
+                    key={definition.id}
+                    field={definition}
+                    value={values[definition.id] ?? ''}
+                    error={shownField(definition.id)}
+                    onChange={(value) => setValues((current) => ({ ...current, [definition.id]: value }))}
+                  />
+                ))}
+              </FormGrid>
+            )}
+          </FormSection>
 
-          <h3 className={styles.sectionTitle}>Benefits</h3>
+          <FormSection
+            title="Benefits"
+            icon={<Icon.CheckCircle width={15} height={15} />}
+            actions={
+              <Button variant="secondary" size="sm" leadingIcon={<Icon.Plus />} onClick={() => setBenefits((list) => [...list, { title: '', description: '' }])}>
+                Add benefit
+              </Button>
+            }
+          >
           {benefits.map((benefit, index) => (
             <div key={index} className={styles.listRow}>
               <Input label={index === 0 ? 'Benefit' : undefined} aria-label={`Benefit ${index + 1}`} value={benefit.title} placeholder="e.g. Low interest rate" onChange={(e) => setBenefits((list) => list.map((b, i) => (i === index ? { ...b, title: e.target.value } : b)))} />
@@ -302,9 +329,18 @@ export function ProductFormDrawer({ open, product, defaultCategoryId, defaultSub
               <button type="button" className={styles.remove} aria-label={`Remove benefit ${index + 1}`} onClick={() => setBenefits((list) => list.filter((_, i) => i !== index))}><Icon.Trash /></button>
             </div>
           ))}
-          <div><Button variant="secondary" size="sm" leadingIcon={<Icon.Plus />} onClick={() => setBenefits((list) => [...list, { title: '', description: '' }])}>Add benefit</Button></div>
+          {benefits.length === 0 && <p className={styles.hint}>No benefits listed yet.</p>}
+          </FormSection>
 
-          <h3 className={styles.sectionTitle}>Eligibility</h3>
+          <FormSection
+            title="Eligibility"
+            icon={<Icon.ShieldCheck width={15} height={15} />}
+            actions={
+              <Button variant="secondary" size="sm" leadingIcon={<Icon.Plus />} onClick={() => setCriteria((list) => [...list, { criteria: '', description: '' }])}>
+                Add criterion
+              </Button>
+            }
+          >
           {criteria.map((item, index) => (
             <div key={index} className={styles.listRow}>
               <Input label={index === 0 ? 'Criterion' : undefined} aria-label={`Criterion ${index + 1}`} value={item.criteria} placeholder="e.g. Age 21–60" onChange={(e) => setCriteria((list) => list.map((c, i) => (i === index ? { ...c, criteria: e.target.value } : c)))} />
@@ -312,7 +348,8 @@ export function ProductFormDrawer({ open, product, defaultCategoryId, defaultSub
               <button type="button" className={styles.remove} aria-label={`Remove criterion ${index + 1}`} onClick={() => setCriteria((list) => list.filter((_, i) => i !== index))}><Icon.Trash /></button>
             </div>
           ))}
-          <div><Button variant="secondary" size="sm" leadingIcon={<Icon.Plus />} onClick={() => setCriteria((list) => [...list, { criteria: '', description: '' }])}>Add criterion</Button></div>
+          {criteria.length === 0 && <p className={styles.hint}>No eligibility criteria listed yet.</p>}
+          </FormSection>
         </form>
       )}
     </Drawer>

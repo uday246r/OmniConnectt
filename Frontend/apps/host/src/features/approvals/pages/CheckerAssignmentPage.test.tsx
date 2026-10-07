@@ -115,10 +115,22 @@ describe('CheckerAssignmentPage', () => {
      */
     renderWithQuery(<CheckerAssignmentPage />, { route: '/settings/checker-assignment' })
 
+    // Each row names its own actions, and they differ per module — so this cannot be a constant
+    // rendered next to every label.
     await waitFor(() => {
       expect(screen.getByText('Create / Edit / Delete')).toBeInTheDocument()
+      expect(screen.getByText('Create / Edit')).toBeInTheDocument()
     })
-    expect([screen.queryAllByText(/Lead/).map((e) => e.textContent), screen.queryAllByText(/remote\./).map((e) => e.textContent)]).toEqual(['PROBE'])
+
+    // The label and the key are still there: the actions are an addition to the row, not a
+    // replacement for the identity of what is being assigned.
+    expect(screen.getByText('User Directory')).toBeInTheDocument()
+    expect(screen.getByText('host.settings.users')).toBeInTheDocument()
+    expect(screen.getByText('Lead Management — Leads')).toBeInTheDocument()
+
+    // No row advertises a read capability as something a checker would hold.
+    expect(screen.queryByText(/View/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Export/)).not.toBeInTheDocument()
   })
 
   it('triggers drawer layer when clicking Assign Checker', async () => {

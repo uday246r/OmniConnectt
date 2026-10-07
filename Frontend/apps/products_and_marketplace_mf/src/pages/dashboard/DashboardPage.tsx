@@ -1,13 +1,13 @@
 import { useEffect, useMemo } from 'react';
-import { Button, DataTable, EmptyState, Icon, PageHeader, Select, SkeletonBlock, formatDate, formatRelativeTime } from '@omniconnect/ui';
+import { Button, DataTable, EmptyState, Icon, PageHeader, ResponsiveRows, Select, SkeletonBlock, StatTile, formatDate, formatRelativeTime, type ResponsiveColumn } from '@omniconnect/ui';
 import { BarChart } from '../../components/charts/BarChart';
 import { DonutChart } from '../../components/charts/DonutChart';
 import { CatalogIcon } from '../../components/CatalogIcon';
-import { KpiTile } from '../../components/KpiTile';
 import { StatusBadge } from '../../components/StatusBadge';
 import { useCatalogOptionsStore } from '../../stores/useCatalogOptionsStore';
 import { useDashboardStore } from '../../stores/useDashboardStore';
 import { resolveStatus, useStatusConfigStore } from '../../stores/useStatusConfigStore';
+import type { RecentProduct } from '../../types/domain';
 import { formatAuditAction, formatNumber } from '../../utils/format';
 import page from '../page.module.css';
 import styles from './dashboard.module.css';
@@ -48,6 +48,24 @@ export function DashboardPage() {
   );
   const totalProducts = distribution.reduce((sum, d) => sum + d.count, 0);
 
+  const recentColumns: ResponsiveColumn<RecentProduct>[] = [
+    {
+      key: 'name',
+      label: 'Product',
+      priority: 'always',
+      render: (product) => (
+        <div className={page.nameCell}>
+          <CatalogIcon iconKey={product.iconKey} size="sm" />
+          <span className={page.name}>{product.name}</span>
+        </div>
+      ),
+    },
+    { key: 'category', label: 'Category', priority: 'low', render: (p) => <span className={page.muted}>{p.categoryName}</span> },
+    { key: 'subCategory', label: 'Sub-category', priority: 'low', render: (p) => <span className={page.muted}>{p.subCategoryName}</span> },
+    { key: 'status', label: 'Status', priority: 'high', render: (p) => <StatusBadge entityType={PRODUCT_STATUS} value={p.status} /> },
+    { key: 'added', label: 'Added', priority: 'high', render: (p) => <span className={page.muted}>{formatDate(p.createdAt)}</span> },
+  ];
+
   return (
     <div className={page.page}>
       <PageHeader icon={<Icon.Package />} title="Product catalogue overview" subtitle="Manage and monitor your products, categories and sub-categories" />
@@ -64,11 +82,11 @@ export function DashboardPage() {
           Array.from({ length: 5 }, (_, i) => <SkeletonBlock key={i} width="100%" height={132} radius="14px" />)
         ) : summary ? (
           <>
-            <KpiTile label="Total products" value={summary.totalProducts.value} changePercent={summary.totalProducts.changePercent} changeLabel={changeLabel} accent="primary" icon={<Icon.Box />} caption="All products" />
-            <KpiTile label="Live products" value={summary.liveProducts.value} changePercent={summary.liveProducts.changePercent} changeLabel={changeLabel} accent="success" icon={<Icon.CheckCircle />} caption="Status is live" />
-            <KpiTile label="Not live" value={summary.unpublishedProducts.value} changePercent={summary.unpublishedProducts.changePercent} changeLabel={changeLabel} accent="warning" icon={<Icon.FileText />} caption="Drafts and inactive" />
-            <KpiTile label="Categories" value={summary.totalCategories.value} changePercent={summary.totalCategories.changePercent} changeLabel={changeLabel} accent="info" icon={<Icon.Layers />} caption="Lines of business" />
-            <KpiTile label="Sub-categories" value={summary.totalSubCategories.value} changePercent={summary.totalSubCategories.changePercent} changeLabel={changeLabel} accent="danger" icon={<Icon.Grid />} caption="Types of product" />
+            <StatTile label="Total products" value={summary.totalProducts.value} changePercent={summary.totalProducts.changePercent} changeLabel={changeLabel} accent="primary" icon={<Icon.Box />} caption="All products" />
+            <StatTile label="Live products" value={summary.liveProducts.value} changePercent={summary.liveProducts.changePercent} changeLabel={changeLabel} accent="success" icon={<Icon.CheckCircle />} caption="Status is live" />
+            <StatTile label="Not live" value={summary.unpublishedProducts.value} changePercent={summary.unpublishedProducts.changePercent} changeLabel={changeLabel} accent="warning" icon={<Icon.FileText />} caption="Drafts and inactive" />
+            <StatTile label="Categories" value={summary.totalCategories.value} changePercent={summary.totalCategories.changePercent} changeLabel={changeLabel} accent="info" icon={<Icon.Layers />} caption="Lines of business" />
+            <StatTile label="Sub-categories" value={summary.totalSubCategories.value} changePercent={summary.totalSubCategories.changePercent} changeLabel={changeLabel} accent="danger" icon={<Icon.Grid />} caption="Types of product" />
           </>
         ) : null}
       </div>
@@ -117,37 +135,17 @@ export function DashboardPage() {
             <h2 className={styles.panelTitle}>Recently added products</h2>
             <p className={styles.panelHint}>The latest products in the catalogue.</p>
           </div>
-          {recentProducts.length === 0 ? (
-            <p className={styles.emptyNote}>Nothing added yet.</p>
-          ) : (
-            <DataTable bare minWidth={520}>
-              <thead>
-                <tr>
-                  <th scope="col">Product</th>
-                  <th scope="col">Category</th>
-                  <th scope="col">Sub-category</th>
-                  <th scope="col">Status</th>
-                  <th scope="col">Added</th>
-                </tr>
-              </thead>
-              <tbody>
-                {recentProducts.map((product) => (
-                  <tr key={product.id}>
-                    <td>
-                      <div className={page.nameCell}>
-                        <CatalogIcon iconKey={product.iconKey} size="sm" />
-                        <span className={page.name}>{product.name}</span>
-                      </div>
-                    </td>
-                    <td className={page.muted}>{product.categoryName}</td>
-                    <td className={page.muted}>{product.subCategoryName}</td>
-                    <td><StatusBadge entityType={PRODUCT_STATUS} value={product.status} /></td>
-                    <td className={page.muted}>{formatDate(product.createdAt)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </DataTable>
-          )}
+          {/* Was a bare table with neither a skeleton nor an empty state — just a <p> note. */}
+          <DataTable bare>
+            <ResponsiveRows
+              columns={recentColumns}
+              rows={recentProducts}
+              rowKey={(product) => product.id}
+              loading={!loaded && loading}
+              loadingRows={5}
+              empty="Nothing added yet."
+            />
+          </DataTable>
         </section>
 
         <section className={`${page.card} ${styles.panel}`} aria-label="Recent activity">

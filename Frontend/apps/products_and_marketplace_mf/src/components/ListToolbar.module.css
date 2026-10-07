@@ -5,7 +5,16 @@
   gap: var(--omni-space-3);
 }
 
-.search { flex: 1 1 280px; min-width: 220px; }
+/* Reset and the list-wide actions, pushed to the right end of the row as the host does. */
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+  flex-wrap: wrap;
+}
+
+.search { flex: 1 1 280px; min-width: 220px; max-width: 420px; }
 .control { flex: 0 1 200px; min-width: 150px; }
 
 @media (max-width: 720px) {

@@ -3,8 +3,9 @@ import { cleanParams } from './query';
 import type { CatalogBreakdown, DashboardSummary, RecentActivity, RecentProduct, StatusDistribution } from '../types/domain';
 
 export const dashboardApi = {
-  async summary(days?: number, signal?: AbortSignal): Promise<DashboardSummary> {
-    const { data } = await httpClient.get('/dashboard/summary', { params: cleanParams({ days }), signal });
+  /** `fresh` asks the server rather than accepting the briefly-cached answer — for a Refresh button. */
+  async summary(days?: number, signal?: AbortSignal, fresh = false): Promise<DashboardSummary> {
+    const { data } = await httpClient.get('/dashboard/summary', { params: cleanParams({ days }), signal, fresh });
     return data;
   },
   /** Products per category; or per sub-category of `categoryId` when one is given. */

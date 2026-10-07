@@ -1,3 +1,9 @@
+// Imported BEFORE any of this app's own styles, so the platform tokens are defined for them — both
+// inside the host and in a standalone preview. This used to sit below the page imports, which made the
+// claim false: the tokens landed last in the bundled stylesheet. It was harmless only because
+// tokens.css is @layer-wrapped. Every screen's styles are CSS modules, so none of them can leak out.
+import '@omniconnect/ui/tokens.css';
+
 import React, { useEffect, type ComponentType } from 'react';
 import { AuditLogsPage } from './pages/audit/AuditLogsPage';
 import { CategoriesPage } from './pages/categories/CategoriesPage';
@@ -8,10 +14,7 @@ import { SubCategoriesPage } from './pages/subcategories/SubCategoriesPage';
 import { Toasts } from './components/Toasts';
 import { PlatformPermissionProvider } from './permissions/PermissionContext';
 import { useStatusConfigStore } from './stores/useStatusConfigStore';
-
-// Imported BEFORE any of this app's own styles, so the platform tokens are defined for them — both inside
-// the host and in a standalone preview. Every screen's styles are CSS modules, so none of them can leak out.
-import '@omniconnect/ui/tokens.css';
+import styles from './App.module.css';
 
 export interface ProductsAppProps {
   /**
@@ -44,7 +47,7 @@ export const App: React.FC<ProductsAppProps> = ({ page }) => {
 
   return (
     <PlatformPermissionProvider>
-      <div style={{ width: '100%', minHeight: '100%' }}>
+      <div className={styles.root}>
         <Page />
         <Toasts />
       </div>

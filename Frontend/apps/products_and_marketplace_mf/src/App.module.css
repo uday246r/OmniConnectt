@@ -1,0 +1,5 @@
+/* The remote's own root box. Was an inline style, which this package forbids. */
+.root {
+  width: 100%;
+  min-height: 100%;
+}

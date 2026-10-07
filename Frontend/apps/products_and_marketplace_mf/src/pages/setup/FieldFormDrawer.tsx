@@ -1,8 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { Button, Drawer, Icon, Input, Select, Switch } from '@omniconnect/ui';
+import { Button, Drawer, FormField, FormGrid, FormSection, Icon, Input, Select, Switch, TextArea } from '@omniconnect/ui';
 import { ValidationRulesEditor, describeRuleProblem } from '@omniconnect/ui/validation-editor';
-import { Field } from '../../components/form/Field';
-import { TextArea } from '../../components/form/TextArea';
 import { useSaveAction } from '../../hooks/useSaveAction';
 import { subCategoryApi } from '../../services/subCategoryApi';
 import { useToastStore } from '../../stores/useToastStore';
@@ -131,27 +129,56 @@ export function FieldFormDrawer({ open, subCategoryId, field, fieldCount, onClos
     >
       <form id={FORM_ID} onSubmit={submit} noValidate className={page.formStack}>
         {save.error && <p role="alert" className={page.error}>{save.error}</p>}
-        <div className={page.formGrid}>
-          <div className={page.wide}><Input label="Label" value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} errorText={submitted ? errors.label : undefined} helperText="What the product form and card call it, e.g. Interest Rate." required autoFocus /></div>
-          <Field label="Type" helper={isEdit ? 'Cannot change once products hold values for it.' : undefined}>
-            <Select aria-label="Type" options={FIELD_DATA_TYPES.map((t) => ({ value: t, label: t }))} value={form.dataType} onChange={(e) => setForm({ ...form, dataType: e.target.value as FieldDataType })} />
-          </Field>
-          <Input label="Unit" value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} helperText="Shown beside the value, e.g. ₹, % p.a., years. A currency puts it in front." />
-          {isChoice(form.dataType) && (
-            <div className={page.wide}><TextArea label="Options" value={form.options} onChange={(e) => setForm({ ...form, options: e.target.value })} errorText={submitted ? errors.options : undefined} helperText="One per line." rows={4} required /></div>
-          )}
-          <Input label="Order" type="number" value={form.sortOrder} onChange={(e) => setForm({ ...form, sortOrder: e.target.value })} helperText="Lower comes first." />
-        </div>
+        <FormSection title="The field" icon={<Icon.FileText width={15} height={15} />}>
+          <FormGrid>
+            <FormField label="Label" required full error={submitted ? errors.label : undefined} helper="What the product form and card call it, e.g. Interest Rate.">
+              {(control) => <Input {...control.aria} value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} autoFocus />}
+            </FormField>
+            <FormField label="Type" helper={isEdit ? 'Cannot change once products hold values for it.' : undefined}>
+              {(control) => (
+                <Select
+                  id={control.id}
+                  options={FIELD_DATA_TYPES.map((t) => ({ value: t, label: t }))}
+                  value={form.dataType}
+                  onChange={(e) => setForm({ ...form, dataType: e.target.value as FieldDataType })}
+                />
+              )}
+            </FormField>
+            <FormField label="Unit" helper="Shown beside the value, e.g. ₹, % p.a., years. A currency puts it in front.">
+              {(control) => <Input {...control.aria} value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} />}
+            </FormField>
+            {isChoice(form.dataType) && (
+              <FormField label="Options" required full error={submitted ? errors.options : undefined} helper="One per line.">
+                {(control) => (
+                  <TextArea {...control.aria} rows={4} value={form.options} onChange={(e) => setForm({ ...form, options: e.target.value })} />
+                )}
+              </FormField>
+            )}
+            <FormField label="Order" helper="Lower comes first.">
+              {(control) => <Input {...control.aria} type="number" value={form.sortOrder} onChange={(e) => setForm({ ...form, sortOrder: e.target.value })} />}
+            </FormField>
+          </FormGrid>
+        </FormSection>
 
-        <div className={styles.toggles}>
-          {TOGGLES.map(({ key, label }) => (
-            <label key={key} className={styles.toggle}><Switch checked={form[key]} onChange={(e) => setForm({ ...form, [key]: e.target.checked })} /> {label}</label>
-          ))}
-        </div>
+        <FormSection title="How it behaves" icon={<Icon.Settings width={15} height={15} />}>
+          <div className={styles.toggles}>
+            {TOGGLES.map(({ key, label }) => (
+              <label key={key} className={styles.toggle}>
+                <Switch checked={form[key]} onChange={(e) => setForm({ ...form, [key]: e.target.checked })} /> {label}
+              </label>
+            ))}
+          </div>
+        </FormSection>
 
-        <Field label="Formats" error={submitted ? errors.rules : undefined} helper="Rules a value must meet. Built-in formats only here; ones defined in Manage Formats are still enforced by the server.">
-          <ValidationRulesEditor rules={form.validations} onChange={(validations) => setForm({ ...form, validations })} customPresets={[]} title="Formats" />
-        </Field>
+        <FormSection title="Formats" icon={<Icon.ShieldCheck width={15} height={15} />}>
+          <FormField
+            label="Formats"
+            error={submitted ? errors.rules : undefined}
+            helper="Rules a value must meet. Built-in formats only here; ones defined in Manage Formats are still enforced by the server."
+          >
+            <ValidationRulesEditor rules={form.validations} onChange={(validations) => setForm({ ...form, validations })} customPresets={[]} title="Formats" />
+          </FormField>
+        </FormSection>
       </form>
     </Drawer>
   );

@@ -1,9 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import { Button, Drawer, Icon, Input, Select } from '@omniconnect/ui';
+import { Button, Drawer, FormField, FormGrid, FormSection, Icon, Input, Select, TextArea } from '@omniconnect/ui';
 import { CatalogIcon } from '../../components/CatalogIcon';
 import { IconPicker } from '../../components/IconPicker';
-import { Field } from '../../components/form/Field';
-import { TextArea } from '../../components/form/TextArea';
 import { useSaveAction } from '../../hooks/useSaveAction';
 import { subCategoryApi } from '../../services/subCategoryApi';
 import { useCatalogOptionsStore } from '../../stores/useCatalogOptionsStore';
@@ -119,18 +117,64 @@ export function SubCategoryFormDrawer({ open, subCategory, defaultCategoryId, on
     >
       <form id={FORM_ID} onSubmit={submit} noValidate className={styles.formStack}>
         {save.error && <p role="alert" className={styles.error}>{save.error}</p>}
-        <Field label="Category" required error={shown('categoryId')} helper={movingCategory ? 'Every product beneath this sub-category moves to the new category with it.' : undefined}>
-          <Select aria-label="Category" options={categoryOptions} value={form.categoryId} placeholder="Choose a category" onChange={(e) => set('categoryId', e.target.value)} />
-        </Field>
-        <Input label="Sub-category name" value={form.name} onChange={(e) => set('name', e.target.value)} errorText={shown('name')} helperText="A type of product, e.g. Home Loan — not one specific offering." required autoFocus />
-        <Input label="Sub-category code" value={form.code} onChange={(e) => set('code', e.target.value)} errorText={shown('code')} helperText={`${CODE_HINT} Unique across the whole catalogue.`} required />
-        <TextArea label="Description" value={form.description} onChange={(e) => set('description', e.target.value)} errorText={shown('description')} />
-        <Field label="Status" helper="Which statuses exist, and which make a sub-category live, is set in Setup.">
-          <Select aria-label="Status" options={options} value={form.status} onChange={(e) => set('status', e.target.value)} />
-        </Field>
-        <Field label="Icon">
-          <IconPicker label="Sub-category icon" value={form.iconKey} onChange={(key) => set('iconKey', key)} />
-        </Field>
+
+        <FormSection title="Sub-category details" icon={<Icon.Package width={15} height={15} />}>
+          <FormGrid>
+            <FormField
+              label="Category"
+              required
+              full
+              error={shown('categoryId')}
+              helper={movingCategory ? 'Every product beneath this sub-category moves to the new category with it.' : undefined}
+            >
+              {(control) => (
+                <Select
+                  id={control.id}
+                  options={categoryOptions}
+                  value={form.categoryId}
+                  placeholder="Choose a category"
+                  onChange={(e) => set('categoryId', e.target.value)}
+                />
+              )}
+            </FormField>
+            <FormField
+              label="Sub-category name"
+              required
+              error={shown('name')}
+              helper="A type of product, e.g. Home Loan — not one specific offering."
+            >
+              {(control) => (
+                <Input {...control.aria} value={form.name} onChange={(e) => set('name', e.target.value)} autoFocus />
+              )}
+            </FormField>
+            <FormField
+              label="Sub-category code"
+              required
+              error={shown('code')}
+              helper={`${CODE_HINT} Unique across the whole catalogue.`}
+            >
+              {(control) => <Input {...control.aria} value={form.code} onChange={(e) => set('code', e.target.value)} />}
+            </FormField>
+            <FormField label="Description" full error={shown('description')}>
+              {(control) => (
+                <TextArea {...control.aria} value={form.description} onChange={(e) => set('description', e.target.value)} />
+              )}
+            </FormField>
+          </FormGrid>
+        </FormSection>
+
+        <FormSection title="Appearance and visibility" icon={<Icon.Eye width={15} height={15} />}>
+          <FormGrid>
+            <FormField label="Status" helper="Which statuses exist, and which make a sub-category live, is set in Setup.">
+              {(control) => (
+                <Select id={control.id} options={options} value={form.status} onChange={(e) => set('status', e.target.value)} />
+              )}
+            </FormField>
+            <FormField label="Icon">
+              <IconPicker label="Sub-category icon" value={form.iconKey} onChange={(key) => set('iconKey', key)} />
+            </FormField>
+          </FormGrid>
+        </FormSection>
       </form>
     </Drawer>
   );
