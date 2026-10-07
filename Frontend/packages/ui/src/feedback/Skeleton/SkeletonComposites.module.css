@@ -1,0 +1,222 @@
+/*
+ * Geometry for the composite placeholders. Every number here is copied from the component the
+ * placeholder stands in for — FormSection / FormGrid / FormField, DetailPanel — so that the real
+ * content lands exactly where its placeholder was. If one of those changes its padding or its grid,
+ * change it here too; a skeleton that is a few pixels off is what makes a page twitch on load.
+ */
+
+/* A placeholder with a fixed size must not be squeezed by the flex row it sits in. */
+.fixed { flex: none; }
+
+/* ── Form ───────────────────────────────────────────────────────────────── */
+.formStack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+}
+
+.formCard {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 14px 16px;
+  background: var(--omni-color-surface);
+  border: 1px solid #eaecf0;
+  border-radius: var(--omni-radius-lg);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.03), 0 3px 8px rgba(15, 23, 42, 0.02);
+}
+
+/* FormSection's blue rule, greyed: the title reads as a title before it has words. */
+.formTitle {
+  padding-left: 8px;
+  border-left: 3px solid #e2e8f0;
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px 12px;
+}
+
+.formField {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  min-width: 0;
+}
+
+@media (max-width: 768px) {
+  .formGrid { grid-template-columns: 1fr; }
+}
+
+/* ── Detail drawer ──────────────────────────────────────────────────────── */
+.detailStack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+}
+
+.detailCard {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 18px 14px;
+  background: var(--omni-color-surface);
+  border: 1.5px solid #e8edf5;
+  border-radius: var(--omni-radius-lg-plus);
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.04);
+}
+
+.detailGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.detailField {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border: 1.5px solid #eef2f7;
+  border-radius: var(--omni-radius-lg-minus);
+  min-width: 0;
+}
+
+.detailText {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
+@media (max-width: 560px) {
+  .detailGrid { grid-template-columns: 1fr; }
+}
+
+/* ── Chart ──────────────────────────────────────────────────────────────── */
+.chartPlot {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 160px;
+  overflow: hidden;
+}
+
+.chartGridLines {
+  position: absolute;
+  inset: 0 0 22px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.chartGridLines span {
+  display: block;
+  height: 1px;
+  background: #f1f5f9;
+}
+
+.chartBars {
+  position: absolute;
+  inset: 8px 12px 22px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-around;
+  gap: 10px;
+}
+
+.chartBar {
+  flex: 1;
+  max-width: 44px;
+}
+
+.chartLine {
+  position: absolute;
+  inset: 8px 0 22px;
+  width: 100%;
+  height: calc(100% - 30px);
+}
+
+.chartLine path {
+  fill: none;
+  stroke: #e2e8f0;
+  stroke-width: 3;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+  animation: omniSkeletonPulse 1.4s ease-in-out infinite;
+}
+
+@keyframes omniSkeletonPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
+.chartDonut {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 28px;
+  flex-wrap: wrap;
+  width: 100%;
+  height: 100%;
+  min-height: 160px;
+}
+
+/* A ring, not a disc: the hole is punched with a mask, so the shimmer still sweeps across the band. */
+.donutRing {
+  flex: none;
+  -webkit-mask: radial-gradient(circle, transparent 0 46px, #000 47px);
+  mask: radial-gradient(circle, transparent 0 46px, #000 47px);
+}
+
+.donutLegend {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1 1 140px;
+  max-width: 220px;
+}
+
+.donutLegendRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ── List / feed ────────────────────────────────────────────────────────── */
+.list {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.listRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 11px 0;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.listRow:last-child { border-bottom: none; }
+
+.listDot {
+  margin-top: 3px;
+  flex: none;
+}
+
+.listText {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  flex: 1;
+  min-width: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chartLine path { animation: none; }
+}

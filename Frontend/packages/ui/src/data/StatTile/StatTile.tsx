@@ -1,8 +1,9 @@
 import type { ReactNode } from 'react'
 import { classNames } from '../../utils/classNames'
+import { SkeletonBlock } from '../../feedback/Skeleton/Skeleton'
 import styles from './StatTile.module.css'
 
-export type StatTileAccent = 'primary' | 'success' | 'warning' | 'info' | 'danger'
+export type StatTileAccent = 'primary' | 'success' | 'warning' | 'info' | 'danger' | 'neutral' | 'violet'
 
 export interface StatTileProps {
   label: string
@@ -74,5 +75,37 @@ export function StatTile({
         </div>
       )}
     </article>
+  )
+}
+
+export interface StatTileSkeletonProps {
+  /** Set when the real tile will carry a change or a caption, so the placeholder is the same height. */
+  foot?: boolean
+  className?: string
+}
+
+/**
+ * A tile that has not got its figure yet.
+ *
+ * Shape-matched to `StatTile` — the same card, the same icon square, a label line and a value line —
+ * so the row keeps its height and its columns while the numbers load. Without it the tiles were simply
+ * absent until the request returned, then arrived and pushed the table below them down the page.
+ */
+export function StatTileSkeleton({ foot, className }: StatTileSkeletonProps) {
+  return (
+    <div className={classNames(styles.tile, styles.skeleton, className)} aria-hidden="true">
+      <div className={styles.head}>
+        <SkeletonBlock width={42} height={42} radius="var(--omni-radius-lg)" />
+        <div className={styles.skeletonNumbers}>
+          <SkeletonBlock width="62%" height={10} radius="4px" />
+          <SkeletonBlock width="38%" height={24} radius="6px" />
+        </div>
+      </div>
+      {foot && (
+        <div className={styles.skeletonFoot}>
+          <SkeletonBlock width="54%" height={12} radius="4px" />
+        </div>
+      )}
+    </div>
   )
 }

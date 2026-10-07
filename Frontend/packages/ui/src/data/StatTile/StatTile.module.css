@@ -1,29 +1,124 @@
+/*
+ * One headline figure.
+ *
+ * The geometry is the host's `.summaryCard` (settings-users/pages/UsersPage.module.css), which is the
+ * most finished stat card on the platform: a 16px card with a gradient rule along its top edge, a
+ * tinted icon tile with its own hairline border, a small uppercase label and a heavy, tightly-set
+ * figure, lifting slightly on hover. This tile was flatter than that — a solid top border, a plain
+ * tinted square, a sentence-case label — so a row of them read as a different, plainer product beside
+ * the host's. Values the host keeps raw are kept raw here and flagged, not snapped to a token.
+ */
+
 .tile {
   --accent: var(--omni-color-primary-600);
+  --accent-light: var(--omni-color-primary-400);
   --accent-soft: var(--omni-color-primary-50);
+  --accent-soft-2: var(--omni-color-primary-100);
+  --accent-line: var(--omni-color-primary-200);
+  --accent-glow: rgba(37, 99, 235, 0.12);
+
+  position: relative;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  gap: var(--omni-space-4);
+  gap: 12px;
   min-width: 0;
-  padding: var(--omni-space-4) var(--omni-space-5);
+  padding: 18px 20px 16px; /* host raw */
   background: var(--omni-color-surface);
-  /* 1.5px / 18px / the host's card shadow — the chrome every other card on the platform uses. */
-  border: 1.5px solid var(--omni-color-border);
-  border-top: 3px solid var(--accent);
-  border-radius: 18px;
-  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+  border: 1.5px solid #e8edf5; /* host raw */
+  border-radius: var(--omni-radius-xl);
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.03), 0 8px 20px -4px rgba(15, 23, 42, 0.04); /* host raw */
+  transition:
+    box-shadow 0.18s ease,
+    transform 0.18s ease,
+    border-color 0.18s ease;
 }
 
-.success { --accent: var(--omni-color-success-600); --accent-soft: var(--omni-color-success-50); }
-.warning { --accent: var(--omni-color-warning-500); --accent-soft: var(--omni-color-warning-50); }
-.info { --accent: var(--omni-color-primary-500); --accent-soft: var(--omni-color-primary-50); }
-.danger { --accent: var(--omni-color-danger-600); --accent-soft: var(--omni-color-danger-50); }
+/* The accent rule. A pseudo-element rather than `border-top`, so it can be a gradient and so it
+   follows the card's rounded corners instead of squaring them off. */
+.tile::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3.5px; /* host raw */
+  background: linear-gradient(90deg, var(--accent), var(--accent-light));
+}
+
+.tile:hover {
+  border-color: var(--accent-line);
+  box-shadow: 0 12px 28px -4px var(--accent-glow);
+  transform: translateY(-2.5px); /* host raw */
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tile { transition: none; }
+  .tile:hover { transform: none; }
+}
+
+.success {
+  --accent: var(--omni-color-success-600);
+  --accent-light: var(--omni-color-success-400);
+  --accent-soft: var(--omni-color-success-50);
+  --accent-soft-2: var(--omni-color-success-100);
+  --accent-line: var(--omni-color-success-200);
+  --accent-glow: rgba(5, 150, 105, 0.14);
+}
+
+.warning {
+  --accent: var(--omni-color-warning-600);
+  --accent-light: var(--omni-color-warning-400);
+  --accent-soft: var(--omni-color-warning-50);
+  --accent-soft-2: var(--omni-color-warning-100);
+  --accent-line: var(--omni-color-warning-200);
+  --accent-glow: rgba(217, 119, 6, 0.14);
+}
+
+.danger {
+  --accent: var(--omni-color-danger-600);
+  --accent-light: var(--omni-color-danger-400);
+  --accent-soft: var(--omni-color-danger-50);
+  --accent-soft-2: var(--omni-color-danger-100);
+  --accent-line: var(--omni-color-danger-200);
+  --accent-glow: rgba(220, 38, 38, 0.12);
+}
+
+.info {
+  --accent: var(--omni-color-primary-500);
+  --accent-light: var(--omni-color-primary-300);
+  --accent-soft: var(--omni-color-primary-50);
+  --accent-soft-2: var(--omni-color-primary-100);
+  --accent-line: var(--omni-color-primary-200);
+  --accent-glow: rgba(59, 130, 246, 0.12);
+}
+
+/* The host's third and fourth summary cards. Neither slate nor violet is in the token scale, so the
+   values are the host's own, verbatim (UsersPage.module.css `.iconGray` / `.iconPurple`). They exist
+   so a row of four tiles can be four colours, as the host's is, rather than two blues and a green. */
+.neutral {
+  --accent: #64748b;
+  --accent-light: #94a3b8;
+  --accent-soft: #f8fafc;
+  --accent-soft-2: #f1f5f9;
+  --accent-line: #cbd5e1;
+  --accent-glow: rgba(71, 85, 105, 0.12);
+}
+
+.violet {
+  --accent: #7c3aed;
+  --accent-light: #a78bfa;
+  --accent-soft: #ede9fe;
+  --accent-soft-2: #ddd6fe;
+  --accent-line: #c4b5fd;
+  --accent-glow: rgba(124, 58, 237, 0.13);
+}
 
 .head {
   display: flex;
   align-items: center;
-  gap: var(--omni-space-3);
+  gap: 15px; /* host raw */
 }
 
 .icon {
@@ -31,34 +126,45 @@
   align-items: center;
   justify-content: center;
   flex: none;
-  width: 44px;
-  height: 44px;
-  background: var(--accent-soft);
+  width: 42px;
+  height: 42px;
+  background: linear-gradient(135deg, var(--accent-soft) 0%, var(--accent-soft-2) 100%);
+  border: 1px solid var(--accent-line);
   color: var(--accent);
-  border-radius: var(--omni-radius-lg-minus);
+  border-radius: var(--omni-radius-lg);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05); /* host raw */
 }
 
 .icon svg {
-  width: 22px;
-  height: 22px;
+  width: 20px;
+  height: 20px;
 }
 
 .numbers {
   display: flex;
   flex-direction: column;
+  gap: 4px;
   min-width: 0;
 }
 
 .label {
-  font-size: var(--omni-font-size-sm);
-  color: var(--omni-color-text-secondary);
+  font-size: var(--omni-font-size-xs-plus);
+  font-weight: var(--omni-font-weight-bold);
+  color: #64748b; /* host raw: between text-secondary and text-muted */
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .value {
-  font-size: var(--omni-font-size-2xl);
-  font-weight: var(--omni-font-weight-bold);
+  font-size: 27px; /* host raw */
+  font-weight: 800; /* host raw */
   color: var(--omni-color-text-primary);
-  line-height: var(--omni-line-height-tight);
+  line-height: 1;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
 }
 
 .foot {
@@ -67,6 +173,8 @@
   justify-content: space-between;
   gap: var(--omni-space-2);
   flex-wrap: wrap;
+  padding-top: 10px;
+  border-top: 1px dashed #e8edf5;
   font-size: var(--omni-font-size-xs);
 }
 
@@ -74,10 +182,41 @@
   display: inline-flex;
   align-items: baseline;
   gap: 4px;
+  padding: 2px 8px;
+  border-radius: var(--omni-radius-pill);
+  font-weight: var(--omni-font-weight-semibold);
 }
 
-.up { color: var(--omni-color-success-600); }
-.down { color: var(--omni-color-danger-600); }
-.flat { color: var(--omni-color-text-muted); }
-.changeLabel { color: var(--omni-color-text-secondary); }
+.up { color: var(--omni-color-success-700); background: var(--omni-color-success-50); }
+.down { color: var(--omni-color-danger-700); background: var(--omni-color-danger-50); }
+.flat { color: var(--omni-color-text-secondary); background: var(--omni-color-surface-alt); }
+.changeLabel { color: var(--omni-color-text-secondary); font-weight: var(--omni-font-weight-regular); }
 .caption { color: var(--omni-color-text-muted); margin-left: auto; }
+
+/* ── Loading ────────────────────────────────────────────────────────────────
+   The same card with its content replaced by placeholders, so a row of tiles holds its height and
+   its columns while the figures load instead of appearing after the table and pushing it down. */
+
+.skeleton,
+.skeleton:hover {
+  border-color: #e8edf5;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.03), 0 8px 20px -4px rgba(15, 23, 42, 0.04);
+  transform: none;
+}
+
+.skeleton::before {
+  background: #eaecf0;
+}
+
+.skeletonNumbers {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  flex: 1;
+  min-width: 0;
+}
+
+.skeletonFoot {
+  padding-top: 10px;
+  border-top: 1px dashed #e8edf5;
+}

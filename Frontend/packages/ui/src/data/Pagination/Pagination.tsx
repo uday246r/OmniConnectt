@@ -8,8 +8,13 @@ export interface PaginationProps {
   pageSize: number
   total: number
   onPageChange: (page: number) => void
-  /** Noun for the summary line, e.g. "user" — pluralised automatically. */
+  /** Noun for the summary line, in the SINGULAR, e.g. "user" — an "s" is added for any count but one. */
   itemLabel?: string
+  /**
+   * The plural, for a noun that does not take a plain "s" — "category" → "categories". Without it a
+   * caller either passed the singular and got "categorys", or passed the plural and got "categoriess".
+   */
+  itemLabelPlural?: string
   /**
    * Supply this to show the rows-per-page control. Omit it and the control is hidden, for tables
    * whose page size is fixed by the caller.
@@ -38,6 +43,7 @@ export function Pagination({
   total,
   onPageChange,
   itemLabel = 'item',
+  itemLabelPlural,
   onPageSizeChange,
   pageSizeOptions = DEFAULT_PAGE_SIZES,
   hideWhenSinglePage = true,
@@ -50,7 +56,7 @@ export function Pagination({
   // Clamped so an empty result reads "Showing 0 to 0 of 0" rather than "1 to 0".
   const first = total === 0 ? 0 : (page - 1) * pageSize + 1
   const last = Math.min(page * pageSize, total)
-  const plural = total === 1 ? '' : 's'
+  const noun = total === 1 ? itemLabel : (itemLabelPlural ?? `${itemLabel}s`)
 
   return (
     <nav className={classNames(styles.bar, className)} aria-label="Pagination">
@@ -59,8 +65,7 @@ export function Pagination({
         <span className={styles.summaryText}>
           Showing <strong className={styles.summaryNum}>{first}</strong> to{' '}
           <strong className={styles.summaryNum}>{last}</strong> of{' '}
-          <strong className={styles.summaryNum}>{total}</strong> {itemLabel}
-          {plural}
+          <strong className={styles.summaryNum}>{total}</strong> {noun}
         </span>
       </div>
 

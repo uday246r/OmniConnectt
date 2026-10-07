@@ -1,4 +1,24 @@
 .field {
+  /*
+   * What a control placed in this field should look like — Input's own values, published as
+   * properties so the dropdown (Combobox / Select) can match it. Without this a form mixed two
+   * controls: 46px tinted text boxes and 36px white outlined dropdowns, side by side in one grid,
+   * which is the single most visible "assembled from parts" tell a form can have. Keep these in step
+   * with primitives/Input/Input.module.css.
+   */
+  --omni-field-height: 46px;
+  --omni-field-pad: 14px;
+  --omni-field-font-size: var(--omni-font-size-md);
+  --omni-field-radius: var(--omni-radius-lg);
+  --omni-field-border: #e2e8f0;
+  --omni-field-border-hover: #c8d4e0;
+  --omni-field-border-invalid: #f43f5e;
+  --omni-field-bg: var(--omni-color-surface-alt);
+  --omni-field-bg-hover: var(--omni-color-surface);
+  --omni-field-bg-invalid: #fff5f6;
+  --omni-field-bg-disabled: #f1f5f9;
+  --omni-field-focus-ring: 0 0 0 4px rgba(37, 99, 235, 0.09), 0 1px 2px rgba(15, 23, 42, 0.04);
+
   display: flex;
   flex-direction: column;
   gap: 5px; /* host: UserFormLayer .inputGroup */

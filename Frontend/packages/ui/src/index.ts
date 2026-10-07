@@ -95,8 +95,8 @@ export { readStoredPageSize } from './data/RowsPerPage/RowsPerPage'
 export type { RowsPerPageProps } from './data/RowsPerPage/RowsPerPage'
 export type { PaginationProps } from './data/Pagination/Pagination'
 
-export { StatTile } from './data/StatTile/StatTile'
-export type { StatTileProps, StatTileAccent } from './data/StatTile/StatTile'
+export { StatTile, StatTileSkeleton } from './data/StatTile/StatTile'
+export type { StatTileProps, StatTileAccent, StatTileSkeletonProps } from './data/StatTile/StatTile'
 
 export { EmptyState } from './data/EmptyState/EmptyState'
 
@@ -143,6 +143,13 @@ export type {
   SkeletonTableProps,
   TableSkeletonProps,
 } from './feedback/Skeleton/Skeleton'
+export { SkeletonForm, SkeletonDetail, SkeletonChart, SkeletonList } from './feedback/Skeleton/SkeletonComposites'
+export type {
+  SkeletonFormProps,
+  SkeletonDetailProps,
+  SkeletonChartProps,
+  SkeletonListProps,
+} from './feedback/Skeleton/SkeletonComposites'
 
 // ── Utilities ────────────────────────────────────────────────
 export { classNames } from './utils/classNames'

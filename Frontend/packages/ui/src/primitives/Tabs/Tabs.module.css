@@ -5,6 +5,15 @@
 }
 
 .tab {
+  /* A <button>, so its native chrome has to be cleared HERE. The host's global reset.css used to do
+     it implicitly, which is why a remote rendered outside the host drew each tab as a grey bordered
+     box: a shared component must not rely on a stylesheet only one of its consumers loads. */
+  appearance: none;
+  background: none;
+  border: 0;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
   display: flex;
   align-items: center;
   gap: var(--omni-space-2);

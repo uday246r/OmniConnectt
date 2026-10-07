@@ -9,23 +9,40 @@
   width: 100%;
   min-width: 0;
   box-sizing: border-box;
-  border: 1.5px solid var(--omni-color-border);
-  border-radius: var(--omni-radius-md);
-  background: var(--omni-color-surface);
+  /*
+   * Every surface value reads an --omni-field-* property first and falls back to the standalone
+   * look. FormField sets those properties, so a dropdown placed in a form takes the Input's
+   * geometry and fill — 46px, the tinted surface, the larger radius — and sits beside a text box as
+   * the same kind of control. On its own (a toolbar filter, a table header) nothing sets them and
+   * it stays the compact outlined control it has always been.
+   */
+  border: 1.5px solid var(--omni-field-border, var(--omni-color-border));
+  border-radius: var(--omni-field-radius, var(--omni-radius-md));
+  background: var(--omni-field-bg, var(--omni-color-surface));
   transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.wrap:hover:not(:focus-within) {
+  border-color: var(--omni-field-border-hover, var(--omni-field-border, var(--omni-color-border)));
+  background: var(--omni-field-bg-hover, var(--omni-field-bg, var(--omni-color-surface)));
 }
 
 .wrap:focus-within {
   border-color: var(--omni-color-primary-600);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+  background: var(--omni-color-surface);
+  box-shadow: var(--omni-field-focus-ring, 0 0 0 3px rgba(37, 99, 235, 0.12));
 }
 
-.invalid {
-  border-color: var(--omni-color-danger);
+.invalid,
+.invalid:hover:not(:focus-within) {
+  border-color: var(--omni-field-border-invalid, var(--omni-color-danger));
+  background: var(--omni-field-bg-invalid, var(--omni-field-bg, var(--omni-color-surface)));
 }
 
-.disabled {
-  background: var(--omni-color-surface-alt);
+.disabled,
+.disabled:hover:not(:focus-within) {
+  border-color: var(--omni-field-border, var(--omni-color-border));
+  background: var(--omni-field-bg-disabled, var(--omni-color-surface-alt));
   cursor: not-allowed;
 }
 
@@ -56,7 +73,13 @@
 }
 
 .sm { height: 32px; padding: 0 28px 0 10px; font-size: var(--omni-font-size-xs); }
-.md { height: 36px; padding: 0 30px 0 12px; font-size: var(--omni-font-size-sm); }
+/* The default size is the one a form field resizes; an explicit sm or lg is a deliberate choice and
+   is left alone. */
+.md {
+  height: var(--omni-field-height, 36px);
+  padding: 0 30px 0 var(--omni-field-pad, 12px);
+  font-size: var(--omni-field-font-size, var(--omni-font-size-sm));
+}
 .lg { height: 42px; padding: 0 32px 0 14px; font-size: var(--omni-font-size-md); }
 
 .prefix {

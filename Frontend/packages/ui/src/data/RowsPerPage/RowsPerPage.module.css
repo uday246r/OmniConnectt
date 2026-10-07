@@ -10,6 +10,8 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  /* Never the thing that gives way in a crowded toolbar: squeezed, the number is unreadable. */
+  flex: none;
 }
 
 .label {
@@ -21,8 +23,15 @@
   white-space: nowrap;
 }
 
+/*
+ * A fixed width, not a minimum. The select is `width: 100%` of a box that has no width of its own
+ * (this wrapper is sized by its content), so with only a minimum it fell back to the input's
+ * intrinsic ~180px and a control that shows a two-digit number took as much room as a filter. 92px
+ * fits the widest option, "Custom", beside the chevron.
+ */
 .select {
-  min-width: 76px;
+  width: 92px;
+  flex: none;
 }
 
 /*
