@@ -17,9 +17,13 @@ import {
  * just not the same one, and nothing anywhere compared them.
  *
  * `now` is injected rather than mocked. A clock these tests control is simpler to read than
- * vi.setSystemTime, and it keeps the local-timezone behaviour honest — these assertions have to
- * hold in whatever zone CI happens to run in, so they are written against local-day boundaries
- * rather than against literal UTC strings.
+ * vi.setSystemTime, and it keeps the local-timezone behaviour honest — so the assertions are
+ * written against local-day boundaries rather than against literal UTC strings.
+ *
+ * The zone itself is pinned to Asia/Kuala_Lumpur by vitest.config.ts. It used to be whatever the
+ * machine happened to be in, and the one assertion below that DOES name a literal UTC instant is
+ * why that mattered: at UTC it compared a value to itself and failed. See that config for the
+ * whole account.
  */
 
 /** Noon on a Thursday, so day arithmetic never lands ambiguously on a boundary. */
@@ -80,6 +84,14 @@ describe('resolveDateRange', () => {
    * same typed input.
    */
   it('reads a custom time as local, not as UTC', () => {
+    /*
+     * This one distinguishes the two readings by naming the UTC instant outright, which only
+     * separates them at a non-zero offset — at UTC both produce the same string. The zone is pinned
+     * for exactly that reason, so assert the pin is in force rather than let the guard quietly
+     * become a tautology if it is ever removed.
+     */
+    expect(new Date(2026, 8, 12).getTimezoneOffset()).not.toBe(0)
+
     const { from } = resolveDateRange(
       { preset: 'custom', fromDate: '2026-09-12', fromTime: '09:00' },
       NOW,

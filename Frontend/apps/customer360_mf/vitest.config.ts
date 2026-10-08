@@ -18,5 +18,8 @@ export default defineConfig({
     // first import then crossed the 5s default — a timeout that also leaked its pending requests into the
     // next test's call count. A budget sized for a loaded CI runner, not a correctness change.
     testTimeout: 20_000,
+    // Pinned so Date does not follow the machine's zone and CI cannot disagree with a laptop — the
+    // reasoning, and the bug that prompted it, are in packages/ui/vitest.config.ts.
+    env: { TZ: 'Asia/Kuala_Lumpur' },
   },
 })

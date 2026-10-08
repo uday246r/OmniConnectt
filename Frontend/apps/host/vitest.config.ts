@@ -14,5 +14,8 @@ export default defineConfig({
     setupFiles: ['./src/test/setup.ts'],
     testTimeout: 15000,
     include: ['src/**/*.test.{ts,tsx}'],
+    // Pinned so Date does not follow the machine's zone and CI cannot disagree with a laptop — the
+    // reasoning, and the bug that prompted it, are in packages/ui/vitest.config.ts.
+    env: { TZ: 'Asia/Kuala_Lumpur' },
   },
 })
