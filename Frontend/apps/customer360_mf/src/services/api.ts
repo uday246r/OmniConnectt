@@ -16,6 +16,7 @@ import type {
   FieldConfig,
   FieldConfigProfileType,
   ApprovalPendingDto,
+  LeadRecord,
 } from '../types/api';
 import { createRequestCache } from '@omniconnect/ui';
 import { getAccessToken, ensureFreshAccessToken, getCurrentUser, isRunningInHost } from '../api/hostBridge';
@@ -24,6 +25,9 @@ import { getAccessToken, ensureFreshAccessToken, getCurrentUser, isRunningInHost
 // the host's own domain (nginx in production, the host's dev-server proxy in development), so one build
 // works in every environment. VITE_API_BASE_URL overrides it only for a backend on another origin.
 export const API_BASE_URL: string = import.meta.env.VITE_API_BASE_URL || '/api/customer360-service';
+export const LEAD_API_BASE_URL: string =
+  (import.meta as any).env?.VITE_LEAD_API_BASE_URL ||
+  (isRunningInHost() ? '/api/lead-service' : 'http://localhost:5046/api/lead-service');
 
 // ---------------------------------------------------------------------------
 // Response envelopes
@@ -147,7 +151,90 @@ async function send<T>(endpoint: string, options: RequestInit = {}): Promise<T> 
   return response.json();
 }
 
+export interface LeadApiResponse<T> {
+  success: boolean;
+  data: T;
+  message?: string | null;
+  errors?: Record<string, string> | null;
+}
+
+export interface LeadPagedResult<T> {
+  items: T[];
+  totalRecords: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+
+async function requestLead<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  let token: string | null = null;
+  if (isRunningInHost()) {
+    try {
+      token = await ensureFreshAccessToken();
+    } catch {
+      token = getAccessToken();
+    }
+  } else {
+    token = getAccessToken();
+  }
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(options.headers as Record<string, string> | undefined),
+  };
+
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  let response = await fetch(`${LEAD_API_BASE_URL}${endpoint}`, { ...options, headers });
+
+  if (response.status === 401 && isRunningInHost()) {
+    try {
+      token = await ensureFreshAccessToken();
+      headers['Authorization'] = `Bearer ${token}`;
+      response = await fetch(`${LEAD_API_BASE_URL}${endpoint}`, { ...options, headers });
+    } catch (err) {
+      console.error('[Auth] Failed to refresh token for lead request:', err);
+    }
+  }
+
+  if (!response.ok) {
+    const errData = await response.json().catch(() => ({}) as { message?: string; detail?: string });
+    throw new ApiError(errData.message || errData.detail || `HTTP error ${response.status}`, response.status);
+  }
+
+  return response.json();
+}
+
 export const api = {
+  // Customer Leads (from LeadService)
+  getCustomerLeads: (params: {
+    page?: number;
+    pageSize?: number;
+    search?: string;
+    product?: string;
+    branch?: string;
+    name?: string;
+    icNumber?: string;
+    phone?: string;
+    status?: string;
+    fresh?: boolean;
+  } = {}): Promise<LeadApiResponse<LeadPagedResult<LeadRecord>>> => {
+    const query = new URLSearchParams();
+    if (params.page) query.append('page', params.page.toString());
+    if (params.pageSize) query.append('pageSize', params.pageSize.toString());
+    if (params.search) query.append('search', params.search);
+    if (params.product) query.append('product', params.product);
+    if (params.branch) query.append('branch', params.branch);
+    if (params.name) query.append('name', params.name);
+    if (params.icNumber) query.append('icNumber', params.icNumber);
+    if (params.phone) query.append('phone', params.phone);
+    if (params.status) query.append('status', params.status);
+
+    return requestLead(`/api/leads?${query.toString()}`, params.fresh ? { cache: 'no-store' } : {});
+  },
+
   // Search dropdown options config
   getSearchOptions: (): Promise<ApiEnvelope<LookupOptions>> => request('/v1/lookups'),
 

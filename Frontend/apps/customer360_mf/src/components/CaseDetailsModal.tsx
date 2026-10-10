@@ -1,31 +1,21 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useInteractionStore } from '../store/interactionStore';
-import { FileText, User, ShieldAlert, Check, Copy, Hash, Calendar, Layers, Activity } from '@omniconnect/ui/icons';
-import { Button, Badge, DetailField, DetailGrid, DetailSection, Drawer, EMPTY_VALUE } from '@omniconnect/ui';
+import { FileText, User, ShieldAlert, Hash, Calendar, Layers, Activity } from '@omniconnect/ui/icons';
+import { Badge, DetailField, DetailGrid, DetailSection, Drawer, EMPTY_VALUE } from '@omniconnect/ui';
 import { formatValue } from '../shared/formatValue';
 import styles from './ProductDetailsModal.module.css';
 import { useShallow } from 'zustand/react/shallow';
 
 export default function CaseDetailsModal() {
-  const { selectedCase, modalOpen, closeCaseModal } = useInteractionStore(useShallow((s) => ({ selectedCase: s.selectedCase, modalOpen: s.modalOpen, closeCaseModal: s.closeCaseModal })));
-  const [copiedKey, setCopiedKey] = useState<string | null>(null);
-
-  /*
-   * No audit dispatch here any more.
-   *
-   * Opening this drawer rendered data the browser already had; nothing was fetched and nothing was
-   * authorized, so the row it wrote through the host bridge asserted an event no server observed.
-   * That bridge member is gone platform-wide — see the host's hostBridge.ts.
-   */
+  const { selectedCase, modalOpen, closeCaseModal } = useInteractionStore(
+    useShallow((s) => ({
+      selectedCase: s.selectedCase,
+      modalOpen: s.modalOpen,
+      closeCaseModal: s.closeCaseModal,
+    }))
+  );
 
   if (!modalOpen || !selectedCase) return null;
-
-  const handleCopyText = (key: string, text?: string | null) => {
-    if (!text || text === EMPTY_VALUE) return;
-    navigator.clipboard.writeText(text);
-    setCopiedKey(key);
-    setTimeout(() => setCopiedKey(null), 1500);
-  };
 
   const caseIdStr = String(selectedCase.caseId || '').trim();
   const title = selectedCase.main || 'Interaction Case';
@@ -45,17 +35,6 @@ export default function CaseDetailsModal() {
             <span className={styles.footerAccountId}>
               Case: {caseIdStr || EMPTY_VALUE}
             </span>
-            {caseIdStr && (
-              <button
-                type="button"
-                onClick={() => handleCopyText('caseId', caseIdStr)}
-                className={`${styles.footerCopyBtn}${copiedKey === 'caseId' ? ` ${styles.footerCopyBtnCopied}` : ''}`}
-                title="Copy Case ID"
-              >
-                {copiedKey === 'caseId' ? <Check size={13} /> : <Copy size={13} />}
-                <span>{copiedKey === 'caseId' ? 'Copied' : 'Copy'}</span>
-              </button>
-            )}
           </div>
         </div>
       }
@@ -136,35 +115,11 @@ export default function CaseDetailsModal() {
         <DetailSection title="Contact & Customer Identity" icon={<User size={13} />}>
           <DetailGrid>
             <DetailField label="Contact Number" mono>
-              {selectedCase.contactNo && (
-                <span className={styles.fieldValueRow}>
-                  <span>{formatValue(selectedCase.contactNo)}</span>
-                  <button
-                    type="button"
-                    onClick={() => handleCopyText('contactNo', selectedCase.contactNo)}
-                    className={`${styles.copyBtn}${copiedKey === 'contactNo' ? ` ${styles.copyBtnCopied}` : ''}`}
-                    title="Copy Contact Number"
-                  >
-                    {copiedKey === 'contactNo' ? <Check size={12} /> : <Copy size={12} />}
-                  </button>
-                </span>
-              )}
+              {formatValue(selectedCase.contactNo)}
             </DetailField>
 
             <DetailField label="National ID / IC" mono>
-              {selectedCase.nric && (
-                <span className={styles.fieldValueRow}>
-                  <span>{formatValue(selectedCase.nric)}</span>
-                  <button
-                    type="button"
-                    onClick={() => handleCopyText('nric', selectedCase.nric)}
-                    className={`${styles.copyBtn}${copiedKey === 'nric' ? ` ${styles.copyBtnCopied}` : ''}`}
-                    title="Copy NRIC"
-                  >
-                    {copiedKey === 'nric' ? <Check size={12} /> : <Copy size={12} />}
-                  </button>
-                </span>
-              )}
+              {formatValue(selectedCase.nric)}
             </DetailField>
 
             <DetailField label="State / Branch">{formatValue(selectedCase.stateName)}</DetailField>

@@ -1,10 +1,33 @@
 /*
- * Styles extracted from this component's former inline blocks. Values map to platform
- * tokens where an exact equivalent exists.
+ * Balanced 2-column layout to distribute section cards across the full screen width,
+ * providing spacious breathing room and executive elegance for the profile view.
  */
 
-.stack {
+.twoColumnGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+  align-items: start;
+  width: 100%;
+}
+
+.column {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 20px;
+  min-width: 0;
+}
+
+.singleColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  width: 100%;
+}
+
+@media (max-width: 1024px) {
+  .twoColumnGrid {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
 }

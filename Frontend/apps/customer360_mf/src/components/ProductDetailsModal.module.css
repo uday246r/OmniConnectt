@@ -16,6 +16,19 @@
   gap: 16px;
   margin-bottom: 16px;
   transition: all 180ms ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.heroCard::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  border-radius: 14px 14px 0 0;
+  background: linear-gradient(90deg, #2563eb, #60a5fa);
 }
 
 .heroCard:hover {
@@ -274,13 +287,6 @@
   letter-spacing: 0.04em;
 }
 
-.fieldValueRow {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 6px;
-  min-width: 0;
-}
 
 .fieldValue {
   font-size: 13.5px;
@@ -305,28 +311,6 @@
   color: #059669;
 }
 
-.copyBtn {
-  background: none;
-  border: none;
-  cursor: pointer;
-  color: #94a3b8;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 3px;
-  border-radius: 4px;
-  transition: all 120ms ease;
-  flex-shrink: 0;
-}
-
-.copyBtn:hover {
-  background: #e2e8f0;
-  color: #1e293b;
-}
-
-.copyBtnCopied {
-  color: #059669 !important;
-}
 
 /* Footer layout */
 .footerSpread {
@@ -353,29 +337,6 @@
   white-space: nowrap;
 }
 
-.footerCopyBtn {
-  background: none;
-  border: none;
-  cursor: pointer;
-  color: #475569;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 8px;
-  font-size: 12px;
-  font-weight: 600;
-  border-radius: 6px;
-  transition: all 140ms ease;
-}
-
-.footerCopyBtn:hover {
-  background: #f1f5f9;
-  color: #0f172a;
-}
-
-.footerCopyBtnCopied {
-  color: #059669;
-}
 
 /* Loading Skeleton */
 .skeletonCard {

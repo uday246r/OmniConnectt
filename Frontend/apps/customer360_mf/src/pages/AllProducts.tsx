@@ -190,9 +190,6 @@ export default function AllProducts() {
               placeholder="Search product name, account number..."
               value={searchTerm}
               onValueChange={setSearchTerm}
-              suggestions={searchSuggestions}
-              onSelectSuggestion={(s) => setSearchTerm(s.id)}
-              emptyHint="No matching products."
             />
           </div>
 

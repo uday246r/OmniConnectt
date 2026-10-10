@@ -1,37 +1,419 @@
 /*
- * Styles extracted from this component's former inline blocks. Values map to platform
- * tokens where an exact equivalent exists.
+ * DynamicProfileSection Styles
+ * High-end, executive card containers aligned with OmniConnect Host App design standards.
+ * Featuring top accent stripes, host-matched badges, and modern quick-op style field cards.
  */
 
-.spread {
+.sectionCard {
+  background: var(--omni-color-surface, #ffffff);
+  border: 1px solid #eaecf0;
+  border-radius: var(--omni-radius-xl, 16px);
+  padding: 22px 24px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+  width: 100%;
+  position: relative;
+  overflow: hidden;
+}
+
+.sectionCard:hover {
+  border-color: var(--omni-color-border-strong, #cbd5e1);
+  box-shadow: 0 6px 20px rgba(15, 23, 42, 0.08);
+  transform: translateY(-1px);
+}
+
+/* Colored top accent stripe matching host stat card treatment */
+.sectionCard::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  border-radius: 16px 16px 0 0;
+  background: linear-gradient(90deg, #2563eb, #60a5fa);
+}
+
+.cardThemeBlue::before {
+  background: linear-gradient(90deg, #2563eb, #60a5fa);
+}
+
+.cardThemeIndigo::before {
+  background: linear-gradient(90deg, #4f46e5, #818cf8);
+}
+
+.cardThemeEmerald::before {
+  background: linear-gradient(90deg, #059669, #34d399);
+}
+
+.cardThemePurple::before {
+  background: linear-gradient(90deg, #7c3aed, #a78bfa);
+}
+
+.cardThemeAmber::before {
+  background: linear-gradient(90deg, #d97706, #fbbf24);
+}
+
+.cardThemeTeal::before {
+  background: linear-gradient(90deg, #0d9488, #2dd4bf);
+}
+
+.cardThemeSky::before {
+  background: linear-gradient(90deg, #0284c7, #38bdf8);
+}
+
+.sectionHeader {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  width: 100%;
-  gap: 8px;
+  padding-bottom: 14px;
+  margin-bottom: 18px;
+  border-bottom: 1px solid #eaecf0;
+  gap: 12px;
 }
 
-.rule {
-  overflow-wrap: anywhere;
+.sectionHeaderLeft {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
 }
 
-.row {
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 2px;
-  color: var(--omni-color-primary-600);
+.sectionIconBadge {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--omni-radius-lg-minus, 10px);
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  position: relative;
+  transition: transform 0.2s ease;
 }
 
-.linkValue {
-  color: var(--omni-color-primary-600);
-  text-decoration: none;
-  word-break: break-all;
+.sectionCard:hover .sectionIconBadge {
+  transform: translateY(-1px) scale(1.04);
 }
+
+/* Curated Theme Badges per Section matching Host Scale */
+.badgeBlue {
+  background: var(--omni-color-primary-50, #eff6ff);
+  color: var(--omni-color-primary-600, #2563eb);
+  border: 1px solid #bfdbfe;
+}
+
+.badgeIndigo {
+  background: #eef2ff;
+  color: #4f46e5;
+  border: 1px solid #c7d2fe;
+}
+
+.badgeEmerald {
+  background: var(--omni-color-success-50, #ecfdf5);
+  color: var(--omni-color-success-600, #059669);
+  border: 1px solid #a7f3d0;
+}
+
+.badgePurple {
+  background: #ede9fe;
+  color: #7c3aed;
+  border: 1px solid #ddd6fe;
+}
+
+.badgeAmber {
+  background: var(--omni-color-warning-50, #fffbeb);
+  color: var(--omni-color-warning-600, #d97706);
+  border: 1px solid #fde68a;
+}
+
+.badgeTeal {
+  background: #f0fdfa;
+  color: #0d9488;
+  border: 1px solid #99f6e4;
+}
+
+.badgeSky {
+  background: #f0f9ff;
+  color: #0284c7;
+  border: 1px solid #bae6fd;
+}
+
+.sectionTitleBlock {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+}
+
+.sectionTitle {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--omni-color-text-primary, #0f172a);
+  letter-spacing: -0.02em;
+  margin: 0;
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: color 0.18s ease;
+}
+
+.sectionCard:hover .sectionTitle {
+  color: var(--omni-color-primary-700, #1d4ed8);
+}
+
+.fieldCountBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: var(--omni-radius-pill, 999px);
+  flex-shrink: 0;
+  letter-spacing: 0.1px;
+  user-select: none;
+}
+
+.countDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.countNumber {
+  font-weight: 700;
+  font-feature-settings: 'tnum';
+  font-variant-numeric: tabular-nums;
+}
+
+.countText {
+  font-weight: 600;
+  opacity: 0.9;
+}
+
+/* Themed count badge styles matching each section */
+.countBadgeBlue {
+  background: var(--omni-color-primary-50, #eff6ff);
+  color: var(--omni-color-primary-700, #1d4ed8);
+  border: 1px solid #bfdbfe;
+}
+.countBadgeBlue .countDot {
+  background: var(--omni-color-primary-500, #3b82f6);
+}
+
+.countBadgeIndigo {
+  background: #eef2ff;
+  color: #4338ca;
+  border: 1px solid #c7d2fe;
+}
+.countBadgeIndigo .countDot {
+  background: #6366f1;
+}
+
+.countBadgeEmerald {
+  background: var(--omni-color-success-50, #ecfdf5);
+  color: var(--omni-color-success-700, #047857);
+  border: 1px solid #a7f3d0;
+}
+.countBadgeEmerald .countDot {
+  background: var(--omni-color-success-500, #10b981);
+}
+
+.countBadgePurple {
+  background: #ede9fe;
+  color: #6d28d9;
+  border: 1px solid #ddd6fe;
+}
+.countBadgePurple .countDot {
+  background: #8b5cf6;
+}
+
+.countBadgeAmber {
+  background: var(--omni-color-warning-50, #fffbeb);
+  color: var(--omni-color-warning-700, #b45309);
+  border: 1px solid #fde68a;
+}
+.countBadgeAmber .countDot {
+  background: var(--omni-color-warning-500, #f59e0b);
+}
+
+.countBadgeTeal {
+  background: #f0fdfa;
+  color: #0f766e;
+  border: 1px solid #99f6e4;
+}
+.countBadgeTeal .countDot {
+  background: #14b8a6;
+}
+
+.countBadgeSky {
+  background: #f0f9ff;
+  color: #0369a1;
+  border: 1px solid #bae6fd;
+}
+.countBadgeSky .countDot {
+  background: #0ea5e9;
+}
+
+/* ── 2-Column Grid of Field Rows ── */
+.fieldsGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 28px;
+  row-gap: 0;
+  width: 100%;
+}
+
+/* ── Clean Field Data Row (text representation with subtle separator, no nested box) ── */
+.fieldBox {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 4px;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--omni-color-border-subtle, #f1f5f9);
+  border-radius: 0;
+  min-height: 42px;
+  transition: background-color 0.15s ease;
+  position: relative;
+}
+
+.fieldBox:hover {
+  background: transparent;
+}
+
+.fieldBoxFull {
+  grid-column: 1 / -1;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 11px 4px;
+  min-height: 50px;
+}
+
+.fieldLabel {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--omni-color-text-secondary, #64748b);
+  letter-spacing: 0.01em;
+  min-width: 0;
+  flex: 1;
+  line-height: 1.35;
+}
+
+.fieldBox:not(.fieldBoxFull) .fieldLabel {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fieldValueContainer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-shrink: 0;
+  max-width: 65%;
+  text-align: right;
+}
+
+.fieldBoxFull .fieldValueContainer {
+  justify-content: flex-start;
+  text-align: left;
+  width: 100%;
+  max-width: 100%;
+}
+
+.fieldValue {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--omni-color-text-primary, #0f172a);
+  white-space: nowrap;
+  line-height: 1.35;
+}
+
+.fieldBoxFull .fieldValue {
+  white-space: normal;
+  word-break: break-word;
+}
+
+.placeholderValue {
+  color: var(--omni-color-text-muted, #94a3b8);
+  font-weight: 500;
+}
+
+.statusActive {
+  display: inline-flex;
+  align-items: center;
+  padding: 2.5px 9px;
+  font-size: 11.5px;
+  font-weight: 700;
+  border-radius: var(--omni-radius-pill, 999px);
+  background: var(--omni-color-success-50, #ecfdf5);
+  color: var(--omni-color-success-600, #059669);
+  border: 1px solid #a7f3d0;
+}
+
+.statusPriority {
+  display: inline-flex;
+  align-items: center;
+  padding: 2.5px 9px;
+  font-size: 11.5px;
+  font-weight: 700;
+  border-radius: var(--omni-radius-pill, 999px);
+  background: var(--omni-color-warning-50, #fff7ed);
+  color: var(--omni-color-warning-700, #c2410c);
+  border: 1px solid #ffedd5;
+}
+
+/* ── Sensitive Row & Reveal Button ── */
+.sensitiveRow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.revealBtn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 3px 6px;
+  color: var(--omni-color-primary-600, #2563eb);
+  border-radius: var(--omni-radius-xs, 4px);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.revealBtn:hover {
+  background: var(--omni-color-primary-50, #eff6ff);
+  color: var(--omni-color-primary-700, #1d4ed8);
+}
+
+/* ── Link Value ── */
+.linkValue {
+  color: var(--omni-color-primary-600, #2563eb);
+  text-decoration: none;
+  font-size: 13.5px;
+  font-weight: 600;
+  word-break: break-all;
+  transition: color 0.15s ease;
+}
+
 .linkValue:hover {
   text-decoration: underline;
+  color: var(--omni-color-primary-700, #1d4ed8);
+}
+
+@media (max-width: 640px) {
+  .fieldsGrid {
+    grid-template-columns: 1fr;
+  }
 }

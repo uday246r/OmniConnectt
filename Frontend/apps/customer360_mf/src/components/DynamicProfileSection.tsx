@@ -3,57 +3,28 @@ import {
   User, MapPin, Phone, Mail, Calendar, Globe, Shield, BookOpen, DollarSign, AlertTriangle,
   Hash, CreditCard, Building2, CheckSquare, TrendingUp, FileText, Briefcase, Eye, EyeOff,
 } from '@omniconnect/ui/icons';
-import { DetailField, DetailGrid, DetailSection } from '@omniconnect/ui';
 import type { ContactDetail, CustomerProfile, FieldConfig } from '../types/api';
 import { applyMaskingRule, formatFieldValue, hasRevealableValue } from '../utils/fieldMasking';
 import styles from './DynamicProfileSection.module.css';
 
-/** Decorative only — which icon a known section heading gets. Not part of the admin-configurable
- * spec (label/visibility/section/order/sensitive/masking), so kept as a small static lookup here
- * rather than a new DB column; an unrecognized section name still renders fine with the fallback. */
+/** Decorative section icon lookup — provides distinct visual identity per section */
 const SECTION_ICONS: Record<string, React.ReactNode> = {
-  'Personal Details': <User size={16} />,
-  'Residency Details': <MapPin size={16} />,
-  'Contact Details': <Phone size={16} />,
-  'Employment Details': <Briefcase size={16} />,
-  'Additional Details': <FileText size={16} />,
-  'Referrer & Relationship Information': <User size={16} />,
-  'Company Details': <Building2 size={16} />,
-  'Online Banking Status': <Globe size={16} />,
-  'Business Registration': <FileText size={16} />,
-  'Company Information': <Briefcase size={16} />,
-  'Contact Information': <Phone size={16} />,
-  'RM Manager Information': <User size={16} />,
+  'Personal Details': <User size={20} />,
+  'Residency Details': <MapPin size={20} />,
+  'Contact Details': <Phone size={20} />,
+  'Employment Details': <Briefcase size={20} />,
+  'Additional Details': <FileText size={20} />,
+  'Referrer & Relationship Information': <User size={20} />,
+  'Company Details': <Building2 size={20} />,
+  'Online Banking Status': <Globe size={20} />,
+  'Business Registration': <FileText size={20} />,
+  'Company Information': <Building2 size={20} />,
+  'Contact Information': <Phone size={20} />,
+  'RM Manager Information': <User size={20} />,
+  'Registered Address': <MapPin size={20} />,
+  'Business Address': <MapPin size={20} />,
+  'Mailing Address': <MapPin size={20} />,
 };
-
-const FIELD_ICONS: Record<string, React.ReactNode> = {
-  salutation: <User size={14} />,
-  gender: <User size={14} />, birthDate: <Calendar size={14} />, race: <User size={14} />,
-  religion: <Globe size={14} />, bumiStatus: <Shield size={14} />, educationLevel: <BookOpen size={14} />,
-  hnwi: <DollarSign size={14} />, pep: <AlertTriangle size={14} />, status: <User size={14} />,
-  disabilityStatus: <User size={14} />, branch: <Building2 size={14} />, pdpaTag: <CheckSquare size={14} />,
-  phprId: <Hash size={14} />, nationalId: <CreditCard size={14} />, oldId: <CreditCard size={14} />,
-  passport: <CreditCard size={14} />, languagePreferred: <Globe size={14} />, mybsnInd: <CheckSquare size={14} />,
-  vipTagging: <Shield size={14} />, placeBirth: <MapPin size={14} />, citizenship: <Globe size={14} />,
-  resdCode: <Building2 size={14} />, 'contact.fixedAddress': <MapPin size={14} />,
-  'contact.padrEmail1': <Mail size={14} />, 'contact.contactNumber': <Phone size={14} />,
-  preferComChnl: <Mail size={14} />, marketMessageOpt: <TrendingUp size={14} />,
-  jobStatus: <Briefcase size={14} />, employerName: <Building2 size={14} />, employerPhone: <Phone size={14} />,
-  employerEmail: <Mail size={14} />, payrollInd: <CheckSquare size={14} />, designation: <User size={14} />,
-  occupation: <Briefcase size={14} />, industry: <Building2 size={14} />, annualIncome: <DollarSign size={14} />,
-  employerAddress: <MapPin size={14} />, openingDate: <Calendar size={14} />,
-  turnedNonResidentDate: <Calendar size={14} />, lastContactDate: <Calendar size={14} />,
-  flags: <Shield size={14} />, segmentation: <TrendingUp size={14} />, refEmployeeName: <User size={14} />,
-  refEmployeeEmail: <Mail size={14} />, refEmployeeId: <Hash size={14} />, refEmployeePhoneNo: <Phone size={14} />,
-  refStaffId: <FileText size={14} />, organizationType: <Building2 size={14} />, country: <Globe size={14} />,
-  onlineBankingRegistrationStatus: <User size={14} />, onlineBankingActivationStatus: <Shield size={14} />,
-  businessRegDate: <Calendar size={14} />, organizationName: <Building2 size={14} />, brn: <FileText size={14} />,
-  brn2: <FileText size={14} />, economicSector: <Building2 size={14} />, companyWebsite: <Globe size={14} />,
-  tin: <FileText size={14} />, cifNumber: <FileText size={14} />, residentType: <Globe size={14} />,
-  residentAddress: <MapPin size={14} />, rmName: <User size={14} />, rmId: <FileText size={14} />,
-  rmBranchCode: <Building2 size={14} />, rmContactNo: <Phone size={14} />,
-};
-
 /** contact.X ApiFields live on the separate ContactDetail object (GET /v1/contactinfo), not the
  * profile itself — every other ApiField is read straight off the profile. */
 function resolveRawValue(
@@ -81,8 +52,7 @@ function resolveRawValue(
 }
 
 /** Adjacent configs (already sorted by displayOrder) grouped by Section, preserving the order each
- * section first appears in — so admin-chosen displayOrder controls section order too, without a
- * separate "section order" column. */
+ * section first appears in. */
 export function groupBySection(configs: FieldConfig[]): { section: string; fields: FieldConfig[] }[] {
   const groups: { section: string; fields: FieldConfig[] }[] = [];
   for (const config of configs) {
@@ -99,29 +69,88 @@ export function groupBySection(configs: FieldConfig[]): { section: string; field
 interface DynamicProfileSectionProps {
   section: string;
   fields: FieldConfig[];
-  profile: CustomerProfile | null;
-  contactInfo: ContactDetail | null;
-  revealed: Record<string, boolean>;
-  onToggleReveal: (fieldKey: string, fieldLabel: string, realVal: string) => void;
+  profile?: CustomerProfile | null;
+  contactInfo?: ContactDetail | null;
+  revealed?: Record<string, boolean>;
+  onToggleReveal?: (fieldKey: string, fieldLabel: string, realVal: string) => void;
+  loading?: boolean;
 }
 
 /**
- * Renders one Section's worth of fields through the platform's shared `DetailSection`/`DetailGrid`/
- * `DetailField` primitives — the same ones the host's audit drawers and this remote's own Audit Logs
- * page already use. Which fields appear, their labels, order, and masking all come from FieldConfig;
- * a field whose resolved value is empty is skipped entirely (`DetailField`'s own rule), so a profile
- * with 30 of its 80 possible fields populated renders 30 fields, not 30 values and 50 blanks.
+ * Enhanced, modern presentation for customer profile sections.
+ * Uses a clean horizontal card-box structure (label on left, value on right)
+ * delivering a polished, high-density banking UI without any copy options.
  */
 export default function DynamicProfileSection({
-  section, fields, profile, contactInfo, revealed, onToggleReveal,
+  section,
+  fields,
+  profile = null,
+  contactInfo = null,
+  revealed = {},
+  onToggleReveal = () => {},
+  loading = false,
 }: DynamicProfileSectionProps) {
   const visibleFields = fields.filter((f) => f.visible);
   if (visibleFields.length === 0) return null;
 
   return (
-    <DetailSection title={section} icon={SECTION_ICONS[section] ?? <FileText size={16} />}>
-      <DetailGrid>
-        {visibleFields.map((config) => {
+    <div className={`${styles.sectionCard} ${styles.cardThemeBlue}`}>
+      {/* Section Header */}
+      <div className={styles.sectionHeader}>
+        <div className={styles.sectionHeaderLeft}>
+          <div className={`${styles.sectionIconBadge} ${styles.badgeBlue}`}>
+            {SECTION_ICONS[section] ?? <FileText size={20} />}
+          </div>
+          <div className={styles.sectionTitleBlock}>
+            <h3 className={styles.sectionTitle}>{section}</h3>
+          </div>
+        </div>
+        <span className={`${styles.fieldCountBadge} ${styles.countBadgeBlue}`}>
+          <span className={styles.countDot} />
+          <span className={styles.countNumber}>{visibleFields.length}</span>
+          <span className={styles.countText}>{visibleFields.length === 1 ? 'field' : 'fields'}</span>
+        </span>
+      </div>
+
+      {/* Grid of Clean Field Boxes */}
+      <div className={styles.fieldsGrid}>
+        {visibleFields.map((config, index) => {
+          if (loading) {
+            const isFullWidth =
+              /address/i.test(config.displayLabel) ||
+              /remark/i.test(config.displayLabel) ||
+              /description/i.test(config.displayLabel) ||
+              config.displayLabel.length > 28;
+
+            const order = typeof config.displayOrder === 'number' ? config.displayOrder : 1;
+            // Shimmer box for label (left side) — pure box placeholder rather than text
+            const labelMod = (order * 11 + config.displayLabel.length * 5) % 40;
+            const labelWidth = isFullWidth ? '35%' : `${72 + labelMod}px`;
+
+            // Shimmer box for value (right side) — pure box placeholder
+            const valMod = (order * 17 + config.displayLabel.length * 7) % 35;
+            const valWidth = isFullWidth ? '65%' : `${60 + valMod}px`;
+
+            return (
+              <div
+                key={config.id || config.apiField}
+                className={`${styles.fieldBox} ${isFullWidth ? styles.fieldBoxFull : ''}`}
+              >
+                <div
+                  className="c360-skel c360-skel-text"
+                  style={{ width: labelWidth, height: '12px', borderRadius: '4px' }}
+                />
+
+                <div className={styles.fieldValueContainer}>
+                  <div
+                    className="c360-skel c360-skel-text"
+                    style={{ width: valWidth, height: '14px', borderRadius: '4px' }}
+                  />
+                </div>
+              </div>
+            );
+          }
+
           const raw = resolveRawValue(profile, contactInfo, config.apiField);
           const revealable = config.sensitive && hasRevealableValue(raw);
           const rawStr = revealable ? String(raw) : '';
@@ -140,49 +169,59 @@ export default function DynamicProfileSection({
             displayValue = formatFieldValue(valueToFormat);
           }
 
-          // Any non-sensitive field whose value happens to be a URL renders as a real link — a
-          // generic behavior, not special-cased to one field name (the old inline JSX only did this
-          // for "Company Website" specifically).
           const isLink = !config.sensitive && /^(https?:\/\/|www\.)/i.test(displayValue);
-
-          // Long values (addresses, mainly) get the same "full-width" card treatment the old
-          // hardcoded JSX gave specific address fields — inferred from content length/label rather
-          // than a dedicated config column, since a value that's long is long regardless of which
-          // field it's in.
-          const isFullWidth = displayValue.length > 40 || /address/i.test(config.displayLabel);
+          const isFullWidth =
+            displayValue.length > 25 ||
+            /address/i.test(config.displayLabel) ||
+            (config.displayLabel.length > 24 && displayValue.length > 9) ||
+            (config.displayLabel.length + displayValue.length > 34);
+          const isPlaceholder = displayValue === '_' || displayValue === '-';
+          const isStatusActive = displayValue.toUpperCase() === 'ACTIVE' || displayValue.toUpperCase() === 'YES';
 
           return (
-            <DetailField
+            <div
               key={config.id}
-              label={config.displayLabel}
-              icon={FIELD_ICONS[config.apiField] ?? <FileText size={14} />}
-              full={isFullWidth}
+              className={`${styles.fieldBox} ${isFullWidth ? styles.fieldBoxFull : ''}`}
             >
-              {config.sensitive ? (
-                <span className={styles.spread}>
-                  <span className={styles.rule}>{displayValue}</span>
-                  {revealable && (
-                    <button
-                      type="button"
-                      onClick={() => onToggleReveal(config.apiField, config.displayLabel, rawStr)}
-                      className={styles.row}
-                      title={isRevealed ? 'Hide details' : 'Reveal details'}
-                    >
-                      {isRevealed ? <EyeOff size={15} /> : <Eye size={15} />}
-                    </button>
-                  )}
-                </span>
-              ) : isLink ? (
-                <a href={displayValue} target="_blank" rel="noreferrer" className={styles.linkValue}>
-                  {displayValue}
-                </a>
-              ) : (
-                displayValue
-              )}
-            </DetailField>
+              <span className={styles.fieldLabel}>
+                {config.displayLabel}
+              </span>
+
+              <div className={styles.fieldValueContainer}>
+                {config.sensitive ? (
+                  <div className={styles.sensitiveRow}>
+                    <span className={`${styles.fieldValue} ${isPlaceholder ? styles.placeholderValue : ''}`}>
+                      {displayValue}
+                    </span>
+                    {revealable && (
+                      <button
+                        type="button"
+                        onClick={() => onToggleReveal(config.apiField, config.displayLabel, rawStr)}
+                        className={styles.revealBtn}
+                        title={isRevealed ? 'Hide details' : 'Reveal details'}
+                      >
+                        {isRevealed ? <EyeOff size={15} /> : <Eye size={15} />}
+                      </button>
+                    )}
+                  </div>
+                ) : isLink ? (
+                  <a href={displayValue} target="_blank" rel="noreferrer" className={styles.linkValue}>
+                    {displayValue}
+                  </a>
+                ) : isStatusActive ? (
+                  <span className={styles.statusActive}>
+                    {displayValue}
+                  </span>
+                ) : (
+                  <span className={`${styles.fieldValue} ${isPlaceholder ? styles.placeholderValue : ''}`}>
+                    {displayValue}
+                  </span>
+                )}
+              </div>
+            </div>
           );
         })}
-      </DetailGrid>
-    </DetailSection>
+      </div>
+    </div>
   );
 }

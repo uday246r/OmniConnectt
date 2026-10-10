@@ -396,7 +396,7 @@
 }
 
 .row8 {
-  color: #004EEB;
+  color: var(--omni-color-primary-600, #2563eb);
   font-weight: var(--omni-font-weight-semibold);
   cursor: pointer;
   display: flex;
@@ -422,7 +422,7 @@
 .row10 {
   display: flex;
   gap: 24px;
-  border-bottom: 1px solid #E5E7EB;
+  border-bottom: 1px solid var(--omni-color-border, #e2e8f0);
   padding-bottom: 12px;
   margin-bottom: 24px;
 }
@@ -444,13 +444,13 @@
 
 .strong4 {
   font-weight: var(--omni-font-weight-semibold);
-  color: var(--omni-color-text-primary, #1e293b);
+  color: var(--omni-color-text-primary, #0f172a);
 }
 
 .text2 {
   text-align: center;
   padding: 24px;
-  color: #6B7280;
+  color: var(--omni-color-text-secondary, #64748b);
 }
 
 .stack6 {
@@ -481,7 +481,7 @@
   border: none;
   cursor: pointer;
   padding: 2px;
-  color: #004EEB;
+  color: var(--omni-color-primary-600, #2563eb);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -491,7 +491,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  color: #004EEB;
+  color: var(--omni-color-primary-600, #2563eb);
   font-size: 13px;
   font-weight: var(--omni-font-weight-bold);
   text-transform: uppercase;
@@ -506,15 +506,15 @@
 .filterToggle {
   height: 38px;
   background-color: var(--omni-color-surface);
-  border-color: #e5e7eb;
-  color: #374151;
+  border-color: var(--omni-color-border, #e2e8f0);
+  color: var(--omni-color-text-primary, #0f172a);
 }
 
 .filterToggleOn,
 .filterToggleOn:hover {
-  background-color: var(--omni-color-primary-50);
-  border-color: #004eeb;
-  color: #004eeb;
+  background-color: var(--omni-color-primary-50, #eff6ff);
+  border-color: var(--omni-color-primary-600, #2563eb);
+  color: var(--omni-color-primary-600, #2563eb);
 }
 
 /* Pagination page circle. */
@@ -525,22 +525,22 @@
   padding: 0;
   justify-content: center;
   background-color: var(--omni-color-surface);
-  color: #374151;
-  border-color: #e5e7eb;
+  color: var(--omni-color-text-secondary, #475569);
+  border-color: var(--omni-color-border, #e2e8f0);
 }
 
 .pageDotActive,
 .pageDotActive:hover {
-  background-color: #004eeb;
-  color: var(--omni-color-surface);
-  border-color: #004eeb;
+  background-color: var(--omni-color-primary-600, #2563eb);
+  color: #ffffff;
+  border-color: var(--omni-color-primary-600, #2563eb);
 }
 
 /* Underlined sub-tab. */
 .subTab {
   font-weight: var(--omni-font-weight-bold);
   font-size: var(--omni-font-size-sm);
-  color: #6b7280;
+  color: var(--omni-color-text-secondary, #64748b);
   cursor: pointer;
   border-bottom: 2px solid transparent;
   padding-bottom: 10px;
@@ -551,8 +551,8 @@
 }
 
 .subTabActive {
-  color: #004eeb;
-  border-bottom-color: #004eeb;
+  color: var(--omni-color-primary-600, #2563eb);
+  border-bottom-color: var(--omni-color-primary-600, #2563eb);
 }
 
 /* Account status chip — active vs everything else. */
@@ -818,33 +818,47 @@
 
 /* ── Corporate Signatories Showcase ────────────────────────────── */
 .signatoryCard {
-  padding: 24px;
-  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
-  border-radius: 12px;
-  border: 1px solid var(--omni-color-border, #e2e8f0);
+  padding: 22px 24px;
+  background: var(--omni-color-surface, #ffffff);
+  border-radius: 16px;
+  border: 1px solid #eaecf0;
   margin-bottom: 20px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+  position: relative;
+  overflow: hidden;
+}
+
+.signatoryCard::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  border-radius: 16px 16px 0 0;
+  background: linear-gradient(90deg, #2563eb, #60a5fa);
 }
 
 .signatoryCardHeader {
   display: flex;
   align-items: center;
-  gap: 16px;
-  margin-bottom: 20px;
+  gap: 14px;
+  margin-bottom: 18px;
 }
 
 .signatoryAvatar {
-  width: 52px;
-  height: 52px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
-  color: #ffffff;
-  font-size: 20px;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: var(--omni-color-primary-50, #eff6ff);
+  color: var(--omni-color-primary-600, #2563eb);
+  border: 1.5px solid #bfdbfe;
+  font-size: 17px;
   font-weight: 700;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 2px 8px rgba(2, 132, 199, 0.25);
+  box-shadow: 0 1px 3px rgba(37, 99, 235, 0.12);
   flex-shrink: 0;
 }
 
@@ -861,7 +875,7 @@
 }
 
 .signatoryName {
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 700;
   color: var(--omni-color-text-primary, #0f172a);
   margin: 0;
@@ -871,47 +885,51 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 3px 10px;
+  padding: 2.5px 9px;
   border-radius: 9999px;
   font-size: 11px;
   font-weight: 600;
-  background: #f0fdf4;
-  color: #15803d;
-  border: 1px solid #bbf7d0;
+  background: var(--omni-color-success-50, #ecfdf5);
+  color: var(--omni-color-success-700, #047857);
+  border: 1px solid #a7f3d0;
 }
 
 .signatoryPosition {
-  font-size: 13px;
+  font-size: 12.5px;
   color: var(--omni-color-text-secondary, #64748b);
   margin-top: 2px;
 }
 
 .signatoryGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 14px;
-  padding-top: 16px;
-  border-top: 1px solid var(--omni-color-border, #e2e8f0);
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+  padding-top: 14px;
+  border-top: 1px solid #eaecf0;
 }
 
 .signatoryField {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 3px;
+  padding: 8px 12px;
+  background: var(--omni-color-surface-alt, #f8fafc);
+  border: 1px solid #eaecf0;
+  border-radius: 9px;
 }
 
 .signatoryFieldLabel {
-  font-size: 11px;
+  font-size: 10.5px;
   font-weight: 600;
   text-transform: uppercase;
   color: var(--omni-color-text-muted, #64748b);
-  letter-spacing: 0.03em;
+  letter-spacing: 0.04em;
 }
 
 .signatoryFieldValue {
-  font-size: 14px;
+  font-size: 13.5px;
   font-weight: 600;
-  color: var(--omni-color-text-primary, #1e293b);
+  color: var(--omni-color-text-primary, #0f172a);
   display: flex;
   align-items: center;
   gap: 8px;
@@ -919,73 +937,91 @@
 
 /* ── Interested Products Showcase Card ─────────────────────────── */
 .interestedCard {
-  padding: 24px;
-  background: linear-gradient(135deg, #ffffff 0%, #faf5ff 100%);
-  border-radius: 12px;
-  border: 1px solid #e9d5ff;
-  box-shadow: 0 1px 3px rgba(147, 51, 234, 0.05);
+  padding: 22px 24px;
+  background: var(--omni-color-surface, #ffffff);
+  border-radius: 16px;
+  border: 1px solid #eaecf0;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
   margin-bottom: 20px;
+  position: relative;
+  overflow: hidden;
+}
+
+.interestedCard::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  border-radius: 16px 16px 0 0;
+  background: linear-gradient(90deg, #7c3aed, #a78bfa);
 }
 
 .interestedHeader {
   display: flex;
   align-items: center;
-  gap: 14px;
-  margin-bottom: 20px;
+  gap: 12px;
+  margin-bottom: 18px;
 }
 
 .interestedIconBadge {
-  width: 42px;
-  height: 42px;
+  width: 36px;
+  height: 36px;
   border-radius: 10px;
-  background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%);
-  color: #ffffff;
+  background: #ede9fe;
+  color: #7c3aed;
+  border: 1px solid #ddd6fe;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 2px 8px rgba(109, 40, 217, 0.25);
+  box-shadow: 0 1px 3px rgba(124, 58, 237, 0.12);
   flex-shrink: 0;
 }
 
 .interestedTitle {
-  font-size: 17px;
+  font-size: 15px;
   font-weight: 700;
-  color: #1e1b4b;
+  color: var(--omni-color-text-primary, #0f172a);
   margin: 0;
 }
 
 .interestedHint {
-  font-size: 13px;
-  color: #6b7280;
+  font-size: 12px;
+  color: var(--omni-color-text-secondary, #64748b);
   margin: 2px 0 0;
 }
 
 .interestedGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 16px;
-  padding-top: 16px;
-  border-top: 1px solid #f3e8ff;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  padding-top: 14px;
+  border-top: 1px solid #eaecf0;
 }
 
 .interestedItem {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 3px;
+  padding: 8px 12px;
+  background: var(--omni-color-surface-alt, #f8fafc);
+  border: 1px solid #eaecf0;
+  border-radius: 9px;
 }
 
 .interestedLabel {
-  font-size: 11px;
+  font-size: 10.5px;
   font-weight: 600;
   text-transform: uppercase;
   color: #7c3aed;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.04em;
 }
 
 .interestedValue {
-  font-size: 14px;
+  font-size: 13.5px;
   font-weight: 600;
-  color: #1e293b;
+  color: var(--omni-color-text-primary, #0f172a);
 }
 
 /* ── Legacy recent classes preserved for backwards-compat ──────── */
@@ -1050,4 +1086,174 @@
 
 .treeRowIndent {
   margin-left: var(--omni-space-3);
+}
+
+/* ── Modern Segmented Main Navigation Bar & Full-Screen Layout ── */
+.workspaceWrapper {
+  width: 100%;
+}
+
+.mainNavBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 6px 14px 6px 18px;
+  background: var(--omni-color-surface, #ffffff);
+  border: 1.5px solid #e8edf5;
+  border-radius: var(--omni-radius-xl, 16px);
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+  border-top: 3.5px solid var(--omni-color-primary-600, #2563eb);
+  margin-bottom: 22px;
+  flex-wrap: wrap;
+}
+
+.mainTabsList {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0;
+  flex-wrap: wrap;
+}
+
+.mainTabBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 18px;
+  font-size: var(--omni-font-size-sm, 13.5px);
+  font-weight: var(--omni-font-weight-semibold, 600);
+  color: var(--omni-color-text-secondary, #64748b);
+  background: transparent;
+  border: none;
+  border-radius: var(--omni-radius-lg-minus, 10px);
+  cursor: pointer;
+  transition: all 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+  font-family: inherit;
+}
+
+.mainTabBtn:hover {
+  color: var(--omni-color-text-primary, #0f172a);
+  background: var(--omni-color-surface-alt, #f8fafc);
+}
+
+.mainTabBtnActive {
+  background: var(--omni-color-primary-50, #eff6ff) !important;
+  color: var(--omni-color-primary-600, #2563eb) !important;
+  font-weight: var(--omni-font-weight-bold, 700) !important;
+  box-shadow: inset 0 0 0 1px var(--omni-color-primary-200, #bfdbfe) !important;
+}
+
+.mainTabCount {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1px 7px;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 9999px;
+  background: rgba(100, 116, 139, 0.12);
+  color: inherit;
+}
+
+.mainTabBtnActive .mainTabCount {
+  background: var(--omni-color-primary-200, #bfdbfe);
+  color: var(--omni-color-primary-700, #1d4ed8);
+}
+
+.tabContentContainer {
+  width: 100%;
+}
+
+/* ── Corporate Overview 2-Column Balanced Grid ── */
+.corpOverviewGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+  align-items: start;
+  width: 100%;
+}
+
+.corpOverviewCol {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+}
+
+@media (max-width: 1024px) {
+  .corpOverviewGrid {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+}
+
+/* ── Modern Premium View Button for Data Tables ── */
+.viewActionBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 6px;
+  padding: 4px 11px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #1d4ed8;
+  cursor: pointer;
+  transition: all 0.16s cubic-bezier(0.4, 0, 0.2, 1);
+  white-space: nowrap;
+  box-shadow: 0 1px 2px rgba(37, 99, 235, 0.05);
+  font-family: inherit;
+}
+
+.viewActionBtn:hover {
+  background: #2563eb;
+  border-color: #1d4ed8;
+  color: #ffffff;
+  box-shadow: 0 3px 8px rgba(37, 99, 235, 0.25);
+  transform: translateY(-1px);
+}
+
+.viewActionBtn:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 2px rgba(37, 99, 235, 0.15);
+}
+
+.viewActionBtn:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 1px;
+}
+
+.viewActionIcon {
+  flex-shrink: 0;
+  transition: transform 0.16s ease;
+}
+
+.viewActionBtn:hover .viewActionIcon {
+  transform: scale(1.1);
+}
+
+.leadCustomerName {
+  font-weight: 600;
+  color: var(--omni-color-text-primary, #0f172a);
+  font-size: 13.5px;
+}
+
+.leadCustomerIc {
+  font-size: 11.5px;
+  color: var(--omni-color-text-secondary, #64748b);
+  font-family: var(--omni-font-mono, monospace);
+  margin-top: 1px;
+}
+
+.leadProductName {
+  font-weight: 600;
+  color: var(--omni-color-text-primary, #0f172a);
+}
+
+.leadCategoryName {
+  font-size: 12px;
+  color: var(--omni-color-text-muted, #94a3b8);
 }

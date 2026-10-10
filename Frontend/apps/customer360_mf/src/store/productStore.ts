@@ -196,7 +196,26 @@ export const useProductStore = create<ProductStoreState>((set, get) => ({
       });
     } catch (err) {
       if (version !== _productsVersion) return;
-      set({ error: (err as ApiError).message, errorStatus: (err as ApiError).status ?? null, loading: false });
+      const apiErr = err as ApiError;
+      if (apiErr.status === 404) {
+        // A 404 from the CRM means no products exist for this customer ID — valid empty list
+        set({
+          products: [],
+          totalCount: 0,
+          totalPages: 1,
+          loading: false,
+          error: null,
+          errorStatus: null,
+        });
+        return;
+      }
+      set({
+        products: [],
+        totalCount: 0,
+        error: apiErr.message,
+        errorStatus: apiErr.status ?? null,
+        loading: false,
+      });
       console.error('Error loading products:', err);
     }
   },

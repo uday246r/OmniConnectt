@@ -37,8 +37,9 @@
 }
 
 .pageNavBtn:hover:not(:disabled) {
-  background: var(--omni-color-surface-alt);
-  border-color: var(--omni-color-border-strong);
+  background: var(--omni-color-primary-50, #eff6ff);
+  border-color: var(--omni-color-primary-200, #bfdbfe);
+  color: var(--omni-color-primary-600, #2563eb);
 }
 
 .pageNavBtn:disabled {
@@ -110,15 +111,15 @@
 
 /*
  * The white table card — matches the host's Users page and lead_mf's View Leads / Audit Trail
- * (`shell.card` there): 18px radius, the same border/shadow, so a card in this remote reads as the
+ * (`shell.card` there): 16px radius, the same border/shadow, so a card in this remote reads as the
  * same platform surface rather than the older `.c360-table-container` global class's own token
  * indirection layer.
  */
 .card {
-  background: var(--omni-color-surface);
-  border-radius: 18px;
-  border: 1.5px solid #e8edf5;
-  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+  background: var(--omni-color-surface, #ffffff);
+  border-radius: var(--omni-radius-xl, 16px);
+  border: 1px solid #eaecf0;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
   overflow: hidden;
   box-sizing: border-box;
   display: flex;
@@ -127,18 +128,13 @@
 
 /*
  * Table toolbar: search on the left, actions on the right.
- *
- * The three table pages (Audit Logs, All Products, All Interactions) each had this element left
- * with an EMPTY className — collateral from an earlier automated class-renaming pass — so the row
- * had no layout at all. The search box stayed at its intrinsic width and the Refresh / action
- * button wrapped onto its own line beneath it.
  */
 .toolbar {
   display: flex;
   align-items: center;
   gap: var(--omni-space-3);
   padding: var(--omni-space-4);
-  border-bottom: 1px solid var(--omni-color-border);
+  border-bottom: 1px solid #eaecf0;
   flex-wrap: wrap;
 }
 

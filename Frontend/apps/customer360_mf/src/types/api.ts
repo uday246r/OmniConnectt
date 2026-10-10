@@ -487,3 +487,32 @@ export interface ApprovalPendingDto {
 export function isApprovalPending(value: unknown): value is ApprovalPendingDto {
   return typeof value === 'object' && value !== null && 'approvalRequestId' in value;
 }
+
+/**
+ * LeadRecord representation matching LeadService's LeadRecordDto
+ */
+export interface LeadRecord {
+  id: string;
+  name: string;
+  icNumber: string;
+  phone: string;
+  email: string;
+  product: string;
+  catalogProductId?: string | null;
+  categoryName?: string;
+  subCategoryId?: string | null;
+  subCategoryName?: string;
+  state: string;
+  branch: string;
+  status: string;
+  createdDate: string;
+  employerName?: string;
+  appliedAmount?: string;
+  preferredSalesExecutive?: string | null;
+  propertyType?: string | null;
+  propertyStatus?: string | null;
+  dateOfIncorporation?: string | null;
+  companyName?: string | null;
+  entityType?: string | null;
+  marketingConsent?: string | null;
+}

@@ -2,21 +2,18 @@ import React from 'react';
 import type { IndividualProfile, ContactDetail, FieldConfig } from '../types/api';
 import { useFieldReveal } from '../hooks/useFieldReveal';
 import DynamicProfileSection, { groupBySection } from './DynamicProfileSection';
-
 import { DEFAULT_INDIVIDUAL_FIELD_CONFIGS } from '../constants/defaultFieldConfigs';
 import styles from './IndividualDetails.module.css';
 
 interface IndividualDetailsProps {
-  subTab: string;
-  profile: IndividualProfile | null;
-  contactInfo: ContactDetail | null;
-  /** Field-visibility/masking config for the Individual profile — fetched once by Customer360.tsx
-   * and passed down, same as `profile`/`contactInfo`. */
-  fieldConfigs: FieldConfig[];
+  subTab?: string;
+  profile?: IndividualProfile | null;
+  contactInfo?: ContactDetail | null;
+  fieldConfigs?: FieldConfig[];
+  loading?: boolean;
 }
 
-/** Which Sections (in FieldConfig) render under which of this page's sub-tabs. Supports both
- * full composite keys and specific sub-section keys. */
+/** Which Sections (in FieldConfig) render under which of this page's sub-tabs. */
 const SUBTAB_SECTIONS: Record<string, string[]> = {
   personal_details: ['Personal Details'],
   personal: ['Personal Details'],
@@ -43,26 +40,42 @@ const SUBTAB_SECTIONS: Record<string, string[]> = {
   relationship_details: ['Referrer & Relationship Information'],
 
   details: ['Personal Details', 'Residency Details', 'Contact Details', 'Employment Details', 'Additional Details', 'Referrer & Relationship Information'],
+  overview: ['Personal Details', 'Residency Details', 'Contact Details', 'Employment Details', 'Additional Details', 'Referrer & Relationship Information'],
+  all: ['Personal Details', 'Residency Details', 'Contact Details', 'Employment Details', 'Additional Details', 'Referrer & Relationship Information'],
 };
 
-export default function IndividualDetails({ subTab, profile, contactInfo, fieldConfigs }: IndividualDetailsProps) {
+export default function IndividualDetails({
+  subTab = 'overview',
+  profile = null,
+  contactInfo = null,
+  fieldConfigs = [],
+  loading = false,
+}: IndividualDetailsProps) {
   const { revealed, toggleReveal } = useFieldReveal({
     customerName: profile?.fullName || 'Unknown',
     customerType: 'Individual',
     customerId: profile?.nationalId || '',
   });
 
-  if (!profile) return null;
+  if (!profile && !loading) return null;
 
-  const sectionsForTab = SUBTAB_SECTIONS[subTab] || ['Personal Details', 'Residency Details', 'Contact Details'];
+  const sectionsForTab = SUBTAB_SECTIONS[subTab] || [
+    'Personal Details',
+    'Residency Details',
+    'Contact Details',
+    'Employment Details',
+    'Additional Details',
+    'Referrer & Relationship Information',
+  ];
 
-  const configsByApiField = new Map(fieldConfigs.map((config) => [config.apiField, config]));
+  const safeConfigs = fieldConfigs || [];
+  const configsByApiField = new Map(safeConfigs.map((config) => [config.apiField, config]));
   const defaultApiFields = new Set(DEFAULT_INDIVIDUAL_FIELD_CONFIGS.map((config) => config.apiField));
   const effectiveConfigs = [
     ...DEFAULT_INDIVIDUAL_FIELD_CONFIGS.map(
       (defaultConfig) => configsByApiField.get(defaultConfig.apiField) ?? defaultConfig
     ),
-    ...fieldConfigs.filter((config) => !defaultApiFields.has(config.apiField)),
+    ...safeConfigs.filter((config) => !defaultApiFields.has(config.apiField)),
   ];
 
   const configsForTab = effectiveConfigs
@@ -70,8 +83,52 @@ export default function IndividualDetails({ subTab, profile, contactInfo, fieldC
     .sort((a, b) => a.displayOrder - b.displayOrder);
   const grouped = groupBySection(configsForTab);
 
+  const isOverview = ['overview', 'all', 'details'].includes(subTab) || sectionsForTab.length > 2;
+
+  if (isOverview) {
+    // Balanced 2-column distribution across full screen to optimize layout and eliminate excess vertical scroll:
+    // Col 1 (Left): Personal Details (~20 fields), Contact Details (~4 fields), Referrer & Relationship (~3 fields) -> ~27 fields
+    // Col 2 (Right): Employment Details (~10 fields), Residency Details (~4 fields), Additional Details (~5 fields) -> ~19 fields
+    const col1Sections = new Set(['Personal Details', 'Contact Details', 'Referrer & Relationship Information']);
+    const col1Groups = grouped.filter((g) => col1Sections.has(g.section));
+    const col2Groups = grouped.filter((g) => !col1Sections.has(g.section));
+
+    return (
+      <div className={styles.twoColumnGrid}>
+        <div className={styles.column}>
+          {col1Groups.map(({ section, fields }) => (
+            <DynamicProfileSection
+              key={section}
+              section={section}
+              fields={fields}
+              profile={profile}
+              contactInfo={contactInfo}
+              revealed={revealed}
+              onToggleReveal={toggleReveal}
+              loading={loading}
+            />
+          ))}
+        </div>
+        <div className={styles.column}>
+          {col2Groups.map(({ section, fields }) => (
+            <DynamicProfileSection
+              key={section}
+              section={section}
+              fields={fields}
+              profile={profile}
+              contactInfo={contactInfo}
+              revealed={revealed}
+              onToggleReveal={toggleReveal}
+              loading={loading}
+            />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className={styles.stack}>
+    <div className={styles.singleColumn}>
       {grouped.map(({ section, fields }) => (
         <DynamicProfileSection
           key={section}
@@ -81,6 +138,7 @@ export default function IndividualDetails({ subTab, profile, contactInfo, fieldC
           contactInfo={contactInfo}
           revealed={revealed}
           onToggleReveal={toggleReveal}
+          loading={loading}
         />
       ))}
     </div>

@@ -1,0 +1,548 @@
+.wrapper {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  margin-bottom: 18px;
+}
+
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--omni-color-text-secondary, #64748b);
+  margin-bottom: 12px;
+  font-weight: 500;
+  flex-wrap: wrap;
+}
+
+.breadcrumbRoot {
+  color: var(--omni-color-text-secondary, #64748b);
+  transition: color 0.15s ease;
+}
+
+.breadcrumbSeparator {
+  color: var(--omni-color-text-muted, #94a3b8);
+  font-size: 13px;
+}
+
+.breadcrumbCategory {
+  color: var(--omni-color-text-secondary, #475569);
+  font-weight: 500;
+}
+
+.breadcrumbCurrent {
+  color: var(--omni-color-text-primary, #0f172a);
+  font-weight: 700;
+}
+
+/* ── Hero Profile Banner (Host Executive Gradient with Luminous Glass Accents) ── */
+.banner {
+  background: linear-gradient(120deg, #1e40af 0%, #2563eb 45%, #3b82f6 100%);
+  border-radius: 18px;
+  padding: 24px 32px 20px;
+  color: #ffffff;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(37, 99, 235, 0.25), 0 1px 4px rgba(37, 99, 235, 0.15);
+  border: none;
+  backdrop-filter: blur(12px);
+  transition: all 0.25s ease;
+}
+
+.banner::before {
+  content: '';
+  position: absolute;
+  top: -50px;
+  right: -50px;
+  width: 220px;
+  height: 220px;
+  border-radius: var(--omni-radius-circle, 50%);
+  background: rgba(255, 255, 255, 0.08);
+  pointer-events: none;
+}
+
+.banner::after {
+  content: '';
+  position: absolute;
+  bottom: -60px;
+  right: 120px;
+  width: 160px;
+  height: 160px;
+  border-radius: var(--omni-radius-circle, 50%);
+  background: rgba(255, 255, 255, 0.05);
+  pointer-events: none;
+}
+
+.bannerMainRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  position: relative;
+  z-index: 1;
+}
+
+.profileLeft {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  min-width: 0;
+  flex: 1;
+}
+
+/* ── Avatar Section with Glow & Status ── */
+.avatarContainer {
+  position: relative;
+  flex-shrink: 0;
+  display: inline-flex;
+}
+
+.avatarCircle {
+  width: 58px;
+  height: 58px;
+  border-radius: var(--omni-radius-lg-plus, 14px);
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  border: 1.5px solid rgba(255, 255, 255, 0.32);
+  backdrop-filter: blur(8px);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.avatarCircle:hover {
+  transform: translateY(-1px) scale(1.02);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+}
+
+.avatarStatusDot {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: var(--omni-color-live-dot, #34d399);
+  border: 2.5px solid #2563eb;
+  box-shadow: 0 0 8px rgba(52, 211, 153, 0.8);
+}
+
+.profileInfo {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+  gap: 5px;
+}
+
+.nameRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.customerName {
+  font-size: 22px;
+  font-weight: 800;
+  color: #ffffff;
+  margin: 0;
+  letter-spacing: -0.025em;
+  line-height: 1.25;
+}
+
+.badgeList {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.statusBadge {
+  display: inline-flex;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.18);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  padding: 3px 11px;
+  border-radius: var(--omni-radius-pill, 999px);
+  font-size: 11.5px;
+  font-weight: 600;
+  backdrop-filter: blur(4px);
+}
+
+.statusDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #34d399;
+  margin-right: 5px;
+  box-shadow: 0 0 6px #34d399;
+  flex-shrink: 0;
+  animation: pulseGlow 2s infinite ease-in-out;
+}
+
+@keyframes pulseGlow {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(0.85);
+  }
+}
+
+.segmentationBadge {
+  display: inline-flex;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.18);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  padding: 3px 11px;
+  border-radius: var(--omni-radius-pill, 999px);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  backdrop-filter: blur(4px);
+}
+
+/* ── Primary Customer Identifier Pill (Clean Static Badge) ── */
+.idBadge {
+  display: inline-flex;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.16);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  padding: 3px 11px;
+  border-radius: var(--omni-radius-pill, 999px);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  backdrop-filter: blur(4px);
+  font-family: inherit;
+  cursor: default;
+  user-select: all;
+}
+
+.openCasesBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(245, 158, 11, 0.22);
+  color: #fef08a;
+  border: 1px solid rgba(251, 191, 36, 0.45);
+  padding: 3px 10px;
+  border-radius: var(--omni-radius-pill, 999px);
+  font-size: 11.5px;
+  font-weight: 600;
+  backdrop-filter: blur(4px);
+}
+
+.priorityBadge {
+  display: inline-flex;
+  align-items: center;
+  background: rgba(249, 115, 22, 0.22);
+  color: #ffedd5;
+  border: 1px solid rgba(251, 146, 60, 0.45);
+  padding: 3px 10px;
+  border-radius: var(--omni-radius-pill, 999px);
+  font-size: 11.5px;
+  font-weight: 600;
+  backdrop-filter: blur(4px);
+}
+
+.subline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.sublineItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 6.5px;
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  padding: 4px 11px;
+  border-radius: var(--omni-radius-md, 8px);
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(6px);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  transition: background 0.18s ease;
+}
+
+.sublineItem:hover {
+  background: rgba(255, 255, 255, 0.22);
+  border-color: rgba(255, 255, 255, 0.35);
+}
+
+.sublineIcon {
+  flex-shrink: 0;
+  transition: transform 0.15s ease;
+}
+
+/* Curated distinct metadata icon hues matching host palette */
+.iconId {
+  color: #93c5fd; /* brand blue 300 */
+}
+
+.iconLocation {
+  color: #fda4af; /* rose */
+}
+
+.iconSince {
+  color: #93c5fd; /* brand blue 300 */
+}
+
+.iconHoldings {
+  color: #fde68a; /* amber */
+}
+
+.iconContact {
+  color: #c4b5fd; /* purple */
+}
+
+.iconPhone {
+  color: #86efac; /* green */
+}
+
+.iconBranch {
+  color: #a5b4fc; /* indigo */
+}
+
+/* ── Top RM Details Chip (Executive Frosted Card in the right corner) ── */
+.bannerRmChip {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 8px 14px 8px 10px;
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: var(--omni-radius-lg-minus, 10px);
+  backdrop-filter: blur(6px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+
+.bannerRmChip:hover {
+  background: rgba(255, 255, 255, 0.22);
+  border-color: rgba(255, 255, 255, 0.35);
+}
+
+.bannerRmAvatar {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--omni-radius-md, 8px);
+  background: rgba(255, 255, 255, 0.22);
+  border: 1.5px solid rgba(255, 255, 255, 0.32);
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  backdrop-filter: blur(6px);
+}
+
+.bannerRmDetails {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 1px;
+}
+
+.bannerRmRole {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.75);
+  text-transform: uppercase;
+}
+
+.bannerRmName {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #ffffff;
+  white-space: nowrap;
+}
+
+.bannerRmMeta {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.85);
+  white-space: nowrap;
+}
+
+/* ── Banner Right: RM Chip, Health Score & Search Button ── */
+.bannerRight {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-shrink: 0;
+}
+
+.scoreContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+
+.scoreCircle {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 2.5px solid #34d399;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(52, 211, 153, 0.2);
+  box-shadow: 0 0 10px rgba(52, 211, 153, 0.35);
+}
+
+.scoreNumber {
+  font-size: 17px;
+  font-weight: 800;
+  color: #ffffff;
+  line-height: 1;
+}
+
+.scoreLabel {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.75);
+  text-transform: uppercase;
+}
+
+.actionGroup {
+  display: flex;
+  align-items: center;
+}
+
+.searchButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 18px;
+  border-radius: var(--omni-radius-lg-minus, 10px);
+  background: rgba(255, 255, 255, 0.18);
+  border: 1.5px solid rgba(255, 255, 255, 0.35);
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  outline: none;
+}
+
+.searchButton:hover {
+  background: #ffffff;
+  color: var(--omni-color-primary-600, #2563eb);
+  border-color: #ffffff;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
+}
+
+.searchButton:active {
+  transform: translateY(0);
+}
+
+/* ── Dynamic Metrics & Highlights Strip (Host Pattern) ── */
+.metricsRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 26px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
+  position: relative;
+  z-index: 1;
+}
+
+.metricItem {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 105px;
+}
+
+.metricLabel {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.metricValue {
+  font-size: 16px;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: -0.01em;
+}
+
+@media (max-width: 1024px) {
+  .bannerMainRow {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .bannerRight {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    width: 100%;
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid rgba(255, 255, 255, 0.2);
+  }
+
+  .metricsRow {
+    gap: 16px;
+  }
+}
+
+/* ── Hero Profile Banner Skeleton ── */
+.bannerSkeleton {
+  pointer-events: none;
+  user-select: none;
+}
+
+.skelOnBlue {
+  position: relative;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: var(--omni-radius-sm, 6px);
+}
+
+.skelOnBlue::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.35) 50%, transparent 100%);
+  animation: c360-hero-sweep 1.4s ease-in-out infinite;
+}
+
+@keyframes c360-hero-sweep {
+  100% {
+    transform: translateX(100%);
+  }
+}
+

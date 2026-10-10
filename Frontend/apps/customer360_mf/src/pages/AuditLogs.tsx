@@ -18,8 +18,6 @@ import {
   Activity,
   Key,
   Box,
-  Copy,
-  Check,
   LayoutGrid,
 } from '@omniconnect/ui/icons';
 import { api, ApiError } from '../services/api';

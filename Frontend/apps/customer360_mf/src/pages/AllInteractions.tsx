@@ -193,9 +193,6 @@ export default function AllInteractions() {
               placeholder="Search case #, subject, assignee..."
               value={searchTerm}
               onValueChange={setSearchTerm}
-              suggestions={searchSuggestions}
-              onSelectSuggestion={(s) => setSearchTerm(s.id)}
-              emptyHint="No matching interactions."
             />
           </div>
 

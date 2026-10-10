@@ -78,14 +78,21 @@
   height: 38px;
   padding: 0 14px;
   border-radius: var(--omni-radius-lg-minus);
-  border: 1px solid #eaecf0;
+  border: 1px solid var(--omni-color-border, #eaecf0);
   background: var(--omni-color-surface);
-  color: #334155;
+  color: var(--omni-color-text-secondary, #475569);
   font-size: var(--omni-font-size-sm);
   font-weight: var(--omni-font-weight-semibold);
   cursor: pointer;
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
   font-family: inherit;
+  transition: all 0.15s ease;
+}
+
+.panel:hover {
+  background: var(--omni-color-surface-alt, #f8fafc);
+  border-color: var(--omni-color-border-strong, #cbd5e1);
+  color: var(--omni-color-text-primary, #0f172a);
 }
 
 .row4 {

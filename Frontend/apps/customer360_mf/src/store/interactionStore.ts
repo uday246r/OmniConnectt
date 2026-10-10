@@ -91,7 +91,26 @@ export const useInteractionStore = create<InteractionStoreState>((set, get) => (
       });
     } catch (err) {
       if (version !== _interactionsVersion) return;
-      set({ error: (err as ApiError).message, errorStatus: (err as ApiError).status ?? null, loading: false });
+      const apiErr = err as ApiError;
+      if (apiErr.status === 404) {
+        // A 404 from the CRM means no interactions exist for this customer ID — valid empty list
+        set({
+          interactions: [],
+          totalCount: 0,
+          totalPages: 1,
+          loading: false,
+          error: null,
+          errorStatus: null,
+        });
+        return;
+      }
+      set({
+        interactions: [],
+        totalCount: 0,
+        error: apiErr.message,
+        errorStatus: apiErr.status ?? null,
+        loading: false,
+      });
       console.error('Error loading interactions:', err);
     }
   },

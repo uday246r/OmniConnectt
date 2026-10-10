@@ -35,7 +35,7 @@
   border: none;
   cursor: pointer;
   padding: 2px;
-  color: #004EEB;
+  color: var(--omni-color-primary-600, #2563eb);
   display: flex;
   align-items: center;
   justify-content: center;

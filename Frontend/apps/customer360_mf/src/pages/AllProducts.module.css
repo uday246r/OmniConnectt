@@ -74,6 +74,13 @@
   z-index: 1;
 }
 
+.panel:hover {
+  background: #ffffff;
+  color: var(--omni-color-primary-600, #2563eb);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.16);
+  transform: translateY(-1px);
+}
+
 .box {
   position: relative;
   width: 100%;

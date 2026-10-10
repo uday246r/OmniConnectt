@@ -1,4 +1,4 @@
-import React, { useState, type ReactNode } from 'react';
+import React, { type ReactNode } from 'react';
 import { useProductStore } from '../store/productStore';
 import { useCustomerStore } from '../store/customerStore';
 import {
@@ -11,8 +11,6 @@ import {
   TrendingUp,
   ScrollText,
   Calendar,
-  Check,
-  Copy,
   Hash,
   CheckCircle2,
   Building,
@@ -47,10 +45,6 @@ interface FieldCardProps {
   bold?: boolean;
   emerald?: boolean;
   fullWidth?: boolean;
-  copyKey?: string;
-  copyValue?: string | null;
-  onCopy?: (key: string, text?: string | null) => void;
-  copiedKey?: string | null;
 }
 
 /** One field, rendered through the shared `DetailField` — a value that resolves to EMPTY_VALUE is
@@ -63,44 +57,17 @@ const FieldCard = ({
   bold,
   emerald,
   fullWidth,
-  copyKey,
-  copyValue,
-  onCopy,
-  copiedKey,
 }: FieldCardProps) => {
-  const isCopied = copyKey && copiedKey === copyKey;
-  const valText = typeof value === 'string' ? value : '';
-  const canCopy = onCopy && copyKey && (copyValue || valText) && valText !== EMPTY_VALUE;
-
-  // The value is always wrapped in a <span> below (for the optional copy button), which defeats
-  // DetailField's own built-in emptiness check — it only sees through a plain string. Do that check
-  // here instead, on the raw value, so a field the CRM never populated is skipped rather than shown
-  // as an empty card.
   if (isEmptyDetailValue(value ?? EMPTY_VALUE)) return null;
 
   return (
     <DetailField label={label} full={fullWidth}>
-      <span className={styles.fieldValueRow}>
-        <span
-          className={`${mono ? styles.fieldValueMono : ''}${bold ? ` ${styles.fieldValueBold}` : ''}${
-            emerald ? ` ${styles.fieldValueEmerald}` : ''
-          }`}
-        >
-          {value ?? EMPTY_VALUE}
-        </span>
-        {canCopy && (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onCopy(copyKey, copyValue || valText);
-            }}
-            className={`${styles.copyBtn}${isCopied ? ` ${styles.copyBtnCopied}` : ''}`}
-            title="Copy value"
-          >
-            {isCopied ? <Check size={12} /> : <Copy size={12} />}
-          </button>
-        )}
+      <span
+        className={`${mono ? styles.fieldValueMono : ''}${bold ? ` ${styles.fieldValueBold}` : ''}${
+          emerald ? ` ${styles.fieldValueEmerald}` : ''
+        }`}
+      >
+        {value ?? EMPTY_VALUE}
       </span>
     </DetailField>
   );
@@ -119,20 +86,7 @@ export default function ProductDetailsModal() {
   const { customerType, profile } = useCustomerStore(useShallow((s) => ({ customerType: s.customerType, profile: s.profile })));
   const isCorp = customerType === 'corporate';
   const profileCountry = (profile as CorporateProfile | null)?.country;
-  const [copiedKey, setCopiedKey] = useState<string | null>(null);
-
-  // No audit dispatch on open — see CaseDetailsModal. The product data was fetched, and audited,
-  // when the endpoint that returned it served the request.
-
-
   const formatCurrency = (val: unknown) => formatMoney(val, profileCountry);
-
-  const handleCopyText = (key: string, text?: string | null) => {
-    if (!text || text === EMPTY_VALUE) return;
-    navigator.clipboard.writeText(text);
-    setCopiedKey(key);
-    setTimeout(() => setCopiedKey(null), 1500);
-  };
 
   if (!modalOpen) return null;
 
@@ -232,8 +186,6 @@ export default function ProductDetailsModal() {
       bold?: boolean;
       emerald?: boolean;
       fullWidth?: boolean;
-      copyKey?: string;
-      copyValue?: string | null;
       isCurrency?: boolean;
     }
   ) => {
@@ -246,10 +198,6 @@ export default function ProductDetailsModal() {
         bold={opts?.bold}
         emerald={opts?.emerald}
         fullWidth={opts?.fullWidth}
-        copyKey={opts?.copyKey}
-        copyValue={opts?.copyValue ?? (typeof val === 'string' ? val : undefined)}
-        onCopy={handleCopyText}
-        copiedKey={copiedKey}
       />
     );
   };
@@ -271,7 +219,7 @@ export default function ProductDetailsModal() {
               {renderField('Position Date', d.positionDate)}
               {renderField('Product Category', d.productCategory)}
               {renderField('Product Name', d.productName, { bold: true })}
-              {renderField('Account Number', d.accountNumber || d.accountNo, { mono: true, copyKey: 'corpAcc' })}
+              {renderField('Account Number', d.accountNumber || d.accountNo, { mono: true })}
               <DetailField label="Account Status">
                 <StatusBadge status={d.derivedAccountStatus} dot />
               </DetailField>
@@ -282,7 +230,7 @@ export default function ProductDetailsModal() {
               {renderField('State Account', d.stateAccount)}
               {renderField('HSMM Rates', d.hsmmRates)}
               {renderField('Maturity Instruction', d.maturityInstruction)}
-              {renderField('Crediting CASA Account No', d.creditingCasaAccountNo, { mono: true, copyKey: 'casaNo' })}
+              {renderField('Crediting CASA Account No', d.creditingCasaAccountNo, { mono: true })}
               {renderField('Blocking Reasons', d.blockingReasons)}
               {renderField('PHPR ID', d.phprId, { mono: true })}
               {renderField('Cust ID', d.custId, { mono: true })}
@@ -311,8 +259,8 @@ export default function ProductDetailsModal() {
               {renderField('Position Date', d.positionDate)}
               {renderField('Card Type', d.cardTypeDesc || d.cardType)}
               {renderField('Product Name', d.productName, { bold: true })}
-              {renderField('Account No', d.accountNo || d.accountNumber, { mono: true, copyKey: 'cardAcc' })}
-              {renderField('Card No', d.cardNo, { mono: true, copyKey: 'cardNo' })}
+              {renderField('Account No', d.accountNo || d.accountNumber, { mono: true })}
+              {renderField('Card No', d.cardNo, { mono: true })}
               <DetailField label="Card Status">
                 <StatusBadge status={d.cardStatus} dot />
               </DetailField>
@@ -349,7 +297,7 @@ export default function ProductDetailsModal() {
             {renderField('Position Date', d.positionDate)}
             {renderField('Product Category', d.productCategory)}
             {renderField('Product Name', d.productName, { bold: true })}
-            {renderField('Account No', d.accountNo || d.accountNumber, { mono: true, copyKey: 'loanAcc' })}
+            {renderField('Account No', d.accountNo || d.accountNumber, { mono: true })}
             <DetailField label="Financing Status">
               <StatusBadge status={d.financingStatus || d.derivedAccountStatus} dot />
             </DetailField>
@@ -401,9 +349,9 @@ export default function ProductDetailsModal() {
         <>
           <DetailSection title="Card Information" icon={<CreditCard size={13} />}>
             <DetailGrid>
-              {renderField('Card No', d.cardNo, { mono: true, copyKey: 'indCardNo' })}
+              {renderField('Card No', d.cardNo, { mono: true })}
               {renderField('Card Type', d.cardTypeDesc || d.cardType)}
-              {renderField('Account No', d.accountNo || d.accountNumber, { mono: true, copyKey: 'indCardAcc' })}
+              {renderField('Account No', d.accountNo || d.accountNumber, { mono: true })}
               <DetailField label="Card Status">
                 <StatusBadge status={d.cardStatus} dot />
               </DetailField>
@@ -435,7 +383,7 @@ export default function ProductDetailsModal() {
       return (
         <DetailSection title="Gold Account Information" icon={<Coins size={13} />}>
           <DetailGrid>
-            {renderField('Gold Account No', d.goldAccountNo || d.accountNo || d.accountNumber, { mono: true, copyKey: 'goldAcc' })}
+            {renderField('Gold Account No', d.goldAccountNo || d.accountNo || d.accountNumber, { mono: true })}
             {renderField('Account Type', d.accountType)}
             <DetailField label="Status">
               <StatusBadge status={d.status} dot />
@@ -457,7 +405,7 @@ export default function ProductDetailsModal() {
           hidden={allEmpty(d.investmentAccountNo || d.accountNo || d.accountNumber, d.fundName, d.unitHoldings, d.positionDate)}
         >
           <DetailGrid>
-            {renderField('Investment Account No', d.investmentAccountNo || d.accountNo || d.accountNumber, { mono: true, copyKey: 'utAcc' })}
+            {renderField('Investment Account No', d.investmentAccountNo || d.accountNo || d.accountNumber, { mono: true })}
             {renderField('Fund Name', d.fundName, { fullWidth: true, bold: true })}
             {renderField('Unit Holdings', d.unitHoldings, { bold: true })}
             {renderField('Position Date', d.positionDate)}
@@ -474,7 +422,7 @@ export default function ProductDetailsModal() {
           hidden={allEmpty(d.willWritingRefNo || d.accountNo || d.accountNumber, d.productName, d.tarikhDaftarWasiat, d.positionDate)}
         >
           <DetailGrid>
-            {renderField('Will Writing Ref No', d.willWritingRefNo || d.accountNo || d.accountNumber, { mono: true, copyKey: 'willRef' })}
+            {renderField('Will Writing Ref No', d.willWritingRefNo || d.accountNo || d.accountNumber, { mono: true })}
             {renderField('Product Name', d.productName, { fullWidth: true, bold: true })}
             {renderField('Registration Date (Tarikh Daftar)', d.tarikhDaftarWasiat)}
             {renderField('Position Date', d.positionDate)}
@@ -488,7 +436,7 @@ export default function ProductDetailsModal() {
         <>
           <DetailSection title="Account Information" icon={<Landmark size={13} />}>
             <DetailGrid>
-              {renderField('Account No', d.accountNumber || d.accountNo, { mono: true, copyKey: 'depAcc' })}
+              {renderField('Account No', d.accountNumber || d.accountNo, { mono: true })}
               <DetailField label="Account Status">
                 <StatusBadge status={d.derivedAccountStatus} dot />
               </DetailField>
@@ -520,7 +468,7 @@ export default function ProductDetailsModal() {
       <>
         <DetailSection title="Account Information" icon={<FileText size={13} />}>
           <DetailGrid>
-            {renderField('Account No', d.accountNo || d.accountNumber, { mono: true, copyKey: 'loanAcc' })}
+            {renderField('Account No', d.accountNo || d.accountNumber, { mono: true })}
             <DetailField label="Financing Status">
               <StatusBadge status={d.financingStatus} dot />
             </DetailField>
@@ -577,7 +525,7 @@ export default function ProductDetailsModal() {
           hidden={allEmpty(d.policyNo || d.accountNo || d.accountNumber, d.planName, d.providerName, d.productDescription)}
         >
           <DetailGrid>
-            {renderField('Policy Number', d.policyNo || d.accountNo || d.accountNumber, { mono: true, copyKey: 'policyNo' })}
+            {renderField('Policy Number', d.policyNo || d.accountNo || d.accountNumber, { mono: true })}
             {renderField('Plan Name', d.planName, { bold: true })}
             {renderField('Provider Name', d.providerName)}
             {renderField('Product Description', d.productDescription, { fullWidth: true })}
@@ -622,17 +570,6 @@ export default function ProductDetailsModal() {
             <span className={styles.footerAccountId}>
               Account: {accountNoStr || EMPTY_VALUE}
             </span>
-            {accountNoStr && (
-              <button
-                type="button"
-                onClick={() => handleCopyText('footerAcc', accountNoStr)}
-                className={`${styles.footerCopyBtn}${copiedKey === 'footerAcc' ? ` ${styles.footerCopyBtnCopied}` : ''}`}
-                title="Copy Account Number"
-              >
-                {copiedKey === 'footerAcc' ? <Check size={13} /> : <Copy size={13} />}
-                <span>{copiedKey === 'footerAcc' ? 'Copied' : 'Copy'}</span>
-              </button>
-            )}
           </div>
         </div>
       }
